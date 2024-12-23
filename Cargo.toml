@@ -1,0 +1,21 @@
+[package]
+name = "hyperlane"
+version = "0.0.1"
+edition = "2021"
+authors = ["ltpp-universe <root@ltpp.vip>"] 
+license = "MIT"
+description = """Hyperlane is a lightweight and high-performance Rust HTTP server library designed to simplify network service development. It supports HTTP request parsing, response building, TCP communication, and redirection features, making it ideal for building modern web services."""
+keywords = ["http", "request", "response", "tcp", "redirect"]
+repository = "https://github.com/ltpp-universe/hyperlane.git"
+categories = ["network-programming", "web-programming"]
+exclude = [
+    "target",    
+    "Cargo.lock",
+    "sh",
+    ".github"
+]
+
+[dependencies]
+http-constant = "1.7.0"
+http-type = "1.0.1"
+
