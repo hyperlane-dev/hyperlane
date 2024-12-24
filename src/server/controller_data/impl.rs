@@ -3,7 +3,7 @@ use std::{net::TcpStream, sync::Arc};
 
 use super::r#type::ControllerData;
 
-impl<'a> ControllerData<'a> {
+impl ControllerData {
     pub fn stream(&self) -> Arc<TcpStream> {
         self.stream.clone()
     }

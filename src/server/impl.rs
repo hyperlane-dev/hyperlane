@@ -1,6 +1,7 @@
 use super::{
     config::r#type::ServerConfig, controller_data::r#type::ControllerData, error::r#type::Error,
-    r#type::Server, tmp::r#type::Tmp,
+    middleware::r#type::MiddlewareArcLock, r#type::Server, route::r#type::RouterFuncArcLock,
+    tmp::r#type::Tmp,
 };
 use http_constant::*;
 use http_type::*;
@@ -37,23 +38,6 @@ impl Server {
         self
     }
 
-    pub fn thread_pool_max_num(&mut self, num: usize) -> &mut Self {
-        self.cfg.thread_pool_max_num(num);
-        self
-    }
-
-    pub fn thread_num_is_full(&self) -> bool {
-        self.tmp.get_thread_pool_num() >= self.cfg.get_thread_pool_max_num()
-    }
-
-    pub fn thread_num_add(&mut self) {
-        self.tmp.thread_num_add();
-    }
-
-    pub fn thread_num_sub(&mut self) {
-        self.tmp.thread_num_sub();
-    }
-
     pub fn router<F>(&mut self, route: &'static str, func: F) -> &mut Self
     where
         F: 'static + Send + Sync + Fn(&mut ControllerData),
@@ -88,17 +72,17 @@ impl Server {
             }
             let stream: TcpStream = stream_res.unwrap();
             let stream_arc: Arc<TcpStream> = Arc::new(stream);
-            let request_obj_res: Result<Request<'_>, Error> =
+            let request_obj_res: Result<Request, Error> =
                 Request::new(&stream_arc.as_ref()).map_err(|err| Error::InvalidHttpRequest(err));
-            let request_obj: Request<'_> = request_obj_res.unwrap();
+            let request_obj: Request = request_obj_res.unwrap();
             let route: String = request_obj.path().into_owned();
-            let mut controller_data: ControllerData<'_> = ControllerData {
+            let mut controller_data: ControllerData = ControllerData {
                 stream: stream_arc,
                 response: Response::default(),
                 request: request_obj.clone(),
             };
-            let middleware_arc = Arc::clone(&self.middleware);
-            let router_func_arc = Arc::clone(&self.router_func);
+            let middleware_arc: MiddlewareArcLock = Arc::clone(&self.middleware);
+            let router_func_arc: RouterFuncArcLock = Arc::clone(&self.router_func);
             spawn(move || {
                 if let Ok(middleware_guard) = middleware_arc.read() {
                     for middleware in middleware_guard.iter() {

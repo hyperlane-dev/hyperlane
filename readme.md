@@ -27,29 +27,29 @@ Server::new()
     .host("0.0.0.0")
     .port(80)
     .middleware(|controller_data| {
-        let request: Request<'_> = controller_data.request();
+        let request: Request = controller_data.request();
         println!("{:?}", request);
     })
     .router("/", |controller_data| {
-        let mut response: Response<'_> = controller_data.response.clone();
+        let mut response: Response = controller_data.response.clone();
         let body: Vec<u8> = "404 Not Found".as_bytes().to_vec();
-        let stream: &std::net::TcpStream = controller_data.stream();
+        let stream: std::sync::Arc<std::net::TcpStream> = controller_data.stream();
         let res: Result<(), ResponseError> = response
             .body(body)
             .status_code(404)
             .header("server", "hyperlane")
-            .send(stream);
+            .send(&stream);
         println!("{:?}", res);
     })
     .router("/hello", |controller_data| {
-        let mut response: Response<'_> = controller_data.response.clone();
+        let mut response: Response = controller_data.response.clone();
         let body: Vec<u8> = "hello world!".as_bytes().to_vec();
-        let stream: &std::net::TcpStream = controller_data.stream();
+        let stream: std::sync::Arc<std::net::TcpStream> = controller_data.stream();
         let res: Result<(), ResponseError> = response
             .body(body)
             .status_code(200)
             .header("server", "hyperlane")
-            .send(stream);
+            .send(&stream);
         println!("{:?}", res);
     })
     .listen();
@@ -57,33 +57,33 @@ Server::new()
 
 ```rust
 use hyperlane::*;
-let mut server: Server<'_> = Server::new();
+let mut server: Server = Server::new();
 server.host("0.0.0.0");
 server.port(80);
 server.middleware(|controller_data| {
-    let request: Request<'_> = controller_data.request();
+    let request: Request = controller_data.request();
     println!("{:?}", request);
 });
 server.router("/", |controller_data| {
-    let mut response: Response<'_> = controller_data.response.clone();
+    let mut response: Response = controller_data.response.clone();
     let body: Vec<u8> = "404 Not Found".as_bytes().to_vec();
-    let stream: &std::net::TcpStream = controller_data.stream();
+    let stream: std::sync::Arc<std::net::TcpStream> = controller_data.stream();
     let res: Result<(), ResponseError> = response
         .body(body)
         .status_code(404)
         .header("server", "hyperlane")
-        .send(stream);
+        .send(&stream);
     println!("{:?}", res);
 });
 server.router("/hello", |controller_data| {
-    let mut response: Response<'_> = controller_data.response.clone();
+    let mut response: Response = controller_data.response.clone();
     let body: Vec<u8> = "hello world!".as_bytes().to_vec();
-    let stream: &std::net::TcpStream = controller_data.stream();
+    let stream: std::sync::Arc<std::net::TcpStream> = controller_data.stream();
     let res: Result<(), ResponseError> = response
         .body(body)
         .status_code(200)
         .header("server", "hyperlane")
-        .send(stream);
+        .send(&stream);
     println!("{:?}", res);
 });
 server.listen();
