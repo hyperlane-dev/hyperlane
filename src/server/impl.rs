@@ -1,30 +1,33 @@
 use super::{
     config::r#type::ServerConfig, controller_data::r#type::ControllerData, error::r#type::Error,
-    r#type::Server,
+    r#type::Server, tmp::r#type::Tmp,
 };
 use http_constant::*;
 use http_type::*;
 use std::{
     collections::HashMap,
     net::{TcpListener, TcpStream},
+    sync::{Arc, RwLock},
+    thread::spawn,
 };
 
-impl<'a> Default for Server<'a> {
+impl Default for Server {
     fn default() -> Self {
         Self {
             cfg: ServerConfig::default(),
-            router_func: HashMap::new(),
-            middleware: vec![],
+            router_func: Arc::new(RwLock::new(HashMap::new())),
+            middleware: Arc::new(RwLock::new(vec![])),
+            tmp: Tmp::default(),
         }
     }
 }
 
-impl<'a> Server<'a> {
+impl Server {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn host(&mut self, host: &'a str) -> &mut Self {
+    pub fn host(&mut self, host: &'static str) -> &mut Self {
         self.cfg.host(host);
         self
     }
@@ -34,19 +37,40 @@ impl<'a> Server<'a> {
         self
     }
 
-    pub fn router<F>(&mut self, route: &'a str, func: F) -> &mut Self
+    pub fn thread_pool_max_num(&mut self, num: usize) -> &mut Self {
+        self.cfg.thread_pool_max_num(num);
+        self
+    }
+
+    pub fn thread_num_is_full(&self) -> bool {
+        self.tmp.get_thread_pool_num() >= self.cfg.get_thread_pool_max_num()
+    }
+
+    pub fn thread_num_add(&mut self) {
+        self.tmp.thread_num_add();
+    }
+
+    pub fn thread_num_sub(&mut self) {
+        self.tmp.thread_num_sub();
+    }
+
+    pub fn router<F>(&mut self, route: &'static str, func: F) -> &mut Self
     where
-        F: 'static + Fn(&mut ControllerData),
+        F: 'static + Send + Sync + Fn(&mut ControllerData),
     {
-        self.router_func.insert(route, Box::new(func));
+        if let Ok(mut router_func) = self.router_func.write() {
+            router_func.insert(route, Box::new(func));
+        }
         self
     }
 
     pub fn middleware<F>(&mut self, func: F) -> &mut Self
     where
-        F: 'static + Fn(&mut ControllerData),
+        F: 'static + Send + Sync + Fn(&mut ControllerData),
     {
-        self.middleware.push(Box::new(func));
+        if let Ok(mut middleware) = self.middleware.write() {
+            middleware.push(Box::new(func));
+        }
         self
     }
 
@@ -62,23 +86,31 @@ impl<'a> Server<'a> {
             if stream_res.is_err() {
                 continue;
             }
-            let mut stream: TcpStream = stream_res.unwrap();
+            let stream: TcpStream = stream_res.unwrap();
+            let stream_arc: Arc<TcpStream> = Arc::new(stream);
             let request_obj_res: Result<Request<'_>, Error> =
-                Request::new(&stream).map_err(|err| Error::InvalidHttpRequest(err));
+                Request::new(&stream_arc.as_ref()).map_err(|err| Error::InvalidHttpRequest(err));
             let request_obj: Request<'_> = request_obj_res.unwrap();
             let route: String = request_obj.path().into_owned();
-            let route_str: &str = route.as_str();
             let mut controller_data: ControllerData<'_> = ControllerData {
-                stream: &mut stream,
+                stream: stream_arc,
                 response: Response::default(),
                 request: request_obj.clone(),
             };
-            for middleware in &self.middleware {
-                middleware(&mut controller_data);
-            }
-            self.router_func.get(route_str).and_then(|func| {
-                let res: () = func(&mut controller_data);
-                Some(res)
+            let middleware_arc = Arc::clone(&self.middleware);
+            let router_func_arc = Arc::clone(&self.router_func);
+            spawn(move || {
+                if let Ok(middleware_guard) = middleware_arc.read() {
+                    for middleware in middleware_guard.iter() {
+                        middleware(&mut controller_data);
+                    }
+                }
+                if let Ok(router_func) = router_func_arc.read() {
+                    router_func.get(route.as_str()).and_then(|func| {
+                        let res: () = func(&mut controller_data);
+                        Some(res)
+                    });
+                }
             });
         }
         self

@@ -1,11 +1,11 @@
 use http_type::*;
-use std::net::TcpStream;
+use std::{net::TcpStream, sync::Arc};
 
 use super::r#type::ControllerData;
 
 impl<'a> ControllerData<'a> {
-    pub fn stream(&self) -> &TcpStream {
-        self.stream
+    pub fn stream(&self) -> Arc<TcpStream> {
+        self.stream.clone()
     }
 
     pub fn response(&self) -> Response {

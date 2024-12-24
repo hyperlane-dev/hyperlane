@@ -1,9 +1,13 @@
-use super::{config::r#type::ServerConfig, route::r#type::RouterFuncBox};
-use std::collections::HashMap;
+use super::{config::r#type::ServerConfig, route::r#type::RouterFuncBox, tmp::r#type::Tmp};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 #[allow(dead_code)]
-pub struct Server<'a> {
-    pub(crate) cfg: ServerConfig<'a>,
-    pub(crate) router_func: HashMap<&'a str, RouterFuncBox>,
-    pub(crate) middleware: Vec<RouterFuncBox>,
+pub struct Server {
+    pub(crate) cfg: ServerConfig<'static>,
+    pub(crate) router_func: Arc<RwLock<HashMap<&'static str, RouterFuncBox>>>,
+    pub(crate) middleware: Arc<RwLock<Vec<RouterFuncBox>>>,
+    pub(crate) tmp: Tmp,
 }
