@@ -2,12 +2,9 @@ use super::{
     config::r#type::ServerConfig, controller_data::r#type::ControllerData, error::r#type::Error,
     r#type::Server,
 };
-use http_constant::*;
 use http_type::*;
 use std::{
-    borrow::Cow,
     collections::HashMap,
-    io::Write,
     net::{TcpListener, TcpStream},
 };
 
@@ -65,36 +62,18 @@ impl<'a> Server<'a> {
             let request_obj_res: Result<Request<'_>, Error> =
                 Request::new(&stream).map_err(|err| Error::InvalidHttpRequest(err));
             let request_obj: Request<'_> = request_obj_res.unwrap();
-            let method: Cow<'_, str> = request_obj.method();
-            if method == OPTIONS {
-                Self::handle_preflight_request(&mut stream);
-                continue;
-            }
             let route: String = request_obj.path().into_owned();
             let route_str: &str = route.as_str();
             let controller_data: ControllerData<'_> = ControllerData {
                 stream: &mut stream,
                 response: Response::default(),
+                request: request_obj.clone(),
             };
             self.router_func.get(route_str).and_then(|func| {
-                let res = func(controller_data);
+                let res: () = func(controller_data);
                 Some(res)
             });
         }
         self
-    }
-
-    fn handle_preflight_request(stream: &mut TcpStream) {
-        let response = "HTTP/1.1 204 No Content\r\n\
-                    Access-Control-Allow-Origin: *\r\n\
-                    Access-Control-Allow-Methods: *\r\n\
-                    Access-Control-Allow-Headers: *\r\n\
-                    Content-Length: 0\r\n\
-                    \r\n";
-        if let Err(e) = stream.write_all(response.as_bytes()) {
-            println!("Failed to respond to preflight request: {}", e);
-        } else {
-            println!("ok");
-        }
     }
 }

@@ -11,4 +11,8 @@ impl<'a> ControllerData<'a> {
     pub fn response(&self) -> Response {
         self.response.clone()
     }
+
+    pub fn request(&self) -> Request {
+        self.request.clone()
+    }
 }
