@@ -5,7 +5,7 @@
 [![](https://img.shields.io/crates/l/hyperlane.svg)](./LICENSE)
 [![](https://github.com/ltpp-universe/hyperlane/workflows/Rust/badge.svg)](https://github.com/ltpp-universe/hyperlane/actions?query=workflow:Rust)
 
-[Official Documentation](https://docs.ltpp.vip/hyperlane/)
+[Official Documentation](https://docs.ltpp.vip/HYPERLANE/)
 
 [Api Docs](https://docs.rs/hyperlane/latest/hyperlane/)
 
