@@ -11,8 +11,6 @@
 
 > Hyperlane is a lightweight and high-performance Rust HTTP server library designed to simplify network service development. It supports HTTP request parsing, response building, TCP communication, and redirection features, making it ideal for building modern web services.
 
-## Features
-
 ## Installation
 
 To use this crate, you can run cmd:
