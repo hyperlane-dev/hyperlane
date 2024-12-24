@@ -1,24 +1,30 @@
-use std::{
-    borrow::{Borrow, BorrowMut},
-    io::Write,
-};
-
 #[test]
 fn test_server() {
     use crate::*;
-    Server::new()
-        .host("0.0.0.0")
-        .port(80)
-        .router("/", |server, controller_data| {
-            println!("sqs");
-            let mut response = controller_data.response.clone();
-            let body = "sqs".as_bytes().to_vec();
-            let res = response.body(body).header("sqs", "hhh").build();
-            if let Err(e) = controller_data.stream.write_all(&res) {
-                println!("Failed to respond to preflight request: {}", e);
-            } else {
-                println!("ok");
-            }
-        })
-        .listen();
+    let mut server: Server<'_> = Server::new();
+    server.host("0.0.0.0");
+    server.port(80);
+    server.router("/", |controller_data| {
+        let mut response: Response<'_> = controller_data.response.clone();
+        let body: Vec<u8> = "404 Not Found".as_bytes().to_vec();
+        let stream: &std::net::TcpStream = controller_data.stream();
+        let res: Result<(), ResponseError> = response
+            .body(body)
+            .status_code(404)
+            .header("server", "hyperlane")
+            .send(stream);
+        println!("{:?}", res);
+    });
+    server.router("/hello", |controller_data| {
+        let mut response: Response<'_> = controller_data.response.clone();
+        let body: Vec<u8> = "hello world!".as_bytes().to_vec();
+        let stream: &std::net::TcpStream = controller_data.stream();
+        let res: Result<(), ResponseError> = response
+            .body(body)
+            .status_code(200)
+            .header("server", "hyperlane")
+            .send(stream);
+        println!("{:?}", res);
+    });
+    server.listen();
 }

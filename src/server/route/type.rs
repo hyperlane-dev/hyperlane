@@ -1,4 +1,4 @@
-use crate::{server::controller_data::r#type::ControllerData, Server};
+use crate::server::controller_data::r#type::ControllerData;
 
-pub type RouterFunc = dyn for<'a> Fn(&'a Server<'a>, &'a mut ControllerData<'a>);
+pub type RouterFunc = dyn Fn(ControllerData);
 pub type RouterFuncBox = Box<RouterFunc>;

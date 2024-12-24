@@ -1,4 +1,4 @@
-use crate::response::r#type::Response;
+use http_type::*;
 use std::net::TcpStream;
 
 #[derive(Debug)]

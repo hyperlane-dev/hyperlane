@@ -106,10 +106,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "http-type"
-version = "1.0.1"
+name = "http-response"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ccc591fda3f144b8fede931b0290185294f0ed4684ba0b23107ad9b001fc871"
+checksum = "a8d2371b5ea8c3ae6b75941d6ccf81c46faf9a679590bee94bffd0676a7d8f1a"
+dependencies = [
+ "brotli",
+ "flate2",
+ "http-constant",
+]
+
+[[package]]
+name = "http-type"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0a70eb722a86803e86b16cb1d03eb8d3fd8bfb9d33c6508d132e8eb409f0844"
 dependencies = [
  "hex",
  "http-constant",
@@ -122,9 +133,10 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "http-constant",
+ "http-response",
  "http-type",
 ]
 

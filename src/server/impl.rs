@@ -2,8 +2,8 @@ use super::{
     config::r#type::ServerConfig, controller_data::r#type::ControllerData, error::r#type::Error,
     r#type::Server,
 };
-use crate::{request::r#type::Request, response::r#type::Response};
 use http_constant::*;
+use http_type::*;
 use std::{
     borrow::Cow,
     collections::HashMap,
@@ -27,18 +27,23 @@ impl<'a> Server<'a> {
     }
 
     pub fn host(&mut self, host: &'a str) -> &mut Self {
-        self.cfg.host = host;
+        self.cfg.host(host);
         self
     }
 
     pub fn port(&mut self, port: usize) -> &mut Self {
-        self.cfg.port = port;
+        self.cfg.port(port);
+        self
+    }
+
+    pub fn buffer_size(&mut self, buffer_size: usize) -> &mut Self {
+        self.cfg.buffer_size(buffer_size);
         self
     }
 
     pub fn router<F>(&mut self, route: &'a str, func: F) -> &mut Self
     where
-        F: 'static + Fn(&Server, &mut ControllerData),
+        F: 'static + Fn(ControllerData),
     {
         self.router_func.insert(route, Box::new(func));
         self
@@ -47,7 +52,7 @@ impl<'a> Server<'a> {
     pub fn listen(&mut self) -> &mut Self {
         let addr: String = format!("{}:{}", &self.cfg.host, &self.cfg.port);
         let listener_res: Result<TcpListener, Error> =
-            TcpListener::bind(&addr).map_err(|_| Error::TcpBindError);
+            TcpListener::bind(&addr).map_err(|e| Error::TcpBindError(e.to_string()));
         if listener_res.is_err() {
             return self;
         }
@@ -58,21 +63,21 @@ impl<'a> Server<'a> {
             }
             let mut stream: TcpStream = stream_res.unwrap();
             let request_obj_res: Result<Request<'_>, Error> =
-                Request::new(&stream).map_err(|_| Error::InvalidHttpRequest);
+                Request::new(&stream).map_err(|err| Error::InvalidHttpRequest(err));
             let request_obj: Request<'_> = request_obj_res.unwrap();
-            let method: Cow<'_, str> = request_obj.method;
+            let method: Cow<'_, str> = request_obj.method();
             if method == OPTIONS {
                 Self::handle_preflight_request(&mut stream);
                 continue;
             }
-            let route: String = request_obj.path.into_owned();
+            let route: String = request_obj.path().into_owned();
             let route_str: &str = route.as_str();
-            let mut controller_data: ControllerData<'_> = ControllerData {
+            let controller_data: ControllerData<'_> = ControllerData {
                 stream: &mut stream,
                 response: Response::default(),
             };
             self.router_func.get(route_str).and_then(|func| {
-                let res = func(self, &mut controller_data);
+                let res = func(controller_data);
                 Some(res)
             });
         }
