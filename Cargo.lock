@@ -97,9 +97,9 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "http-constant"
-version = "1.7.0"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3a5b28302c718893a1e9ad484b28e7c2ef7fc4f1f1bcca8c73f0263545facf3"
+checksum = "5099e3e9a3178368124f83a438d739d0a16622dcbf9e444719e2728721143b4d"
 dependencies = [
  "brotli",
  "flate2",
@@ -122,8 +122,9 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
+ "http-constant",
  "http-type",
 ]
 

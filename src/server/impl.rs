@@ -2,6 +2,7 @@ use super::{
     config::r#type::ServerConfig, controller_data::r#type::ControllerData, error::r#type::Error,
     r#type::Server,
 };
+use http_constant::*;
 use http_type::*;
 use std::{
     collections::HashMap,
@@ -13,7 +14,6 @@ impl<'a> Default for Server<'a> {
         Self {
             cfg: ServerConfig::default(),
             router_func: HashMap::new(),
-            static_dir: None,
             middleware: vec![],
         }
     }
@@ -34,11 +34,6 @@ impl<'a> Server<'a> {
         self
     }
 
-    pub fn buffer_size(&mut self, buffer_size: usize) -> &mut Self {
-        self.cfg.buffer_size(buffer_size);
-        self
-    }
-
     pub fn router<F>(&mut self, route: &'a str, func: F) -> &mut Self
     where
         F: 'static + Fn(&mut ControllerData),
@@ -56,7 +51,7 @@ impl<'a> Server<'a> {
     }
 
     pub fn listen(&mut self) -> &mut Self {
-        let addr: String = format!("{}:{}", &self.cfg.host, &self.cfg.port);
+        let addr: String = format!("{}{}{}", &self.cfg.host, COLON_SPACE_SYMBOL, &self.cfg.port);
         let listener_res: Result<TcpListener, Error> =
             TcpListener::bind(&addr).map_err(|e| Error::TcpBindError(e.to_string()));
         if listener_res.is_err() {
