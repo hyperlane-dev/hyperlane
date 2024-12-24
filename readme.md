@@ -26,6 +26,10 @@ use hyperlane::*;
 Server::new()
     .host("0.0.0.0")
     .port(80)
+    .middleware(|controller_data| {
+        let request: Request<'_> = controller_data.request();
+        println!("{:?}", request);
+    })
     .router("/", |controller_data| {
         let mut response: Response<'_> = controller_data.response.clone();
         let body: Vec<u8> = "404 Not Found".as_bytes().to_vec();
@@ -56,6 +60,10 @@ use hyperlane::*;
 let mut server: Server<'_> = Server::new();
 server.host("0.0.0.0");
 server.port(80);
+server.middleware(|controller_data| {
+    let request: Request<'_> = controller_data.request();
+    println!("{:?}", request);
+});
 server.router("/", |controller_data| {
     let mut response: Response<'_> = controller_data.response.clone();
     let body: Vec<u8> = "404 Not Found".as_bytes().to_vec();

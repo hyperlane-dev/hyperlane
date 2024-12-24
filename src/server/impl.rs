@@ -14,6 +14,7 @@ impl<'a> Default for Server<'a> {
             cfg: ServerConfig::default(),
             router_func: HashMap::new(),
             static_dir: None,
+            middleware: vec![],
         }
     }
 }
@@ -40,9 +41,17 @@ impl<'a> Server<'a> {
 
     pub fn router<F>(&mut self, route: &'a str, func: F) -> &mut Self
     where
-        F: 'static + Fn(ControllerData),
+        F: 'static + Fn(&mut ControllerData),
     {
         self.router_func.insert(route, Box::new(func));
+        self
+    }
+
+    pub fn middleware<F>(&mut self, func: F) -> &mut Self
+    where
+        F: 'static + Fn(&mut ControllerData),
+    {
+        self.middleware.push(Box::new(func));
         self
     }
 
@@ -64,13 +73,16 @@ impl<'a> Server<'a> {
             let request_obj: Request<'_> = request_obj_res.unwrap();
             let route: String = request_obj.path().into_owned();
             let route_str: &str = route.as_str();
-            let controller_data: ControllerData<'_> = ControllerData {
+            let mut controller_data: ControllerData<'_> = ControllerData {
                 stream: &mut stream,
                 response: Response::default(),
                 request: request_obj.clone(),
             };
+            for middleware in &self.middleware {
+                middleware(&mut controller_data);
+            }
             self.router_func.get(route_str).and_then(|func| {
-                let res: () = func(controller_data);
+                let res: () = func(&mut controller_data);
                 Some(res)
             });
         }
