@@ -113,9 +113,9 @@ dependencies = [
 
 [[package]]
 name = "http-type"
-version = "1.6.0"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6fe1018620807954d3f5c390d8904b24bcb93432a99e2d6bfc2369f6fff85fe"
+checksum = "3ff3da75d68d4527144e6edca4bfbe360a02c73f6fdee9677254540e8589292c"
 dependencies = [
  "hex",
  "http-constant",
@@ -128,7 +128,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "color-output",
  "http-constant",

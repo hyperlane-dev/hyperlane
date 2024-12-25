@@ -1,11 +1,12 @@
 use super::{
     config::r#type::ServerConfig, controller_data::r#type::ControllerData, error::r#type::Error,
-    middleware::r#type::MiddlewareArcLock, r#type::Server, route::r#type::RouterFuncArcLock,
+    log, middleware::r#type::MiddlewareArcLock, r#type::Server, route::r#type::RouterFuncArcLock,
     tmp::r#type::Tmp,
 };
 use http_constant::*;
 use http_type::*;
 use std::{
+    any::Any,
     collections::HashMap,
     net::{TcpListener, TcpStream},
     sync::{Arc, RwLock},
@@ -18,7 +19,7 @@ impl Default for Server {
             cfg: ServerConfig::default(),
             router_func: Arc::new(RwLock::new(HashMap::new())),
             middleware: Arc::new(RwLock::new(vec![])),
-            tmp: Tmp::default(),
+            tmp: Arc::new(RwLock::new(Tmp::default())),
         }
     }
 }
@@ -59,6 +60,7 @@ impl Server {
     }
 
     pub fn listen(&mut self) -> &mut Self {
+        self.init();
         let addr: String = format!("{}{}{}", &self.cfg.host, COLON_SPACE_SYMBOL, &self.cfg.port);
         let listener_res: Result<TcpListener, Error> =
             TcpListener::bind(&addr).map_err(|e| Error::TcpBindError(e.to_string()));
@@ -83,20 +85,36 @@ impl Server {
             };
             let middleware_arc: MiddlewareArcLock = Arc::clone(&self.middleware);
             let router_func_arc: RouterFuncArcLock = Arc::clone(&self.router_func);
+            let tmp_arc: Arc<RwLock<Tmp>> = Arc::clone(&self.tmp);
             spawn(move || {
-                if let Ok(middleware_guard) = middleware_arc.read() {
-                    for middleware in middleware_guard.iter() {
-                        middleware(&mut controller_data);
+                let _ = tmp_arc.write().and_then(|mut tmp| {
+                    tmp.add_thread_num();
+                    Ok(())
+                });
+                let result: Result<(), Box<dyn Any + Send>> = std::panic::catch_unwind(move || {
+                    if let Ok(middleware_guard) = middleware_arc.read() {
+                        for middleware in middleware_guard.iter() {
+                            middleware(&mut controller_data);
+                        }
                     }
-                }
-                if let Ok(router_func) = router_func_arc.read() {
-                    router_func.get(route.as_str()).and_then(|func| {
-                        let res: () = func(&mut controller_data);
-                        Some(res)
-                    });
-                }
+                    if let Ok(router_func) = router_func_arc.read() {
+                        router_func.get(route.as_str()).and_then(|func| {
+                            let res: () = func(&mut controller_data);
+                            Some(res)
+                        });
+                    }
+                });
+                let _ = tmp_arc.write().and_then(|mut tmp| {
+                    tmp.sub_thread_num();
+                    Ok(())
+                });
+                if let Err(_err) = result {}
             });
         }
         self
+    }
+
+    fn init(&self) {
+        log::thread::run();
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 authors = ["ltpp-universe <root@ltpp.vip>"] 
 license = "MIT"
@@ -18,7 +18,7 @@ exclude = [
 [dependencies]
 color-output = "4.1.2"
 http-constant = "1.9.0"
-http-type = "1.6.0"
+http-type = "1.7.0"
 
 [dev-dependencies]
 color-output = "4.1.2"
