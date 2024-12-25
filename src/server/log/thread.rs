@@ -1,13 +1,11 @@
-use super::r#type::Log;
 use std::thread::spawn;
 
+use super::r#type::{write_debug, write_error, write_info};
+
 pub fn run() {
-    spawn(|| {
-        let log: Log = Log::default();
-        loop {
-            log.write_error();
-            log.write_info();
-            log.write_debug();
-        }
+    spawn(|| loop {
+        write_error();
+        write_info();
+        write_debug();
     });
 }
