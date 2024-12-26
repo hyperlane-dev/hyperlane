@@ -2,7 +2,6 @@ use super::{config::r#type::ServerConfig, route::r#type::RouterFuncBox, tmp::r#t
 use http_type::ArcRwLock;
 use std::collections::HashMap;
 
-#[allow(dead_code)]
 pub struct Server {
     pub(crate) cfg: ServerConfig<'static>,
     pub(crate) router_func: ArcRwLock<HashMap<&'static str, RouterFuncBox>>,

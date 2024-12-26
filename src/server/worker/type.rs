@@ -1,6 +1,6 @@
-use std::thread;
+use std::thread::JoinHandle;
 
 pub struct Worker {
-    pub(crate) id: usize,
-    pub(crate) thread: Option<thread::JoinHandle<()>>,
+    pub(super) id: usize,
+    pub(super) thread: Option<JoinHandle<()>>,
 }

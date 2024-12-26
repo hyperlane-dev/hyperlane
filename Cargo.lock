@@ -113,12 +113,13 @@ dependencies = [
 
 [[package]]
 name = "http-type"
-version = "1.7.0"
+version = "2.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ff3da75d68d4527144e6edca4bfbe360a02c73f6fdee9677254540e8589292c"
+checksum = "1a4a418d4dce4793cd60a758932ebcbc9c0dfe5f948f40481e18589188a5dfe6"
 dependencies = [
  "hex",
  "http-constant",
+ "lombok-macros",
  "serde",
  "serde-xml-rs",
  "serde_json",
@@ -128,12 +129,13 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "1.2.0"
+version = "2.0.1"
 dependencies = [
  "color-output",
  "http-constant",
  "http-type",
  "lazy_static",
+ "lombok-macros",
 ]
 
 [[package]]
@@ -300,6 +302,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
 
 [[package]]
+name = "lombok-macros"
+version = "1.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "305b2cced433b70fa8d4374b3d682e3a2f57834d5cfbd2e2c69d782ba0bdcd76"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -331,9 +344,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.37"
+version = "1.0.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5b9d34b8991d19d98081b46eacdd8eb58c6f2b201139f7c5f643cc155a633af"
+checksum = "0e4dccaaaf89514f546c693ddc140f729f958c247918a13380cccc6078391acc"
 dependencies = [
  "proc-macro2",
 ]

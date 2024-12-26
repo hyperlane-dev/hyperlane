@@ -13,13 +13,12 @@ use http_constant::*;
 use http_type::*;
 use std::{
     any::Any,
+    borrow::Cow,
     collections::HashMap,
     net::{TcpListener, TcpStream},
     panic::catch_unwind,
     sync::{Arc, RwLock},
 };
-
-const THREAD_POOL_SIZE: usize = 10;
 
 impl Default for Server {
     fn default() -> Self {
@@ -38,22 +37,22 @@ impl Server {
     }
 
     pub fn host(&mut self, host: &'static str) -> &mut Self {
-        self.cfg.host(host);
+        self.cfg.set_host(host);
         self
     }
 
     pub fn port(&mut self, port: usize) -> &mut Self {
-        self.cfg.port(port);
+        self.cfg.set_port(port);
         self
     }
 
     pub fn thread_pool_size(&mut self, thread_pool_size: usize) -> &mut Self {
-        self.cfg.thread_pool_size(thread_pool_size);
+        self.cfg.set_thread_pool_size(thread_pool_size);
         self
     }
 
     pub fn log_path(&mut self, log_path: &'static str) -> &mut Self {
-        self.cfg.log_path(log_path);
+        self.cfg.set_log_path(log_path);
         self
     }
 
@@ -79,14 +78,19 @@ impl Server {
 
     pub fn listen(&mut self) -> &mut Self {
         self.init();
-        let addr: String = format!("{}{}{}", &self.cfg.host, COLON_SPACE_SYMBOL, &self.cfg.port);
+        let addr: String = format!(
+            "{}{}{}",
+            &self.cfg.get_host(),
+            COLON_SPACE_SYMBOL,
+            &self.cfg.get_port()
+        );
         let listener_res: Result<TcpListener, Error> =
             TcpListener::bind(&addr).map_err(|e| Error::TcpBindError(e.to_string()));
         if listener_res.is_err() {
             return self;
         }
         let tcp_listener: TcpListener = listener_res.unwrap();
-        let thread_pool: ThreadPool = ThreadPool::new(THREAD_POOL_SIZE);
+        let thread_pool: ThreadPool = ThreadPool::new(*self.cfg.get_thread_pool_size());
         for stream_res in tcp_listener.incoming() {
             if stream_res.is_err() {
                 continue;
@@ -95,7 +99,7 @@ impl Server {
             let stream_arc: Arc<TcpStream> = Arc::new(stream);
             let middleware_arc: MiddlewareArcLock = Arc::clone(&self.middleware);
             let router_func_arc: RouterFuncArcLock = Arc::clone(&self.router_func);
-            let tmp_arc: Arc<RwLock<Tmp>> = Arc::clone(&self.tmp);
+            let tmp_arc: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
             let thread_pool_func = move || {
                 let _ = tmp_arc.write().and_then(|mut tmp| {
                     tmp.add_thread_num();
@@ -106,12 +110,13 @@ impl Server {
                         Request::new(&stream_arc.as_ref())
                             .map_err(|err| Error::InvalidHttpRequest(err));
                     if let Ok(request_obj) = request_obj_res {
-                        let route = request_obj.path().into_owned();
-                        let mut controller_data = ControllerData {
-                            stream: stream_arc.clone(),
-                            response: Response::default(),
-                            request: request_obj.clone(),
-                        };
+                        let route =
+                            <Cow<'_, str> as Clone>::clone(&request_obj.get_path()).into_owned();
+                        let mut controller_data: ControllerData = ControllerData::new();
+                        controller_data
+                            .set_stream(Some(stream_arc.clone()))
+                            .set_response(Some(Response::default()))
+                            .set_request(Some(request_obj.clone()));
                         if let Ok(middleware_guard) = middleware_arc.read() {
                             for middleware in middleware_guard.iter() {
                                 middleware(&mut controller_data);

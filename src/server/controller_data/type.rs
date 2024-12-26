@@ -1,9 +1,10 @@
 use http_type::*;
+use lombok_macros::*;
 use std::{net::TcpStream, sync::Arc};
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Lombok)]
 pub struct ControllerData {
-    pub(crate) stream: Arc<TcpStream>,
-    pub(crate) request: Request,
-    pub(crate) response: Response,
+    pub(super) stream: Option<Arc<TcpStream>>,
+    pub(super) request: Option<Request>,
+    pub(super) response: Option<Response>,
 }
