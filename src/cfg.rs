@@ -12,16 +12,18 @@ fn test_server_basic_usage() {
         controller_data
             .get_log()
             .log_debug(format!("Request => {:?}", request), |log_data| {
-                println!("{}", log_data);
-                log_data.clone()
+                let write_data: String = format!("{}\n", log_data);
+                println!("{}", write_data);
+                write_data.clone()
             });
     });
     server.router("/", |controller_data| {
         controller_data
             .get_log()
             .log_info("visit path /", |log_data| {
-                println!("visit / {}", log_data);
-                log_data.clone()
+                let write_data: String = format!("{}\n", log_data);
+                println!("{}", write_data);
+                write_data.clone()
             });
         let mut response: Response = controller_data.get_response().clone().unwrap();
         let body: Vec<u8> = "404 Not Found".as_bytes().to_vec();
@@ -34,16 +36,18 @@ fn test_server_basic_usage() {
         controller_data
             .get_log()
             .log_info(format!("Response => {:?}", res), |log_data| {
-                println!("{}", log_data);
-                log_data.clone()
+                let write_data: String = format!("{}\n", log_data);
+                println!("{}", write_data);
+                write_data.clone()
             });
     });
     server.router("/hello", |controller_data| {
         controller_data
             .get_log()
             .log_info("visit path /", |log_data| {
-                println!("visit / {}", log_data);
-                log_data.clone()
+                let write_data: String = format!("{}\n", log_data);
+                println!("{}", write_data);
+                write_data.clone()
             });
         let mut response: Response = controller_data.get_response().clone().unwrap();
         let body: Vec<u8> = "hello world!".as_bytes().to_vec();
@@ -56,8 +60,9 @@ fn test_server_basic_usage() {
         controller_data
             .get_log()
             .log_info(format!("Response => {:?}", res), |log_data| {
-                println!("{}", log_data);
-                log_data.clone()
+                let write_data: String = format!("{}\n", log_data);
+                println!("{}", write_data);
+                write_data.clone()
             });
     });
     server.listen();
