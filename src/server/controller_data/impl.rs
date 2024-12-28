@@ -1,5 +1,5 @@
 use super::r#type::ControllerData;
-use crate::server::log::r#type::Log;
+use hyperlane_log::*;
 
 impl ControllerData {
     pub fn new() -> Self {

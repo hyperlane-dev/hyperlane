@@ -1,17 +1,11 @@
-use super::log::r#type::Log;
 use super::{
-    config::r#type::ServerConfig,
-    controller_data::r#type::ControllerData,
-    error::r#type::Error,
-    log::{self},
-    middleware::r#type::MiddlewareArcLock,
-    r#type::Server,
-    route::r#type::RouterFuncArcLock,
-    thread_pool::r#type::ThreadPool,
-    tmp::r#type::Tmp,
+    config::r#type::ServerConfig, controller_data::r#type::ControllerData, error::r#type::Error,
+    middleware::r#type::MiddlewareArcLock, r#type::Server, route::r#type::RouterFuncArcLock,
+    thread_pool::r#type::ThreadPool, tmp::r#type::Tmp,
 };
 use http_constant::*;
 use http_type::*;
+use hyperlane_log::*;
 use std::{
     any::Any,
     borrow::Cow,
@@ -186,7 +180,7 @@ impl Server {
 
     fn init_log(&self) {
         let _ = self.get_tmp().read().and_then(|tmp| {
-            log::thread::run(tmp.get_log());
+            log_run(tmp.get_log());
             Ok(())
         });
     }

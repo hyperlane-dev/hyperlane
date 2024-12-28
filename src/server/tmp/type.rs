@@ -1,5 +1,5 @@
-use crate::server::log::r#type::Log;
 use http_type::ArcMutex;
+use hyperlane_log::*;
 use lombok_macros::*;
 
 #[derive(Clone, Lombok)]

@@ -1,5 +1,5 @@
 use super::r#type::Tmp;
-use crate::server::log::r#type::Log;
+use hyperlane_log::*;
 use std::sync::{Arc, Mutex};
 
 impl Default for Tmp {

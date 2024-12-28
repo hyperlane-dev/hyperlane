@@ -27,11 +27,13 @@ let mut server: Server = Server::new();
 server.host("0.0.0.0");
 server.port(80);
 server.thread_pool_size(10);
+server.log_dir("./logs");
+server.log_size(1_024_000);
 server.middleware(|controller_data| {
     let request: Request = controller_data.get_request().clone().unwrap();
     controller_data
         .get_log()
-        .log_info(format!("Request => {:?}", request), |log_data| {
+        .log_debug(format!("Request => {:?}", request), |log_data| {
             println!("{}", log_data);
             log_data.clone()
         });
