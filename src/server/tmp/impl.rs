@@ -1,11 +1,12 @@
-use std::sync::{Arc, Mutex};
-
 use super::r#type::Tmp;
+use crate::server::log::r#type::Log;
+use std::sync::{Arc, Mutex};
 
 impl Default for Tmp {
     fn default() -> Self {
         Self {
             running_thread_num: Arc::new(Mutex::new(0)),
+            log: Log::default(),
         }
     }
 }

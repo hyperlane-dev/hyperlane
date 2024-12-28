@@ -1,11 +1,11 @@
+use crate::Log;
 use std::thread::spawn;
 
-use super::r#type::{write_debug, write_error, write_info};
-
-pub fn run() {
-    spawn(|| loop {
-        write_error();
-        write_info();
-        write_debug();
+pub fn run(log: &Log) {
+    let log_clone: Log = log.clone();
+    spawn(move || loop {
+        log_clone.write_error();
+        log_clone.write_info();
+        log_clone.write_debug();
     });
 }

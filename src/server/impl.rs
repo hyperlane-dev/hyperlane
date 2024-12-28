@@ -1,8 +1,9 @@
+use super::log::r#type::Log;
 use super::{
     config::r#type::ServerConfig,
     controller_data::r#type::ControllerData,
     error::r#type::Error,
-    log::{self, r#type::add_error_data},
+    log::{self},
     middleware::r#type::MiddlewareArcLock,
     r#type::Server,
     route::r#type::RouterFuncArcLock,
@@ -23,7 +24,7 @@ use std::{
 impl Default for Server {
     fn default() -> Self {
         Self {
-            cfg: ServerConfig::default(),
+            cfg: Arc::new(RwLock::new(ServerConfig::default())),
             router_func: Arc::new(RwLock::new(HashMap::new())),
             middleware: Arc::new(RwLock::new(vec![])),
             tmp: Arc::new(RwLock::new(Tmp::default())),
@@ -37,22 +38,50 @@ impl Server {
     }
 
     pub fn host(&mut self, host: &'static str) -> &mut Self {
-        self.cfg.set_host(host);
+        let _ = self.get_cfg().write().and_then(|mut cfg| {
+            cfg.set_host(host);
+            Ok(())
+        });
         self
     }
 
     pub fn port(&mut self, port: usize) -> &mut Self {
-        self.cfg.set_port(port);
+        let _ = self.get_cfg().write().and_then(|mut cfg| {
+            cfg.set_port(port);
+            Ok(())
+        });
         self
     }
 
     pub fn thread_pool_size(&mut self, thread_pool_size: usize) -> &mut Self {
-        self.cfg.set_thread_pool_size(thread_pool_size);
+        let _ = self.get_cfg().write().and_then(|mut cfg| {
+            cfg.set_thread_pool_size(thread_pool_size);
+            Ok(())
+        });
         self
     }
 
-    pub fn log_path(&mut self, log_path: &'static str) -> &mut Self {
-        self.cfg.set_log_path(log_path);
+    pub fn log_dir(&mut self, log_dir: &'static str) -> &mut Self {
+        let _ = self.get_cfg().write().and_then(|mut cfg| {
+            cfg.set_log_dir(log_dir);
+            Ok(())
+        });
+        let _ = self.get_tmp().write().and_then(|mut tmp| {
+            tmp.log.set_path(log_dir);
+            Ok(())
+        });
+        self
+    }
+
+    pub fn log_size(&mut self, log_size: usize) -> &mut Self {
+        let _ = self.get_cfg().write().and_then(|mut cfg| {
+            cfg.set_log_size(log_size);
+            Ok(())
+        });
+        let _ = self.get_tmp().write().and_then(|mut tmp| {
+            tmp.log.set_file_size(log_size);
+            Ok(())
+        });
         self
     }
 
@@ -78,19 +107,23 @@ impl Server {
 
     pub fn listen(&mut self) -> &mut Self {
         self.init();
-        let addr: String = format!(
-            "{}{}{}",
-            &self.cfg.get_host(),
-            COLON_SPACE_SYMBOL,
-            &self.cfg.get_port()
-        );
+        let mut host: &str = EMPTY_STR;
+        let mut port: usize = usize::default();
+        let mut thread_pool_size: usize = usize::default();
+        let _ = self.get_cfg().read().and_then(|cfg| {
+            host = cfg.get_host();
+            port = *cfg.get_port();
+            thread_pool_size = *cfg.get_thread_pool_size();
+            Ok(())
+        });
+        let addr: String = format!("{}{}{}", host, COLON_SPACE_SYMBOL, port);
         let listener_res: Result<TcpListener, Error> =
             TcpListener::bind(&addr).map_err(|e| Error::TcpBindError(e.to_string()));
         if listener_res.is_err() {
             return self;
         }
         let tcp_listener: TcpListener = listener_res.unwrap();
-        let thread_pool: ThreadPool = ThreadPool::new(*self.cfg.get_thread_pool_size());
+        let thread_pool: ThreadPool = ThreadPool::new(thread_pool_size);
         for stream_res in tcp_listener.incoming() {
             if stream_res.is_err() {
                 continue;
@@ -105,6 +138,10 @@ impl Server {
                     tmp.add_thread_num();
                     Ok(())
                 });
+                let log: Log = tmp_arc
+                    .read()
+                    .and_then(|tmp| Ok(tmp.log.clone()))
+                    .unwrap_or_default();
                 let thread_result: Result<(), Box<dyn Any + Send>> = catch_unwind(move || {
                     let request_obj_res: Result<Request, Error> =
                         Request::new(&stream_arc.as_ref())
@@ -116,7 +153,8 @@ impl Server {
                         controller_data
                             .set_stream(Some(stream_arc.clone()))
                             .set_response(Some(Response::default()))
-                            .set_request(Some(request_obj.clone()));
+                            .set_request(Some(request_obj.clone()))
+                            .set_log(log);
                         if let Ok(middleware_guard) = middleware_arc.read() {
                             for middleware in middleware_guard.iter() {
                                 middleware(&mut controller_data);
@@ -135,7 +173,10 @@ impl Server {
                     Ok(())
                 });
                 if let Err(err) = thread_result {
-                    add_error_data(err);
+                    let _ = tmp_arc.read().and_then(|tem| {
+                        tem.get_log().log_error(err, |data| data.to_string());
+                        Ok(())
+                    });
                 }
             };
             thread_pool.execute(thread_pool_func);
@@ -143,7 +184,14 @@ impl Server {
         self
     }
 
+    fn init_log(&self) {
+        let _ = self.get_tmp().read().and_then(|tmp| {
+            log::thread::run(tmp.get_log());
+            Ok(())
+        });
+    }
+
     fn init(&self) {
-        log::thread::run();
+        self.init_log();
     }
 }

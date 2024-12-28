@@ -29,68 +29,58 @@ server.port(80);
 server.thread_pool_size(10);
 server.middleware(|controller_data| {
     let request: Request = controller_data.get_request().clone().unwrap();
-    output("Request", &format!("{:#?}", request), Color::Yellow);
+    controller_data
+        .get_log()
+        .log_info(format!("Request => {:?}", request), |log_data| {
+            println!("{}", log_data);
+            log_data.clone()
+        });
 });
 server.router("/", |controller_data| {
+    controller_data
+        .get_log()
+        .log_info("visit path /", |log_data| {
+            println!("visit / {}", log_data);
+            log_data.clone()
+        });
     let mut response: Response = controller_data.get_response().clone().unwrap();
     let body: Vec<u8> = "404 Not Found".as_bytes().to_vec();
-    let stream: std::sync::Arc<TcpStream> = controller_data.get_stream().clone().unwrap();
-    let res: Result<(), ResponseError> = response
+    let stream: ControllerDataStream = controller_data.get_stream().clone().unwrap();
+    let res: ResponseResult = response
         .set_body(body)
         .set_status_code(404)
         .set_header("server", "hyperlane")
         .send(&stream);
-    output("Response", &format!("{:#?}", res), Color::Green);
+    controller_data
+        .get_log()
+        .log_info(format!("Response => {:?}", res), |log_data| {
+            println!("{}", log_data);
+            log_data.clone()
+        });
 });
 server.router("/hello", |controller_data| {
+    controller_data
+        .get_log()
+        .log_info("visit path /", |log_data| {
+            println!("visit / {}", log_data);
+            log_data.clone()
+        });
     let mut response: Response = controller_data.get_response().clone().unwrap();
     let body: Vec<u8> = "hello world!".as_bytes().to_vec();
-    let stream = controller_data.get_stream().clone().unwrap();
-    let res: Result<(), ResponseError> = response
+    let stream: ControllerDataStream = controller_data.get_stream().clone().unwrap();
+    let res: ResponseResult = response
         .set_body(body)
         .set_status_code(200)
         .set_header("server", "hyperlane")
         .send(&stream);
-    output("Response", &format!("{:#?}", res), Color::Green);
+    controller_data
+        .get_log()
+        .log_info(format!("Response => {:?}", res), |log_data| {
+            println!("{}", log_data);
+            log_data.clone()
+        });
 });
 server.listen();
-```
-
-```rust
-use hyperlane::*;
-Server::new()
-    .host("0.0.0.0")
-    .port(80)
-    .thread_pool_size(10)
-    .middleware(|controller_data| {
-        let request: Request = controller_data.get_request().clone().unwrap();
-        output("Request", &format!("{:#?}", request), Color::Yellow);
-    })
-    .router("/", |controller_data| {
-        let mut response: Response = controller_data.get_response().clone().unwrap();
-        let body: Vec<u8> = "404 Not Found".as_bytes().to_vec();
-        let stream: std::sync::Arc<std::net::TcpStream> =
-            controller_data.get_stream().clone().unwrap();
-        let res: Result<(), ResponseError> = response
-            .set_body(body)
-            .set_status_code(404)
-            .set_header("server", "hyperlane")
-            .send(&stream);
-        output("Response", &format!("{:#?}", res), Color::Green);
-    })
-    .router("/hello", |controller_data| {
-        let mut response: Response = controller_data.get_response().clone().unwrap();
-        let body: Vec<u8> = "hello world!".as_bytes().to_vec();
-        let stream: std::sync::Arc<std::net::TcpStream> =
-            controller_data.get_stream().clone().unwrap();
-        let res: Result<(), ResponseError> = response
-            .set_body(body)
-            .set_status_code(200)
-            .set_header("server", "hyperlane")
-            .send(&stream);
-        output("Response", &format!("{:#?}", res), Color::Green);
-    })
-    .listen();
 ```
 
 ## License
