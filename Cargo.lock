@@ -179,7 +179,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "2.3.1"
+version = "2.3.2"
 dependencies = [
  "http-constant",
  "http-type",
@@ -189,9 +189,9 @@ dependencies = [
 
 [[package]]
 name = "hyperlane-log"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "911140d47b168e89da84452222d03e0ce19ea1dba76fefbfdc79ab2a976952c2"
+checksum = "bbea610a8673d024c72dc4b9ebed24f262f6fc06b3b55d886c211d1b52324886"
 dependencies = [
  "chrono",
  "http-type",
