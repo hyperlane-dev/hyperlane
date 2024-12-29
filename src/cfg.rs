@@ -44,13 +44,14 @@ fn test_server_basic_usage() {
     server.middleware(|controller_data| {
         let request: Request = controller_data.get_request().clone().unwrap();
         let stream: ControllerDataStream = controller_data.get_stream().clone().unwrap();
-        let _ = stream.peer_addr().and_then(|host| {
-            controller_data.get_log().log_debug(
-                format!("Request => \nhost => {}\n{:#?}", host, request),
-                common_log,
-            );
-            Ok(())
-        });
+        let host: String = stream
+            .peer_addr()
+            .and_then(|host| Ok(host.to_string()))
+            .unwrap_or("Unknown".to_owned());
+        controller_data.get_log().log_debug(
+            format!("Request host => {}\n{:#?}", host, request),
+            common_log,
+        );
     });
     server.router("/", |controller_data| {
         controller_data
