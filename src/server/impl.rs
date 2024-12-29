@@ -6,14 +6,8 @@ use super::{
 use http_constant::*;
 use http_type::*;
 use hyperlane_log::*;
-use std::{
-    any::Any,
-    borrow::Cow,
-    collections::HashMap,
-    net::{TcpListener, TcpStream},
-    panic::catch_unwind,
-    sync::{Arc, RwLock},
-};
+use hyperlane_time::*;
+use std_macro_extensions::*;
 
 impl Default for Server {
     fn default() -> Self {
@@ -168,7 +162,9 @@ impl Server {
                 });
                 if let Err(err) = thread_result {
                     let _ = tmp_arc.read().and_then(|tem| {
-                        tem.get_log().log_error(err, |data| data.to_string());
+                        tem.get_log().log_error(err, |data| {
+                            format!("{}: {}{}", current_time(), data.to_string(), HTTP_BR)
+                        });
                         Ok(())
                     });
                 }
