@@ -65,9 +65,14 @@ server.log_dir("./logs");
 server.log_size(1_024_000);
 server.middleware(|controller_data| {
     let request: Request = controller_data.get_request().clone().unwrap();
-    controller_data
-        .get_log()
-        .log_debug(format!("Request => \n{:#?}", request), common_log);
+    let stream: ControllerDataStream = controller_data.get_stream().clone().unwrap();
+    let _ = stream.peer_addr().and_then(|host| {
+        controller_data.get_log().log_debug(
+            format!("Request => \nhost => {}\n{:#?}", host, request),
+            common_log,
+        );
+        Ok(())
+    });
 });
 server.router("/", |controller_data| {
     controller_data
