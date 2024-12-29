@@ -30,6 +30,11 @@ fn test_server_basic_usage() {
             )
             .run();
     }
+    fn common_log(log_data: &String) -> String {
+        println(&log_data);
+        let write_data: String = format!("{}: {}\n", current_time(), log_data);
+        write_data.clone()
+    }
     let mut server: Server = Server::new();
     server.host("0.0.0.0");
     server.port(80);
@@ -40,20 +45,12 @@ fn test_server_basic_usage() {
         let request: Request = controller_data.get_request().clone().unwrap();
         controller_data
             .get_log()
-            .log_debug(format!("Request => {:?}", request), |log_data| {
-                let write_data: String = format!("{}\n", log_data);
-                println(&write_data);
-                write_data.clone()
-            });
+            .log_debug(format!("Request => \n{:#?}", request), common_log);
     });
     server.router("/", |controller_data| {
         controller_data
             .get_log()
-            .log_info("visit path /", |log_data| {
-                let write_data: String = format!("{}\n", log_data);
-                println(&write_data);
-                write_data.clone()
-            });
+            .log_info("visit path /", common_log);
         let mut response: Response = controller_data.get_response().clone().unwrap();
         let body: Vec<u8> = "404 Not Found".as_bytes().to_vec();
         let stream: ControllerDataStream = controller_data.get_stream().clone().unwrap();
@@ -62,22 +59,15 @@ fn test_server_basic_usage() {
             .set_status_code(404)
             .set_header("server", "hyperlane")
             .send(&stream);
-        controller_data
-            .get_log()
-            .log_info(format!("Response => {:?}", res), |log_data| {
-                let write_data: String = format!("{}\n", log_data);
-                println(&write_data);
-                write_data.clone()
-            });
+        controller_data.get_log().log_info(
+            format!("Response => {:?}", String::from_utf8_lossy(&res.unwrap())),
+            common_log,
+        );
     });
     server.router("/hello", |controller_data| {
         controller_data
             .get_log()
-            .log_info("visit path /", |log_data| {
-                let write_data: String = format!("{}\n", log_data);
-                println(&write_data);
-                write_data.clone()
-            });
+            .log_info("visit path /hello", common_log);
         let mut response: Response = controller_data.get_response().clone().unwrap();
         let body: Vec<u8> = "hello world!".as_bytes().to_vec();
         let stream: ControllerDataStream = controller_data.get_stream().clone().unwrap();
@@ -86,16 +76,13 @@ fn test_server_basic_usage() {
             .set_status_code(200)
             .set_header("server", "hyperlane")
             .send(&stream);
-        controller_data
-            .get_log()
-            .log_info(format!("Response => {:?}", res), |log_data| {
-                let write_data: String = format!("{}\n", log_data);
-                println(&write_data);
-                write_data.clone()
-            });
+        controller_data.get_log().log_info(
+            format!("Response => {:?}", String::from_utf8_lossy(&res.unwrap())),
+            common_log,
+        );
     });
     server.router("/panic", |_controller_data| {
-        panic!("panic");
+        panic!("test panic");
     });
     server.listen();
 }

@@ -162,7 +162,7 @@ impl Server {
                 });
                 if let Err(err) = thread_result {
                     let _ = tmp_arc.read().and_then(|tem| {
-                        tem.get_log().log_error(err, |data| {
+                        tem.get_log().log_error(format!("{:?}", err), |data| {
                             format!("{}: {}{}", current_time(), data.to_string(), HTTP_BR)
                         });
                         Ok(())
