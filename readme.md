@@ -128,6 +128,7 @@ server.router("/request", |controller_data| {
         .set_body(body)
         .set_status_code(200)
         .set_header("server", "hyperlane")
+        .set_header(CONTENT_TYPE, APPLICATION_JSON)
         .send(&stream);
     controller_data.get_log().log_info(
         format!("Response => {:?}", String::from_utf8_lossy(&res.unwrap())),
