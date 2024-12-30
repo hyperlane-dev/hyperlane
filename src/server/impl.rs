@@ -3,7 +3,6 @@ use super::{
     middleware::r#type::MiddlewareArcLock, r#type::Server, route::r#type::RouterFuncArcLock,
     thread_pool::r#type::ThreadPool, tmp::r#type::Tmp,
 };
-use http_constant::*;
 use http_type::*;
 use hyperlane_log::*;
 use hyperlane_time::*;

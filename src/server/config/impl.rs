@@ -1,6 +1,6 @@
 use super::r#type::ServerConfig;
 use crate::utils::thread::get_thread_count;
-use http_constant::*;
+use http_type::*;
 use hyperlane_log::*;
 
 impl<'a> Default for ServerConfig<'a> {
