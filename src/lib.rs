@@ -5,6 +5,8 @@ pub(crate) mod utils;
 pub use crate::utils::thread::*;
 pub use color_output::*;
 pub use http_constant::*;
+#[allow(ambiguous_glob_reexports)]
+pub use http_request::*;
 pub use http_type::*;
 pub use hyperlane_log::*;
 pub use hyperlane_time::*;

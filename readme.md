@@ -57,6 +57,31 @@ fn common_log(log_data: &String) -> String {
     let write_data: String = format!("{}: {}\n", current_time(), log_data);
     write_data.clone()
 }
+fn send() -> Vec<u8> {
+    let mut header: HashMap<&str, &str> = HashMap::new();
+    header.insert("Accept", "*/*");
+    header.insert("Content-Type", "application/json");
+    header.insert("Connection", "keep-alive");
+    header.insert("Accept-Encoding", "gzip, deflate");
+    let mut body: HashMap<&str, &str> = HashMap::new();
+    body.insert("code", "fn main() {\r\n    println!(\"hello world\");\r\n}");
+    body.insert("language", "rust");
+    body.insert("testin", "");
+    let mut _request_builder = RequestBuilder::new()
+        .post("https://code.ltpp.vip/")
+        .json(body)
+        .headers(header)
+        .timeout(10000)
+        .redirect()
+        .buffer(4096)
+        .max_redirect_times(8)
+        .http1_1_only()
+        .builder();
+    _request_builder
+        .send()
+        .and_then(|response| Ok(response.binary().body))
+        .unwrap_or_default()
+}
 let mut server: Server = Server::new();
 server.host("0.0.0.0");
 server.port(80);
@@ -85,6 +110,23 @@ server.router("/", |controller_data| {
     let res: ResponseResult = response
         .set_body(body)
         .set_status_code(404)
+        .set_header("server", "hyperlane")
+        .send(&stream);
+    controller_data.get_log().log_info(
+        format!("Response => {:?}", String::from_utf8_lossy(&res.unwrap())),
+        common_log,
+    );
+});
+server.router("/request", |controller_data| {
+    controller_data
+        .get_log()
+        .log_info("visit path /request", common_log);
+    let mut response: Response = controller_data.get_response().clone().unwrap();
+    let body: Vec<u8> = send();
+    let stream: ControllerDataStream = controller_data.get_stream().clone().unwrap();
+    let res: ResponseResult = response
+        .set_body(body)
+        .set_status_code(200)
         .set_header("server", "hyperlane")
         .send(&stream);
     controller_data.get_log().log_info(
