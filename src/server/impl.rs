@@ -54,7 +54,7 @@ impl Server {
             Ok(())
         });
         let _ = self.get_tmp().write().and_then(|mut tmp| {
-            tmp.log.set_path(log_dir);
+            tmp.log.set_path(log_dir.into());
             Ok(())
         });
         self
@@ -134,8 +134,7 @@ impl Server {
                         Request::new(&stream_arc.as_ref())
                             .map_err(|err| Error::InvalidHttpRequest(err));
                     if let Ok(request_obj) = request_obj_res {
-                        let route =
-                            <Cow<'_, str> as Clone>::clone(&request_obj.get_path()).into_owned();
+                        let route: &String = &request_obj.get_path();
                         let mut controller_data: ControllerData = ControllerData::new();
                         controller_data
                             .set_stream(Some(stream_arc.clone()))
