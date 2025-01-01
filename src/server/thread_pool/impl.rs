@@ -1,6 +1,6 @@
 use super::r#type::ThreadPool;
 use crate::server::worker::r#type::Worker;
-use http_type::ArcMutex;
+use http_type::*;
 use std::sync::mpsc::{self, Receiver};
 pub use std_macro_extensions::*;
 

@@ -1,7 +1,12 @@
 use super::{
-    config::r#type::ServerConfig, controller_data::r#type::ControllerData, error::r#type::Error,
-    middleware::r#type::MiddlewareArcLock, r#type::Server, route::r#type::RouterFuncArcLock,
-    thread_pool::r#type::ThreadPool, tmp::r#type::Tmp,
+    config::r#type::ServerConfig,
+    controller_data::r#type::ControllerData,
+    error::r#type::Error,
+    middleware::r#type::MiddlewareArcLock,
+    r#type::Server,
+    route::r#type::{RouterFuncArcLock, VecRouterFuncBox},
+    thread_pool::r#type::ThreadPool,
+    tmp::r#type::Tmp,
 };
 use http_type::*;
 use hyperlane_log::*;
@@ -13,7 +18,7 @@ impl Default for Server {
         Self {
             cfg: Arc::new(RwLock::new(ServerConfig::default())),
             router_func: Arc::new(RwLock::new(HashMap::new())),
-            middleware: Arc::new(RwLock::new(vec![])),
+            middleware: Arc::new(RwLock::new(VecRouterFuncBox::default())),
             tmp: Arc::new(RwLock::new(Tmp::default())),
         }
     }

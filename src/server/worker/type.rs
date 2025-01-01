@@ -1,4 +1,4 @@
-use lombok_macros::Lombok;
+use lombok_macros::*;
 use std::thread::JoinHandle;
 
 #[allow(dead_code)]
