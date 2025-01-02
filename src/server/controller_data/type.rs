@@ -6,14 +6,12 @@ use std::{net::TcpStream, sync::Arc};
 pub type ControllerDataStream = Arc<TcpStream>;
 pub type ControllerDataStreamOpt = Option<ControllerDataStream>;
 pub type ControllerDataRequest = Request;
-pub type ControllerDataRequestOpt = Option<ControllerDataRequest>;
 pub type ControllerDataResponse = Response;
-pub type ControllerDataResponseOpt = Option<ControllerDataResponse>;
 
 #[derive(Clone, Debug, Lombok)]
 pub struct ControllerData {
     pub(super) stream: ControllerDataStreamOpt,
-    pub(super) request: ControllerDataRequestOpt,
-    pub(super) response: ControllerDataResponseOpt,
+    pub(super) request: ControllerDataRequest,
+    pub(super) response: ControllerDataResponse,
     pub(super) log: Log,
 }

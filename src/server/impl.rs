@@ -143,8 +143,8 @@ impl Server {
                         let mut controller_data: ControllerData = ControllerData::new();
                         controller_data
                             .set_stream(Some(stream_arc.clone()))
-                            .set_response(Some(Response::default()))
-                            .set_request(Some(request_obj.clone()))
+                            .set_response(Response::default())
+                            .set_request(request_obj.clone())
                             .set_log(log);
                         if let Ok(middleware_guard) = middleware_arc.read() {
                             for middleware in middleware_guard.iter() {

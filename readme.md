@@ -99,7 +99,7 @@ fn run_server() {
     server.log_size(1_024_000);
 
     server.middleware(|controller_data| {
-        let request: Request = controller_data.get_request().clone().unwrap();
+        let request: Request = controller_data.get_request().clone();
         let stream: ControllerDataStream = controller_data.get_stream().clone().unwrap();
         let host: String = stream
             .peer_addr()
@@ -115,7 +115,7 @@ fn run_server() {
         controller_data
             .get_log()
             .log_info("visit path /", common_log);
-        let mut response: Response = controller_data.get_response().clone().unwrap();
+        let mut response: Response = controller_data.get_response().clone();
         let body: Vec<u8> = "404 Not Found".as_bytes().to_vec();
         let stream: ControllerDataStream = controller_data.get_stream().clone().unwrap();
         let res: ResponseResult = response
@@ -133,7 +133,7 @@ fn run_server() {
         controller_data
             .get_log()
             .log_info("visit path /request", common_log);
-        let mut response: Response = controller_data.get_response().clone().unwrap();
+        let mut response: Response = controller_data.get_response().clone();
         let body: Vec<u8> = send_request();
         let stream: ControllerDataStream = controller_data.get_stream().clone().unwrap();
         let res: ResponseResult = response
@@ -152,7 +152,7 @@ fn run_server() {
         controller_data
             .get_log()
             .log_info("visit path /hello", common_log);
-        let mut response: Response = controller_data.get_response().clone().unwrap();
+        let mut response: Response = controller_data.get_response().clone();
         let body: Vec<u8> = "hello world!".as_bytes().to_vec();
         let stream: ControllerDataStream = controller_data.get_stream().clone().unwrap();
         let res: ResponseResult = response
