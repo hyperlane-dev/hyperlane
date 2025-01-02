@@ -1,6 +1,7 @@
 #[test]
 fn test_server_basic_usage() {
     use crate::*;
+
     fn println(data: &str) {
         let binding: String = current_time();
         let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();
@@ -86,6 +87,9 @@ fn test_server_basic_usage() {
                 format!("Request host => {}\n{:#?}", host, request),
                 common_log,
             );
+            controller_data
+                .get_mut_request()
+                .set_header("middleware", "crate");
         });
 
         server.router("/", |controller_data| {

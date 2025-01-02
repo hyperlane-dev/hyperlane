@@ -109,6 +109,9 @@ fn run_server() {
             format!("Request host => {}\n{:#?}", host, request),
             common_log,
         );
+        controller_data
+            .get_mut_request()
+            .set_header("middleware", "crate");
     });
 
     server.router("/", |controller_data| {
