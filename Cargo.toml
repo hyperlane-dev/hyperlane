@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "2.25.0"
+version = "2.26.0"
 edition = "2021"
 authors = ["ltpp-universe <root@ltpp.vip>"] 
 license = "MIT"
@@ -17,9 +17,9 @@ exclude = [
 
 [dependencies]
 color-output = "6.1.4"
-http-request = "8.21.1"
-http-type = "2.14.0"
-hyperlane-log = "0.11.0"
+http-request = "8.22.0"
+http-type = "2.15.0"
+hyperlane-log = "0.12.0"
 hyperlane-time = "0.0.1"
 lombok-macros = "1.5.0"
 std-macro-extensions = "0.17.6"
