@@ -283,9 +283,9 @@ dependencies = [
 
 [[package]]
 name = "http-request"
-version = "8.22.0"
+version = "8.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56fc49af52e48ccb472a5a20b6d21dd993b68ce46f4c69de3c18fe6d4d236433"
+checksum = "18718de34e4af8bfa13636b739185a42ad981ee05d7feefb7a5598ca0f88a126"
 dependencies = [
  "brotli",
  "flate2",
@@ -320,7 +320,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "2.27.0"
+version = "2.28.0"
 dependencies = [
  "color-output",
  "http-request",
