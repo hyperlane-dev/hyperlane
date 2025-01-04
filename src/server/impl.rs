@@ -165,7 +165,14 @@ impl Server {
                 });
                 if let Err(err) = thread_result {
                     let _ = tmp_arc.read().and_then(|tem| {
-                        tem.get_log().log_error(format!("{:?}", err), |data| {
+                        let err_str: &str = if let Some(msg) = err.downcast_ref::<&str>() {
+                            msg
+                        } else if let Some(msg) = err.downcast_ref::<String>() {
+                            msg
+                        } else {
+                            &format!("{:#?}", err)
+                        };
+                        tem.get_log().log_error(format!("{}", err_str), |data| {
                             format!("{}: {}{}", current_time(), data.to_string(), HTTP_BR)
                         });
                         Ok(())
