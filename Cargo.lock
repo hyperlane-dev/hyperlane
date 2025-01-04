@@ -283,15 +283,15 @@ dependencies = [
 
 [[package]]
 name = "http-request"
-version = "8.19.0"
+version = "8.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0224dff22451ca4eea6f9a9460f6c9fb5053a4cae84238d2958e107d3b58ffe"
+checksum = "45992ae924b7ae17dca33693127d856735fa5f8c2fb383ad5ac37d1e41cb7726"
 dependencies = [
  "brotli",
  "flate2",
  "hex",
  "http-compress",
- "http-type 2.12.0",
+ "http-type 2.13.0",
  "rustls",
  "serde",
  "serde-xml-rs",
@@ -319,9 +319,9 @@ dependencies = [
 
 [[package]]
 name = "http-type"
-version = "2.12.0"
+version = "2.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8364187d49becf16da08b7acca7da79987b33c2eb52d07875238a17f556cac1"
+checksum = "2328364a5d68f9f246d1d818cfdc71caf9194a88d494bd68106ff8f6aef1027e"
 dependencies = [
  "hex",
  "http-constant",
@@ -335,11 +335,11 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "2.22.0"
+version = "2.23.0"
 dependencies = [
  "color-output",
  "http-request",
- "http-type 2.12.0",
+ "http-type 2.13.0",
  "hyperlane-log",
  "hyperlane-time",
  "lombok-macros",
@@ -348,11 +348,11 @@ dependencies = [
 
 [[package]]
 name = "hyperlane-log"
-version = "0.9.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ce43a1e7575516fb5d04750ff68f0d7a6921b401faebcfbf452d1c4d480983e"
+checksum = "5e1dc7c4ab73d690aa7c5dc448147ccbeb82d7a7ab7d8cfea65c50fac1b1727f"
 dependencies = [
- "http-type 2.12.0",
+ "http-type 2.13.0",
  "hyperlane-time",
  "lazy_static",
  "lombok-macros",
