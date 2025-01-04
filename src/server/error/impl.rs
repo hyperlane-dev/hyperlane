@@ -1,5 +1,5 @@
 use super::r#type::Error;
-use http_type::*;
+use crate::*;
 use std::{
     error::Error as StdError,
     fmt::{self, Display},

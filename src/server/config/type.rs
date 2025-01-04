@@ -1,4 +1,4 @@
-use lombok_macros::*;
+use crate::*;
 
 #[derive(Clone, Debug, Lombok)]
 pub struct ServerConfig<'a> {

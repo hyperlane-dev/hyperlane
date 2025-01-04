@@ -1,6 +1,6 @@
 use super::r#type::Worker;
 use crate::server::thread_pool::r#type::Job;
-use http_type::*;
+use crate::*;
 use std::{sync::mpsc::Receiver, thread::spawn};
 
 impl Worker {

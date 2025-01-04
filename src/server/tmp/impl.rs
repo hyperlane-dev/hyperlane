@@ -1,6 +1,5 @@
 use super::r#type::Tmp;
-use hyperlane_log::*;
-pub use std_macro_extensions::*;
+use crate::*;
 
 impl Default for Tmp {
     fn default() -> Self {

@@ -291,7 +291,7 @@ dependencies = [
  "flate2",
  "hex",
  "http-compress",
- "http-type 2.7.0",
+ "http-type 2.9.0",
  "rustls",
  "serde",
  "serde-xml-rs",
@@ -319,9 +319,9 @@ dependencies = [
 
 [[package]]
 name = "http-type"
-version = "2.7.0"
+version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce7eccd0c1018ae8052aa80db52834f272939f3f869effc8342cf0d93848571f"
+checksum = "8f3952b8644f1066784abb8bbcc99b1bd33614ee68b5147421efe45149f37e1f"
 dependencies = [
  "hex",
  "http-constant",
@@ -339,7 +339,7 @@ version = "2.20.0"
 dependencies = [
  "color-output",
  "http-request",
- "http-type 2.7.0",
+ "http-type 2.9.0",
  "hyperlane-log",
  "hyperlane-time",
  "lombok-macros",
@@ -352,7 +352,7 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e0d969691b67c5a01abd31f5d8837add277083f32847ad22da9dec18c36e2f2"
 dependencies = [
- "http-type 2.7.0",
+ "http-type 2.9.0",
  "hyperlane-time",
  "lazy_static",
  "lombok-macros",
