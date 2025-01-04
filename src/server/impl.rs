@@ -97,6 +97,10 @@ impl Server {
         self
     }
 
+    fn common_log(data: &String) -> String {
+        format!("{}: {}{}", current_time(), data.to_string(), HTTP_BR)
+    }
+
     pub fn listen(&mut self) -> &mut Self {
         self.init();
         let mut host: &str = EMPTY_STR;
@@ -112,6 +116,13 @@ impl Server {
         let listener_res: Result<TcpListener, Error> =
             TcpListener::bind(&addr).map_err(|e| Error::TcpBindError(e.to_string()));
         if listener_res.is_err() {
+            let _ = self.get_tmp().write().and_then(|tmp| {
+                tmp.get_log().log_error(
+                    format!("{}", listener_res.err().unwrap_or(Error::Unknown)),
+                    Self::common_log,
+                );
+                Ok(())
+            });
             return self;
         }
         let tcp_listener: TcpListener = listener_res.unwrap();
@@ -165,16 +176,15 @@ impl Server {
                 });
                 if let Err(err) = thread_result {
                     let _ = tmp_arc.read().and_then(|tem| {
-                        let err_str: &str = if let Some(msg) = err.downcast_ref::<&str>() {
-                            msg
+                        let err_str: String = if let Some(msg) = err.downcast_ref::<String>() {
+                            msg.to_owned()
                         } else if let Some(msg) = err.downcast_ref::<String>() {
-                            msg
+                            msg.to_owned()
                         } else {
-                            &format!("{:#?}", err)
+                            format!("{:?}", err)
                         };
-                        tem.get_log().log_error(format!("{}", err_str), |data| {
-                            format!("{}: {}{}", current_time(), data.to_string(), HTTP_BR)
-                        });
+                        tem.get_log()
+                            .log_error(format!("{}", err_str), Self::common_log);
                         Ok(())
                     });
                 }
