@@ -261,9 +261,9 @@ dependencies = [
 
 [[package]]
 name = "http-compress"
-version = "1.1.0"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0342b64cc714674354e5798e92c3a10dbff11b5fd9ca93772a319f487bb1036c"
+checksum = "c9193af93a7140e2dceb75e23a33bc773cc322a95297469dd504b4f9cbcf3be8"
 dependencies = [
  "brotli",
  "flate2",
@@ -273,9 +273,9 @@ dependencies = [
 
 [[package]]
 name = "http-constant"
-version = "1.19.0"
+version = "1.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f09fc4f6e3df09db3e4a37473de20bb6f6fa1c3c93afb52abcdaeb53209d8eb"
+checksum = "d1b047e43433ee2293d69d10dae9dd8eebb492768835611d886ea570d1a2dd9a"
 dependencies = [
  "brotli",
  "flate2",
@@ -283,9 +283,9 @@ dependencies = [
 
 [[package]]
 name = "http-request"
-version = "8.23.0"
+version = "8.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18718de34e4af8bfa13636b739185a42ad981ee05d7feefb7a5598ca0f88a126"
+checksum = "29d70084e2f94076763760c0650e1b88c9a369d1461f08bac92831f2eeea6426"
 dependencies = [
  "brotli",
  "flate2",
@@ -304,9 +304,9 @@ dependencies = [
 
 [[package]]
 name = "http-type"
-version = "2.15.0"
+version = "2.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcc231970728c410a62e96cff26118782a765d1790f6a832a142460672fb4e3d"
+checksum = "5d0b5ad0e7eab207dbda362915705f10caf225e73d23b4b3f2c1b2198e596ec9"
 dependencies = [
  "hex",
  "http-constant",
@@ -320,7 +320,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "2.28.0"
+version = "2.29.0"
 dependencies = [
  "color-output",
  "http-request",
@@ -333,9 +333,9 @@ dependencies = [
 
 [[package]]
 name = "hyperlane-log"
-version = "0.12.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53f8ab6922db8b63c7b829e0211baecd1d07c036e6b91c1f9d5ae790550cb5a9"
+checksum = "6d686e0afc70fe39965a18ace59f155f3dead96345ea866f80f00114a6bdbd26"
 dependencies = [
  "http-type",
  "hyperlane-time",

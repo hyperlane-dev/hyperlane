@@ -49,10 +49,10 @@ fn test_server_basic_usage() {
             .buffer(4096)
             .max_redirect_times(8)
             .http1_1_only()
-            .builder();
+            .build();
         _request_builder
             .send()
-            .and_then(|response| Ok(response.binary().body))
+            .and_then(|response| Ok(response.binary().get_body()))
             .unwrap_or_default()
     }
 
