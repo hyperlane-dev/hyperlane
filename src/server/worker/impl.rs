@@ -4,6 +4,7 @@ use crate::*;
 use std::{sync::mpsc::Receiver, thread::spawn};
 
 impl Worker {
+    #[inline]
     pub fn new(id: usize, receiver: ArcMutex<Receiver<Job>>) -> Worker {
         let thread = spawn(move || loop {
             let job = receiver.lock().unwrap().recv().unwrap();

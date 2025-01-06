@@ -2,6 +2,7 @@ use super::r#type::ServerConfig;
 use crate::*;
 
 impl<'a> Default for ServerConfig<'a> {
+    #[inline]
     fn default() -> Self {
         Self {
             host: DEFAULT_HOST,

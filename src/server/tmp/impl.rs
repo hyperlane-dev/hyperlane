@@ -2,6 +2,7 @@ use super::r#type::Tmp;
 use crate::*;
 
 impl Default for Tmp {
+    #[inline]
     fn default() -> Self {
         Self {
             running_thread_num: Arc::new(Mutex::new(0)),
@@ -11,6 +12,7 @@ impl Default for Tmp {
 }
 
 impl Tmp {
+    #[inline]
     pub fn add_thread_num(&mut self) {
         let _ = self
             .running_thread_num
@@ -21,6 +23,7 @@ impl Tmp {
             });
     }
 
+    #[inline]
     pub fn sub_thread_num(&mut self) {
         let _ = self
             .running_thread_num

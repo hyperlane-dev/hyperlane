@@ -3,6 +3,7 @@ use http_type::{Request, Response};
 use hyperlane_log::*;
 
 impl ControllerData {
+    #[inline]
     pub fn new() -> Self {
         ControllerData {
             stream: None,
