@@ -320,7 +320,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "2.33.0"
+version = "2.34.0"
 dependencies = [
  "color-output",
  "http-request",
@@ -333,9 +333,9 @@ dependencies = [
 
 [[package]]
 name = "hyperlane-log"
-version = "0.17.0"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4918c15e9dd5c47bd546f03f4501304fa557b55eff2ff03ef638bc18328a5f8"
+checksum = "7ab7fba521bad8facf94dc85d132abe071a230c33cb77782b784292f246c4792"
 dependencies = [
  "http-type",
  "hyperlane-time",
