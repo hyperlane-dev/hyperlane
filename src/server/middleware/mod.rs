@@ -1,1 +1,1 @@
-pub mod r#type;
+pub(crate) mod r#type;
