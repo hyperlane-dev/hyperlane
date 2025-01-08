@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "2.37.1"
+version = "2.38.0"
 edition = "2021"
 authors = ["ltpp-universe <root@ltpp.vip>"] 
 license = "MIT"
@@ -22,7 +22,6 @@ http-type = "2.25.0"
 hyperlane-log = "0.20.0"
 hyperlane-time = "0.0.2"
 lombok-macros = "1.7.0"
-pcre2 = "0.2.9"
 std-macro-extensions = "0.18.0"
 
 [profile.dev]
