@@ -9,7 +9,7 @@
 
 [Api Docs](https://docs.rs/hyperlane/latest/hyperlane/)
 
-> Hyperlane is a lightweight and high-performance Rust HTTP server library designed to simplify network service development. It supports HTTP request parsing, response building, TCP communication, and redirection features, making it ideal for building modern web services.
+> hyperlane is a lightweight and high-performance Rust HTTP server library designed to simplify network service development. It supports HTTP request parsing, response building, TCP communication, and redirection features, making it ideal for building modern web services.
 
 ## Installation
 
