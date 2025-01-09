@@ -203,6 +203,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "file-operation"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7f04e69520e4fb15f9804aa78167ebe8f68acb6286be481b46ff503370a42a7"
+
+[[package]]
 name = "flate2"
 version = "1.0.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -316,27 +322,31 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "2.41.0"
+version = "2.42.0"
 dependencies = [
  "color-output",
+ "file-operation",
  "http-request",
  "http-type",
  "hyperlane-log",
  "hyperlane-time",
  "lombok-macros",
+ "recoverable-spawn",
  "std-macro-extensions",
 ]
 
 [[package]]
 name = "hyperlane-log"
-version = "0.24.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "942b5699ab343391a734c00723a834e949460bc11efc0762ac570ed573ad3c11"
+checksum = "e2a000c51b8794b786245597b99f010eeb0a0db0e358643c13ba3da996af151f"
 dependencies = [
+ "file-operation",
  "http-type",
  "hyperlane-time",
  "lazy_static",
  "lombok-macros",
+ "recoverable-spawn",
 ]
 
 [[package]]
@@ -641,6 +651,12 @@ checksum = "0e4dccaaaf89514f546c693ddc140f729f958c247918a13380cccc6078391acc"
 dependencies = [
  "proc-macro2",
 ]
+
+[[package]]
+name = "recoverable-spawn"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dfcefa9a8382fbd8fad8ddde71131306bdab35b48bd0feb0f14d5547ee847d07"
 
 [[package]]
 name = "regex"
