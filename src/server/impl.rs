@@ -181,7 +181,7 @@ impl Server {
                     tem.get_log().log_error(err_string, Self::common_log);
                 }
             };
-            let _ = thread_pool.execute(thread_pool_func, handle_error_func);
+            let _ = thread_pool.execute(thread_pool_func, handle_error_func, || {});
         }
         self
     }
