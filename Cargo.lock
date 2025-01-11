@@ -322,7 +322,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "2.46.0"
+version = "2.46.1"
 dependencies = [
  "color-output",
  "file-operation",

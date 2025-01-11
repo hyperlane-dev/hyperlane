@@ -147,5 +147,32 @@ fn test_server_basic_usage() {
         run_server();
     }
 
-    main();
+    let run_test = || {
+        recoverable_spawn(main);
+        std::thread::sleep(std::time::Duration::from_secs(4));
+        recoverable_spawn(|| {
+            let mut header: HashMap<&str, &str> = HashMap::new();
+            header.insert(ACCEPT, ACCEPT_ANY);
+            header.insert(CONTENT_TYPE, APPLICATION_JSON);
+            header.insert(ACCEPT_ENCODING, ACCEPT_ENCODING_GZIP);
+            let mut body: HashMap<&str, &str> = HashMap::new();
+            body.insert("key", "value");
+            let mut _request_builder = RequestBuilder::new()
+                .post("http://127.0.0.1:60000/")
+                .json(body)
+                .headers(header)
+                .timeout(10000)
+                .redirect()
+                .buffer(4096)
+                .max_redirect_times(8)
+                .http1_1_only()
+                .build();
+            _request_builder
+                .send()
+                .and_then(|response| Ok(response.binary().get_body()))
+                .unwrap_or_default();
+        });
+    };
+    run_test();
+    std::thread::sleep(std::time::Duration::from_secs(6));
 }
