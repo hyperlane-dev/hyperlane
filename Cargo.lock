@@ -204,9 +204,9 @@ dependencies = [
 
 [[package]]
 name = "file-operation"
-version = "0.0.2"
+version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7f04e69520e4fb15f9804aa78167ebe8f68acb6286be481b46ff503370a42a7"
+checksum = "868c355396ddbf2060bdaffa23d556fd67e31fcbd67e065e77b7d47e72a7982d"
 
 [[package]]
 name = "flate2"
@@ -267,9 +267,9 @@ dependencies = [
 
 [[package]]
 name = "http-compress"
-version = "1.13.0"
+version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01617bce6abe7320a403fbb06025fe5e52f229cb5e13f5bc66fd7b430edff366"
+checksum = "11c3cc34cca2446f41a105b17cb7ef8dcb3103931313da19d4810e13a2ac027d"
 dependencies = [
  "brotli",
  "flate2",
@@ -279,15 +279,15 @@ dependencies = [
 
 [[package]]
 name = "http-constant"
-version = "1.25.0"
+version = "1.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb37523f40fe53d5ae3171dc23673f86e51b8aa0384f25ee50aad427b52eb637"
+checksum = "b7e2991db9cba1223b35dcf186f4a5bf9ff5fdb44abfe346d424fe9107cd4c90"
 
 [[package]]
 name = "http-request"
-version = "8.34.0"
+version = "8.35.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f9d185fedc08422f1bfbcf4b0dd6e2999ff528c725e9b6d12760025877ca213"
+checksum = "0728a43f54c53ff32eab33f80f2810ca93ae4665202a29fd312d150311947a32"
 dependencies = [
  "brotli",
  "flate2",
@@ -306,9 +306,9 @@ dependencies = [
 
 [[package]]
 name = "http-type"
-version = "2.27.0"
+version = "2.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2562e79880a281b908e89a62c933f1ef21d11622c22ef0193014a801697a56d5"
+checksum = "57c2ed8ff3224a582c00eee2d947a80f23e2694acd609c3af972c597fdc94a5a"
 dependencies = [
  "hex",
  "http-constant",
@@ -322,7 +322,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "2.42.0"
+version = "2.44.0"
 dependencies = [
  "color-output",
  "file-operation",
@@ -331,29 +331,30 @@ dependencies = [
  "hyperlane-log",
  "hyperlane-time",
  "lombok-macros",
- "recoverable-spawn",
+ "recoverable-spawn 1.0.0",
+ "recoverable-thread-pool",
  "std-macro-extensions",
 ]
 
 [[package]]
 name = "hyperlane-log"
-version = "0.27.0"
+version = "0.29.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2a000c51b8794b786245597b99f010eeb0a0db0e358643c13ba3da996af151f"
+checksum = "feb32fe0e5e3da96335add69662b3bfd082baffb6df8532e4c0e5c52a80d8cf2"
 dependencies = [
  "file-operation",
  "http-type",
  "hyperlane-time",
  "lazy_static",
  "lombok-macros",
- "recoverable-spawn",
+ "recoverable-spawn 0.8.0",
 ]
 
 [[package]]
 name = "hyperlane-time"
-version = "0.0.2"
+version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39409c94ad720e02a3ae17098e22fbd5e8adeb5ef4e6bc3f563de0f1b32d000c"
+checksum = "49b1b985e97fd18e5a1ff955e831f5f77366f5d5b13a55a6e305193eb8ecbecd"
 
 [[package]]
 name = "icu_collections"
@@ -654,9 +655,25 @@ dependencies = [
 
 [[package]]
 name = "recoverable-spawn"
-version = "0.0.3"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfcefa9a8382fbd8fad8ddde71131306bdab35b48bd0feb0f14d5547ee847d07"
+checksum = "18e573621fa93ea2a85c30e7041226400a481c9bea2046388cd2fd6204148fcf"
+
+[[package]]
+name = "recoverable-spawn"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6ab370a4810c8dcd32c712ac15f5e3a243870d5614c259719a3ae2bff9ce4ac"
+
+[[package]]
+name = "recoverable-thread-pool"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cde179f32d9f9ce4d4bad104c69861f1308c5e82684f70311b210ea25ac6f206"
+dependencies = [
+ "lombok-macros",
+ "recoverable-spawn 1.0.0",
+]
 
 [[package]]
 name = "regex"
@@ -723,9 +740,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.20"
+version = "0.23.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5065c3f250cbd332cd894be57c40fa52387247659b14a2d6041d121547903b1b"
+checksum = "8f287924602bf649d949c63dc8ac8b235fa5387d394020705b80c4eb597ce5b8"
 dependencies = [
  "aws-lc-rs",
  "log",

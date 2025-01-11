@@ -5,12 +5,12 @@ use super::{
     middleware::r#type::MiddlewareArcLock,
     r#type::Server,
     route::r#type::{RouterFuncArcLock, VecRouterFuncBox},
-    thread_pool::r#type::ThreadPool,
     tmp::r#type::Tmp,
 };
 use http_type::*;
 use hyperlane_log::*;
 use hyperlane_time::*;
+use recoverable_thread_pool::*;
 use std_macro_extensions::*;
 
 impl Default for Server {
@@ -146,61 +146,42 @@ impl Server {
             let stream_arc: Arc<TcpStream> = Arc::new(stream);
             let middleware_arc: MiddlewareArcLock = Arc::clone(&self.middleware);
             let router_func_arc: RouterFuncArcLock = Arc::clone(&self.router_func);
-            let tmp_arc: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
+            let thread_pool_func_tmp_arc: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
+            let error_handle_tmp_arc: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
             let thread_pool_func = move || {
-                let _ = tmp_arc.write().and_then(|mut tmp| {
-                    tmp.add_thread_num();
-                    Ok(())
-                });
-                let log: Log = tmp_arc
+                let log: Log = thread_pool_func_tmp_arc
                     .read()
                     .and_then(|tmp| Ok(tmp.log.clone()))
                     .unwrap_or_default();
-                let thread_result: Result<(), Box<dyn Any + Send>> = catch_unwind(move || {
-                    let request_obj_res: Result<Request, Error> =
-                        Request::new(&stream_arc.as_ref())
-                            .map_err(|err| Error::InvalidHttpRequest(err));
-                    if let Ok(request_obj) = request_obj_res {
-                        let route: &String = &request_obj.get_path();
-                        let mut controller_data: ControllerData = ControllerData::new();
-                        controller_data
-                            .set_stream(Some(stream_arc.clone()))
-                            .set_response(Response::default())
-                            .set_request(request_obj.clone())
-                            .set_log(log);
-                        if let Ok(middleware_guard) = middleware_arc.read() {
-                            for middleware in middleware_guard.iter() {
-                                middleware(&mut controller_data);
-                            }
-                        }
-                        if let Ok(router_func) = router_func_arc.read() {
-                            router_func.get(route.as_str()).and_then(|func| {
-                                func(&mut controller_data);
-                                Some(())
-                            });
+                let request_obj_res: Result<Request, Error> = Request::new(&stream_arc.as_ref())
+                    .map_err(|err| Error::InvalidHttpRequest(err));
+                if let Ok(request_obj) = request_obj_res {
+                    let route: &String = &request_obj.get_path();
+                    let mut controller_data: ControllerData = ControllerData::new();
+                    controller_data
+                        .set_stream(Some(stream_arc.clone()))
+                        .set_response(Response::default())
+                        .set_request(request_obj.clone())
+                        .set_log(log);
+                    if let Ok(middleware_guard) = middleware_arc.read() {
+                        for middleware in middleware_guard.iter() {
+                            middleware(&mut controller_data);
                         }
                     }
-                });
-                let _ = tmp_arc.write().and_then(|mut tmp| {
-                    tmp.sub_thread_num();
-                    Ok(())
-                });
-                if let Err(err) = thread_result {
-                    let _ = tmp_arc.read().and_then(|tem| {
-                        let err_str: String = if let Some(msg) = err.downcast_ref::<String>() {
-                            msg.to_owned()
-                        } else if let Some(msg) = err.downcast_ref::<String>() {
-                            msg.to_owned()
-                        } else {
-                            format!("{:?}", err)
-                        };
-                        tem.get_log()
-                            .log_error(format!("{}", err_str), Self::common_log);
-                        Ok(())
-                    });
+                    if let Ok(router_func) = router_func_arc.read() {
+                        if let Some(func) = router_func.get(route.as_str()) {
+                            func(&mut controller_data);
+                        }
+                    }
                 }
             };
-            thread_pool.execute(thread_pool_func);
+            let handle_error_func = move |err_str: &str| {
+                let err_string: String = err_str.to_owned();
+                if let Ok(tem) = error_handle_tmp_arc.read() {
+                    tem.get_log().log_error(err_string, Self::common_log);
+                }
+            };
+            let _ = thread_pool.execute(thread_pool_func, handle_error_func);
         }
         self
     }

@@ -4,7 +4,5 @@ pub(crate) mod error;
 pub(crate) mod r#impl;
 pub(crate) mod middleware;
 pub(crate) mod route;
-pub(crate) mod thread_pool;
 pub(crate) mod tmp;
 pub(crate) mod r#type;
-pub(crate) mod worker;
