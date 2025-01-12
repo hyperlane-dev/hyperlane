@@ -285,9 +285,9 @@ checksum = "b7e2991db9cba1223b35dcf186f4a5bf9ff5fdb44abfe346d424fe9107cd4c90"
 
 [[package]]
 name = "http-request"
-version = "8.35.1"
+version = "8.35.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0728a43f54c53ff32eab33f80f2810ca93ae4665202a29fd312d150311947a32"
+checksum = "43962383618a15b8612a4fc9269dae70df9294f5311b623e63d498eabb2543bb"
 dependencies = [
  "brotli",
  "flate2",
@@ -322,7 +322,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "2.46.1"
+version = "2.47.0"
 dependencies = [
  "color-output",
  "file-operation",
@@ -853,9 +853,9 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
 name = "std-macro-extensions"
-version = "0.18.0"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e71c3025435f2ee74bd1f5bb8febb0e60e03dd575bfe62f10f3e99535034a7d4"
+checksum = "eb81c946abc2091d8d58391d0a3adcbc9d60cddbf3acebbc54690c2ba75ea9b1"
 
 [[package]]
 name = "subtle"

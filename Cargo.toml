@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "2.46.1"
+version = "2.47.0"
 edition = "2021"
 authors = ["ltpp-universe <root@ltpp.vip>"] 
 license = "MIT"
@@ -18,14 +18,14 @@ exclude = [
 [dependencies]
 color-output = "6.1.4"
 file-operation = "0.1.1"
-http-request = "8.35.1"
+http-request = "8.35.3"
 http-type = "2.27.1"
 hyperlane-log = "0.29.3"
 hyperlane-time = "0.0.3"
 lombok-macros = "1.7.0"
 recoverable-spawn = "2.0.0"
 recoverable-thread-pool = "1.0.1"
-std-macro-extensions = "0.18.0"
+std-macro-extensions = "0.20.0"
 
 [profile.dev]
 incremental = true
