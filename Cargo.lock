@@ -240,9 +240,12 @@ dependencies = [
 
 [[package]]
 name = "file-operation"
-version = "0.1.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1caeb7f36f832662881e6b3bf785a53621f7043c401796ec11a808ead0b5eb17"
+checksum = "ce83a53c687c548132d8671e8d394dd85c1b5d155958f75fb2c82d9947ab3275"
+dependencies = [
+ "tokio",
+]
 
 [[package]]
 name = "flate2"
@@ -364,7 +367,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "2.48.0"
+version = "3.0.0"
 dependencies = [
  "color-output",
  "file-operation",
@@ -376,13 +379,14 @@ dependencies = [
  "recoverable-spawn",
  "recoverable-thread-pool",
  "std-macro-extensions",
+ "tokio",
 ]
 
 [[package]]
 name = "hyperlane-log"
-version = "0.29.4"
+version = "0.29.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ffa09e55eb5fcfc05a9f94139297bdd09c6139a5e01d8d4a093c6af96811e6e"
+checksum = "92611ab1b53d35ebe6a213a5968d342069f33162f8640ba54d49a1775b945f49"
 dependencies = [
  "file-operation",
  "http-type",

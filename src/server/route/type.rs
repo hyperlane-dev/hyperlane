@@ -1,8 +1,10 @@
 use crate::*;
 
-pub type RouterFunc = dyn Fn(&mut ControllerData) + Send + Sync + 'static;
-pub type RouterFuncBox = Box<RouterFunc>;
-pub type VecRouterFuncBox = Vec<RouterFuncBox>;
-pub type ArcRwLockHashMapRouterFuncBox = ArcRwLock<HashMap<&'static str, RouterFuncBox>>;
+pub type HashMapRouterFuncBox = HashMap<&'static str, BoxDynFunc>;
+pub type AsyncHashMapRouterFuncBox = HashMap<&'static str, BoxAsyncFunc>;
+
+pub type ArcRwLockHashMapRouterFuncBox = ArcRwLock<HashMapRouterFuncBox>;
+pub type AsyncArcRwLockHashMapRouterFuncBox = AsyncArcRwLock<AsyncHashMapRouterFuncBox>;
+
 pub type RouterFuncArcLock =
-    ArcRwLock<HashMap<&'static str, Box<dyn Fn(&mut ControllerData) + Send + Sync>>>;
+    ArcRwLock<HashMap<&'static str, Box<dyn Fn(ArcRwLock<ControllerData>) + Send + Sync>>>;

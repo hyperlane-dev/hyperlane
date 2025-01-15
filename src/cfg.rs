@@ -1,5 +1,5 @@
-#[test]
-fn test_server_basic_usage() {
+#[tokio::test]
+async fn test_server_basic_usage() {
     use crate::*;
 
     fn println(data: &str) {
@@ -56,11 +56,11 @@ fn test_server_basic_usage() {
             .unwrap_or_default()
     }
 
-    fn panic_route(_controller_data: &mut ControllerData) {
+    fn panic_route(_controller_data: ArcRwLock<ControllerData>) {
         panic!("test panic");
     }
 
-    fn run_server() {
+    async fn run_server() {
         let mut server: Server = Server::new();
         server.host("0.0.0.0");
         server.port(60000);
@@ -68,7 +68,9 @@ fn test_server_basic_usage() {
         server.log_dir("./logs");
         server.log_size(1_024_000);
 
-        server.middleware(|controller_data| {
+        server.middleware(|arc_lock_controller_data| {
+            let mut controller_data: RwLockWriteControllerData =
+                arc_lock_controller_data.write().unwrap();
             let request: Request = controller_data.get_request().clone();
             let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
             let host: String = stream
@@ -84,7 +86,9 @@ fn test_server_basic_usage() {
                 .set_header("middleware", "crate");
         });
 
-        server.router("/", |controller_data| {
+        server.router("/", |arc_lock_controller_data| {
+            let controller_data: RwLockWriteControllerData =
+                arc_lock_controller_data.write().unwrap();
             controller_data
                 .get_log()
                 .log_info("visit path /", common_log);
@@ -102,7 +106,31 @@ fn test_server_basic_usage() {
             );
         });
 
-        server.router("/request", |controller_data| {
+        server
+            .async_router("/async", |arc_lock_controller_data| async move {
+                let controller_data: RwLockWriteControllerData =
+                    arc_lock_controller_data.write().unwrap();
+                controller_data
+                    .get_log()
+                    .log_info("visit path /", common_log);
+                let mut response: Response = controller_data.get_response().clone();
+                let body: Vec<u8> = "Async".as_bytes().to_vec();
+                let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
+                let res: ResponseResult = response
+                    .set_body(body)
+                    .set_status_code(200)
+                    .set_header("server", "hyperlane")
+                    .send(&stream);
+                controller_data.get_log().log_info(
+                    format!("Response => {:?}", String::from_utf8_lossy(&res.unwrap())),
+                    common_log,
+                );
+            })
+            .await;
+
+        server.router("/request", |arc_lock_controller_data| {
+            let controller_data: RwLockWriteControllerData =
+                arc_lock_controller_data.write().unwrap();
             controller_data
                 .get_log()
                 .log_info("visit path /request", common_log);
@@ -121,7 +149,9 @@ fn test_server_basic_usage() {
             );
         });
 
-        server.router("/hello", |controller_data| {
+        server.router("/hello", |arc_lock_controller_data| {
+            let controller_data: RwLockWriteControllerData =
+                arc_lock_controller_data.write().unwrap();
             controller_data
                 .get_log()
                 .log_info("visit path /hello", common_log);
@@ -143,36 +173,31 @@ fn test_server_basic_usage() {
         server.listen();
     }
 
-    fn main() {
-        run_server();
-    }
-
     let run_test = || {
-        recoverable_spawn(main);
-        std::thread::sleep(std::time::Duration::from_secs(4));
-        recoverable_spawn(|| {
-            let mut header: HashMap<&str, &str> = HashMap::new();
-            header.insert(ACCEPT, ACCEPT_ANY);
-            header.insert(CONTENT_TYPE, APPLICATION_JSON);
-            header.insert(ACCEPT_ENCODING, ACCEPT_ENCODING_GZIP);
-            let mut body: HashMap<&str, &str> = HashMap::new();
-            body.insert("key", "value");
-            let mut _request_builder = RequestBuilder::new()
-                .post("http://127.0.0.1:60000/")
-                .json(body)
-                .headers(header)
-                .timeout(10000)
-                .redirect()
-                .buffer(4096)
-                .max_redirect_times(8)
-                .http1_1_only()
-                .build();
-            _request_builder
-                .send()
-                .and_then(|response| Ok(response.binary().get_body()))
-                .unwrap_or_default();
-        });
+        let mut header: HashMap<&str, &str> = HashMap::new();
+        header.insert(ACCEPT, ACCEPT_ANY);
+        header.insert(CONTENT_TYPE, APPLICATION_JSON);
+        header.insert(ACCEPT_ENCODING, ACCEPT_ENCODING_GZIP);
+        let mut body: HashMap<&str, &str> = HashMap::new();
+        body.insert("key", "value");
+        let mut _request_builder = RequestBuilder::new()
+            .post("http://127.0.0.1:60000/")
+            .json(body)
+            .headers(header)
+            .timeout(10000)
+            .redirect()
+            .buffer(4096)
+            .max_redirect_times(8)
+            .http1_1_only()
+            .build();
+        _request_builder
+            .send()
+            .and_then(|response| Ok(response.binary().get_body()))
+            .unwrap_or_default();
     };
-    run_test();
-    std::thread::sleep(std::time::Duration::from_secs(6));
+    run_server().await;
+    async_recoverable_spawn(run_server);
+    std::thread::sleep(std::time::Duration::from_secs(2));
+    recoverable_spawn(run_test);
+    std::thread::sleep(std::time::Duration::from_secs(4));
 }

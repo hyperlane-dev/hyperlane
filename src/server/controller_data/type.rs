@@ -1,6 +1,8 @@
-use http_type::*;
-use hyperlane_log::*;
-use lombok_macros::*;
+use crate::*;
+
+pub type ArcRwLockControllerData = ArcRwLock<ControllerData>;
+pub type RwLockWriteControllerData<'a> = RwLockWriteGuard<'a, ControllerData>;
+pub type RwLockReadControllerData<'a> = RwLockReadGuard<'a, ControllerData>;
 
 #[derive(Clone, Debug, Lombok)]
 pub struct ControllerData {

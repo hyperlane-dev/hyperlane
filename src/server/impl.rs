@@ -1,17 +1,4 @@
-use super::{
-    config::r#type::ServerConfig,
-    controller_data::r#type::ControllerData,
-    error::r#type::Error,
-    middleware::r#type::MiddlewareArcLock,
-    r#type::Server,
-    route::r#type::{RouterFuncArcLock, VecRouterFuncBox},
-    tmp::r#type::Tmp,
-};
-use http_type::*;
-use hyperlane_log::*;
-use hyperlane_time::*;
-use recoverable_thread_pool::*;
-use std_macro_extensions::*;
+use crate::*;
 
 impl Default for Server {
     #[inline]
@@ -19,8 +6,10 @@ impl Default for Server {
         Self {
             cfg: Arc::new(RwLock::new(ServerConfig::default())),
             router_func: Arc::new(RwLock::new(HashMap::new())),
-            middleware: Arc::new(RwLock::new(VecRouterFuncBox::default())),
+            middleware: Arc::new(RwLock::new(VecBoxDynFunc::default())),
             tmp: Arc::new(RwLock::new(Tmp::default())),
+            async_router_func: Arc::new(tokio::sync::RwLock::new(hash_map!())),
+            async_middleware: Arc::new(tokio::sync::RwLock::new(vec![])),
         }
     }
 }
@@ -87,7 +76,7 @@ impl Server {
     #[inline]
     pub fn router<F>(&mut self, route: &'static str, func: F) -> &mut Self
     where
-        F: 'static + Send + Sync + Fn(&mut ControllerData),
+        F: Func,
     {
         if let Ok(mut router_func) = self.router_func.write() {
             router_func.insert(route, Box::new(func));
@@ -98,10 +87,53 @@ impl Server {
     #[inline]
     pub fn middleware<F>(&mut self, func: F) -> &mut Self
     where
-        F: 'static + Send + Sync + Fn(&mut ControllerData),
+        F: Func,
     {
         if let Ok(mut middleware) = self.middleware.write() {
             middleware.push(Box::new(func));
+        }
+        self
+    }
+
+    #[inline]
+    pub async fn async_router<F, Fut>(&mut self, route: &'static str, func: F) -> &mut Self
+    where
+        F: AsyncFuncWithoutPin<Fut>,
+        Fut: Future<Output = ()> + Send + Sync + 'static,
+    {
+        {
+            let has_route: bool = match self.router_func.read() {
+                Ok(router_func_map) => router_func_map.contains_key(route),
+                Err(_) => false,
+            };
+            if !has_route {
+                let mut mut_async_router_func: tokio::sync::RwLockWriteGuard<
+                    '_,
+                    HashMap<&str, Box<dyn AsyncFunc>>,
+                > = self.async_router_func.write().await;
+                mut_async_router_func.insert(
+                    route,
+                    Box::new(move |controller_data| Box::pin(func(controller_data))),
+                );
+            }
+        }
+        self
+    }
+
+    #[inline]
+    pub async fn async_middleware<F, Fut>(&mut self, func: F) -> &mut Self
+    where
+        F: AsyncFuncWithoutPin<Fut>,
+        Fut: Future<Output = ()> + Send + Sync + 'static,
+    {
+        {
+            let mut mut_async_middleware: tokio::sync::RwLockWriteGuard<
+                '_,
+                Vec<Box<dyn AsyncFunc>>,
+            > = self.async_middleware.write().await;
+            mut_async_middleware.push(Box::new(move |controller_data| {
+                Box::pin(func(controller_data))
+            }));
         }
         self
     }
@@ -124,12 +156,12 @@ impl Server {
             Ok(())
         });
         let addr: String = format!("{}{}{}", host, COLON_SPACE_SYMBOL, port);
-        let listener_res: Result<TcpListener, Error> =
-            TcpListener::bind(&addr).map_err(|e| Error::TcpBindError(e.to_string()));
+        let listener_res: Result<TcpListener, ServerError> =
+            TcpListener::bind(&addr).map_err(|e| ServerError::TcpBindError(e.to_string()));
         if listener_res.is_err() {
             let _ = self.get_tmp().write().and_then(|tmp| {
                 tmp.get_log().log_error(
-                    format!("{}", listener_res.err().unwrap_or(Error::Unknown)),
+                    format!("{}", listener_res.err().unwrap_or(ServerError::Unknown)),
                     Self::common_log,
                 );
                 Ok(())
@@ -144,17 +176,22 @@ impl Server {
             }
             let stream: TcpStream = stream_res.unwrap();
             let stream_arc: Arc<TcpStream> = Arc::new(stream);
-            let middleware_arc: MiddlewareArcLock = Arc::clone(&self.middleware);
-            let router_func_arc: RouterFuncArcLock = Arc::clone(&self.router_func);
-            let thread_pool_func_tmp_arc: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
-            let error_handle_tmp_arc: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
-            let thread_pool_func = move || {
-                let log: Log = thread_pool_func_tmp_arc
+            let middleware_arc_lock: MiddlewareArcLock = Arc::clone(&self.middleware);
+            let async_middleware_arc_lock: AsyncArcRwLockHashMapMiddlewareFuncBox =
+                Arc::clone(&self.async_middleware);
+            let router_func_arc_lock: RouterFuncArcLock = Arc::clone(&self.router_func);
+            let async_router_func_arc_lock: AsyncArcRwLockHashMapRouterFuncBox =
+                Arc::clone(&self.async_router_func);
+            let thread_pool_func_tmp_arc_lock: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
+            let error_handle_tmp_arc_lock: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
+            let thread_pool_func = move || async move {
+                let log: Log = thread_pool_func_tmp_arc_lock
                     .read()
                     .and_then(|tmp| Ok(tmp.log.clone()))
                     .unwrap_or_default();
-                let request_obj_res: Result<Request, Error> = Request::new(&stream_arc.as_ref())
-                    .map_err(|err| Error::InvalidHttpRequest(err));
+                let request_obj_res: Result<Request, ServerError> =
+                    Request::new(&stream_arc.as_ref())
+                        .map_err(|err| ServerError::InvalidHttpRequest(err));
                 if let Ok(request_obj) = request_obj_res {
                     let route: &String = &request_obj.get_path();
                     let mut controller_data: ControllerData = ControllerData::new();
@@ -163,25 +200,39 @@ impl Server {
                         .set_response(Response::default())
                         .set_request(request_obj.clone())
                         .set_log(log);
-                    if let Ok(middleware_guard) = middleware_arc.read() {
+                    let arc_lock_controller_data: ArcRwLockControllerData =
+                        Arc::new(RwLock::new(controller_data));
+                    if let Ok(middleware_guard) = middleware_arc_lock.read() {
                         for middleware in middleware_guard.iter() {
-                            middleware(&mut controller_data);
+                            middleware(arc_lock_controller_data.clone());
                         }
                     }
-                    if let Ok(router_func) = router_func_arc.read() {
+                    let async_middleware_guard: tokio::sync::RwLockReadGuard<'_, VecBoxAsyncFunc> =
+                        async_middleware_arc_lock.read().await;
+                    for async_middleware in async_middleware_guard.iter() {
+                        async_middleware(arc_lock_controller_data.clone()).await;
+                    }
+                    if let Ok(router_func) = router_func_arc_lock.read() {
                         if let Some(func) = router_func.get(route.as_str()) {
-                            func(&mut controller_data);
+                            func(arc_lock_controller_data.clone());
                         }
+                    }
+                    let async_router_func_guard: tokio::sync::RwLockReadGuard<
+                        '_,
+                        AsyncHashMapRouterFuncBox,
+                    > = async_router_func_arc_lock.read().await;
+                    if let Some(async_func) = async_router_func_guard.get(route.as_str()) {
+                        async_func(arc_lock_controller_data.clone()).await;
                     }
                 }
             };
-            let handle_error_func = move |err_str: &str| {
-                let err_string: String = err_str.to_owned();
-                if let Ok(tem) = error_handle_tmp_arc.read() {
-                    tem.get_log().log_error(err_string, Self::common_log);
+            let handle_error_func = move |err_string: Arc<String>| async move {
+                if let Ok(tem) = error_handle_tmp_arc_lock.read() {
+                    tem.get_log()
+                        .log_error(err_string.to_string(), Self::common_log);
                 }
             };
-            let _ = thread_pool.execute(thread_pool_func, handle_error_func, || {});
+            let _ = thread_pool.async_execute(thread_pool_func, handle_error_func, || async {});
         }
         self
     }
