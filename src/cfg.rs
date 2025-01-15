@@ -195,7 +195,6 @@ async fn test_server_basic_usage() {
             .and_then(|response| Ok(response.binary().get_body()))
             .unwrap_or_default();
     };
-    run_server().await;
     async_recoverable_spawn(run_server);
     std::thread::sleep(std::time::Duration::from_secs(2));
     recoverable_spawn(run_test);
