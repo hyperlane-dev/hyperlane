@@ -56,8 +56,121 @@ async fn test_server_basic_usage() {
             .unwrap_or_default()
     }
 
-    fn panic_route(_controller_data: ArcRwLock<ControllerData>) {
+    fn test_sync_middleware(arc_lock_controller_data: ArcRwLockControllerData) {
+        let mut controller_data: RwLockWriteControllerData =
+            arc_lock_controller_data.write().unwrap();
+        let request: Request = controller_data.get_request().clone();
+        let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
+        let host: String = stream
+            .peer_addr()
+            .and_then(|host| Ok(host.to_string()))
+            .unwrap_or("Unknown".to_owned());
+        controller_data.get_log().log_debug(
+            format!("Request host => {}\n{:#?}", host, request),
+            common_log,
+        );
+        controller_data
+            .get_mut_request()
+            .set_header("middleware", "crate");
+    }
+
+    async fn test_async_middleware(arc_lock_controller_data: ArcRwLockControllerData) {
+        let mut controller_data: RwLockWriteControllerData =
+            arc_lock_controller_data.write().unwrap();
+        let request: Request = controller_data.get_request().clone();
+        let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
+        let host: String = stream
+            .peer_addr()
+            .and_then(|host| Ok(host.to_string()))
+            .unwrap_or("Unknown".to_owned());
+        controller_data.get_log().log_debug(
+            format!("Request host => {}\n{:#?}", host, request),
+            common_log,
+        );
+        controller_data
+            .get_mut_request()
+            .set_header("middleware", "crate");
+    }
+
+    fn sync_root_router(arc_lock_controller_data: ArcRwLockControllerData) {
+        let controller_data: RwLockWriteControllerData = arc_lock_controller_data.write().unwrap();
+        controller_data
+            .get_log()
+            .log_info("visit path /", common_log);
+        let mut response: Response = controller_data.get_response().clone();
+        let body: Vec<u8> = "404 Not Found".as_bytes().to_vec();
+        let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
+        let res: ResponseResult = response
+            .set_body(body)
+            .set_status_code(404)
+            .set_header("server", "hyperlane")
+            .send(&stream);
+        controller_data.get_log().log_info(
+            format!("Response => {:?}", String::from_utf8_lossy(&res.unwrap())),
+            common_log,
+        );
+    }
+
+    fn sync_request_router(arc_lock_controller_data: ArcRwLockControllerData) {
+        let controller_data: RwLockWriteControllerData = arc_lock_controller_data.write().unwrap();
+        controller_data
+            .get_log()
+            .log_info("visit path /request", common_log);
+        let mut response: Response = controller_data.get_response().clone();
+        let body: Vec<u8> = send_request();
+        let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
+        let res: ResponseResult = response
+            .set_body(body)
+            .set_status_code(200)
+            .set_header("server", "hyperlane")
+            .set_header(CONTENT_TYPE, APPLICATION_JSON)
+            .send(&stream);
+        controller_data.get_log().log_info(
+            format!("Response => {:?}", String::from_utf8_lossy(&res.unwrap())),
+            common_log,
+        );
+    }
+
+    fn sync_hello_router(arc_lock_controller_data: ArcRwLockControllerData) {
+        let controller_data: RwLockWriteControllerData = arc_lock_controller_data.write().unwrap();
+        controller_data
+            .get_log()
+            .log_info("visit path /hello", common_log);
+        let mut response: Response = controller_data.get_response().clone();
+        let body: Vec<u8> = "hello world!".as_bytes().to_vec();
+        let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
+        let res: ResponseResult = response
+            .set_body(body)
+            .set_status_code(200)
+            .set_header("server", "hyperlane")
+            .send(&stream);
+        controller_data.get_log().log_info(
+            format!("Response => {:?}", String::from_utf8_lossy(&res.unwrap())),
+            common_log,
+        );
+    }
+
+    fn sync_panic_route(_controller_data: ArcRwLock<ControllerData>) {
         panic!("test panic");
+    }
+
+    async fn async_test_async_router(arc_lock_controller_data: ArcRwLockControllerData) {
+        let controller_data: RwLockWriteControllerData = arc_lock_controller_data.write().unwrap();
+        controller_data
+            .get_log()
+            .log_info("visit path /", common_log);
+        let mut response: Response = controller_data.get_response().clone();
+        let body: Vec<u8> = "Async".as_bytes().to_vec();
+        let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
+        let res: ResponseResult = response
+            .set_body(body)
+            .set_status_code(200)
+            .set_header("server", "hyperlane")
+            .send(&stream);
+        controller_data.get_log().log_info(
+            format!("Response => {:?}", String::from_utf8_lossy(&res.unwrap())),
+            common_log,
+        );
     }
 
     async fn run_server() {
@@ -67,109 +180,15 @@ async fn test_server_basic_usage() {
         server.thread_pool_size(1);
         server.log_dir("./logs");
         server.log_size(1_024_000);
-
-        server.middleware(|arc_lock_controller_data| {
-            let mut controller_data: RwLockWriteControllerData =
-                arc_lock_controller_data.write().unwrap();
-            let request: Request = controller_data.get_request().clone();
-            let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
-            let host: String = stream
-                .peer_addr()
-                .and_then(|host| Ok(host.to_string()))
-                .unwrap_or("Unknown".to_owned());
-            controller_data.get_log().log_debug(
-                format!("Request host => {}\n{:#?}", host, request),
-                common_log,
-            );
-            controller_data
-                .get_mut_request()
-                .set_header("middleware", "crate");
-        });
-
-        server.router("/", |arc_lock_controller_data| {
-            let controller_data: RwLockWriteControllerData =
-                arc_lock_controller_data.write().unwrap();
-            controller_data
-                .get_log()
-                .log_info("visit path /", common_log);
-            let mut response: Response = controller_data.get_response().clone();
-            let body: Vec<u8> = "404 Not Found".as_bytes().to_vec();
-            let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
-            let res: ResponseResult = response
-                .set_body(body)
-                .set_status_code(404)
-                .set_header("server", "hyperlane")
-                .send(&stream);
-            controller_data.get_log().log_info(
-                format!("Response => {:?}", String::from_utf8_lossy(&res.unwrap())),
-                common_log,
-            );
-        });
-
+        server.middleware(test_sync_middleware);
+        server.async_middleware(test_async_middleware).await;
+        server.router("/", sync_root_router);
+        server.router("/request", sync_request_router);
+        server.router("/hello", sync_hello_router);
+        server.router("/panic", sync_panic_route);
         server
-            .async_router("/async", |arc_lock_controller_data| async move {
-                let controller_data: RwLockWriteControllerData =
-                    arc_lock_controller_data.write().unwrap();
-                controller_data
-                    .get_log()
-                    .log_info("visit path /", common_log);
-                let mut response: Response = controller_data.get_response().clone();
-                let body: Vec<u8> = "Async".as_bytes().to_vec();
-                let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
-                let res: ResponseResult = response
-                    .set_body(body)
-                    .set_status_code(200)
-                    .set_header("server", "hyperlane")
-                    .send(&stream);
-                controller_data.get_log().log_info(
-                    format!("Response => {:?}", String::from_utf8_lossy(&res.unwrap())),
-                    common_log,
-                );
-            })
+            .async_router("/test/async", async_test_async_router)
             .await;
-
-        server.router("/request", |arc_lock_controller_data| {
-            let controller_data: RwLockWriteControllerData =
-                arc_lock_controller_data.write().unwrap();
-            controller_data
-                .get_log()
-                .log_info("visit path /request", common_log);
-            let mut response: Response = controller_data.get_response().clone();
-            let body: Vec<u8> = send_request();
-            let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
-            let res: ResponseResult = response
-                .set_body(body)
-                .set_status_code(200)
-                .set_header("server", "hyperlane")
-                .set_header(CONTENT_TYPE, APPLICATION_JSON)
-                .send(&stream);
-            controller_data.get_log().log_info(
-                format!("Response => {:?}", String::from_utf8_lossy(&res.unwrap())),
-                common_log,
-            );
-        });
-
-        server.router("/hello", |arc_lock_controller_data| {
-            let controller_data: RwLockWriteControllerData =
-                arc_lock_controller_data.write().unwrap();
-            controller_data
-                .get_log()
-                .log_info("visit path /hello", common_log);
-            let mut response: Response = controller_data.get_response().clone();
-            let body: Vec<u8> = "hello world!".as_bytes().to_vec();
-            let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
-            let res: ResponseResult = response
-                .set_body(body)
-                .set_status_code(200)
-                .set_header("server", "hyperlane")
-                .send(&stream);
-            controller_data.get_log().log_info(
-                format!("Response => {:?}", String::from_utf8_lossy(&res.unwrap())),
-                common_log,
-            );
-        });
-
-        server.router("/panic", panic_route);
         server.listen();
     }
 
