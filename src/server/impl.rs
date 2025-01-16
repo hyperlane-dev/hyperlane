@@ -160,7 +160,7 @@ impl Server {
             TcpListener::bind(&addr).map_err(|e| ServerError::TcpBindError(e.to_string()));
         if listener_res.is_err() {
             let _ = self.get_tmp().write().and_then(|tmp| {
-                tmp.get_log().log_error(
+                tmp.get_log().error(
                     format!("{}", listener_res.err().unwrap_or(ServerError::Unknown)),
                     Self::common_log,
                 );
@@ -229,10 +229,10 @@ impl Server {
             let handle_error_func = move |err_string: Arc<String>| async move {
                 if let Ok(tem) = error_handle_tmp_arc_lock.read() {
                     tem.get_log()
-                        .log_error(err_string.to_string(), Self::common_log);
+                        .error(err_string.to_string(), Self::common_log);
                 }
             };
-            let _ = thread_pool.async_execute(thread_pool_func, handle_error_func, || async {});
+            let _ = thread_pool.async_execute_with_catch(thread_pool_func, handle_error_func);
         }
         self
     }
