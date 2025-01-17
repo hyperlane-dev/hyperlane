@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "3.1.2"
+version = "3.2.0"
 edition = "2021"
 authors = ["ltpp-universe <root@ltpp.vip>"] 
 license = "MIT"
@@ -16,6 +16,7 @@ exclude = [
 ]
 
 [dependencies]
+clonelicious = "0.0.2"
 color-output = "6.1.4"
 file-operation = "0.3.0"
 http-request = "8.35.3"

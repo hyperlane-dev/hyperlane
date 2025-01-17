@@ -182,6 +182,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "clonelicious"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b284715abcdc38629cb63e7480fa8c9feb1fa3d9a93f1e1a5dd64cae33b82855"
+
+[[package]]
 name = "cmake"
 version = "0.1.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -367,8 +373,9 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "3.1.2"
+version = "3.2.0"
 dependencies = [
+ "clonelicious",
  "color-output",
  "file-operation",
  "http-request",
