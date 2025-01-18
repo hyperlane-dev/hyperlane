@@ -185,6 +185,16 @@ async fn test_server_basic_usage() {
         server
             .async_router("/test/async", async_test_async_router)
             .await;
+        let test_string: String = String::from("test");
+        server
+            .async_router(
+                "/test/async_func",
+                async_func!(test_string, |data| {
+                    println(&test_string);
+                    println(&format!("{:?}", data));
+                }),
+            )
+            .await;
         server.listen();
     }
 

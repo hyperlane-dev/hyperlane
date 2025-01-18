@@ -42,6 +42,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-move"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c85c057a8ae3f90fdeabd009603bd4165684aadf7c6ee36c0eda5dbdd991c5da"
+dependencies = [
+ "tokio",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -373,8 +382,9 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "3.2.0"
+version = "3.2.1"
 dependencies = [
+ "async-move",
  "clonelicious",
  "color-output",
  "file-operation",
