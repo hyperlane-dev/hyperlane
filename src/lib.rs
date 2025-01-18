@@ -3,7 +3,7 @@ pub(crate) mod server;
 pub(crate) mod utils;
 
 pub use crate::utils::thread::*;
-pub use async_move::*;
+pub use async_func::*;
 pub use clonelicious::*;
 pub use color_output::*;
 pub use file_operation::*;

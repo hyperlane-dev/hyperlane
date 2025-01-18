@@ -185,7 +185,7 @@ async fn test_server_basic_usage() {
         server
             .async_router("/test/async", async_test_async_router)
             .await;
-        let test_string: String = String::from("test");
+        let test_string: String = "test".to_owned();
         server
             .async_router(
                 "/test/async_func",
