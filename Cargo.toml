@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "3.6.1"
+version = "3.6.2"
 edition = "2021"
 authors = ["ltpp-universe <root@ltpp.vip>"] 
 license = "MIT"
@@ -31,11 +31,14 @@ std-macro-extensions = "0.20.1"
 tokio = { version = "1.43.0", features = ["full"] }
 
 [profile.dev]
-incremental = true
+incremental = false
 opt-level = 3
 lto = true
 panic = "abort"
 debug = false
+codegen-units = 1
+strip = "debuginfo"
+backtrace = "off"
 
 [profile.release]
 incremental = false
@@ -43,3 +46,6 @@ opt-level = 3
 lto = true
 panic = "abort"
 debug = false
+codegen-units = 1
+strip = "debuginfo"
+backtrace = "off"

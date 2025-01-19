@@ -175,24 +175,21 @@ impl Server {
         let addr: String = format!("{}{}{}", host, COLON_SPACE_SYMBOL, port);
         let listener_res: Result<TcpListener, ServerError> =
             TcpListener::bind(&addr).map_err(|e| ServerError::TcpBindError(e.to_string()));
-        if listener_res.is_err() {
+        if let Err(err) = listener_res {
             let _ = self.get_tmp().write().and_then(|tmp| {
-                tmp.get_log()
-                    .error(listener_res.err().unwrap().to_string(), Self::common_log);
+                tmp.get_log().error(err.to_string(), Self::common_log);
                 Ok(())
             });
             return self;
         }
         let tcp_listener: TcpListener = listener_res.unwrap();
         let thread_pool: ThreadPool = ThreadPool::new(thread_pool_size);
-
         for stream_res in tcp_listener.incoming() {
-            if stream_res.is_err() {
+            if let Err(err) = stream_res {
                 let tmp_arc_lock: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
                 let _ = run_function(move || {
                     if let Ok(tem) = tmp_arc_lock.read() {
-                        tem.get_log()
-                            .error(stream_res.err().unwrap().to_string(), Self::common_log);
+                        tem.get_log().error(err.to_string(), Self::common_log);
                     }
                 });
                 continue;
