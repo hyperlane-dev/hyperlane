@@ -327,9 +327,9 @@ dependencies = [
 
 [[package]]
 name = "http-compress"
-version = "1.13.2"
+version = "1.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b44570f84d8d63080359cdf6111d4430688ccd00ca81c6bbf99707e899137af7"
+checksum = "15f0552f4e196c7f8363fbc522c197729d3ea25131b46af29fc369daaf88859b"
 dependencies = [
  "brotli",
  "flate2",
@@ -345,9 +345,9 @@ checksum = "b7e2991db9cba1223b35dcf186f4a5bf9ff5fdb44abfe346d424fe9107cd4c90"
 
 [[package]]
 name = "http-request"
-version = "8.35.4"
+version = "8.35.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15f4b6b72839d644b35eb4aa3d0b8734161e1fcfb3fd0bbd047d38f263048dfc"
+checksum = "f868da6ba12357ad1dc0df07c8d95e396c84a8c8da250f56b8644e790f237269"
 dependencies = [
  "brotli",
  "flate2",
@@ -366,9 +366,9 @@ dependencies = [
 
 [[package]]
 name = "http-type"
-version = "2.29.0"
+version = "2.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f62d46f0d2f1e5f6ee6edd869f5fc934557e9b1a42957a574cc98a90c8d12d20"
+checksum = "426e0b4ad34b592d99f61af6053727f63001b7982e77396336945df4cff0e650"
 dependencies = [
  "hex",
  "http-constant",
@@ -383,7 +383,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "3.4.1"
+version = "3.4.2"
 dependencies = [
  "async-func",
  "clonelicious",
@@ -402,9 +402,9 @@ dependencies = [
 
 [[package]]
 name = "hyperlane-log"
-version = "1.1.2"
+version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb14154a08b2d1adf32a32f6af10187936c7b3f7409c90cffb0001a65687e1a4"
+checksum = "e0e038c432934b7c4f2ff167c0e1fd47d37b27828f90b4b7dc70386407859550"
 dependencies = [
  "file-operation",
  "http-type",
@@ -953,9 +953,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.135"
+version = "1.0.136"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b0d7ba2887406110130a978386c4e1befb98c674b4fba677954e4db976630d9"
+checksum = "336a0c23cf42a38d9eaa7cd22c7040d04e1228a19a933890805ffd00a16437d2"
 dependencies = [
  "itoa",
  "memchr",
