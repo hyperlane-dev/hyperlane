@@ -125,10 +125,9 @@ fn sync_root_router(arc_lock_controller_data: ArcRwLockControllerData) {
         .set_status_code(404)
         .set_header("server", "hyperlane")
         .send(&stream);
-    controller_data.get_log().info(
-        format!("Response => {:?}", String::from_utf8_lossy(&res.unwrap())),
-        common_log,
-    );
+    controller_data
+        .get_log()
+        .info(format!("Response result => {:?}", res), common_log);
 }
 
 fn sync_request_router(arc_lock_controller_data: ArcRwLockControllerData) {
@@ -145,10 +144,9 @@ fn sync_request_router(arc_lock_controller_data: ArcRwLockControllerData) {
         .set_header("server", "hyperlane")
         .set_header(CONTENT_TYPE, APPLICATION_JSON)
         .send(&stream);
-    controller_data.get_log().info(
-        format!("Response => {:?}", String::from_utf8_lossy(&res.unwrap())),
-        common_log,
-    );
+    controller_data
+        .get_log()
+        .info(format!("Response result => {:?}", res), common_log);
 }
 
 fn sync_hello_router(arc_lock_controller_data: ArcRwLockControllerData) {
@@ -164,10 +162,9 @@ fn sync_hello_router(arc_lock_controller_data: ArcRwLockControllerData) {
         .set_status_code(200)
         .set_header("server", "hyperlane")
         .send(&stream);
-    controller_data.get_log().info(
-        format!("Response => {:?}", String::from_utf8_lossy(&res.unwrap())),
-        common_log,
-    );
+    controller_data
+        .get_log()
+        .info(format!("Response result => {:?}", res), common_log);
 }
 
 fn sync_panic_route(_controller_data: ArcRwLock<ControllerData>) {
@@ -185,10 +182,9 @@ async fn async_test_async_router(arc_lock_controller_data: ArcRwLockControllerDa
         .set_status_code(200)
         .set_header("server", "hyperlane")
         .send(&stream);
-    controller_data.get_log().info(
-        format!("Response => {:?}", String::from_utf8_lossy(&res.unwrap())),
-        common_log,
-    );
+    controller_data
+        .get_log()
+        .info(format!("Response result => {:?}", res), common_log);
 }
 
 async fn run_server() {
