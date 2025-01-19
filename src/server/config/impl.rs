@@ -9,7 +9,8 @@ impl<'a> Default for ServerConfig<'a> {
             port: DEFAULT_WEB_PORT,
             thread_pool_size: get_thread_count(),
             log_dir: DEFAULT_LOG_DIR,
-            log_size: 1_024_000_000,
+            log_size: DEFAULT_LOG_FILE_SIZE,
+            interval_millis: DEFAULT_LOG_INTERVAL_MILLIS,
         }
     }
 }

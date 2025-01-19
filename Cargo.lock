@@ -327,9 +327,9 @@ dependencies = [
 
 [[package]]
 name = "http-compress"
-version = "1.13.1"
+version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11c3cc34cca2446f41a105b17cb7ef8dcb3103931313da19d4810e13a2ac027d"
+checksum = "b44570f84d8d63080359cdf6111d4430688ccd00ca81c6bbf99707e899137af7"
 dependencies = [
  "brotli",
  "flate2",
@@ -345,9 +345,9 @@ checksum = "b7e2991db9cba1223b35dcf186f4a5bf9ff5fdb44abfe346d424fe9107cd4c90"
 
 [[package]]
 name = "http-request"
-version = "8.35.3"
+version = "8.35.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43962383618a15b8612a4fc9269dae70df9294f5311b623e63d498eabb2543bb"
+checksum = "15f4b6b72839d644b35eb4aa3d0b8734161e1fcfb3fd0bbd047d38f263048dfc"
 dependencies = [
  "brotli",
  "flate2",
@@ -366,9 +366,9 @@ dependencies = [
 
 [[package]]
 name = "http-type"
-version = "2.28.0"
+version = "2.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "174769d779d66bad779f51206292b7e3e4c10f412731b7a2645bb3bbf23cc882"
+checksum = "f62d46f0d2f1e5f6ee6edd869f5fc934557e9b1a42957a574cc98a90c8d12d20"
 dependencies = [
  "hex",
  "http-constant",
@@ -377,12 +377,13 @@ dependencies = [
  "serde-xml-rs",
  "serde_json",
  "serde_urlencoded",
+ "tokio",
  "url",
 ]
 
 [[package]]
 name = "hyperlane"
-version = "3.4.0"
+version = "3.4.1"
 dependencies = [
  "async-func",
  "clonelicious",
@@ -401,9 +402,9 @@ dependencies = [
 
 [[package]]
 name = "hyperlane-log"
-version = "1.0.0"
+version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dae2370e84be49f081fcb882dd29a9f1df043d713cd4916d32296c9b02fe85e3"
+checksum = "cb14154a08b2d1adf32a32f6af10187936c7b3f7409c90cffb0001a65687e1a4"
 dependencies = [
  "file-operation",
  "http-type",
@@ -1019,9 +1020,9 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
 name = "std-macro-extensions"
-version = "0.20.0"
+version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb81c946abc2091d8d58391d0a3adcbc9d60cddbf3acebbc54690c2ba75ea9b1"
+checksum = "ae15297f096f8e3c653a5b245a9cf9fe30930f060db9f6d80fdc804690da3e7f"
 
 [[package]]
 name = "subtle"

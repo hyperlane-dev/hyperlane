@@ -176,6 +176,7 @@ async fn test_server_basic_usage() {
         server.thread_pool_size(1);
         server.log_dir("./logs");
         server.log_size(1_024_000);
+        server.log_interval_millis(1000);
         server.middleware(test_sync_middleware);
         server.async_middleware(test_async_middleware).await;
         server.router("/", sync_root_router);

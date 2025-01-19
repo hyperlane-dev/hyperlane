@@ -1,4 +1,8 @@
 use crate::*;
+use std::{
+    future::Future,
+    net::{TcpListener, TcpStream},
+};
 
 impl Default for Server {
     #[inline]
@@ -68,6 +72,19 @@ impl Server {
         });
         let _ = self.get_tmp().write().and_then(|mut tmp| {
             tmp.log.set_file_size(log_size);
+            Ok(())
+        });
+        self
+    }
+
+    #[inline]
+    pub fn log_interval_millis(&mut self, interval_millis: usize) -> &mut Self {
+        let _ = self.get_cfg().write().and_then(|mut cfg| {
+            cfg.set_interval_millis(interval_millis);
+            Ok(())
+        });
+        let _ = self.get_tmp().write().and_then(|mut tmp| {
+            tmp.log.set_interval_millis(interval_millis);
             Ok(())
         });
         self
