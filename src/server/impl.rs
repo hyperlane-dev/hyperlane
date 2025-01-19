@@ -177,10 +177,8 @@ impl Server {
             TcpListener::bind(&addr).map_err(|e| ServerError::TcpBindError(e.to_string()));
         if listener_res.is_err() {
             let _ = self.get_tmp().write().and_then(|tmp| {
-                tmp.get_log().error(
-                    format!("{}", listener_res.err().unwrap_or(ServerError::Unknown)),
-                    Self::common_log,
-                );
+                tmp.get_log()
+                    .error(listener_res.err().unwrap().to_string(), Self::common_log);
                 Ok(())
             });
             return self;
