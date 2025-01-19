@@ -190,6 +190,13 @@ impl Server {
 
         for stream_res in tcp_listener.incoming() {
             if stream_res.is_err() {
+                let tmp_arc_lock: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
+                let _ = run_function(move || {
+                    if let Ok(tem) = tmp_arc_lock.read() {
+                        tem.get_log()
+                            .error(stream_res.err().unwrap().to_string(), Self::common_log);
+                    }
+                });
                 continue;
             }
             let stream: TcpStream = stream_res.unwrap();
@@ -207,36 +214,34 @@ impl Server {
                     .read()
                     .and_then(|tmp| Ok(tmp.log.clone()))
                     .unwrap_or_default();
-                let request_obj_res: Result<Request, ServerError> =
-                    Request::new(&stream_arc.as_ref())
-                        .map_err(|err| ServerError::InvalidHttpRequest(err));
-                if let Ok(request_obj) = request_obj_res {
-                    let route: &String = &request_obj.get_path().clone();
-                    let mut controller_data: ControllerData = ControllerData::new();
-                    controller_data
-                        .set_stream(Some(stream_arc))
-                        .set_request(request_obj)
-                        .set_log(log);
-                    let arc_lock_controller_data: ArcRwLockControllerData =
-                        Arc::new(RwLock::new(controller_data));
-                    if let Ok(middleware_guard) = middleware_arc_lock.read() {
-                        for middleware in middleware_guard.iter() {
-                            middleware(arc_lock_controller_data.clone());
-                        }
+                let request_obj: Request = Request::new(&stream_arc.as_ref())
+                    .map_err(|err| ServerError::InvalidHttpRequest(err))
+                    .unwrap();
+                let route: &String = &request_obj.get_path().clone();
+                let mut controller_data: ControllerData = ControllerData::new();
+                controller_data
+                    .set_stream(Some(stream_arc))
+                    .set_request(request_obj)
+                    .set_log(log);
+                let arc_lock_controller_data: ArcRwLockControllerData =
+                    Arc::new(RwLock::new(controller_data));
+                if let Ok(middleware_guard) = middleware_arc_lock.read() {
+                    for middleware in middleware_guard.iter() {
+                        middleware(arc_lock_controller_data.clone());
                     }
-                    for async_middleware in async_middleware_arc_lock.read().await.iter() {
-                        async_middleware(arc_lock_controller_data.clone()).await;
+                }
+                for async_middleware in async_middleware_arc_lock.read().await.iter() {
+                    async_middleware(arc_lock_controller_data.clone()).await;
+                }
+                if let Ok(router_func) = router_func_arc_lock.read() {
+                    if let Some(func) = router_func.get(route.as_str()) {
+                        func(arc_lock_controller_data.clone());
                     }
-                    if let Ok(router_func) = router_func_arc_lock.read() {
-                        if let Some(func) = router_func.get(route.as_str()) {
-                            func(arc_lock_controller_data.clone());
-                        }
-                    }
-                    if let Some(async_func) =
-                        async_router_func_arc_lock.read().await.get(route.as_str())
-                    {
-                        async_func(arc_lock_controller_data.clone()).await;
-                    }
+                }
+                if let Some(async_func) =
+                    async_router_func_arc_lock.read().await.get(route.as_str())
+                {
+                    async_func(arc_lock_controller_data.clone()).await;
                 }
             };
             let handle_error_func = move |err_string: Arc<String>| async move {

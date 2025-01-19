@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "3.4.3"
+version = "3.4.5"
 edition = "2021"
 authors = ["ltpp-universe <root@ltpp.vip>"] 
 license = "MIT"
@@ -20,10 +20,10 @@ async-func = "0.1.0"
 clonelicious = "1.0.0"
 color-output = "6.1.4"
 file-operation = "0.3.0"
-http-request = "8.35.5"
-http-type = "2.30.0"
-hyperlane-log = "1.1.3"
-hyperlane-time = "0.0.3"
+http-request = "8.35.6"
+http-type = "2.30.1"
+hyperlane-log = "1.1.4"
+hyperlane-time = "0.0.4"
 lombok-macros = "1.7.0"
 recoverable-spawn = "3.3.0"
 recoverable-thread-pool = "2.0.1"
@@ -35,8 +35,11 @@ incremental = true
 opt-level = 3
 lto = true
 panic = "abort"
+debug = false
 
 [profile.release]
+incremental = false
 opt-level = 3
 lto = true
 panic = "abort"
+debug = false
