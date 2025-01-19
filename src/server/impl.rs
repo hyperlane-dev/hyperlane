@@ -187,6 +187,7 @@ impl Server {
         }
         let tcp_listener: TcpListener = listener_res.unwrap();
         let thread_pool: ThreadPool = ThreadPool::new(thread_pool_size);
+
         for stream_res in tcp_listener.incoming() {
             if stream_res.is_err() {
                 continue;
@@ -199,10 +200,10 @@ impl Server {
             let router_func_arc_lock: RouterFuncArcLock = Arc::clone(&self.router_func);
             let async_router_func_arc_lock: AsyncArcRwLockHashMapRouterFuncBox =
                 Arc::clone(&self.async_router_func);
-            let thread_pool_func_tmp_arc_lock: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
+            let tmp_arc_lock: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
             let error_handle_tmp_arc_lock: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
             let thread_pool_func = move || async move {
-                let log: Log = thread_pool_func_tmp_arc_lock
+                let log: Log = tmp_arc_lock
                     .read()
                     .and_then(|tmp| Ok(tmp.log.clone()))
                     .unwrap_or_default();
@@ -210,12 +211,11 @@ impl Server {
                     Request::new(&stream_arc.as_ref())
                         .map_err(|err| ServerError::InvalidHttpRequest(err));
                 if let Ok(request_obj) = request_obj_res {
-                    let route: &String = &request_obj.get_path();
+                    let route: &String = &request_obj.get_path().clone();
                     let mut controller_data: ControllerData = ControllerData::new();
                     controller_data
-                        .set_stream(Some(stream_arc.clone()))
-                        .set_response(Response::default())
-                        .set_request(request_obj.clone())
+                        .set_stream(Some(stream_arc))
+                        .set_request(request_obj)
                         .set_log(log);
                     let arc_lock_controller_data: ArcRwLockControllerData =
                         Arc::new(RwLock::new(controller_data));
@@ -224,9 +224,7 @@ impl Server {
                             middleware(arc_lock_controller_data.clone());
                         }
                     }
-                    let async_middleware_guard: tokio::sync::RwLockReadGuard<'_, VecBoxAsyncFunc> =
-                        async_middleware_arc_lock.read().await;
-                    for async_middleware in async_middleware_guard.iter() {
+                    for async_middleware in async_middleware_arc_lock.read().await.iter() {
                         async_middleware(arc_lock_controller_data.clone()).await;
                     }
                     if let Ok(router_func) = router_func_arc_lock.read() {
@@ -234,11 +232,9 @@ impl Server {
                             func(arc_lock_controller_data.clone());
                         }
                     }
-                    let async_router_func_guard: tokio::sync::RwLockReadGuard<
-                        '_,
-                        AsyncHashMapRouterFuncBox,
-                    > = async_router_func_arc_lock.read().await;
-                    if let Some(async_func) = async_router_func_guard.get(route.as_str()) {
+                    if let Some(async_func) =
+                        async_router_func_arc_lock.read().await.get(route.as_str())
+                    {
                         async_func(arc_lock_controller_data.clone()).await;
                     }
                 }
