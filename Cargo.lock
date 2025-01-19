@@ -326,9 +326,9 @@ dependencies = [
 
 [[package]]
 name = "http-compress"
-version = "2.1.1"
+version = "2.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27b3cf98b77ae485a6f9a24c92048af2ec2232dd27810bf44ee99e2192c196e5"
+checksum = "e6242d5c59573ded331fd99c8a4ce6e04542b7ea065a2fb2ad4b267adc7fed5f"
 dependencies = [
  "brotli",
  "flate2",
@@ -337,15 +337,15 @@ dependencies = [
 
 [[package]]
 name = "http-constant"
-version = "1.25.2"
+version = "1.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1865a72e940924a6b72e27c041bef61407d21099ad93c895f325b14303eeb50d"
+checksum = "0e6d6d1dab5c7e7dfd78192e6ac4e1fada87d5e906865469d634083b528b7e00"
 
 [[package]]
 name = "http-request"
-version = "8.36.1"
+version = "8.36.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dea60e0a9f86e5ddbea976ac96efe588892297110c07855ca2ea5a4e7ee2f76b"
+checksum = "e5e3233d5c053d84b7851e9eaa7ecb828c9e0943552df89d27f8e39723f3d736"
 dependencies = [
  "brotli",
  "flate2",
@@ -364,9 +364,9 @@ dependencies = [
 
 [[package]]
 name = "http-type"
-version = "2.30.5"
+version = "2.30.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "687b8bb47a91291ee25e0b4172b2335f24f0e0e73aa9c22131cc11bd677b44bc"
+checksum = "14064b6c8551422f02f0a2ae234d6046765e1c271f767d234124910497cd4f2d"
 dependencies = [
  "hex",
  "http-compress",
@@ -382,12 +382,13 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "3.5.1"
+version = "3.5.2"
 dependencies = [
  "async-func",
  "clonelicious",
  "color-output",
  "file-operation",
+ "http-compress",
  "http-request",
  "http-type",
  "hyperlane-log",
@@ -401,9 +402,9 @@ dependencies = [
 
 [[package]]
 name = "hyperlane-log"
-version = "1.1.5"
+version = "1.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "691a10edc623a21c7a5e9b3693b39ae4d036d6d655c6e53d7b1ec85b14306d7f"
+checksum = "e46877d52f2f685b9b96b36cca3cdff93168db4d3d4ee16c1933164b6d361a45"
 dependencies = [
  "file-operation",
  "http-type",
@@ -787,9 +788,9 @@ dependencies = [
 
 [[package]]
 name = "recoverable-thread-pool"
-version = "2.0.2"
+version = "2.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9f3de6b07ef734a5f4c5b6be23fdbf498cc5bba406eb76613297214c192493f"
+checksum = "a801e04cbd03c789a9e8ee4a053bec96bc7f0e9975fb8666d738ca284cb72789"
 dependencies = [
  "lombok-macros",
  "recoverable-spawn",

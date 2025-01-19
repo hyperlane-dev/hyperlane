@@ -7,6 +7,7 @@ pub use async_func::*;
 pub use clonelicious::*;
 pub use color_output::*;
 pub use file_operation::*;
+pub use http_compress::*;
 pub use http_request::*;
 pub use http_type::*;
 pub use hyperlane_log::*;
