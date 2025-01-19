@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "3.4.6"
+version = "3.5.0"
 edition = "2021"
 authors = ["ltpp-universe <root@ltpp.vip>"] 
 license = "MIT"
@@ -20,8 +20,8 @@ async-func = "0.1.0"
 clonelicious = "1.0.0"
 color-output = "6.1.4"
 file-operation = "0.3.0"
-http-request = "8.35.6"
-http-type = "2.30.1"
+http-request = "8.36.0"
+http-type = "2.30.4"
 hyperlane-log = "1.1.4"
 hyperlane-time = "0.0.4"
 lombok-macros = "1.7.0"
