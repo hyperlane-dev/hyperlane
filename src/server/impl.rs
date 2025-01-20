@@ -157,7 +157,7 @@ impl Server {
 
     #[inline]
     fn common_log(data: &String) -> String {
-        format!("{}: {}{}", current_time(), data.to_string(), HTTP_BR)
+        format!("{}: {}{}", current_time(), data.to_string(), BR)
     }
 
     #[inline]

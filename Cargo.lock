@@ -382,7 +382,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "3.6.4"
+version = "3.6.5"
 dependencies = [
  "async-func",
  "clonelicious",
@@ -787,9 +787,9 @@ dependencies = [
 
 [[package]]
 name = "recoverable-thread-pool"
-version = "2.0.5"
+version = "2.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c91c02496c78c352ff2f8fbbc62aa3dd9b9fd502c92fb85770f42ef84ec96e2"
+checksum = "6562f4f6bc00ced0d06513f6b5e57d816b1d46d575dc93b3c86514b8064c3e28"
 dependencies = [
  "lombok-macros",
  "recoverable-spawn",
