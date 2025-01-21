@@ -200,7 +200,7 @@ impl Server {
                     .unwrap_or_default();
                 let request_obj: Request = Request::new(&stream_arc.as_ref())
                     .map_err(|err| ServerError::InvalidHttpRequest(err))
-                    .unwrap();
+                    .unwrap_or_default();
                 let route: &String = &request_obj.get_path().clone();
                 let mut controller_data: ControllerData = ControllerData::new();
                 controller_data
