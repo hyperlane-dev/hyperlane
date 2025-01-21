@@ -138,9 +138,9 @@ dependencies = [
 
 [[package]]
 name = "brotli-decompressor"
-version = "4.0.1"
+version = "4.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a45bd2e4095a8b518033b128020dd4a55aab1c0a381ba4404a472630f4bc362"
+checksum = "74fa05ad7d803d413eb8380983b092cbbaf9a85f151b871360e7b00cd7060b37"
 dependencies = [
  "alloc-no-stdlib",
  "alloc-stdlib",
@@ -382,7 +382,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "3.6.6"
+version = "3.6.7"
 dependencies = [
  "async-func",
  "clonelicious",
@@ -401,9 +401,9 @@ dependencies = [
 
 [[package]]
 name = "hyperlane-log"
-version = "1.1.12"
+version = "1.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c959417dce19785456247b6a4c5945b79b5d6c10a5ff4ddc1f132b68f0f849d"
+checksum = "e98d9da61faa20a66176abc48b50036d90593c7a1eab4c10618c5be99c89fbf7"
 dependencies = [
  "file-operation",
  "http-type",
@@ -777,9 +777,9 @@ dependencies = [
 
 [[package]]
 name = "recoverable-spawn"
-version = "3.3.4"
+version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c360793fe65dba55ddcec06e6af90729ae5d97feecccb1296c5e0614eca0f492"
+checksum = "6c02d7005acb0380d9c4abcd41bfc8b8567c16cc408d0d49e8a3c34a561f7793"
 dependencies = [
  "once_cell",
  "tokio",
@@ -787,9 +787,9 @@ dependencies = [
 
 [[package]]
 name = "recoverable-thread-pool"
-version = "2.0.6"
+version = "2.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6562f4f6bc00ced0d06513f6b5e57d816b1d46d575dc93b3c86514b8064c3e28"
+checksum = "26bddb1895f8236a11bf009d3d8e059eb4dfcafe58afbf689552fd6a6fa2b2aa"
 dependencies = [
  "lombok-macros",
  "recoverable-spawn",

@@ -169,7 +169,6 @@ async fn test_server_basic_usage() {
         let mut server: Server = Server::new();
         server.host("0.0.0.0");
         server.port(60000);
-        server.thread_pool_size(1);
         server.log_dir("./logs");
         server.log_size(1_024_000);
         server.log_interval_millis(1000);
@@ -217,8 +216,8 @@ async fn test_server_basic_usage() {
             .and_then(|response| Ok(response.binary().get_body()))
             .unwrap_or_default();
     };
-    async_recoverable_spawn(run_server);
+    recoverable_spawn::r#async::recoverable_spawn(run_server);
     std::thread::sleep(std::time::Duration::from_secs(2));
-    recoverable_spawn(run_test);
+    recoverable_spawn::r#sync::recoverable_spawn(run_test);
     std::thread::sleep(std::time::Duration::from_secs(4));
 }

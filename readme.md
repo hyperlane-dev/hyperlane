@@ -191,7 +191,6 @@ async fn run_server() {
     let mut server: Server = Server::new();
     server.host("0.0.0.0");
     server.port(60000);
-    server.thread_pool_size(1);
     server.log_dir("./logs");
     server.log_size(1_024_000);
     server.log_interval_millis(1000);

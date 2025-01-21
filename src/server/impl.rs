@@ -43,15 +43,6 @@ impl Server {
     }
 
     #[inline]
-    pub fn thread_pool_size(&mut self, thread_pool_size: usize) -> &mut Self {
-        let _ = self.get_cfg().write().and_then(|mut cfg| {
-            cfg.set_thread_pool_size(thread_pool_size);
-            Ok(())
-        });
-        self
-    }
-
-    #[inline]
     pub fn log_dir(&mut self, log_dir: &'static str) -> &mut Self {
         let _ = self.get_cfg().write().and_then(|mut cfg| {
             cfg.set_log_dir(log_dir);
@@ -165,11 +156,9 @@ impl Server {
         self.init();
         let mut host: &str = EMPTY_STR;
         let mut port: usize = usize::default();
-        let mut thread_pool_size: usize = usize::default();
         let _ = self.get_cfg().read().and_then(|cfg| {
             host = cfg.get_host();
             port = *cfg.get_port();
-            thread_pool_size = *cfg.get_thread_pool_size();
             Ok(())
         });
         let addr: String = format!("{}{}{}", host, COLON_SPACE_SYMBOL, port);
@@ -183,9 +172,9 @@ impl Server {
             return self;
         }
         let tcp_listener: TcpListener = listener_res.unwrap();
-        let thread_pool: ThreadPool = ThreadPool::new(thread_pool_size);
         for stream_res in tcp_listener.incoming() {
             if let Err(err) = stream_res {
+                use recoverable_spawn::r#sync::*;
                 let tmp_arc_lock: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
                 let _ = run_function(move || {
                     if let Ok(tem) = tmp_arc_lock.read() {
@@ -245,7 +234,16 @@ impl Server {
                         .error(err_string.to_string(), Self::common_log);
                 }
             };
-            let _ = thread_pool.async_execute_with_catch(thread_pool_func, handle_error_func);
+            tokio::spawn(async move {
+                use recoverable_spawn::r#async::*;
+                let run_result: AsyncSpawnResult = async_run_function(thread_pool_func).await;
+                if let Err(err) = run_result {
+                    let err_string: String = tokio_error_to_string(err);
+                    let _: AsyncSpawnResult =
+                        async_run_error_handle_function(handle_error_func, Arc::new(err_string))
+                            .await;
+                }
+            });
         }
         self
     }
