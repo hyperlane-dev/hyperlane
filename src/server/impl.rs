@@ -198,7 +198,7 @@ impl Server {
                     .read()
                     .and_then(|tmp| Ok(tmp.log.clone()))
                     .unwrap_or_default();
-                let request_obj: Request = Request::new(&stream_arc.as_ref())
+                let request_obj: Request = Request::new(stream_arc.as_ref())
                     .map_err(|err| ServerError::InvalidHttpRequest(err))
                     .unwrap_or_default();
                 let route: &String = &request_obj.get_path().clone();
