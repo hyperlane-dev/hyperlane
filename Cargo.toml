@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "3.6.9"
+version = "3.7.0"
 edition = "2021"
 authors = ["ltpp-universe <root@ltpp.vip>"] 
 license = "MIT"
@@ -21,13 +21,13 @@ clonelicious = "1.0.0"
 color-output = "6.1.4"
 file-operation = "0.3.0"
 http-compress = "2.2.0"
-http-request = "8.37.4"
+http-request = "8.37.5"
 hyperlane-log = "1.1.14"
 hyperlane-time = "0.0.5"
 lombok-macros = "1.7.0"
 recoverable-spawn = "3.3.3"
 recoverable-thread-pool = "2.0.4"
-std-macro-extensions = "0.20.1"
+std-macro-extensions = "0.21.0"
 tokio = { version = "1.43.0", features = ["full"] }
 
 [profile.dev]
