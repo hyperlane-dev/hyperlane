@@ -22,7 +22,6 @@ macro_rules! print_success {
                 .build();
             output_list_builder.add(text_output);
         )*
-        output_list_builder.add(text_endl_output);
         output_list_builder.run();
     }};
 }
@@ -51,7 +50,6 @@ macro_rules! print_warning {
                 .build();
             output_list_builder.add(text_output);
         )*
-        output_list_builder.add(text_endl_output);
         output_list_builder.run();
     }};
 }
@@ -80,7 +78,6 @@ macro_rules! print_danger {
                 .build();
             output_list_builder.add(text_output);
         )*
-        output_list_builder.add(text_endl_output);
         output_list_builder.run();
     }};
 }
