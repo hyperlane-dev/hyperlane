@@ -12,7 +12,7 @@ if [ -z "$update_message" ]; then
     exit 1
 fi
 git commit -m "feat:$update_message";
-git push ltpp master;
+git push jihulab master;
 echo -e "\e[32mltpp push finish\e[0m";
 git push origin master;
 echo -e "\e[32morigin push finish\e[0m";
