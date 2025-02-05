@@ -13,7 +13,7 @@ if [ -z "$update_message" ]; then
 fi
 git commit -m "feat:$update_message";
 git push jihulab master;
-echo -e "\e[32mltpp push finish\e[0m";
+echo -e "\e[32mjihulab push finish\e[0m";
 git push origin master;
 echo -e "\e[32morigin push finish\e[0m";
 echo "Press Enter to continue...";
