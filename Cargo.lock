@@ -326,9 +326,9 @@ dependencies = [
 
 [[package]]
 name = "http-compress"
-version = "2.2.1"
+version = "2.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "842a74befdbf887041a1dad9c819ff3222a2aed203c420e5d50e618357b34b6a"
+checksum = "32559685cb661bd2c3f592f31cf3e7de0e9cb4f0a0276962d99444f7f6748b42"
 dependencies = [
  "brotli",
  "flate2",
@@ -337,15 +337,15 @@ dependencies = [
 
 [[package]]
 name = "http-constant"
-version = "1.26.1"
+version = "1.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c55fae5d1478014c77ea58dd6248f13dfc17222a969c5f335be2f244d7c3497"
+checksum = "10848ec913e96f2ce1450f85469d0bdc352129be261eec684c2a1ae97db1ae18"
 
 [[package]]
 name = "http-request"
-version = "8.37.5"
+version = "8.37.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c4237628a5b6d1f2e8358062a258fee2be8f78ec22f9b1a5319c0ae4bed92b0"
+checksum = "c4c6fb4266f71cd074289f2a63ea849034820d6a42ee59530a7c9c274bae2da6"
 dependencies = [
  "brotli",
  "flate2",
@@ -364,9 +364,9 @@ dependencies = [
 
 [[package]]
 name = "http-type"
-version = "2.31.1"
+version = "2.32.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5894a0d552760fbaea07f9a883fc5a77e5a2e5bdd3b346dbc1bf4cfb823f9fee"
+checksum = "a9deeceb1bc7e2354000f0702295013ee9a6a3c0d62acacf600227ce4c6a04c1"
 dependencies = [
  "hex",
  "http-compress",
@@ -382,7 +382,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "3.8.1"
+version = "3.9.0"
 dependencies = [
  "async-func",
  "clonelicious",
@@ -401,9 +401,9 @@ dependencies = [
 
 [[package]]
 name = "hyperlane-log"
-version = "1.1.18"
+version = "1.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec9e05b90f4ef8bcde80dcb071bb12ed1d29535436169881c4bf5f5e4100f6ca"
+checksum = "9e9c7657c265a1e16d9a8f2f18edb8fc594698afef2fdfada73b54eb8f48221f"
 dependencies = [
  "file-operation",
  "http-type",
@@ -702,9 +702,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.20.2"
+version = "1.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
+checksum = "945462a4b81e43c4e3ba96bd7b49d834c6f61198356aa858733bc4acf3cbe62e"
 
 [[package]]
 name = "parking_lot"
