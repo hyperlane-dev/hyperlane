@@ -17,19 +17,8 @@ pub fn get_rw_lock_write_controller_data(
 }
 
 #[inline]
-pub fn get_read_controller_data(
-    arc_lock_controller_data: &ArcRwLockControllerData,
-) -> ControllerData {
+pub fn get_controller_data(arc_lock_controller_data: &ArcRwLockControllerData) -> ControllerData {
     let controller_data: ControllerData =
         get_rw_lock_read_controller_data(arc_lock_controller_data).clone();
-    controller_data
-}
-
-#[inline]
-pub fn get_write_controller_data(
-    arc_lock_controller_data: &ArcRwLockControllerData,
-) -> ControllerData {
-    let controller_data: ControllerData =
-        get_rw_lock_write_controller_data(arc_lock_controller_data).clone();
     controller_data
 }

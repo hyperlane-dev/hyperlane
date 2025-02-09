@@ -63,7 +63,7 @@ async fn test_async_middleware(arc_lock_controller_data: ArcRwLockControllerData
 fn sync_root_router(arc_lock_controller_data: ArcRwLockControllerData) {
     let send_res: ResponseResult =
         send_response(&arc_lock_controller_data, 200, "hello hyperlane => /index");
-    let controller_data: ControllerData = get_read_controller_data(&arc_lock_controller_data);
+    let controller_data: ControllerData = get_controller_data(&arc_lock_controller_data);
     controller_data.get_log().info(
         format!("Response result => {:?}", send_res),
         log_debug_format_handler,
@@ -71,7 +71,7 @@ fn sync_root_router(arc_lock_controller_data: ArcRwLockControllerData) {
 }
 
 fn sync_request_router(arc_lock_controller_data: ArcRwLockControllerData) {
-    let controller_data: ControllerData = get_read_controller_data(&arc_lock_controller_data);
+    let controller_data: ControllerData = get_controller_data(&arc_lock_controller_data);
     let mut response: Response = controller_data.get_response().clone();
     let body: Vec<u8> = send_request();
     let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
@@ -87,7 +87,7 @@ fn sync_request_router(arc_lock_controller_data: ArcRwLockControllerData) {
 }
 
 fn sync_hello_router(arc_lock_controller_data: ArcRwLockControllerData) {
-    let controller_data: ControllerData = get_read_controller_data(&arc_lock_controller_data);
+    let controller_data: ControllerData = get_controller_data(&arc_lock_controller_data);
     controller_data
         .get_log()
         .info("visit path /hello", log_handler);
@@ -109,7 +109,7 @@ fn sync_panic_route(_controller_data: ArcRwLock<ControllerData>) {
 }
 
 async fn async_test_router(arc_lock_controller_data: ArcRwLockControllerData) {
-    let controller_data: ControllerData = get_read_controller_data(&arc_lock_controller_data);
+    let controller_data: ControllerData = get_controller_data(&arc_lock_controller_data);
     controller_data.get_log().info("visit path /", log_handler);
     let mut response: Response = controller_data.get_response().clone();
     let body: &str = "Async";
