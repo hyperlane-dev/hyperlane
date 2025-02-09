@@ -1,9 +1,23 @@
 ## hyperlane
 
-[![](https://img.shields.io/crates/v/hyperlane.svg)](https://crates.io/crates/hyperlane)
-[![](https://docs.rs/hyperlane/badge.svg)](https://docs.rs/hyperlane)
-[![](https://img.shields.io/crates/l/hyperlane.svg)](./LICENSE)
-[![](https://github.com/ltpp-universe/hyperlane/workflows/Rust/badge.svg)](https://github.com/ltpp-universe/hyperlane/actions?query=workflow:Rust)
+<div style="display: flex; justify-content: center;">
+    <img src="./img/logo.png" height="160">
+</div>
+
+<div style="display: flex; justify-content: center; align-items: center; gap: 8px;">
+    <a href="https://crates.io/crates/hyperlane">
+        <img src="https://img.shields.io/crates/v/hyperlane.svg" alt="Crates.io">
+    </a>
+    <a href="https://docs.rs/hyperlane">
+        <img src="https://docs.rs/hyperlane/badge.svg" alt="Docs.rs">
+    </a>
+    <a href="./LICENSE">
+        <img src="https://img.shields.io/crates/l/hyperlane.svg" alt="License">
+    </a>
+    <a href="https://github.com/ltpp-universe/hyperlane/actions?query=workflow:Rust">
+        <img src="https://github.com/ltpp-universe/hyperlane/workflows/Rust/badge.svg" alt="Build Status">
+    </a>
+</div>
 
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
 
