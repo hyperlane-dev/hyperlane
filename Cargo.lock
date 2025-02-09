@@ -437,7 +437,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "3.12.4"
+version = "3.12.5"
 dependencies = [
  "async-func",
  "clonelicious",
