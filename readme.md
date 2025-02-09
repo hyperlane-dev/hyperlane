@@ -5,7 +5,7 @@
 [![](https://img.shields.io/crates/l/hyperlane.svg)](./LICENSE)
 [![](https://github.com/ltpp-universe/hyperlane/workflows/Rust/badge.svg)](https://github.com/ltpp-universe/hyperlane/actions?query=workflow:Rust)
 
-[Official Documentation](https://docs.ltpp.vip/HYPERLANE/)
+[Official Documentation](https://docs.ltpp.vip/hyperlane/)
 
 [Api Docs](https://docs.rs/hyperlane/latest/hyperlane/)
 
@@ -17,6 +17,15 @@ To use this crate, you can run cmd:
 
 ```shell
 cargo add hyperlane
+```
+
+## Quick start
+
+- [hyperlane-quick-start git](https://github.com/ltpp-universe/hyperlane-quick-start)
+- [hyperlane-quick-start docs](https://docs.ltpp.vip/hyperlane/quick-start.html)
+
+```sh
+git clone https://github.com/ltpp-universe/hyperlane-quick-start.git
 ```
 
 ## Use
