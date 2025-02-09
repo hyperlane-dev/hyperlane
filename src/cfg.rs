@@ -170,7 +170,7 @@ async fn test_server_basic_usage() {
         server.host("0.0.0.0");
         server.port(60000);
         server.log_dir("./logs");
-        server.log_size(1_024_000);
+        server.log_size(100_024_000);
         server.log_interval_millis(1000);
         server.middleware(test_sync_middleware);
         server.async_middleware(test_async_middleware).await;
