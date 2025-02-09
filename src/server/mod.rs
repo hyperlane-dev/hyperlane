@@ -4,6 +4,7 @@ pub(crate) mod error;
 pub(crate) mod func;
 pub(crate) mod r#impl;
 pub(crate) mod middleware;
+pub(crate) mod response;
 pub(crate) mod route;
 pub(crate) mod tmp;
 pub(crate) mod r#type;

@@ -24,35 +24,6 @@ cargo add hyperlane
 ```rust
 use hyperlane::*;
 
-fn println(data: &str) {
-    let binding: String = current_time();
-    let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();
-    let mut text_output_builder: OutputBuilder<'_> = OutputBuilder::new();
-    let time_output: Output<'_> = time_output_builder
-        .text(&binding)
-        .blod(true)
-        .bg_color(ColorType::Use(Color::Yellow))
-        .color(ColorType::Rgb(255, 255, 255))
-        .build();
-    let text_output: Output<'_> = text_output_builder
-        .text(data)
-        .blod(true)
-        .bg_color(ColorType::Use(Color::Green))
-        .color(ColorType::Rgb(255, 255, 255))
-        .endl(true)
-        .build();
-    OutputListBuilder::new()
-        .add(time_output)
-        .add(text_output)
-        .run();
-}
-
-fn common_log(log_data: &String) -> String {
-    println(&log_data);
-    let write_data: String = format!("{}: {}\n", current_time(), log_data);
-    write_data.clone()
-}
-
 fn send_request() -> Vec<u8> {
     let mut header: HashMap<&str, &str> = HashMap::new();
     header.insert(ACCEPT, ACCEPT_ANY);
@@ -78,63 +49,29 @@ fn send_request() -> Vec<u8> {
         .unwrap_or_default()
 }
 
-fn test_sync_middleware(arc_lock_controller_data: ArcRwLockControllerData) {
+fn sync_middleware(arc_lock_controller_data: ArcRwLockControllerData) {
     let mut controller_data: RwLockWriteControllerData =
-        arc_lock_controller_data.write().unwrap();
-    let request: Request = controller_data.get_request().clone();
-    let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
-    let host: String = stream
-        .peer_addr()
-        .and_then(|host| Ok(host.to_string()))
-        .unwrap_or("Unknown".to_owned());
-    controller_data.get_log().debug(
-        format!("Request host => {}\n{:#?}", host, request),
-        common_log,
-    );
-    controller_data
-        .get_mut_request()
-        .set_header("middleware", "crate");
+        get_rw_lock_write_controller_data(&arc_lock_controller_data);
+    let response: &mut Response = controller_data.get_mut_response();
+    response.set_header("server", "hyperlane");
 }
 
 async fn test_async_middleware(arc_lock_controller_data: ArcRwLockControllerData) {
-    let mut controller_data: RwLockWriteControllerData =
-        arc_lock_controller_data.write().unwrap();
-    let request: Request = controller_data.get_request().clone();
-    let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
-    let host: String = stream
-        .peer_addr()
-        .and_then(|host| Ok(host.to_string()))
-        .unwrap_or("Unknown".to_owned());
-    controller_data.get_log().debug(
-        format!("Request host => {}\n{:#?}", host, request),
-        common_log,
-    );
-    controller_data
-        .get_mut_request()
-        .set_header("middleware", "crate");
+    sync_middleware(arc_lock_controller_data);
 }
 
 fn sync_root_router(arc_lock_controller_data: ArcRwLockControllerData) {
-    let controller_data: RwLockWriteControllerData = arc_lock_controller_data.write().unwrap();
-    controller_data.get_log().info("visit path /", common_log);
-    let mut response: Response = controller_data.get_response().clone();
-    let body: Vec<u8> = "404 Not Found".as_bytes().to_vec();
-    let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
-    let res: ResponseResult = response
-        .set_body(body)
-        .set_status_code(404)
-        .set_header("server", "hyperlane")
-        .send(&stream);
-    controller_data
-        .get_log()
-        .info(format!("Response result => {:?}", res), common_log);
+    let send_res: ResponseResult =
+        send_response(&arc_lock_controller_data, 200, "hello hyperlane => /index");
+    let controller_data: ControllerData = get_read_controller_data(&arc_lock_controller_data);
+    controller_data.get_log().info(
+        format!("Response result => {:?}", send_res),
+        log_debug_format_handler,
+    );
 }
 
 fn sync_request_router(arc_lock_controller_data: ArcRwLockControllerData) {
-    let controller_data: RwLockWriteControllerData = arc_lock_controller_data.write().unwrap();
-    controller_data
-        .get_log()
-        .info("visit path /request", common_log);
+    let controller_data: ControllerData = get_read_controller_data(&arc_lock_controller_data);
     let mut response: Response = controller_data.get_response().clone();
     let body: Vec<u8> = send_request();
     let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
@@ -146,45 +83,45 @@ fn sync_request_router(arc_lock_controller_data: ArcRwLockControllerData) {
         .send(&stream);
     controller_data
         .get_log()
-        .info(format!("Response result => {:?}", res), common_log);
+        .info(format!("Response result => {:?}", res), log_handler);
 }
 
 fn sync_hello_router(arc_lock_controller_data: ArcRwLockControllerData) {
-    let controller_data: RwLockWriteControllerData = arc_lock_controller_data.write().unwrap();
+    let controller_data: ControllerData = get_read_controller_data(&arc_lock_controller_data);
     controller_data
         .get_log()
-        .info("visit path /hello", common_log);
+        .info("visit path /hello", log_handler);
     let mut response: Response = controller_data.get_response().clone();
-    let body: Vec<u8> = "hello world!".as_bytes().to_vec();
+    let body: &str = "hello world!";
     let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
     let res: ResponseResult = response
-        .set_body(body)
+        .set_body(body.into())
         .set_status_code(200)
         .set_header("server", "hyperlane")
         .send(&stream);
     controller_data
         .get_log()
-        .info(format!("Response result => {:?}", res), common_log);
+        .info(format!("Response result => {:?}", res), log_handler);
 }
 
 fn sync_panic_route(_controller_data: ArcRwLock<ControllerData>) {
     panic!("test panic");
 }
 
-async fn async_test_async_router(arc_lock_controller_data: ArcRwLockControllerData) {
-    let controller_data: RwLockWriteControllerData = arc_lock_controller_data.write().unwrap();
-    controller_data.get_log().info("visit path /", common_log);
+async fn async_test_router(arc_lock_controller_data: ArcRwLockControllerData) {
+    let controller_data: ControllerData = get_read_controller_data(&arc_lock_controller_data);
+    controller_data.get_log().info("visit path /", log_handler);
     let mut response: Response = controller_data.get_response().clone();
-    let body: Vec<u8> = "Async".as_bytes().to_vec();
+    let body: &str = "Async";
     let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
     let res: ResponseResult = response
-        .set_body(body)
+        .set_body(body.into())
         .set_status_code(200)
         .set_header("server", "hyperlane")
         .send(&stream);
     controller_data
         .get_log()
-        .info(format!("Response result => {:?}", res), common_log);
+        .info(format!("Response result => {:?}", res), log_handler);
 }
 
 async fn run_server() {
@@ -194,22 +131,20 @@ async fn run_server() {
     server.log_dir("./logs");
     server.log_size(100_024_000);
     server.log_interval_millis(1000);
-    server.middleware(test_sync_middleware);
+    server.middleware(sync_middleware);
     server.async_middleware(test_async_middleware).await;
     server.router("/", sync_root_router);
     server.router("/request", sync_request_router);
     server.router("/hello", sync_hello_router);
     server.router("/panic", sync_panic_route);
-    server
-        .async_router("/test/async", async_test_async_router)
-        .await;
+    server.async_router("/async/test", async_test_router).await;
     let test_string: String = "test".to_owned();
     server
         .async_router(
             "/test/async_func",
             async_func!(test_string, |data| {
-                println(&test_string);
-                println(&format!("{:?}", data));
+                println_success!(test_string);
+                println_success!(format!("{:?}", data));
             }),
         )
         .await;
