@@ -1,5 +1,6 @@
 use crate::*;
 
+#[inline]
 pub fn get_rw_lock_read_controller_data(
     arc_lock_controller_data: &ArcRwLockControllerData,
 ) -> RwLockReadControllerData {
@@ -7,6 +8,7 @@ pub fn get_rw_lock_read_controller_data(
     controller_data
 }
 
+#[inline]
 pub fn get_rw_lock_write_controller_data(
     arc_lock_controller_data: &ArcRwLockControllerData,
 ) -> RwLockWriteControllerData {
@@ -14,6 +16,7 @@ pub fn get_rw_lock_write_controller_data(
     controller_data
 }
 
+#[inline]
 pub fn get_read_controller_data(
     arc_lock_controller_data: &ArcRwLockControllerData,
 ) -> ControllerData {
@@ -22,6 +25,7 @@ pub fn get_read_controller_data(
     controller_data
 }
 
+#[inline]
 pub fn get_write_controller_data(
     arc_lock_controller_data: &ArcRwLockControllerData,
 ) -> ControllerData {
