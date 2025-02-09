@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "3.12.5"
+version = "3.12.6"
 edition = "2021"
 authors = ["ltpp-universe <root@ltpp.vip>"] 
 license = "MIT"
@@ -16,18 +16,18 @@ exclude = [
 ]
 
 [dependencies]
-async-func = "0.1.0"
-clonelicious = "1.0.0"
-color-output = "6.1.4"
-file-operation = "0.4.0"
-http-compress = "2.2.2"
-http-request = "8.38.0"
-hyperlane-log = "1.1.20"
-hyperlane-time = "0.0.5"
-lombok-macros = "1.7.0"
-recoverable-spawn = "3.3.3"
-recoverable-thread-pool = "2.0.4"
-std-macro-extensions = "0.21.0"
+async-func = "0.1.5"
+clonelicious = "1.0.3"
+color-output = "6.1.8"
+file-operation = "0.4.1"
+http-compress = "2.2.3"
+http-request = "8.38.1"
+hyperlane-log = "1.1.21"
+hyperlane-time = "0.0.6"
+lombok-macros = "1.7.3"
+recoverable-spawn = "3.4.1"
+recoverable-thread-pool = "2.0.8"
+std-macro-extensions = "0.21.1"
 tokio = { version = "1.43.0", features = ["full"] }
 once_cell = "1.20.3"
 simd-json = "0.14.3"

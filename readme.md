@@ -1,11 +1,15 @@
+<center>
+
 ## hyperlane
 
-![](./img/logo.png){height="160"}
+<img src="./img/logo.png" alt="" height="160">
 
 [![](https://img.shields.io/crates/v/hyperlane.svg)](https://crates.io/crates/hyperlane)
 [![](https://docs.rs/hyperlane/badge.svg)](https://docs.rs/hyperlane)
-[![](https://img.shields.io/crates/l/hyperlane.svg)](./LICENSE)
 [![](https://github.com/ltpp-universe/hyperlane/workflows/Rust/badge.svg)](https://github.com/ltpp-universe/hyperlane/actions?query=workflow:Rust)
+[![](https://img.shields.io/crates/l/hyperlane.svg)](./LICENSE)
+
+</center>
 
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
 
