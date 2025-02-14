@@ -69,7 +69,7 @@ fn sync_hello_router(arc_lock_controller_data: ArcRwLockControllerData) {
     let body: &str = "hello world!";
     let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
     let res: ResponseResult = response
-        .set_body(body.into())
+        .set_body(body)
         .set_status_code(200)
         .set_header("server", "hyperlane")
         .send(&stream);
@@ -89,7 +89,7 @@ async fn async_test_router(arc_lock_controller_data: ArcRwLockControllerData) {
     let body: &str = "Async";
     let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
     let res: ResponseResult = response
-        .set_body(body.into())
+        .set_body(body)
         .set_status_code(200)
         .set_header("server", "hyperlane")
         .send(&stream);

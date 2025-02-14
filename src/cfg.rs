@@ -32,7 +32,7 @@ async fn test_server_basic_usage() {
         let body: &str = "hello world!";
         let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
         let res: ResponseResult = response
-            .set_body(body.into())
+            .set_body(body)
             .set_status_code(200)
             .set_header("server", "hyperlane")
             .send(&stream);
@@ -52,7 +52,7 @@ async fn test_server_basic_usage() {
         let body: &str = "Async";
         let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
         let res: ResponseResult = response
-            .set_body(body.into())
+            .set_body(body)
             .set_status_code(200)
             .set_header("server", "hyperlane")
             .send(&stream);
