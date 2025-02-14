@@ -1,14 +1,14 @@
 use crate::*;
 
 #[inline]
-pub fn send_response<T: Into<Vec<u8>>>(
+pub fn send_response<T: Into<ResponseBody>>(
     arc_lock_controller_data: &ArcRwLockControllerData,
     status_code: usize,
-    response_data: T,
+    response_body: T,
 ) -> ResponseResult {
     let controller_data: RwLockWriteControllerData = arc_lock_controller_data.write().unwrap();
     let mut response: Response = controller_data.get_response().clone();
-    let body: Vec<u8> = response_data.into();
+    let body: ResponseBody = response_body.into();
     let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
     let response_res: ResponseResult = response
         .set_body(body)
@@ -18,14 +18,14 @@ pub fn send_response<T: Into<Vec<u8>>>(
 }
 
 #[inline]
-pub fn send_response_once<T: Into<Vec<u8>>>(
+pub fn send_response_once<T: Into<ResponseBody>>(
     arc_lock_controller_data: &ArcRwLockControllerData,
     status_code: usize,
-    response_data: T,
+    response_body: T,
 ) -> ResponseResult {
     let controller_data: RwLockWriteControllerData = arc_lock_controller_data.write().unwrap();
     let mut response: Response = controller_data.get_response().clone();
-    let body: Vec<u8> = response_data.into();
+    let body: ResponseBody = response_body.into();
     let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
     let response_res: ResponseResult = response
         .set_body(body)
