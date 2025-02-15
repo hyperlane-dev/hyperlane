@@ -28,7 +28,7 @@ cargo add hyperlane
 ## Quick start
 
 - [hyperlane-quick-start git](https://github.com/ltpp-universe/hyperlane-quick-start)
-- [hyperlane-quick-start docs](https://docs.ltpp.vip/hyperlane/quick-start.html)
+- [hyperlane-quick-start docs](https://docs.ltpp.vip/hyperlane/quick-start/)
 
 ```sh
 git clone https://github.com/ltpp-universe/hyperlane-quick-start.git
