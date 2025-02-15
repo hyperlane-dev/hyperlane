@@ -1,4 +1,3 @@
-use super::r#type::Tmp;
 use crate::*;
 
 impl Default for Tmp {

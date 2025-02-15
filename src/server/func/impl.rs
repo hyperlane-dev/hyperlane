@@ -1,4 +1,3 @@
-use std::{future::Future, pin::Pin};
 use crate::*;
 
 impl<F> Func for F where F: Fn(ArcRwLock<ControllerData>) + Send + Sync + 'static {}
