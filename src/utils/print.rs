@@ -55,7 +55,7 @@ macro_rules! print_warning {
 }
 
 #[macro_export]
-macro_rules! print_danger {
+macro_rules! print_error {
     ($($data:expr),*) => {{
         let binding: String = format!("[{} => danger]",current_time());
         let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();
