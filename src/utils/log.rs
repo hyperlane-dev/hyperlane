@@ -1,9 +1,13 @@
 use crate::*;
 
 #[inline]
+pub fn common_log<T: ToString>(data: &T) -> String {
+    format!("{}: {}{}", current_time(), data.to_string(), BR)
+}
+
+#[inline]
 pub fn log_handler<T: ToString>(log_data: &T) -> String {
-    let write_data: String = format!("{}: {}\n", current_time(), log_data.to_string());
-    write_data.clone()
+    common_log(log_data)
 }
 
 #[inline]

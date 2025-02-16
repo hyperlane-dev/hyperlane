@@ -88,5 +88,5 @@ async fn test_server_basic_usage() {
     }
 
     recoverable_spawn::r#async::recoverable_spawn(run_server);
-    std::thread::sleep(std::time::Duration::from_secs(10));
+    std::thread::sleep(std::time::Duration::from_secs(60));
 }

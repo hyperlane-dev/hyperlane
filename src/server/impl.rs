@@ -173,11 +173,6 @@ impl Server {
     }
 
     #[inline]
-    fn common_log(data: &String) -> String {
-        format!("{}: {}{}", current_time(), data.to_string(), BR)
-    }
-
-    #[inline]
     pub fn listen(&mut self) -> &mut Self {
         self.init();
         let mut host: &str = EMPTY_STR;
@@ -192,7 +187,7 @@ impl Server {
             TcpListener::bind(&addr).map_err(|e| ServerError::TcpBindError(e.to_string()));
         if let Err(err) = listener_res {
             let _ = self.get_tmp().write().and_then(|tmp| {
-                tmp.get_log().error(err.to_string(), Self::common_log);
+                tmp.get_log().error(err.to_string(), common_log);
                 Ok(())
             });
             return self;
@@ -204,7 +199,7 @@ impl Server {
                 let tmp_arc_lock: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
                 let _ = run_function(move || {
                     if let Ok(tem) = tmp_arc_lock.read() {
-                        tem.get_log().error(err.to_string(), Self::common_log);
+                        tem.get_log().error(err.to_string(), common_log);
                     }
                 });
                 continue;
@@ -218,8 +213,7 @@ impl Server {
             let async_router_func_arc_lock: AsyncArcRwLockHashMapRouterFuncBox =
                 Arc::clone(&self.async_router_func);
             let tmp_arc_lock: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
-            let error_handle_tmp_arc_lock: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
-            let thread_pool_func = move || async move {
+            let handle_request = move || async move {
                 let log: Log = tmp_arc_lock
                     .read()
                     .and_then(|tmp| Ok(tmp.log.clone()))
@@ -254,23 +248,7 @@ impl Server {
                     async_func(arc_lock_controller_data.clone()).await;
                 }
             };
-            let handle_error_func = move |err_string: Arc<String>| async move {
-                if let Ok(tem) = error_handle_tmp_arc_lock.read() {
-                    tem.get_log()
-                        .error(err_string.to_string(), Self::common_log);
-                }
-            };
-            tokio::spawn(async move {
-                use recoverable_spawn::r#async::*;
-
-                let run_result: AsyncSpawnResult = async_run_function(thread_pool_func).await;
-                if let Err(err) = run_result {
-                    let err_string: String = tokio_error_to_string(err);
-                    let _: AsyncSpawnResult =
-                        async_run_error_handle_function(handle_error_func, Arc::new(err_string))
-                            .await;
-                }
-            });
+            tokio::spawn(async move { handle_request().await });
         }
         self
     }
@@ -285,15 +263,22 @@ impl Server {
 
     #[inline]
     fn init_panic_hook(&self) {
+        let tmp: Tmp = self
+            .tmp
+            .read()
+            .map(|tmp| tmp.clone())
+            .unwrap_or_else(|_| Tmp::default());
         let print: bool = self
             .get_cfg()
             .read()
             .and_then(|cfg| Ok(cfg.get_print().clone()))
             .unwrap_or(DEFAULT_PRINT);
         set_hook(Box::new(move |err| {
+            let err_msg: String = format!("{}", err);
             if print {
-                println_error!(format!("{}", err));
+                println_error!(err_msg);
             }
+            handle_error(&tmp, err_msg.clone());
         }));
     }
 
