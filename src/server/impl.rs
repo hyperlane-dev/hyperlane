@@ -194,9 +194,9 @@ impl Server {
         }
         let tcp_listener: TcpListener = listener_res.unwrap();
         for stream_res in tcp_listener.incoming() {
+            let tmp_arc_lock: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
             if let Err(err) = stream_res {
                 use recoverable_spawn::r#sync::*;
-                let tmp_arc_lock: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
                 let _ = run_function(move || {
                     if let Ok(tem) = tmp_arc_lock.read() {
                         tem.get_log().error(err.to_string(), common_log);
@@ -212,7 +212,6 @@ impl Server {
             let router_func_arc_lock: RouterFuncArcLock = Arc::clone(&self.router_func);
             let async_router_func_arc_lock: AsyncArcRwLockHashMapRouterFuncBox =
                 Arc::clone(&self.async_router_func);
-            let tmp_arc_lock: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
             let handle_request = move || async move {
                 let log: Log = tmp_arc_lock
                     .read()
