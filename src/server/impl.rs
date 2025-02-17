@@ -176,8 +176,8 @@ impl Server {
     pub fn judge_enable_keep_alive(arc_lock_controller_data: &ArcRwLockControllerData) -> bool {
         if let Ok(controller_data) = arc_lock_controller_data.read() {
             for tem in controller_data.get_request().get_headers().iter() {
-                if CONNECTION_KEY == tem.0.to_lowercase() {
-                    if KEEP_ALIVE_KEY == tem.1.to_lowercase() {
+                if tem.0.eq_ignore_ascii_case(CONNECTION) {
+                    if tem.1.eq_ignore_ascii_case(CONNECTION_KEEP_ALIVE) {
                         return true;
                     }
                     break;
@@ -235,10 +235,10 @@ impl Server {
                     .unwrap_or_default();
                 loop {
                     let mut controller_data: ControllerData = ControllerData::new();
-                    let request_obj: Request = Request::new_from_reader(&mut reader)
+                    let request_obj: Request = Request::from_reader(&mut reader)
                         .map_err(|err| ServerError::InvalidHttpRequest(err))
                         .unwrap_or_default();
-                    let route: &String = &request_obj.get_path().clone();
+                    let route: String = request_obj.get_path().clone();
                     controller_data
                         .set_stream(Some(stream_arc.clone()))
                         .set_request(request_obj)
