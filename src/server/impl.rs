@@ -173,6 +173,22 @@ impl Server {
     }
 
     #[inline]
+    pub fn judge_enable_keep_alive(arc_lock_controller_data: &ArcRwLockControllerData) -> bool {
+        let mut enable_keep_alive: bool = false;
+        if let Ok(controller_data) = arc_lock_controller_data.read() {
+            for tem in controller_data.get_request().get_headers().iter() {
+                if CONNECTION_KEY == tem.0.to_lowercase() {
+                    if KEEP_ALIVE_KEY == tem.1.to_lowercase() {
+                        enable_keep_alive = true;
+                    }
+                    break;
+                }
+            }
+        }
+        return enable_keep_alive;
+    }
+
+    #[inline]
     pub fn listen(&mut self) -> &mut Self {
         self.init();
         let mut host: &str = EMPTY_STR;
@@ -213,38 +229,44 @@ impl Server {
             let async_router_func_arc_lock: AsyncArcRwLockHashMapRouterFuncBox =
                 Arc::clone(&self.async_router_func);
             let handle_request = move || async move {
+                let mut reader: BufReader<&TcpStream> = BufReader::new(&stream_arc);
                 let log: Log = tmp_arc_lock
                     .read()
                     .and_then(|tmp| Ok(tmp.log.clone()))
                     .unwrap_or_default();
-                let request_obj: Request = Request::new(stream_arc.as_ref())
-                    .map_err(|err| ServerError::InvalidHttpRequest(err))
-                    .unwrap_or_default();
-                let route: &String = &request_obj.get_path().clone();
-                let mut controller_data: ControllerData = ControllerData::new();
-                controller_data
-                    .set_stream(Some(stream_arc))
-                    .set_request(request_obj)
-                    .set_log(log);
-                let arc_lock_controller_data: ArcRwLockControllerData =
-                    Arc::new(RwLock::new(controller_data));
-                if let Ok(middleware_guard) = middleware_arc_lock.read() {
-                    for middleware in middleware_guard.iter() {
-                        middleware(arc_lock_controller_data.clone());
+                loop {
+                    let mut controller_data: ControllerData = ControllerData::new();
+                    let request_obj: Request = Request::new_from_reader(&mut reader)
+                        .map_err(|err| ServerError::InvalidHttpRequest(err))
+                        .unwrap_or_default();
+                    let route: &String = &request_obj.get_path().clone();
+                    controller_data
+                        .set_stream(Some(stream_arc.clone()))
+                        .set_request(request_obj)
+                        .set_log(log.clone());
+                    let arc_lock_controller_data: ArcRwLockControllerData =
+                        Arc::new(RwLock::new(controller_data));
+                    if let Ok(middleware_guard) = middleware_arc_lock.read() {
+                        for middleware in middleware_guard.iter() {
+                            middleware(arc_lock_controller_data.clone());
+                        }
                     }
-                }
-                for async_middleware in async_middleware_arc_lock.read().await.iter() {
-                    async_middleware(arc_lock_controller_data.clone()).await;
-                }
-                if let Ok(router_func) = router_func_arc_lock.read() {
-                    if let Some(func) = router_func.get(route.as_str()) {
-                        func(arc_lock_controller_data.clone());
+                    for async_middleware in async_middleware_arc_lock.read().await.iter() {
+                        async_middleware(arc_lock_controller_data.clone()).await;
                     }
-                }
-                if let Some(async_func) =
-                    async_router_func_arc_lock.read().await.get(route.as_str())
-                {
-                    async_func(arc_lock_controller_data.clone()).await;
+                    if let Ok(router_func) = router_func_arc_lock.read() {
+                        if let Some(func) = router_func.get(route.as_str()) {
+                            func(arc_lock_controller_data.clone());
+                        }
+                    }
+                    if let Some(async_func) =
+                        async_router_func_arc_lock.read().await.get(route.as_str())
+                    {
+                        async_func(arc_lock_controller_data.clone()).await;
+                    }
+                    if !Self::judge_enable_keep_alive(&arc_lock_controller_data) {
+                        return;
+                    }
                 }
             };
             tokio::spawn(async move { handle_request().await });

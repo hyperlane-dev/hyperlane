@@ -43,7 +43,7 @@ fn sync_middleware(arc_lock_controller_data: ArcRwLockControllerData) {
     let mut controller_data: RwLockWriteControllerData =
         get_rw_lock_write_controller_data(&arc_lock_controller_data);
     let response: &mut Response = controller_data.get_mut_response();
-    response.set_header("server", "hyperlane");
+    response.set_header(SERVER, "hyperlane");
 }
 
 async fn test_async_middleware(arc_lock_controller_data: ArcRwLockControllerData) {
@@ -52,7 +52,7 @@ async fn test_async_middleware(arc_lock_controller_data: ArcRwLockControllerData
 
 fn sync_root_router(arc_lock_controller_data: ArcRwLockControllerData) {
     let send_res: ResponseResult =
-        send_response(&arc_lock_controller_data, 200, "hello hyperlane => /index");
+        send_response(&arc_lock_controller_data, 200, "hello hyperlane => /");
     let controller_data: ControllerData = get_controller_data(&arc_lock_controller_data);
     controller_data.get_log().info(
         format!("Response result => {:?}", send_res),
@@ -71,7 +71,7 @@ fn sync_hello_router(arc_lock_controller_data: ArcRwLockControllerData) {
     let res: ResponseResult = response
         .set_body(body)
         .set_status_code(200)
-        .set_header("server", "hyperlane")
+        .set_header(CONNECTION, CONNECTION_KEEP_ALIVE)
         .send(&stream);
     controller_data
         .get_log()
@@ -84,15 +84,13 @@ fn sync_panic_route(_controller_data: ArcRwLock<ControllerData>) {
 
 async fn async_test_router(arc_lock_controller_data: ArcRwLockControllerData) {
     let controller_data: ControllerData = get_controller_data(&arc_lock_controller_data);
-    controller_data.get_log().info("visit path /", log_handler);
+    controller_data
+        .get_log()
+        .info("visit path /async/test", log_handler);
     let mut response: Response = controller_data.get_response().clone();
     let body: &str = "Async";
     let stream: ArcTcpStream = controller_data.get_stream().clone().unwrap();
-    let res: ResponseResult = response
-        .set_body(body)
-        .set_status_code(200)
-        .set_header("server", "hyperlane")
-        .send(&stream);
+    let res: ResponseResult = response.set_body(body).set_status_code(200).send(&stream);
     controller_data
         .get_log()
         .info(format!("Response result => {:?}", res), log_handler);
