@@ -174,18 +174,17 @@ impl Server {
 
     #[inline]
     pub fn judge_enable_keep_alive(arc_lock_controller_data: &ArcRwLockControllerData) -> bool {
-        let mut enable_keep_alive: bool = false;
         if let Ok(controller_data) = arc_lock_controller_data.read() {
             for tem in controller_data.get_request().get_headers().iter() {
                 if CONNECTION_KEY == tem.0.to_lowercase() {
                     if KEEP_ALIVE_KEY == tem.1.to_lowercase() {
-                        enable_keep_alive = true;
+                        return true;
                     }
                     break;
                 }
             }
         }
-        return enable_keep_alive;
+        return false;
     }
 
     #[inline]
@@ -265,6 +264,9 @@ impl Server {
                         async_func(arc_lock_controller_data.clone()).await;
                     }
                     if !Self::judge_enable_keep_alive(&arc_lock_controller_data) {
+                        let _ = arc_lock_controller_data.read().map(|controller_data| {
+                            let _ = controller_data.get_response().clone().close(&stream_arc);
+                        });
                         return;
                     }
                 }
