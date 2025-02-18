@@ -1,6 +1,7 @@
 #[macro_export]
 macro_rules! print_success {
     ($($data:expr),*) => {{
+        use std::io::Write;
         let binding: String = format!("[{} => success]",current_time());
         let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();
         let time_output: Output<'_> = time_output_builder
@@ -22,13 +23,15 @@ macro_rules! print_success {
                 .build();
             output_list_builder.add(text_output);
         )*
-        output_list_builder.run();
+        output_list_builder.run();    
+        std::io::stdout().flush().unwrap();
     }};
 }
 
 #[macro_export]
 macro_rules! print_warning {
     ($($data:expr),*) => {{
+        use std::io::Write;
         let binding: String = format!("[{} => warning]",current_time());
         let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();
         let time_output: Output<'_> = time_output_builder
@@ -51,12 +54,14 @@ macro_rules! print_warning {
             output_list_builder.add(text_output);
         )*
         output_list_builder.run();
+        std::io::stdout().flush().unwrap();
     }};
 }
 
 #[macro_export]
 macro_rules! print_error {
     ($($data:expr),*) => {{
+        use std::io::Write;
         let binding: String = format!("[{} => error]",current_time());
         let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();
         let time_output: Output<'_> = time_output_builder

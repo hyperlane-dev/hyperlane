@@ -1,6 +1,7 @@
 #[macro_export]
 macro_rules! println_success {
     ($($data:expr),*) => {{
+        use std::io::Write;
         let binding: String = format!("[{} => success]",current_time());
         let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();
         let time_output: Output<'_> = time_output_builder
@@ -26,12 +27,14 @@ macro_rules! println_success {
         let text_endl_output: Output<'_> = text_endl_output_builder.text("\n").endl(false).build();
         output_list_builder.add(text_endl_output);
         output_list_builder.run();
+        std::io::stdout().flush().unwrap();
     }};
 }
 
 #[macro_export]
 macro_rules! println_warning {
     ($($data:expr),*) => {{
+        use std::io::Write;
         let binding: String = format!("[{} => warning]",current_time());
         let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();
         let time_output: Output<'_> = time_output_builder
@@ -57,12 +60,14 @@ macro_rules! println_warning {
         let text_endl_output: Output<'_> = text_endl_output_builder.text("\n").endl(false).build();
         output_list_builder.add(text_endl_output);
         output_list_builder.run();
+        std::io::stdout().flush().unwrap();
     }};
 }
 
 #[macro_export]
 macro_rules! println_error {
     ($($data:expr),*) => {{
+        use std::io::Write;
         let binding: String = format!("[{} => error]",current_time());
         let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();
         let time_output: Output<'_> = time_output_builder
@@ -88,5 +93,6 @@ macro_rules! println_error {
         let text_endl_output: Output<'_> = text_endl_output_builder.text("\n").endl(false).build();
         output_list_builder.add(text_endl_output);
         output_list_builder.run();
+        std::io::stdout().flush().unwrap();
     }};
 }
