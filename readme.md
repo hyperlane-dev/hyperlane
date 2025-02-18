@@ -43,9 +43,13 @@ async fn test_middleware(arc_lock_controller_data: ArcRwLockControllerData) {
     let mut controller_data: RwLockWriteControllerData =
         get_rw_lock_write_controller_data(&arc_lock_controller_data).await;
     let response: &mut Response = controller_data.get_mut_response();
+    let socket_addr: String = get_socket_addr(&arc_lock_controller_data)
+        .await
+        .unwrap_or_default();
     response
         .set_header(SERVER, "hyperlane")
-        .set_header(CONNECTION, CONNECTION_KEEP_ALIVE);
+        .set_header(CONNECTION, CONNECTION_KEEP_ALIVE)
+        .set_header("SocketAddr", socket_addr);
 }
 
 async fn root_router(arc_lock_controller_data: ArcRwLockControllerData) {
