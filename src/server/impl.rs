@@ -172,10 +172,15 @@ impl Server {
                     let log: Log = tmp_arc_lock.read().await.log.clone();
                     loop {
                         let mut controller_data: ControllerData = ControllerData::new();
-                        let request_obj: Request = Request::from_stream(&stream_arc)
-                            .await
-                            .map_err(|err| ServerError::InvalidHttpRequest(err))
-                            .unwrap();
+                        let request_obj_result: Result<Request, ServerError> =
+                            Request::from_stream(&stream_arc)
+                                .await
+                                .map_err(|err| ServerError::InvalidHttpRequest(err));
+                        if request_obj_result.is_err() {
+                            let _ = controller_data.get_response().clone().close(&stream_arc);
+                            return;
+                        }
+                        let request_obj: Request = request_obj_result.unwrap_or_default();
                         let route: String = request_obj.get_path().clone();
                         controller_data
                             .set_stream(Some(stream_arc.clone()))
