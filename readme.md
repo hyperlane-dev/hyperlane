@@ -40,12 +40,12 @@ git clone https://github.com/ltpp-universe/hyperlane-quick-start.git
 use hyperlane::*;
 
 async fn test_middleware(arc_lock_controller_data: ArcRwLockControllerData) {
-    let mut controller_data: RwLockWriteControllerData =
-        get_rw_lock_write_controller_data(&arc_lock_controller_data).await;
-    let response: &mut Response = controller_data.get_mut_response();
     let socket_addr: String = get_socket_addr(&arc_lock_controller_data)
         .await
         .unwrap_or_default();
+    let mut controller_data: RwLockWriteControllerData =
+        get_rw_lock_write_controller_data(&arc_lock_controller_data).await;
+    let response: &mut Response = controller_data.get_mut_response();
     response
         .set_header(SERVER, "hyperlane")
         .set_header(CONNECTION, CONNECTION_KEEP_ALIVE)

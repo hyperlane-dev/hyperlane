@@ -84,5 +84,6 @@ macro_rules! print_error {
             output_list_builder.add(text_output);
         )*
         output_list_builder.run();
+        std::io::stdout().flush().unwrap();
     }};
 }
