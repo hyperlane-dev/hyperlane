@@ -133,9 +133,12 @@ checksum = "2b6894e0ab55355a2499616a6496658e9111a2f0cd5419a0a294cb4a5747b1d3"
 
 [[package]]
 name = "color-output"
-version = "6.1.8"
+version = "6.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d641a3a8617977a6612e52206fa673bae5e248f2764868453cf1eb0ed8d4e98a"
+checksum = "f09bbde0681f94a4620864aba472bf05c0ffd8a6980dd8d3f55f826f96132684"
+dependencies = [
+ "hyperlane-time",
+]
 
 [[package]]
 name = "crc32fast"
@@ -258,9 +261,9 @@ checksum = "b7b4c33e9eccb247e9deb2b644a2e77fd03f71e6233e6c810d063d498822351d"
 
 [[package]]
 name = "http-type"
-version = "3.0.1"
+version = "3.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7381267bfd4badae560978b76d8c3116dad644414c8e50fef587835578be65e6"
+checksum = "8f39261baa6ff33e2aadb932f7aea556c2806503e82b89f2b0cb88458ebd1a4a"
 dependencies = [
  "hex",
  "http-compress",
@@ -276,7 +279,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "4.1.2"
+version = "4.1.3"
 dependencies = [
  "async-func",
  "clonelicious",
@@ -285,7 +288,6 @@ dependencies = [
  "http-compress",
  "http-type",
  "hyperlane-log",
- "hyperlane-time",
  "lombok-macros",
  "once_cell",
  "recoverable-spawn",
