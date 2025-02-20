@@ -12,6 +12,6 @@ pub trait Func:
 pub trait FuncWithoutPin<Fut>:
     Fn(ArcRwLock<ControllerData>) -> Fut + Send + Sync + 'static
 where
-    Fut: Future<Output = ()> + Send + 'static,
+    Fut: Future<Output = ()> + Send + Sync + 'static,
 {
 }
