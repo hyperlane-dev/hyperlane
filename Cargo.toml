@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "4.1.5"
+version = "4.1.6"
 edition = "2021"
 authors = ["ltpp-universe <root@ltpp.vip>"] 
 license = "MIT"
@@ -25,7 +25,7 @@ hyperlane-log = "1.1.28"
 lombok-macros = "1.7.3"
 recoverable-spawn = "3.4.1"
 recoverable-thread-pool = "2.0.8"
-std-macro-extensions = "0.21.2"
+std-macro-extensions = "0.21.3"
 tokio = { version = "1.43.0", features = ["full"] }
 once_cell = "1.20.3"
 simd-json = "0.14.3"
