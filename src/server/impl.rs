@@ -187,7 +187,7 @@ impl Server {
                             .set_request(request_obj)
                             .set_log(log.clone());
                         let arc_lock_controller_data: ArcRwLockControllerData =
-                            ArcRwLockControllerData(Arc::new(RwLock::new(controller_data)));
+                            ArcRwLockControllerData::from_controller_data(controller_data);
                         for middleware in async_middleware_arc_lock.read().await.iter() {
                             middleware(arc_lock_controller_data.clone()).await;
                         }

@@ -14,6 +14,11 @@ impl ControllerData {
 
 impl ArcRwLockControllerData {
     #[inline]
+    pub(crate) fn from_controller_data(controller_data: ControllerData) -> Self {
+        Self(Arc::new(RwLock::new(controller_data)))
+    }
+
+    #[inline]
     pub async fn get_read_lock(&self) -> RwLockReadControllerData {
         let controller_data: RwLockReadControllerData = self.0.read().await;
         controller_data
