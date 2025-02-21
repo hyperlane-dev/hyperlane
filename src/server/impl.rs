@@ -137,7 +137,7 @@ impl Server {
         arc_lock_controller_data: &ArcRwLockControllerData,
     ) -> bool {
         let controller_data: RwLockReadGuard<'_, ControllerData> =
-            arc_lock_controller_data.read().await;
+            arc_lock_controller_data.get_read_lock().await;
         for tem in controller_data.get_request().get_headers().iter() {
             if tem.0.eq_ignore_ascii_case(CONNECTION) {
                 if tem.1.eq_ignore_ascii_case(CONNECTION_KEEP_ALIVE) {
@@ -187,7 +187,7 @@ impl Server {
                             .set_request(request_obj)
                             .set_log(log.clone());
                         let arc_lock_controller_data: ArcRwLockControllerData =
-                            Arc::new(RwLock::new(controller_data));
+                            ArcRwLockControllerData(Arc::new(RwLock::new(controller_data)));
                         for middleware in async_middleware_arc_lock.read().await.iter() {
                             middleware(arc_lock_controller_data.clone()).await;
                         }
@@ -197,7 +197,8 @@ impl Server {
                             async_func(arc_lock_controller_data.clone()).await;
                         }
                         if !Self::judge_enable_keep_alive(&arc_lock_controller_data).await {
-                            let controller_data = arc_lock_controller_data.read().await;
+                            let controller_data: RwLockReadControllerData =
+                                arc_lock_controller_data.get_read_lock().await;
                             let _ = controller_data.get_response().clone().close(&stream_arc);
                             return;
                         }

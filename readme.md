@@ -40,11 +40,12 @@ git clone https://github.com/ltpp-universe/hyperlane-quick-start.git
 use hyperlane::*;
 
 async fn test_middleware(arc_lock_controller_data: ArcRwLockControllerData) {
-    let socket_addr: String = get_socket_addr(&arc_lock_controller_data)
+    let socket_addr: String = arc_lock_controller_data
+        .get_socket_addr()
         .await
         .unwrap_or_default();
     let mut controller_data: RwLockWriteControllerData =
-        get_rw_lock_write_controller_data(&arc_lock_controller_data).await;
+        arc_lock_controller_data.get_write_lock().await;
     let response: &mut Response = controller_data.get_mut_response();
     response
         .set_header(SERVER, "hyperlane")
@@ -53,16 +54,17 @@ async fn test_middleware(arc_lock_controller_data: ArcRwLockControllerData) {
 }
 
 async fn root_router(arc_lock_controller_data: ArcRwLockControllerData) {
-    let send_res: ResponseResult =
-        send_response(&arc_lock_controller_data, 200, "hello hyperlane => /").await;
-    let controller_data: ControllerData = get_controller_data(&arc_lock_controller_data).await;
+    let send_res: ResponseResult = arc_lock_controller_data
+        .send_response(200, "hello hyperlane => /")
+        .await;
+    let controller_data: ControllerData = arc_lock_controller_data.get_clone().await;
     controller_data.get_log().info(
         format!("Response result => {:?}", send_res),
         log_debug_format_handler,
     );
 }
 
-async fn panic_route(_controller_data: ArcRwLock<ControllerData>) {
+async fn panic_route(_controller_data: ArcRwLockControllerData) {
     panic!("test panic");
 }
 
