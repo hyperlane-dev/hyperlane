@@ -163,7 +163,7 @@ impl Server {
                 .unwrap();
             while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
                 let tmp_arc_lock: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
-                let stream_arc: ArcRwLockStream = Arc::new(RwLock::new(stream));
+                let stream_arc: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
                 let async_middleware_arc_lock: ArcRwLockHashMapMiddlewareFuncBox =
                     Arc::clone(&self.middleware);
                 let router_func_arc_lock: ArcRwLockHashMapRouterFuncBox =

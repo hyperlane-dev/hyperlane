@@ -1,5 +1,4 @@
 use crate::*;
-use std::{future::Future, pin::Pin};
 
 pub trait Func:
     Fn(ArcRwLockControllerData) -> Pin<Box<dyn Future<Output = ()> + Send + Sync + 'static>>

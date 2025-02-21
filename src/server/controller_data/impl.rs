@@ -63,7 +63,7 @@ impl ArcRwLockControllerData {
         }
         let socket_addr: String = stream_result
             .unwrap()
-            .read()
+            .get_read_lock()
             .await
             .peer_addr()
             .and_then(|host| Ok(host.to_string()))
