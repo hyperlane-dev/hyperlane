@@ -42,7 +42,7 @@ impl Server {
             let mut cfg: RwLockWriteGuard<'_, ServerConfig<'_>> = self.get_cfg().write().await;
             cfg.set_log_dir(log_dir);
             let mut tmp: RwLockWriteGuard<'_, Tmp> = self.get_tmp().write().await;
-            tmp.log.set_path(log_dir.into());
+            tmp.get_mut_log().set_path(log_dir.into());
         }
         self
     }
@@ -53,7 +53,7 @@ impl Server {
             let mut cfg: RwLockWriteGuard<'_, ServerConfig<'_>> = self.get_cfg().write().await;
             cfg.set_log_size(log_size);
             let mut tmp: RwLockWriteGuard<'_, Tmp> = self.get_tmp().write().await;
-            tmp.log.set_file_size(log_size);
+            tmp.get_mut_log().set_file_size(log_size);
         }
         self
     }
@@ -94,7 +94,7 @@ impl Server {
             let mut cfg: RwLockWriteGuard<'_, ServerConfig<'_>> = self.get_cfg().write().await;
             cfg.set_interval_millis(interval_millis);
             let mut tmp: RwLockWriteGuard<'_, Tmp> = self.get_tmp().write().await;
-            tmp.log.set_interval_millis(interval_millis);
+            tmp.get_mut_log().set_interval_millis(interval_millis);
         }
         self
     }
@@ -169,7 +169,7 @@ impl Server {
                 let router_func_arc_lock: ArcRwLockHashMapRouterFuncBox =
                     Arc::clone(&self.router_func);
                 let handle_request = move || async move {
-                    let log: Log = tmp_arc_lock.read().await.log.clone();
+                    let log: Log = tmp_arc_lock.read().await.get_log().clone();
                     loop {
                         let mut controller_data: ControllerData = ControllerData::new();
                         let request_obj_result: Result<Request, ServerError> =
