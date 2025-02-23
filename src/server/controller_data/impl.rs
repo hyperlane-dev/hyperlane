@@ -31,32 +31,32 @@ impl ArcRwLockControllerData {
     }
 
     #[inline]
-    pub async fn get_clone(&self) -> ControllerData {
+    pub async fn get_controller_data(&self) -> ControllerData {
         let controller_data: ControllerData = self.get_read_lock().await.clone();
         controller_data
     }
 
     #[inline]
     pub async fn get_stream(&self) -> OptionArcRwLockStream {
-        let controller_data: ControllerData = self.get_clone().await;
+        let controller_data: ControllerData = self.get_controller_data().await;
         controller_data.get_stream().clone()
     }
 
     #[inline]
     pub async fn get_request(&self) -> Request {
-        let controller_data: ControllerData = self.get_clone().await;
+        let controller_data: ControllerData = self.get_controller_data().await;
         controller_data.get_request().clone()
     }
 
     #[inline]
     pub async fn get_response(&self) -> Response {
-        let controller_data: ControllerData = self.get_clone().await;
+        let controller_data: ControllerData = self.get_controller_data().await;
         controller_data.get_response().clone()
     }
 
     #[inline]
     pub async fn get_log(&self) -> Log {
-        let controller_data: ControllerData = self.get_clone().await;
+        let controller_data: ControllerData = self.get_controller_data().await;
         controller_data.get_log().clone()
     }
 

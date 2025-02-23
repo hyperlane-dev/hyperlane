@@ -106,8 +106,10 @@ impl Server {
         Fut: Future<Output = ()> + Send + Sync + 'static,
     {
         {
-            let mut mut_router_func: RwLockWriteGuard<'_, HashMap<&str, Box<dyn Func>>> =
-                self.router_func.write().await;
+            let mut mut_router_func: RwLockWriteGuard<
+                '_,
+                HashMap<&str, Box<dyn Func + Send + Sync>>,
+            > = self.router_func.write().await;
             mut_router_func.insert(
                 route,
                 Box::new(move |controller_data| Box::pin(func(controller_data))),
@@ -123,7 +125,7 @@ impl Server {
         Fut: Future<Output = ()> + Send + Sync + 'static,
     {
         {
-            let mut mut_async_middleware: RwLockWriteGuard<'_, Vec<Box<dyn Func>>> =
+            let mut mut_async_middleware:RwLockWriteGuard<'_, Vec<Box<dyn Func + Send + Sync>>> =
                 self.middleware.write().await;
             mut_async_middleware.push(Box::new(move |controller_data| {
                 Box::pin(func(controller_data))
