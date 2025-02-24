@@ -148,19 +148,22 @@ impl ArcRwLockControllerData {
     }
 
     #[inline]
-    pub async fn get_request_query(&self) -> RequestQuery {
+    pub async fn get_request_querys(&self) -> RequestQuerys {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         let request: &Request = controller_data.get_request();
-        request.get_query().clone()
+        request.get_querys().clone()
     }
 
     #[inline]
-    pub async fn get_request_header(&self, key: &str) -> Option<String> {
+    pub async fn get_request_query<T: Into<RequestHeadersKey>>(
+        &self,
+        key: T,
+    ) -> Option<RequestQuerysValue> {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         let request: &Request = controller_data.get_request();
         request
-            .get_headers()
-            .get(key)
+            .get_querys()
+            .get(&key.into())
             .and_then(|data| Some(data.clone()))
     }
 
@@ -176,6 +179,16 @@ impl ArcRwLockControllerData {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         let request: &Request = controller_data.get_request();
         String::from_utf8_lossy(request.get_body()).to_string()
+    }
+
+    #[inline]
+    pub async fn get_request_header<K>(&self, key: K) -> Option<RequestHeadersValue>
+    where
+        K: Into<RequestHeadersKey>,
+    {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        let request: &Request = controller_data.get_request();
+        request.get_header(key)
     }
 
     #[inline]
@@ -221,25 +234,23 @@ impl ArcRwLockControllerData {
     #[inline]
     pub async fn set_request_query<K, V>(&self, key: K, value: V) -> &Self
     where
-        K: Into<RequestQueryKey>,
-        V: Into<RequestQueryValue>,
+        K: Into<RequestQuerysKey>,
+        V: Into<RequestQuerysValue>,
     {
         let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
         let request: &mut Request = controller_data.get_mut_request();
-        let mut query: RequestQuery = request.get_query().clone();
-        query.insert(key.into(), value.into());
-        request.set_query(query);
+        request.set_query(key, value);
         self
     }
 
     #[inline]
-    pub async fn set_request_querys<T>(&self, query: T) -> &Self
+    pub async fn set_request_querys<T>(&self, querys: T) -> &Self
     where
-        T: Into<RequestQuery>,
+        T: Into<RequestQuerys>,
     {
         let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
         let request: &mut Request = controller_data.get_mut_request();
-        request.set_query(query);
+        request.set_querys(querys.into());
         self
     }
 
@@ -279,13 +290,13 @@ impl ArcRwLockControllerData {
     }
 
     #[inline]
-    pub async fn get_response_header(&self, key: &str) -> Option<String> {
+    pub async fn get_response_header<K>(&self, key: K) -> Option<ResponseHeadersValue>
+    where
+        K: Into<ResponseHeadersKey>,
+    {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         let response: &Response = controller_data.get_response();
-        response
-            .get_headers()
-            .get(key)
-            .and_then(|data| Some(data.clone()))
+        response.get_header(key)
     }
 
     #[inline]

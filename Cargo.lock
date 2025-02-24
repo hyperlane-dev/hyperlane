@@ -350,9 +350,9 @@ checksum = "0e12cb1453c646f80c681382a4e3da4b7345e1f6d4ff6ffd6f12909f5d00740d"
 
 [[package]]
 name = "http-type"
-version = "3.3.0"
+version = "3.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00b3707fe6f200cc8543b35f2e74531db80451ca9de8a93e592e6947329b1ac9"
+checksum = "9352577ef33cb4ddf19c6c3cb67b5321baabc91ff5118b8bb9fde7bf3d05d345"
 dependencies = [
  "hex",
  "http-compress",
