@@ -127,35 +127,35 @@ impl ArcRwLockControllerData {
     }
 
     #[inline]
-    pub async fn get_request_method<T>(&self) -> RequestMethod {
+    pub async fn get_request_method(&self) -> RequestMethod {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         let request: &Request = controller_data.get_request();
         request.get_method().clone()
     }
 
     #[inline]
-    pub async fn get_request_host<T>(&self) -> RequestHost {
+    pub async fn get_request_host(&self) -> RequestHost {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         let request: &Request = controller_data.get_request();
         request.get_host().clone()
     }
 
     #[inline]
-    pub async fn get_request_path<T>(&self) -> RequestPath {
+    pub async fn get_request_path(&self) -> RequestPath {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         let request: &Request = controller_data.get_request();
         request.get_path().clone()
     }
 
     #[inline]
-    pub async fn get_request_query<T>(&self) -> RequestQuery {
+    pub async fn get_request_query(&self) -> RequestQuery {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         let request: &Request = controller_data.get_request();
         request.get_query().clone()
     }
 
     #[inline]
-    pub async fn get_request_header<T>(&self, key: &str) -> Option<String> {
+    pub async fn get_request_header(&self, key: &str) -> Option<String> {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         let request: &Request = controller_data.get_request();
         request
@@ -165,21 +165,21 @@ impl ArcRwLockControllerData {
     }
 
     #[inline]
-    pub async fn get_request_body<T>(&self) -> RequestBody {
+    pub async fn get_request_body(&self) -> RequestBody {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         let request: &Request = controller_data.get_request();
         request.get_body().clone()
     }
 
     #[inline]
-    pub async fn get_request_body_string<T>(&self) -> String {
+    pub async fn get_request_body_string(&self) -> String {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         let request: &Request = controller_data.get_request();
         String::from_utf8_lossy(request.get_body()).to_string()
     }
 
     #[inline]
-    pub async fn get_request_headers<T>(&self) -> RequestHeaders {
+    pub async fn get_request_headers(&self) -> RequestHeaders {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         let request: &Request = controller_data.get_request();
         request.get_headers().clone()
