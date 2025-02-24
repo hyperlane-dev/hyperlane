@@ -1,7 +1,7 @@
 use crate::*;
 
 pub trait Func:
-    Fn(ArcRwLockControllerData) -> Pin<Box<dyn Future<Output = ()> + Send + Sync + 'static>>
+    Fn(ArcRwLockControllerData) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>>
     + Send
     + Sync
     + 'static
@@ -10,6 +10,6 @@ pub trait Func:
 
 pub trait FuncWithoutPin<Fut>: Fn(ArcRwLockControllerData) -> Fut + Send + Sync + 'static
 where
-    Fut: Future<Output = ()> + Send + Sync + 'static,
+    Fut: Future<Output = ()> + Send + 'static,
 {
 }

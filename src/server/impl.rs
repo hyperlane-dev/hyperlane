@@ -103,13 +103,11 @@ impl Server {
     pub async fn router<F, Fut>(&mut self, route: &'static str, func: F) -> &mut Self
     where
         F: FuncWithoutPin<Fut>,
-        Fut: Future<Output = ()> + Send + Sync + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
     {
         {
-            let mut mut_router_func: RwLockWriteGuard<
-                '_,
-                HashMap<&str, Box<dyn Func + Send + Sync>>,
-            > = self.router_func.write().await;
+            let mut mut_router_func: RwLockWriteGuard<'_, HashMap<&str, Box<dyn Func + Send>>> =
+                self.router_func.write().await;
             mut_router_func.insert(
                 route,
                 Box::new(move |controller_data| Box::pin(func(controller_data))),
@@ -125,7 +123,7 @@ impl Server {
         Fut: Future<Output = ()> + Send + Sync + 'static,
     {
         {
-            let mut mut_async_middleware:RwLockWriteGuard<'_, Vec<Box<dyn Func + Send + Sync>>> =
+            let mut mut_async_middleware: RwLockWriteGuard<'_, Vec<Box<dyn Func + Send>>> =
                 self.middleware.write().await;
             mut_async_middleware.push(Box::new(move |controller_data| {
                 Box::pin(func(controller_data))
