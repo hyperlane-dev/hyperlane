@@ -199,6 +199,14 @@ impl ArcRwLockControllerData {
     }
 
     #[inline]
+    pub async fn set_request(&self, request_data: Request) -> &Self {
+        let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+        let request: &mut Request = controller_data.get_mut_request();
+        *request = request_data;
+        self
+    }
+
+    #[inline]
     pub async fn set_request_method<T>(&self, method: T) -> &Self
     where
         T: Into<RequestMethod>,
