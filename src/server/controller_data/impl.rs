@@ -114,7 +114,10 @@ impl ArcRwLockControllerData {
     }
 
     #[inline]
-    pub async fn send_body<T: Into<ResponseBody>>(&self, response_body: T) -> ResponseResult {
+    pub async fn send_response_body<T: Into<ResponseBody>>(
+        &self,
+        response_body: T,
+    ) -> ResponseResult {
         let controller_data: RwLockWriteControllerData = self.get_write_lock().await;
         let mut response: Response = controller_data.get_response().clone();
         let body: ResponseBody = response_body.into();
@@ -124,7 +127,7 @@ impl ArcRwLockControllerData {
     }
 
     #[inline]
-    pub async fn set_header<K, V>(&self, key: K, value: V) -> &Self
+    pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self
     where
         K: Into<String>,
         V: Into<String>,
@@ -136,7 +139,7 @@ impl ArcRwLockControllerData {
     }
 
     #[inline]
-    pub async fn set_headers(&self, headers: ResponseHeaders) -> &Self {
+    pub async fn set_response_headers(&self, headers: ResponseHeaders) -> &Self {
         let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
         let response: &mut Response = controller_data.get_mut_response();
         response.set_headers(headers);
@@ -144,7 +147,7 @@ impl ArcRwLockControllerData {
     }
 
     #[inline]
-    pub async fn set_body<T: Into<ResponseBody>>(&self, body: T) -> &Self {
+    pub async fn set_response_body<T: Into<ResponseBody>>(&self, body: T) -> &Self {
         let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
         let response: &mut Response = controller_data.get_mut_response();
         response.set_body(body);
@@ -152,7 +155,7 @@ impl ArcRwLockControllerData {
     }
 
     #[inline]
-    pub async fn set_reason_phrase<T: Into<ResponseReasonPhrase>>(
+    pub async fn set_response_reason_phrase<T: Into<ResponseReasonPhrase>>(
         &self,
         reason_phrase: T,
     ) -> &Self {
@@ -163,7 +166,7 @@ impl ArcRwLockControllerData {
     }
 
     #[inline]
-    pub async fn set_status_code(&self, status_code: ResponseStatusCode) -> &Self {
+    pub async fn set_response_status_code(&self, status_code: ResponseStatusCode) -> &Self {
         let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
         let response: &mut Response = controller_data.get_mut_response();
         response.set_status_code(status_code);
