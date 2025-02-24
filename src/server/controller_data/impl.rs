@@ -127,6 +127,47 @@ impl ArcRwLockControllerData {
     }
 
     #[inline]
+    pub async fn close(&self) -> ResponseResult {
+        let controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+        let mut response: Response = controller_data.get_response().clone();
+        let stream_lock: ArcRwLockStream = controller_data.get_stream().clone().unwrap();
+        response.close(&stream_lock).await
+    }
+
+    #[inline]
+    pub async fn log_info<T, L>(&self, data: T, func: L)
+    where
+        T: LogDataTrait,
+        L: LogFuncTrait,
+    {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        let log: &Log = controller_data.get_log();
+        log.info(data, func);
+    }
+
+    #[inline]
+    pub async fn log_debug<T, L>(&self, data: T, func: L)
+    where
+        T: LogDataTrait,
+        L: LogFuncTrait,
+    {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        let log: &Log = controller_data.get_log();
+        log.debug(data, func);
+    }
+
+    #[inline]
+    pub async fn log_error<T, L>(&self, data: T, func: L)
+    where
+        T: LogDataTrait,
+        L: LogFuncTrait,
+    {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        let log: &Log = controller_data.get_log();
+        log.error(data, func);
+    }
+
+    #[inline]
     pub async fn get_request_method(&self) -> RequestMethod {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         let request: &Request = controller_data.get_request();
@@ -380,13 +421,5 @@ impl ArcRwLockControllerData {
         let response: &mut Response = controller_data.get_mut_response();
         response.set_status_code(status_code);
         self
-    }
-
-    #[inline]
-    pub async fn close(&self) -> ResponseResult {
-        let controller_data: RwLockWriteControllerData = self.get_write_lock().await;
-        let mut response: Response = controller_data.get_response().clone();
-        let stream_lock: ArcRwLockStream = controller_data.get_stream().clone().unwrap();
-        response.close(&stream_lock).await
     }
 }

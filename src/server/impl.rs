@@ -120,7 +120,7 @@ impl Server {
     pub async fn middleware<F, Fut>(&mut self, func: F) -> &mut Self
     where
         F: FuncWithoutPin<Fut>,
-        Fut: Future<Output = ()> + Send + Sync + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
     {
         {
             let mut mut_async_middleware: RwLockWriteGuard<'_, Vec<Box<dyn Func + Send>>> =
