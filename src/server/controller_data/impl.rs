@@ -127,6 +127,182 @@ impl ArcRwLockControllerData {
     }
 
     #[inline]
+    pub async fn get_request_method<T>(&self) -> RequestMethod {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        let request: &Request = controller_data.get_request();
+        request.get_method().clone()
+    }
+
+    #[inline]
+    pub async fn get_request_host<T>(&self) -> RequestHost {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        let request: &Request = controller_data.get_request();
+        request.get_host().clone()
+    }
+
+    #[inline]
+    pub async fn get_request_path<T>(&self) -> RequestPath {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        let request: &Request = controller_data.get_request();
+        request.get_path().clone()
+    }
+
+    #[inline]
+    pub async fn get_request_query<T>(&self) -> RequestQuery {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        let request: &Request = controller_data.get_request();
+        request.get_query().clone()
+    }
+
+    #[inline]
+    pub async fn get_request_header<T>(&self, key: &str) -> Option<String> {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        let request: &Request = controller_data.get_request();
+        request
+            .get_headers()
+            .get(key)
+            .and_then(|data| Some(data.clone()))
+    }
+
+    #[inline]
+    pub async fn get_request_body<T>(&self) -> RequestBody {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        let request: &Request = controller_data.get_request();
+        request.get_body().clone()
+    }
+
+    #[inline]
+    pub async fn get_request_body_string<T>(&self) -> String {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        let request: &Request = controller_data.get_request();
+        String::from_utf8_lossy(request.get_body()).to_string()
+    }
+
+    #[inline]
+    pub async fn get_request_headers<T>(&self) -> RequestHeaders {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        let request: &Request = controller_data.get_request();
+        request.get_headers().clone()
+    }
+
+    #[inline]
+    pub async fn set_request_method<T>(&self, method: T) -> &Self
+    where
+        T: Into<RequestMethod>,
+    {
+        let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+        let request: &mut Request = controller_data.get_mut_request();
+        request.set_method(method);
+        self
+    }
+
+    #[inline]
+    pub async fn set_request_host<T>(&self, host: T) -> &Self
+    where
+        T: Into<RequestHost>,
+    {
+        let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+        let request: &mut Request = controller_data.get_mut_request();
+        request.set_host(host);
+        self
+    }
+
+    #[inline]
+    pub async fn set_request_path<T>(&self, path: T) -> &Self
+    where
+        T: Into<RequestPath>,
+    {
+        let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+        let request: &mut Request = controller_data.get_mut_request();
+        request.set_path(path);
+        self
+    }
+
+    #[inline]
+    pub async fn set_request_query<T>(&self, query: T) -> &Self
+    where
+        T: Into<RequestQuery>,
+    {
+        let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+        let request: &mut Request = controller_data.get_mut_request();
+        request.set_query(query);
+        self
+    }
+
+    #[inline]
+    pub async fn set_request_header<K, V>(&self, key: K, value: V) -> &Self
+    where
+        K: Into<String>,
+        V: Into<String>,
+    {
+        let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+        let request: &mut Request = controller_data.get_mut_request();
+        request.set_header(key, value);
+        self
+    }
+
+    #[inline]
+    pub async fn set_request_headers(&self, headers: RequestHeaders) -> &Self {
+        let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+        let request: &mut Request = controller_data.get_mut_request();
+        request.set_headers(headers);
+        self
+    }
+
+    #[inline]
+    pub async fn set_request_body<T: Into<RequestBody>>(&self, body: T) -> &Self {
+        let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+        let request: &mut Request = controller_data.get_mut_request();
+        request.set_body(body);
+        self
+    }
+
+    #[inline]
+    pub async fn get_response_headers(&self) -> ResponseHeaders {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        let response: &Response = controller_data.get_response();
+        response.get_headers().clone()
+    }
+
+    #[inline]
+    pub async fn get_response_header(&self, key: &str) -> Option<String> {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        let response: &Response = controller_data.get_response();
+        response
+            .get_headers()
+            .get(key)
+            .and_then(|data| Some(data.clone()))
+    }
+
+    #[inline]
+    pub async fn get_response_body(&self) -> ResponseBody {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        let response: &Response = controller_data.get_response();
+        response.get_body().clone()
+    }
+
+    #[inline]
+    pub async fn get_response_body_string(&self) -> String {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        let response: &Response = controller_data.get_response();
+        String::from_utf8_lossy(response.get_body()).to_string()
+    }
+
+    #[inline]
+    pub async fn get_response_reason_phrase(&self) -> ResponseReasonPhrase {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        let response: &Response = controller_data.get_response();
+        response.get_reason_phrase().clone()
+    }
+
+    #[inline]
+    pub async fn get_response_status_code(&self) -> ResponseStatusCode {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        let response: &Response = controller_data.get_response();
+        response.get_status_code().clone()
+    }
+
+    #[inline]
     pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self
     where
         K: Into<String>,
