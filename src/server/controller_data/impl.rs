@@ -144,6 +144,33 @@ impl ArcRwLockControllerData {
     }
 
     #[inline]
+    pub async fn set_body<T: Into<ResponseBody>>(&self, body: T) -> &Self {
+        let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+        let response: &mut Response = controller_data.get_mut_response();
+        response.set_body(body);
+        self
+    }
+
+    #[inline]
+    pub async fn set_reason_phrase<T: Into<ResponseReasonPhrase>>(
+        &self,
+        reason_phrase: T,
+    ) -> &Self {
+        let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+        let response: &mut Response = controller_data.get_mut_response();
+        response.set_reason_phrase(reason_phrase);
+        self
+    }
+
+    #[inline]
+    pub async fn set_status_code(&self, status_code: ResponseStatusCode) -> &Self {
+        let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+        let response: &mut Response = controller_data.get_mut_response();
+        response.set_status_code(status_code);
+        self
+    }
+
+    #[inline]
     pub async fn close(&self) -> ResponseResult {
         let controller_data: RwLockWriteControllerData = self.get_write_lock().await;
         let mut response: Response = controller_data.get_response().clone();
