@@ -112,4 +112,42 @@ impl ArcRwLockControllerData {
         let _ = response.close(&stream_lock).await;
         response_res
     }
+
+    #[inline]
+    pub async fn send_body<T: Into<ResponseBody>>(&self, response_body: T) -> ResponseResult {
+        let controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+        let mut response: Response = controller_data.get_response().clone();
+        let body: ResponseBody = response_body.into();
+        let stream_lock: ArcRwLockStream = controller_data.get_stream().clone().unwrap();
+        let response_res: ResponseResult = response.set_body(body).send_body(&stream_lock).await;
+        response_res
+    }
+
+    #[inline]
+    pub async fn set_header<K, V>(&self, key: K, value: V) -> &Self
+    where
+        K: Into<String>,
+        V: Into<String>,
+    {
+        let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+        let response: &mut Response = controller_data.get_mut_response();
+        response.set_header(key, value);
+        self
+    }
+
+    #[inline]
+    pub async fn set_headers(&self, headers: ResponseHeaders) -> &Self {
+        let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+        let response: &mut Response = controller_data.get_mut_response();
+        response.set_headers(headers);
+        self
+    }
+
+    #[inline]
+    pub async fn close(&self) -> ResponseResult {
+        let controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+        let mut response: Response = controller_data.get_response().clone();
+        let stream_lock: ArcRwLockStream = controller_data.get_stream().clone().unwrap();
+        response.close(&stream_lock).await
+    }
 }
