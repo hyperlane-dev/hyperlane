@@ -219,7 +219,21 @@ impl ArcRwLockControllerData {
     }
 
     #[inline]
-    pub async fn set_request_query<T>(&self, query: T) -> &Self
+    pub async fn set_request_query<K, V>(&self, key: K, value: V) -> &Self
+    where
+        K: Into<RequestQueryKey>,
+        V: Into<RequestQueryValue>,
+    {
+        let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+        let request: &mut Request = controller_data.get_mut_request();
+        let mut query: RequestQuery = request.get_query().clone();
+        query.insert(key.into(), value.into());
+        request.set_query(query);
+        self
+    }
+
+    #[inline]
+    pub async fn set_request_querys<T>(&self, query: T) -> &Self
     where
         T: Into<RequestQuery>,
     {
