@@ -12,7 +12,8 @@ exclude = [
     "target",
     "Cargo.lock",
     "sh",
-    ".github"
+    ".github",
+    "logs"    
 ]
 
 [dependencies]
