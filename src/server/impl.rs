@@ -180,7 +180,6 @@ impl Server {
                             let _ = controller_data.get_mut_response().close(&stream_arc);
                             return;
                         }
-                        print_success!(format!("{:?}", request_obj_result));
                         let request_obj: Request = request_obj_result.unwrap_or_default();
                         let route: String = request_obj.get_path().clone();
                         controller_data
