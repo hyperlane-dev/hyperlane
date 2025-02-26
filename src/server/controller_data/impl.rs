@@ -82,16 +82,18 @@ impl ArcRwLockControllerData {
         status_code: usize,
         response_body: T,
     ) -> ResponseResult {
-        let controller_data: RwLockWriteControllerData = self.get_write_lock().await;
-        let mut response: Response = controller_data.get_response().clone();
-        let body: ResponseBody = response_body.into();
-        let stream_lock: ArcRwLockStream = controller_data.get_stream().clone().unwrap();
-        let response_res: ResponseResult = response
-            .set_body(body)
-            .set_status_code(status_code)
-            .send(&stream_lock)
-            .await;
-        response_res
+        if let Some(stream_lock) = self.get_stream().await {
+            let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+            let response: &mut Response = controller_data.get_mut_response();
+            let body: ResponseBody = response_body.into();
+            let response_res: ResponseResult = response
+                .set_body(body)
+                .set_status_code(status_code)
+                .send(&stream_lock)
+                .await;
+            return response_res;
+        }
+        Err(ResponseError::Unknown)
     }
 
     #[inline]
@@ -100,17 +102,19 @@ impl ArcRwLockControllerData {
         status_code: usize,
         response_body: T,
     ) -> ResponseResult {
-        let controller_data: RwLockWriteControllerData = self.get_write_lock().await;
-        let mut response: Response = controller_data.get_response().clone();
-        let body: ResponseBody = response_body.into();
-        let stream_lock: ArcRwLockStream = controller_data.get_stream().clone().unwrap();
-        let response_res: ResponseResult = response
-            .set_body(body)
-            .set_status_code(status_code)
-            .send(&stream_lock)
-            .await;
-        let _ = response.close(&stream_lock).await;
-        response_res
+        if let Some(stream_lock) = self.get_stream().await {
+            let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+            let response: &mut Response = controller_data.get_mut_response();
+            let body: ResponseBody = response_body.into();
+            let response_res: ResponseResult = response
+                .set_body(body)
+                .set_status_code(status_code)
+                .send(&stream_lock)
+                .await;
+            let _ = response.close(&stream_lock).await;
+            return response_res;
+        }
+        Err(ResponseError::Unknown)
     }
 
     #[inline]
@@ -118,20 +122,25 @@ impl ArcRwLockControllerData {
         &self,
         response_body: T,
     ) -> ResponseResult {
-        let controller_data: RwLockWriteControllerData = self.get_write_lock().await;
-        let mut response: Response = controller_data.get_response().clone();
-        let body: ResponseBody = response_body.into();
-        let stream_lock: ArcRwLockStream = controller_data.get_stream().clone().unwrap();
-        let response_res: ResponseResult = response.set_body(body).send_body(&stream_lock).await;
-        response_res
+        if let Some(stream_lock) = self.get_stream().await {
+            let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+            let response: &mut Response = controller_data.get_mut_response();
+            let body: ResponseBody = response_body.into();
+            let response_res: ResponseResult =
+                response.set_body(body).send_body(&stream_lock).await;
+            return response_res;
+        }
+        Err(ResponseError::Unknown)
     }
 
     #[inline]
     pub async fn close(&self) -> ResponseResult {
-        let controller_data: RwLockWriteControllerData = self.get_write_lock().await;
-        let mut response: Response = controller_data.get_response().clone();
-        let stream_lock: ArcRwLockStream = controller_data.get_stream().clone().unwrap();
-        response.close(&stream_lock).await
+        if let Some(stream_lock) = self.get_stream().await {
+            let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+            let response: &mut Response = controller_data.get_mut_response();
+            return response.close(&stream_lock).await;
+        }
+        Err(ResponseError::Unknown)
     }
 
     #[inline]
