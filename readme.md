@@ -45,24 +45,25 @@ async fn test_middleware(arc_lock_controller_data: ArcRwLockControllerData) {
         .get_socket_addr()
         .await
         .unwrap_or_default();
-    let mut controller_data: RwLockWriteControllerData =
-        arc_lock_controller_data.get_write_lock().await;
-    let response: &mut Response = controller_data.get_mut_response();
-    response
-        .set_header(SERVER, "hyperlane")
-        .set_header(CONNECTION, CONNECTION_KEEP_ALIVE)
-        .set_header("SocketAddr", socket_addr);
+    arc_lock_controller_data
+        .set_response_header(SERVER, "hyperlane")
+        .await
+        .set_response_header(CONNECTION, CONNECTION_KEEP_ALIVE)
+        .await
+        .set_response_header("SocketAddr", socket_addr)
+        .await;
 }
 
 async fn root_router(arc_lock_controller_data: ArcRwLockControllerData) {
     let send_res: ResponseResult = arc_lock_controller_data
         .send_response(200, "hello hyperlane => /")
         .await;
-    let controller_data: ControllerData = arc_lock_controller_data.get_controller_data().await;
-    controller_data.get_log().info(
-        format!("Response result => {:?}", send_res),
-        log_debug_format_handler,
-    );
+    arc_lock_controller_data
+        .log_info(
+            format!("Response result => {:?}", send_res),
+            log_debug_format_handler,
+        )
+        .await;
 }
 
 async fn panic_route(_controller_data: ArcRwLockControllerData) {
