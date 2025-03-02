@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "4.14.3"
+version = "4.14.4"
 edition = "2021"
 authors = ["ltpp-universe <root@ltpp.vip>"] 
 license = "MIT"
@@ -23,7 +23,7 @@ clonelicious = "1.0.3"
 color-output = "6.4.0"
 file-operation = "0.4.1"
 http-compress = "2.2.4"
-hyperlane-log = "1.1.30"
+hyperlane-log = "1.2.0"
 lombok-macros = "1.7.3"
 recoverable-spawn = "3.4.1"
 recoverable-thread-pool = "2.0.8"

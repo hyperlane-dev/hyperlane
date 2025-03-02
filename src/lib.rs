@@ -23,7 +23,7 @@ pub use server_manager::*;
 pub use simd_json;
 pub use std_macro_extensions::*;
 pub use tokio;
-pub use utils::{log::*, thread::*};
+pub use utils::thread::*;
 
 pub(crate) use server::{
     config::constant::*,
