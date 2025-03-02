@@ -162,7 +162,7 @@ impl Server {
                 .map_err(|e| ServerError::TcpBindError(e.to_string()))
                 .unwrap();
             while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
-                let tmp_arc_lock: ArcRwLock<Tmp> = Arc::clone(&self.tmp);
+                let tmp_arc_lock: ArcRwLockTmp = Arc::clone(&self.tmp);
                 let stream_arc: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
                 let async_middleware_arc_lock: ArcRwLockHashMapMiddlewareFuncBox =
                     Arc::clone(&self.middleware);
