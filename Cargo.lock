@@ -350,9 +350,9 @@ checksum = "590d21ec88bcc3a54fd43344c452f59a1908ead7fdf6a9d4f22dcf514efb843a"
 
 [[package]]
 name = "http-type"
-version = "3.7.2"
+version = "3.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12788bb780b8c435b82a26f859e3c7a79334aa97e629ca4479cfe1c87e6ecbee"
+checksum = "3bbd5bd88667a576824211a6116b5364e4686167fe7a9d73cbb52559ebd376fa"
 dependencies = [
  "hex",
  "http-compress",
@@ -368,7 +368,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "4.15.0"
+version = "4.16.0"
 dependencies = [
  "async-func",
  "clonelicious",
@@ -392,9 +392,9 @@ dependencies = [
 
 [[package]]
 name = "hyperlane-log"
-version = "1.2.1"
+version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c29f1f11b7ec0cca2dcbeeb8eb2456cd328f5ee0f205803b2c71228f6906bb1"
+checksum = "a05a669263f0021812ae483d83a25e7d08e6032222844338abaa3a377f1a97a1"
 dependencies = [
  "file-operation",
  "hyperlane-time 0.0.7",
@@ -600,9 +600,9 @@ checksum = "30bde2b3dc3671ae49d8e2e9f044c7c005836e7a023ee57cffa25ab82764bb9e"
 
 [[package]]
 name = "lombok-macros"
-version = "1.7.4"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9203d7ef929978612d2c71f5e7ed13529d00e4e9b6a683a2c59713148ab574b"
+checksum = "c093f50f1ac912704228373ec7c7b9e5c927bb37e7c37a8f3d3a53aad2249425"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -730,9 +730,9 @@ dependencies = [
 
 [[package]]
 name = "recoverable-thread-pool"
-version = "2.0.9"
+version = "2.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e0bff600fd10f50faf0b926e59d168e41d88debaf22fab0fceb4d04d040c8aa"
+checksum = "1dd78e4575ff1cd61ffa4e6b65453407efeb396a136d8764edbf1740df8bbdfd"
 dependencies = [
  "lombok-macros",
  "recoverable-spawn",
