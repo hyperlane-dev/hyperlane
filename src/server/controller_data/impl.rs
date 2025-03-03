@@ -61,7 +61,7 @@ impl ArcRwLockControllerData {
     }
 
     #[inline]
-    pub async fn get_client_addr(&self) -> Option<SocketAddr> {
+    pub async fn get_client_addr(&self) -> OptionSocketAddr {
         let stream_result: OptionArcRwLockStream = self.get_stream().await;
         if stream_result.is_none() {
             return None;
