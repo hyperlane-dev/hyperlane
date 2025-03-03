@@ -61,19 +61,34 @@ impl ArcRwLockControllerData {
     }
 
     #[inline]
-    pub async fn get_socket_addr(&self) -> Option<String> {
+    pub async fn get_client_addr(&self) -> Option<SocketAddr> {
         let stream_result: OptionArcRwLockStream = self.get_stream().await;
         if stream_result.is_none() {
             return None;
         }
-        let socket_addr: String = stream_result
+        let socket_addr: SocketAddr = stream_result
             .unwrap()
             .get_read_lock()
             .await
             .peer_addr()
-            .and_then(|host| Ok(host.to_string()))
-            .unwrap_or_default();
+            .unwrap_or(SocketAddr::V4(SocketAddrV4::new(
+                Ipv4Addr::new(0, 0, 0, 0),
+                0,
+            )));
         Some(socket_addr)
+    }
+
+    #[inline]
+    pub async fn get_client_host(&self) -> ClientHost {
+        let addr: Option<SocketAddr> = self.get_client_addr().await;
+        addr.map(|a| a.ip())
+            .unwrap_or(IpAddr::V4([0, 0, 0, 0].into()))
+    }
+
+    #[inline]
+    pub async fn get_client_port(&self) -> ClientPort {
+        let addr: Option<SocketAddr> = self.get_client_addr().await;
+        addr.map(|a| a.port()).unwrap_or(0)
     }
 
     #[inline]
