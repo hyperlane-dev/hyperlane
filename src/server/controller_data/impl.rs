@@ -61,33 +61,30 @@ impl ArcRwLockControllerData {
     }
 
     #[inline]
-    pub async fn get_client_addr(&self) -> OptionSocketAddr {
+    pub async fn get_socket_addr(&self) -> OptionSocketAddr {
         let stream_result: OptionArcRwLockStream = self.get_stream().await;
         if stream_result.is_none() {
             return None;
         }
-        let socket_addr: SocketAddr = stream_result
+        let socket_addr_opt: OptionSocketAddr = stream_result
             .unwrap()
             .get_read_lock()
             .await
             .peer_addr()
-            .unwrap_or(SocketAddr::V4(SocketAddrV4::new(
-                Ipv4Addr::new(0, 0, 0, 0),
-                0,
-            )));
-        Some(socket_addr)
+            .ok();
+        socket_addr_opt
     }
 
     #[inline]
-    pub async fn get_client_host(&self) -> OptionClientHost {
-        let addr: Option<SocketAddr> = self.get_client_addr().await;
-        addr.map(|a| a.ip())
+    pub async fn get_socket_host(&self) -> OptionSocketHost {
+        let addr: Option<SocketAddr> = self.get_socket_addr().await;
+        addr.map(|socket_addr| socket_addr.ip())
     }
 
     #[inline]
-    pub async fn get_client_port(&self) -> OptionClientPort {
-        let addr: Option<SocketAddr> = self.get_client_addr().await;
-        addr.map(|a| a.port())
+    pub async fn get_socket_port(&self) -> OptionSocketPort {
+        let addr: Option<SocketAddr> = self.get_socket_addr().await;
+        addr.map(|socket_addr| socket_addr.port())
     }
 
     #[inline]
