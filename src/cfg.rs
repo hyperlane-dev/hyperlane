@@ -4,9 +4,13 @@ async fn test_server_basic_usage() {
 
     async fn test_middleware(arc_lock_controller_data: ArcRwLockControllerData) {
         let socket_addr: String = arc_lock_controller_data
-            .get_socket_addr()
+            .get_client_addr()
             .await
-            .unwrap_or_default();
+            .unwrap_or(SocketAddr::V4(SocketAddrV4::new(
+                Ipv4Addr::new(0, 0, 0, 0),
+                0,
+            )))
+            .to_string();
         arc_lock_controller_data
             .set_response_header(SERVER, "hyperlane")
             .await
