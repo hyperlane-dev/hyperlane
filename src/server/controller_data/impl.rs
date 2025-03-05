@@ -1,9 +1,9 @@
 use crate::*;
 
-impl ControllerData {
+impl InnerControllerData {
     #[inline]
     pub fn new() -> Self {
-        ControllerData {
+        InnerControllerData {
             stream: None,
             request: Request::default(),
             response: Response::default(),
@@ -12,10 +12,16 @@ impl ControllerData {
     }
 }
 
-impl ArcRwLockControllerData {
+impl ControllerData {
     #[inline]
-    pub(crate) fn from_controller_data(controller_data: ControllerData) -> Self {
+    pub(crate) fn from_controller_data(controller_data: InnerControllerData) -> Self {
         Self(Arc::new(RwLock::new(controller_data)))
+    }
+
+    #[inline]
+    pub async fn get(&self) -> InnerControllerData {
+        let controller_data: InnerControllerData = self.get_read_lock().await.clone();
+        controller_data
     }
 
     #[inline]
@@ -31,32 +37,26 @@ impl ArcRwLockControllerData {
     }
 
     #[inline]
-    pub async fn get_controller_data(&self) -> ControllerData {
-        let controller_data: ControllerData = self.get_read_lock().await.clone();
-        controller_data
-    }
-
-    #[inline]
     pub async fn get_stream(&self) -> OptionArcRwLockStream {
-        let controller_data: ControllerData = self.get_controller_data().await;
+        let controller_data: InnerControllerData = self.get().await;
         controller_data.get_stream().clone()
     }
 
     #[inline]
     pub async fn get_request(&self) -> Request {
-        let controller_data: ControllerData = self.get_controller_data().await;
+        let controller_data: InnerControllerData = self.get().await;
         controller_data.get_request().clone()
     }
 
     #[inline]
     pub async fn get_response(&self) -> Response {
-        let controller_data: ControllerData = self.get_controller_data().await;
+        let controller_data: InnerControllerData = self.get().await;
         controller_data.get_response().clone()
     }
 
     #[inline]
     pub async fn get_log(&self) -> Log {
-        let controller_data: ControllerData = self.get_controller_data().await;
+        let controller_data: InnerControllerData = self.get().await;
         controller_data.get_log().clone()
     }
 

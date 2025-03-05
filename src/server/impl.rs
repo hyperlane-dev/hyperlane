@@ -133,11 +133,8 @@ impl Server {
     }
 
     #[inline]
-    pub async fn judge_enable_keep_alive(
-        arc_lock_controller_data: &ArcRwLockControllerData,
-    ) -> bool {
-        let controller_data: RwLockReadGuard<'_, ControllerData> =
-            arc_lock_controller_data.get_read_lock().await;
+    pub async fn judge_enable_keep_alive(controller_data: &ControllerData) -> bool {
+        let controller_data: RwLockReadControllerData = controller_data.get_read_lock().await;
         for tem in controller_data.get_request().get_headers().iter() {
             if tem.0.eq_ignore_ascii_case(CONNECTION) {
                 if tem.1.eq_ignore_ascii_case(CONNECTION_KEEP_ALIVE) {
@@ -171,34 +168,35 @@ impl Server {
                 let handle_request = move || async move {
                     let log: Log = tmp_arc_lock.read().await.get_log().clone();
                     loop {
-                        let mut controller_data: ControllerData = ControllerData::new();
+                        let mut inner_controller_data: InnerControllerData =
+                            InnerControllerData::new();
                         let request_obj_result: Result<Request, ServerError> =
                             Request::from_stream(&stream_arc)
                                 .await
                                 .map_err(|err| ServerError::InvalidHttpRequest(err));
                         if request_obj_result.is_err() {
-                            let _ = controller_data.get_mut_response().close(&stream_arc);
+                            let _ = inner_controller_data.get_mut_response().close(&stream_arc);
                             return;
                         }
                         let request_obj: Request = request_obj_result.unwrap_or_default();
                         let route: String = request_obj.get_path().clone();
-                        controller_data
+                        inner_controller_data
                             .set_stream(Some(stream_arc.clone()))
                             .set_request(request_obj)
                             .set_log(log.clone());
-                        let arc_lock_controller_data: ArcRwLockControllerData =
-                            ArcRwLockControllerData::from_controller_data(controller_data);
+                        let controller_data: ControllerData =
+                            ControllerData::from_controller_data(inner_controller_data);
                         for middleware in async_middleware_arc_lock.read().await.iter() {
-                            middleware(arc_lock_controller_data.clone()).await;
+                            middleware(controller_data.clone()).await;
                         }
                         if let Some(async_func) =
                             router_func_arc_lock.read().await.get(route.as_str())
                         {
-                            async_func(arc_lock_controller_data.clone()).await;
+                            async_func(controller_data.clone()).await;
                         }
-                        if !Self::judge_enable_keep_alive(&arc_lock_controller_data).await {
+                        if !Self::judge_enable_keep_alive(&controller_data).await {
                             let controller_data: RwLockReadControllerData =
-                                arc_lock_controller_data.get_read_lock().await;
+                                controller_data.get_read_lock().await;
                             let _ = controller_data.get_response().clone().close(&stream_arc);
                             return;
                         }

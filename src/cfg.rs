@@ -2,13 +2,13 @@
 async fn test_server_basic_usage() {
     use crate::*;
 
-    async fn test_middleware(arc_lock_controller_data: ArcRwLockControllerData) {
-        let socket_addr: String = arc_lock_controller_data
+    async fn test_middleware(controller_data: ControllerData) {
+        let socket_addr: String = controller_data
             .get_socket_addr()
             .await
             .unwrap_or(DEFAULT_SOCKET_ADDR)
             .to_string();
-        arc_lock_controller_data
+        controller_data
             .set_response_header(SERVER, "hyperlane")
             .await
             .set_response_header(CONNECTION, CONNECTION_KEEP_ALIVE)
@@ -17,11 +17,11 @@ async fn test_server_basic_usage() {
             .await;
     }
 
-    async fn root_router(arc_lock_controller_data: ArcRwLockControllerData) {
-        let send_res: ResponseResult = arc_lock_controller_data
+    async fn root_router(controller_data: ControllerData) {
+        let send_res: ResponseResult = controller_data
             .send_response(200, "hello hyperlane => /")
             .await;
-        arc_lock_controller_data
+        controller_data
             .log_info(
                 format!("Response result => {:?}", send_res),
                 log_debug_format_handler,
@@ -29,7 +29,7 @@ async fn test_server_basic_usage() {
             .await;
     }
 
-    async fn panic_route(_controller_data: ArcRwLockControllerData) {
+    async fn panic_route(_controller_data: ControllerData) {
         panic!("test panic");
     }
 
