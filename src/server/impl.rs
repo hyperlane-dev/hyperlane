@@ -7,7 +7,8 @@ impl Default for Server {
             cfg: Arc::new(RwLock::new(ServerConfig::default())),
             tmp: Arc::new(RwLock::new(Tmp::default())),
             router_func: Arc::new(RwLock::new(hash_map!())),
-            middleware: Arc::new(RwLock::new(vec![])),
+            request_middleware: Arc::new(RwLock::new(vec![])),
+            response_middleware: Arc::new(RwLock::new(vec![])),
         }
     }
 }
@@ -117,14 +118,30 @@ impl Server {
     }
 
     #[inline]
-    pub async fn middleware<F, Fut>(&mut self, func: F) -> &mut Self
+    pub async fn request_middleware<F, Fut>(&mut self, func: F) -> &mut Self
     where
         F: FuncWithoutPin<Fut>,
         Fut: Future<Output = ()> + Send + 'static,
     {
         {
             let mut mut_async_middleware: RwLockWriteGuard<'_, Vec<Box<dyn Func + Send>>> =
-                self.middleware.write().await;
+                self.request_middleware.write().await;
+            mut_async_middleware.push(Box::new(move |controller_data| {
+                Box::pin(func(controller_data))
+            }));
+        }
+        self
+    }
+
+    #[inline]
+    pub async fn response_middleware<F, Fut>(&mut self, func: F) -> &mut Self
+    where
+        F: FuncWithoutPin<Fut>,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        {
+            let mut mut_async_middleware: RwLockWriteGuard<'_, Vec<Box<dyn Func + Send>>> =
+                self.response_middleware.write().await;
             mut_async_middleware.push(Box::new(move |controller_data| {
                 Box::pin(func(controller_data))
             }));
@@ -161,8 +178,10 @@ impl Server {
             while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
                 let tmp_arc_lock: ArcRwLockTmp = Arc::clone(&self.tmp);
                 let stream_arc: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
-                let async_middleware_arc_lock: ArcRwLockHashMapMiddlewareFuncBox =
-                    Arc::clone(&self.middleware);
+                let async_request_middleware_arc_lock: ArcRwLockHashMapMiddlewareFuncBox =
+                    Arc::clone(&self.request_middleware);
+                let async_response_middleware_arc_lock: ArcRwLockHashMapMiddlewareFuncBox =
+                    Arc::clone(&self.response_middleware);
                 let router_func_arc_lock: ArcRwLockHashMapRouterFuncBox =
                     Arc::clone(&self.router_func);
                 let handle_request = move || async move {
@@ -186,13 +205,20 @@ impl Server {
                             .set_log(log.clone());
                         let controller_data: ControllerData =
                             ControllerData::from_controller_data(inner_controller_data);
-                        for middleware in async_middleware_arc_lock.read().await.iter() {
-                            middleware(controller_data.clone()).await;
+                        for request_middleware in
+                            async_request_middleware_arc_lock.read().await.iter()
+                        {
+                            request_middleware(controller_data.clone()).await;
                         }
                         if let Some(async_func) =
                             router_func_arc_lock.read().await.get(route.as_str())
                         {
                             async_func(controller_data.clone()).await;
+                        }
+                        for response_middleware in
+                            async_response_middleware_arc_lock.read().await.iter()
+                        {
+                            response_middleware(controller_data.clone()).await;
                         }
                         if !Self::judge_enable_keep_alive(&controller_data).await {
                             let controller_data: RwLockReadControllerData =

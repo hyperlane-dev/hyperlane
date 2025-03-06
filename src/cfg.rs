@@ -2,7 +2,7 @@
 async fn test_server_basic_usage() {
     use crate::*;
 
-    async fn test_middleware(controller_data: ControllerData) {
+    async fn request_middleware(controller_data: ControllerData) {
         let socket_addr: String = controller_data
             .get_socket_addr()
             .await
@@ -17,20 +17,17 @@ async fn test_server_basic_usage() {
             .await;
     }
 
-    async fn root_router(controller_data: ControllerData) {
-        let send_res: ResponseResult = controller_data
-            .send_response(200, "hello hyperlane => /")
-            .await;
+    async fn response_middleware(controller_data: ControllerData) {
+        let send_res: String = controller_data.get_response_body_string().await;
         controller_data
-            .log_info(
-                format!("Response result => {:?}", send_res),
-                log_debug_format_handler,
-            )
+            .log_info(send_res, log_debug_format_handler)
             .await;
     }
 
-    async fn panic_route(_controller_data: ControllerData) {
-        panic!("test panic");
+    async fn root_router(controller_data: ControllerData) {
+        let _ = controller_data
+            .send_response(200, "hello hyperlane => /")
+            .await;
     }
 
     async fn run_server() {
@@ -40,16 +37,17 @@ async fn test_server_basic_usage() {
         server.log_dir("./logs").await;
         server.log_size(100_024_000).await;
         server.log_interval_millis(1000).await;
-        server.middleware(test_middleware).await;
+        server.request_middleware(request_middleware).await;
         server.router("/", root_router).await;
-        server.router("/panic", panic_route).await;
+        server.response_middleware(response_middleware).await;
         let test_string: String = "test".to_owned();
         server
             .router(
-                "/test/func",
+                "/test/panic",
                 async_func!(test_string, |data| {
                     println_success!(test_string);
                     println_success!(format!("{:?}", data));
+                    panic!("test panic");
                 }),
             )
             .await;
@@ -57,5 +55,5 @@ async fn test_server_basic_usage() {
     }
 
     recoverable_spawn::r#async::recoverable_spawn(run_server);
-    std::thread::sleep(std::time::Duration::from_secs(60));
+    std::thread::sleep(std::time::Duration::from_secs(10));
 }
