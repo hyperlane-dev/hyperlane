@@ -156,11 +156,17 @@ impl Server {
             if tem.0.eq_ignore_ascii_case(CONNECTION) {
                 if tem.1.eq_ignore_ascii_case(CONNECTION_KEEP_ALIVE) {
                     return true;
+                } else if tem.1.eq_ignore_ascii_case(CONNECTION_CLOSE) {
+                    return false;
                 }
                 break;
             }
         }
-        return false;
+        let enable_keep_alive: bool = controller_data
+            .get_request()
+            .get_version()
+            .is_http1_1_or_higher();
+        return enable_keep_alive;
     }
 
     #[inline]
