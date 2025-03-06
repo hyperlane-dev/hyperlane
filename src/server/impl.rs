@@ -234,7 +234,7 @@ impl Server {
                         }
                     }
                 };
-                tokio::spawn(async move { handle_request().await });
+                tokio::spawn(handle_request());
             }
         }
         self
