@@ -56,9 +56,12 @@ async fn request_middleware(controller_data: ControllerData) {
 }
 
 async fn response_middleware(controller_data: ControllerData) {
-    let send_res: String = controller_data.get_response_body_string().await;
+    let request: String = controller_data.get_request().await.to_string();
+    let response: String = controller_data.get_response().await.to_string();
     controller_data
-        .log_info(send_res, log_debug_format_handler)
+        .log_info(format!("Request => {}", request), log_handler)
+        .await
+        .log_info(format!("Response => {}", response), log_handler)
         .await;
 }
 

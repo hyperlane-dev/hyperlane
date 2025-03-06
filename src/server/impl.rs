@@ -221,9 +221,9 @@ impl Server {
                             response_middleware(controller_data.clone()).await;
                         }
                         if !Self::judge_enable_keep_alive(&controller_data).await {
-                            let controller_data: RwLockReadControllerData =
-                                controller_data.get_read_lock().await;
-                            let _ = controller_data.get_response().clone().close(&stream_arc);
+                            let mut controller_data: RwLockWriteControllerData =
+                                controller_data.get_write_lock().await;
+                            let _ = controller_data.get_mut_response().close(&stream_arc);
                             return;
                         }
                     }
