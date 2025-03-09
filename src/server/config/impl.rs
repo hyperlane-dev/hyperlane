@@ -10,6 +10,7 @@ impl<'a> Default for ServerConfig<'a> {
             log_size: DEFAULT_LOG_FILE_SIZE,
             interval_millis: DEFAULT_LOG_INTERVAL_MILLIS,
             print: DEFAULT_PRINT,
+            websocket_buffer_size: DEFAULT_BUFFER_SIZE,
         }
     }
 }

@@ -45,4 +45,4 @@ pub(crate) use tokio::{
     net::TcpListener,
     sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
-pub(crate) use utils::{websocket::*, error::*};
+pub(crate) use utils::error::*;

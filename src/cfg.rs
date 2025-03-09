@@ -45,6 +45,7 @@ async fn test_server_basic_usage() {
         server.log_dir("./logs").await;
         server.log_size(100_024_000).await;
         server.log_interval_millis(1000).await;
+        server.websocket_buffer_size(4096).await;
         server.request_middleware(request_middleware).await;
         server.response_middleware(response_middleware).await;
         server.router("/", root_router).await;
