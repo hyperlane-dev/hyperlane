@@ -174,7 +174,7 @@ impl Server {
             let addr: String = format!("{}{}{}", host, COLON_SPACE_SYMBOL, port);
             let tcp_listener: TcpListener = TcpListener::bind(&addr)
                 .await
-                .map_err(|e| ServerError::TcpBindError(e.to_string()))
+                .map_err(|err| ServerError::TcpBindError(err.to_string()))
                 .unwrap();
             while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
                 let tmp_arc_lock: ArcRwLockTmp = Arc::clone(&self.tmp);
@@ -205,7 +205,10 @@ impl Server {
                             }
                             .map_err(|err| ServerError::InvalidHttpRequest(err));
                         if request_obj_result.is_err() && enable_websocket_opt.is_none() {
-                            let _ = inner_controller_data.get_mut_response().close(&stream_arc);
+                            let _ = inner_controller_data
+                                .get_mut_response()
+                                .close(&stream_arc)
+                                .await;
                             return;
                         }
                         let mut request_obj: Request = request_obj_result.unwrap_or_default();
