@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "4.28.0"
+version = "4.28.1"
 edition = "2021"
 authors = ["ltpp-universe <root@ltpp.vip>"] 
 license = "MIT"
@@ -20,7 +20,7 @@ exclude = [
 [dependencies]
 async-func = "0.1.6"
 clonelicious = "1.0.4"
-color-output = "6.4.1"
+color-output = "6.4.2"
 file-operation = "0.4.2"
 http-compress = "2.3.2"
 hyperlane-log = "1.2.2"
