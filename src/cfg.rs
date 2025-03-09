@@ -33,6 +33,11 @@ async fn test_server_basic_usage() {
             .await;
     }
 
+    async fn websocket_router(controller_data: ControllerData) {
+        let request_body: Vec<u8> = controller_data.get_request_body().await;
+        let _ = controller_data.send_response_body(request_body).await;
+    }
+
     async fn run_server() {
         let mut server: Server = Server::new();
         server.host("0.0.0.0").await;
@@ -41,9 +46,10 @@ async fn test_server_basic_usage() {
         server.log_size(100_024_000).await;
         server.log_interval_millis(1000).await;
         server.request_middleware(request_middleware).await;
-        server.router("/", root_router).await;
         server.response_middleware(response_middleware).await;
-        let test_string: String = "test".to_owned();
+        server.router("/", root_router).await;
+        server.router("/websocket", websocket_router).await;
+        let test_string: String = "hello hyperlane".to_owned();
         server
             .router(
                 "/test/panic",

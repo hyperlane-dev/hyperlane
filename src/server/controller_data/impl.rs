@@ -137,10 +137,13 @@ impl ControllerData {
         &self,
         response_body: T,
     ) -> ResponseResult {
+        let mut body: ResponseBody = response_body.into();
+        if self.get_request_upgrade_type().await.is_websocket() {
+            create_response_frame(&mut body);
+        }
         if let Some(stream_lock) = self.get_stream().await {
             let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
             let response: &mut Response = controller_data.get_mut_response();
-            let body: ResponseBody = response_body.into();
             let response_res: ResponseResult =
                 response.set_body(body).send_body(&stream_lock).await;
             return response_res;
@@ -264,6 +267,13 @@ impl ControllerData {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         let request: &Request = controller_data.get_request();
         request.get_headers().clone()
+    }
+
+    #[inline]
+    pub async fn get_request_upgrade_type(&self) -> UpgradeType {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        let request: &Request = controller_data.get_request();
+        request.get_upgrade_type().clone()
     }
 
     #[inline]
@@ -448,5 +458,68 @@ impl ControllerData {
         let response: &mut Response = controller_data.get_mut_response();
         response.set_status_code(status_code);
         self
+    }
+
+    #[inline]
+    pub async fn judge_enable_keep_alive(&self) -> bool {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        for tem in controller_data.get_request().get_headers().iter() {
+            if tem.0.eq_ignore_ascii_case(CONNECTION) {
+                if tem.1.eq_ignore_ascii_case(CONNECTION_KEEP_ALIVE) {
+                    return true;
+                } else if tem.1.eq_ignore_ascii_case(CONNECTION_CLOSE) {
+                    return false;
+                }
+                break;
+            }
+        }
+        let enable_keep_alive: bool = controller_data
+            .get_request()
+            .get_version()
+            .is_http1_1_or_higher();
+        return enable_keep_alive;
+    }
+
+    #[inline]
+    pub async fn judge_unenable_keep_alive(&self) -> bool {
+        self.judge_enable_keep_alive().await
+    }
+
+    #[inline]
+    pub async fn judge_enable_websocket(&self) -> bool {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        for tem in controller_data.get_request().get_headers().iter() {
+            if tem.0.eq_ignore_ascii_case(UPGRADE) {
+                if tem.1.eq_ignore_ascii_case(WEBSOCKE) {
+                    return true;
+                }
+                break;
+            }
+        }
+        return false;
+    }
+
+    #[inline]
+    pub(crate) async fn handle_websocket(&self, is_handshake: &mut bool) -> ResponseResult {
+        if *is_handshake {
+            return Ok(());
+        }
+        let key_opt: Option<String> = self.get_request_header(SEC_WEBSOCKET_KEY).await;
+        if let Some(key) = key_opt {
+            let accept_key: String = generate_accept_key(&key);
+            return self
+                .set_response_header(UPGRADE, WEBSOCKE)
+                .await
+                .set_response_header(CONNECTION, UPGRADE)
+                .await
+                .set_response_header(SEC_WEB_SOCKET_ACCEPT, accept_key)
+                .await
+                .send_response(101, "")
+                .await
+                .map(|_| {
+                    *is_handshake = true;
+                });
+        }
+        Err(ResponseError::WebSocketHandShakeError)
     }
 }

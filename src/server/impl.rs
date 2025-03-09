@@ -150,26 +150,6 @@ impl Server {
     }
 
     #[inline]
-    pub async fn judge_enable_keep_alive(controller_data: &ControllerData) -> bool {
-        let controller_data: RwLockReadControllerData = controller_data.get_read_lock().await;
-        for tem in controller_data.get_request().get_headers().iter() {
-            if tem.0.eq_ignore_ascii_case(CONNECTION) {
-                if tem.1.eq_ignore_ascii_case(CONNECTION_KEEP_ALIVE) {
-                    return true;
-                } else if tem.1.eq_ignore_ascii_case(CONNECTION_CLOSE) {
-                    return false;
-                }
-                break;
-            }
-        }
-        let enable_keep_alive: bool = controller_data
-            .get_request()
-            .get_version()
-            .is_http1_1_or_higher();
-        return enable_keep_alive;
-    }
-
-    #[inline]
     pub async fn listen(&mut self) -> &mut Self {
         {
             self.init().await;
@@ -192,18 +172,28 @@ impl Server {
                     Arc::clone(&self.router_func);
                 let handle_request = move || async move {
                     let log: Log = tmp_arc_lock.read().await.get_log().clone();
+                    let mut enable_websocket_opt: Option<bool> = None;
+                    let mut websocket_handshake_finish: bool = false;
+                    let mut history_request: Request = Request::default();
                     loop {
                         let mut inner_controller_data: InnerControllerData =
                             InnerControllerData::new();
                         let request_obj_result: Result<Request, ServerError> =
-                            Request::from_stream(&stream_arc)
+                            Request::from_stream(&stream_arc, websocket_handshake_finish)
                                 .await
                                 .map_err(|err| ServerError::InvalidHttpRequest(err));
-                        if request_obj_result.is_err() {
+                        if request_obj_result.is_err() && enable_websocket_opt.is_none() {
                             let _ = inner_controller_data.get_mut_response().close(&stream_arc);
                             return;
                         }
-                        let request_obj: Request = request_obj_result.unwrap_or_default();
+                        let mut request_obj: Request = request_obj_result.unwrap_or_default();
+                        if websocket_handshake_finish {
+                            decode_websocket_frame(request_obj.get_mut_body());
+                            history_request.set_body(request_obj.get_body().clone());
+                            request_obj = history_request.clone();
+                        } else {
+                            history_request = request_obj.clone();
+                        }
                         let route: String = request_obj.get_path().clone();
                         inner_controller_data
                             .set_stream(Some(stream_arc.clone()))
@@ -211,6 +201,19 @@ impl Server {
                             .set_log(log.clone());
                         let controller_data: ControllerData =
                             ControllerData::from_controller_data(inner_controller_data);
+                        if enable_websocket_opt.is_none() {
+                            enable_websocket_opt =
+                                Some(controller_data.judge_enable_websocket().await);
+                        }
+                        let enable_websocket: bool = enable_websocket_opt.unwrap_or_default();
+                        if enable_websocket {
+                            let handle_res: Result<(), ResponseError> = controller_data
+                                .handle_websocket(&mut websocket_handshake_finish)
+                                .await;
+                            if handle_res.is_err() {
+                                continue;
+                            }
+                        }
                         for request_middleware in
                             async_request_middleware_arc_lock.read().await.iter()
                         {
@@ -226,10 +229,8 @@ impl Server {
                         {
                             response_middleware(controller_data.clone()).await;
                         }
-                        if !Self::judge_enable_keep_alive(&controller_data).await {
-                            let mut controller_data: RwLockWriteControllerData =
-                                controller_data.get_write_lock().await;
-                            let _ = controller_data.get_mut_response().close(&stream_arc);
+                        if controller_data.judge_unenable_keep_alive().await && !enable_websocket {
+                            let _ = controller_data.close().await;
                             return;
                         }
                     }
