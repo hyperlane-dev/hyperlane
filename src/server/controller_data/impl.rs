@@ -137,16 +137,28 @@ impl ControllerData {
         &self,
         response_body: T,
     ) -> ResponseResult {
-        let mut body: ResponseBody = response_body.into();
-        if self.get_request_upgrade_type().await.is_websocket() {
-            create_response_frame(&mut body);
-        }
+        let body: ResponseBody = response_body.into();
+        let is_websocket: bool = self.get_request_upgrade_type().await.is_websocket();
+        let body_list: Vec<ResponseBody> = if is_websocket {
+            WebSocketFrame::create_response_frame_list(&body)
+        } else {
+            vec![body.clone()]
+        };
         if let Some(stream_lock) = self.get_stream().await {
             let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
             let response: &mut Response = controller_data.get_mut_response();
-            let response_res: ResponseResult =
-                response.set_body(body).send_body(&stream_lock).await;
-            return response_res;
+            for tmp_body in body_list {
+                let response_res: ResponseResult =
+                    response.set_body(tmp_body).send_body(&stream_lock).await;
+                if response_res.is_err() {
+                    if is_websocket {
+                        response.set_body(body.clone());
+                    }
+                    return response_res;
+                }
+            }
+            response.set_body(body.clone());
+            return Ok(());
         }
         Err(ResponseError::Unknown)
     }
@@ -506,7 +518,7 @@ impl ControllerData {
         }
         let key_opt: Option<String> = self.get_request_header(SEC_WEBSOCKET_KEY).await;
         if let Some(key) = key_opt {
-            let accept_key: String = generate_accept_key(&key);
+            let accept_key: String = WebSocketFrame::generate_accept_key(&key);
             return self
                 .set_response_header(UPGRADE, WEBSOCKE)
                 .await

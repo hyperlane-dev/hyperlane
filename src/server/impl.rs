@@ -60,6 +60,20 @@ impl Server {
     }
 
     #[inline]
+    pub async fn websocket_buffer_size(&mut self, buffer_size: usize) -> &mut Self {
+        {
+            let buffer_size: usize = if buffer_size == 0 {
+                DEFAULT_BUFFER_SIZE
+            } else {
+                buffer_size
+            };
+            let mut cfg: RwLockWriteGuard<'_, ServerConfig<'_>> = self.get_cfg().write().await;
+            cfg.set_websocket_buffer_size(buffer_size);
+        }
+        self
+    }
+
+    #[inline]
     pub async fn print(&mut self, print: bool) -> &mut Self {
         {
             let mut cfg: RwLockWriteGuard<'_, ServerConfig<'_>> = self.get_cfg().write().await;
@@ -156,6 +170,7 @@ impl Server {
             let cfg: RwLockReadGuard<'_, ServerConfig<'_>> = self.get_cfg().read().await;
             let host: &str = *cfg.get_host();
             let port: usize = *cfg.get_port();
+            let websocket_buffer_size: usize = *cfg.get_websocket_buffer_size();
             let addr: String = format!("{}{}{}", host, COLON_SPACE_SYMBOL, port);
             let tcp_listener: TcpListener = TcpListener::bind(&addr)
                 .await
@@ -179,16 +194,22 @@ impl Server {
                         let mut inner_controller_data: InnerControllerData =
                             InnerControllerData::new();
                         let request_obj_result: Result<Request, ServerError> =
-                            Request::from_stream(&stream_arc, websocket_handshake_finish)
+                            if websocket_handshake_finish {
+                                Request::websocket_request_from_stream(
+                                    &stream_arc,
+                                    websocket_buffer_size,
+                                )
                                 .await
-                                .map_err(|err| ServerError::InvalidHttpRequest(err));
+                            } else {
+                                Request::http_request_from_stream(&stream_arc).await
+                            }
+                            .map_err(|err| ServerError::InvalidHttpRequest(err));
                         if request_obj_result.is_err() && enable_websocket_opt.is_none() {
                             let _ = inner_controller_data.get_mut_response().close(&stream_arc);
                             return;
                         }
                         let mut request_obj: Request = request_obj_result.unwrap_or_default();
                         if websocket_handshake_finish {
-                            decode_websocket_frame(request_obj.get_mut_body());
                             history_request.set_body(request_obj.get_body().clone());
                             request_obj = history_request.clone();
                         } else {
@@ -211,7 +232,8 @@ impl Server {
                                 .handle_websocket(&mut websocket_handshake_finish)
                                 .await;
                             if handle_res.is_err() {
-                                continue;
+                                let _ = controller_data.close().await;
+                                return;
                             }
                         }
                         for request_middleware in
