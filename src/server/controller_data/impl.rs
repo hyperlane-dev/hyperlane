@@ -494,7 +494,7 @@ impl ControllerData {
 
     #[inline]
     pub async fn judge_unenable_keep_alive(&self) -> bool {
-        self.judge_enable_keep_alive().await
+        !self.judge_enable_keep_alive().await
     }
 
     #[inline]
