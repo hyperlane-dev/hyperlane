@@ -92,6 +92,17 @@ impl ControllerData {
     }
 
     #[inline]
+    pub async fn send(&self) -> ResponseResult {
+        if let Some(stream_lock) = self.get_stream().await {
+            let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+            let response: &mut Response = controller_data.get_mut_response();
+            let response_res: ResponseResult = response.send(&stream_lock).await;
+            return response_res;
+        }
+        Err(ResponseError::Unknown)
+    }
+
+    #[inline]
     pub async fn send_response<T: Into<ResponseBody>>(
         &self,
         status_code: usize,
@@ -106,6 +117,18 @@ impl ControllerData {
                 .set_status_code(status_code)
                 .send(&stream_lock)
                 .await;
+            return response_res;
+        }
+        Err(ResponseError::Unknown)
+    }
+
+    #[inline]
+    pub async fn send_once(&self) -> ResponseResult {
+        if let Some(stream_lock) = self.get_stream().await {
+            let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+            let response: &mut Response = controller_data.get_mut_response();
+            let response_res: ResponseResult = response.send(&stream_lock).await;
+            let _ = response.close(&stream_lock).await;
             return response_res;
         }
         Err(ResponseError::Unknown)
