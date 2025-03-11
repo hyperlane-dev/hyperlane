@@ -92,24 +92,25 @@ impl ControllerData {
     }
 
     #[inline]
-    pub async fn send(&self) -> ResponseResult {
-        if let Some(stream_lock) = self.get_stream().await {
-            let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
-            let response: &mut Response = controller_data.get_mut_response();
-            let response_res: ResponseResult = response.send(&stream_lock).await;
-            return response_res;
-        }
-        Err(ResponseError::Unknown)
+    fn inner_is_websocket(&self, controller_data: &RwLockWriteControllerData) -> bool {
+        return controller_data
+            .get_request()
+            .get_upgrade_type()
+            .is_websocket();
     }
 
     #[inline]
-    pub async fn send_response<T: Into<ResponseBody>>(
+    async fn inner_send_response<T: Into<ResponseBody>>(
         &self,
         status_code: usize,
         response_body: T,
+        handle_websocket: bool,
     ) -> ResponseResult {
         if let Some(stream_lock) = self.get_stream().await {
             let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+            if !handle_websocket && self.inner_is_websocket(&controller_data) {
+                return Err(ResponseError::NotSupportUseThisMethod);
+            }
             let response: &mut Response = controller_data.get_mut_response();
             let body: ResponseBody = response_body.into();
             let response_res: ResponseResult = response
@@ -119,19 +120,24 @@ impl ControllerData {
                 .await;
             return response_res;
         }
-        Err(ResponseError::Unknown)
+        Err(ResponseError::NotFoundStream)
     }
 
     #[inline]
-    pub async fn send_once(&self) -> ResponseResult {
-        if let Some(stream_lock) = self.get_stream().await {
-            let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
-            let response: &mut Response = controller_data.get_mut_response();
-            let response_res: ResponseResult = response.send(&stream_lock).await;
-            let _ = response.close(&stream_lock).await;
-            return response_res;
-        }
-        Err(ResponseError::Unknown)
+    pub async fn send_response<T: Into<ResponseBody>>(
+        &self,
+        status_code: usize,
+        response_body: T,
+    ) -> ResponseResult {
+        self.inner_send_response(status_code, response_body, false)
+            .await
+    }
+
+    #[inline]
+    pub async fn send(&self) -> ResponseResult {
+        let status_code: ResponseStatusCode = self.get_response_status_code().await;
+        let response_body: ResponseBody = self.get_response_body().await;
+        self.send_response(status_code, response_body).await
     }
 
     #[inline]
@@ -142,6 +148,9 @@ impl ControllerData {
     ) -> ResponseResult {
         if let Some(stream_lock) = self.get_stream().await {
             let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+            if self.inner_is_websocket(&controller_data) {
+                return Err(ResponseError::NotSupportUseThisMethod);
+            }
             let response: &mut Response = controller_data.get_mut_response();
             let body: ResponseBody = response_body.into();
             let response_res: ResponseResult = response
@@ -152,7 +161,14 @@ impl ControllerData {
             let _ = response.close(&stream_lock).await;
             return response_res;
         }
-        Err(ResponseError::Unknown)
+        Err(ResponseError::NotFoundStream)
+    }
+
+    #[inline]
+    pub async fn send_once(&self) -> ResponseResult {
+        let status_code: ResponseStatusCode = self.get_response_status_code().await;
+        let response_body: ResponseBody = self.get_response_body().await;
+        self.send_response_once(status_code, response_body).await
     }
 
     #[inline]
@@ -183,7 +199,13 @@ impl ControllerData {
             response.set_body(body.clone());
             return Ok(());
         }
-        Err(ResponseError::Unknown)
+        Err(ResponseError::NotFoundStream)
+    }
+
+    #[inline]
+    pub async fn send_body(&self) -> ResponseResult {
+        let body: ResponseBody = self.get_response_body().await;
+        self.send_response_body(body).await
     }
 
     #[inline]
@@ -193,7 +215,7 @@ impl ControllerData {
             let response: &mut Response = controller_data.get_mut_response();
             return response.close(&stream_lock).await;
         }
-        Err(ResponseError::Unknown)
+        Err(ResponseError::NotFoundStream)
     }
 
     #[inline]
@@ -549,7 +571,7 @@ impl ControllerData {
                 .await
                 .set_response_header(SEC_WEB_SOCKET_ACCEPT, accept_key)
                 .await
-                .send_response(101, "")
+                .inner_send_response(101, "", true)
                 .await
                 .map(|_| {
                     *is_handshake = true;
