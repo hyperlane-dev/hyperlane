@@ -6,7 +6,7 @@ impl Default for Server {
         Self {
             cfg: Arc::new(RwLock::new(ServerConfig::default())),
             tmp: Arc::new(RwLock::new(Tmp::default())),
-            router_func: Arc::new(RwLock::new(hash_map!())),
+            route_func: Arc::new(RwLock::new(hash_map!())),
             request_middleware: Arc::new(RwLock::new(vec![])),
             response_middleware: Arc::new(RwLock::new(vec![])),
         }
@@ -115,15 +115,15 @@ impl Server {
     }
 
     #[inline]
-    pub async fn router<F, Fut>(&mut self, route: &'static str, func: F) -> &mut Self
+    pub async fn route<F, Fut>(&mut self, route: &'static str, func: F) -> &mut Self
     where
         F: FuncWithoutPin<Fut>,
         Fut: Future<Output = ()> + Send + 'static,
     {
         {
-            let mut mut_router_func: RwLockWriteGuard<'_, HashMap<&str, Box<dyn Func + Send>>> =
-                self.router_func.write().await;
-            mut_router_func.insert(
+            let mut mut_route_func: RwLockWriteGuard<'_, HashMap<&str, Box<dyn Func + Send>>> =
+                self.route_func.write().await;
+            mut_route_func.insert(
                 route,
                 Box::new(move |controller_data| Box::pin(func(controller_data))),
             );
@@ -183,8 +183,8 @@ impl Server {
                     Arc::clone(&self.request_middleware);
                 let async_response_middleware_arc_lock: ArcRwLockHashMapMiddlewareFuncBox =
                     Arc::clone(&self.response_middleware);
-                let router_func_arc_lock: ArcRwLockHashMapRouterFuncBox =
-                    Arc::clone(&self.router_func);
+                let route_func_arc_lock: ArcRwLockHashMapRouteFuncBox =
+                    Arc::clone(&self.route_func);
                 let handle_request = move || async move {
                     let log: Log = tmp_arc_lock.read().await.get_log().clone();
                     let mut enable_websocket_opt: Option<bool> = None;
@@ -245,7 +245,7 @@ impl Server {
                             request_middleware(controller_data.clone()).await;
                         }
                         if let Some(async_func) =
-                            router_func_arc_lock.read().await.get(route.as_str())
+                            route_func_arc_lock.read().await.get(route.as_str())
                         {
                             async_func(controller_data.clone()).await;
                         }

@@ -65,13 +65,13 @@ async fn response_middleware(controller_data: ControllerData) {
         .await;
 }
 
-async fn root_router(controller_data: ControllerData) {
+async fn root_route(controller_data: ControllerData) {
     let _ = controller_data
         .send_response(200, "hello hyperlane => /")
         .await;
 }
 
-async fn websocket_router(controller_data: ControllerData) {
+async fn websocket_route(controller_data: ControllerData) {
     let request_body: Vec<u8> = controller_data.get_request_body().await;
     let _ = controller_data.send_response_body(request_body).await;
 }
@@ -86,11 +86,11 @@ async fn run_server() {
     server.websocket_buffer_size(4096).await;
     server.request_middleware(request_middleware).await;
     server.response_middleware(response_middleware).await;
-    server.router("/", root_router).await;
-    server.router("/websocket", websocket_router).await;
+    server.route("/", root_route).await;
+    server.route("/websocket", websocket_route).await;
     let test_string: String = "hello hyperlane".to_owned();
     server
-        .router(
+        .route(
             "/test/panic",
             async_func!(test_string, |data| {
                 println_success!(test_string);
