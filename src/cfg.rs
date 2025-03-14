@@ -3,13 +3,9 @@ async fn test_server_basic_usage() {
     use crate::*;
 
     async fn request_middleware(controller_data: ControllerData) {
-        let socket_addr: String = controller_data
-            .get_socket_addr()
-            .await
-            .unwrap_or(DEFAULT_SOCKET_ADDR)
-            .to_string();
+        let socket_addr: String = controller_data.get_socket_addr_or_default_string().await;
         controller_data
-            .set_response_header(SERVER, "hyperlane")
+            .set_response_header(SERVER, HYPERLANE)
             .await
             .set_response_header(CONNECTION, CONNECTION_KEEP_ALIVE)
             .await
@@ -18,6 +14,7 @@ async fn test_server_basic_usage() {
     }
 
     async fn response_middleware(controller_data: ControllerData) {
+        let _ = controller_data.send().await;
         let request: String = controller_data.get_request().await.to_string();
         let response: String = controller_data.get_response().await.to_string();
         controller_data
@@ -28,8 +25,10 @@ async fn test_server_basic_usage() {
     }
 
     async fn root_route(controller_data: ControllerData) {
-        let _ = controller_data
-            .send_response(200, "hello hyperlane => /")
+        controller_data
+            .set_response_status_code(200)
+            .await
+            .set_response_body("Hello hyperlane => /")
             .await;
     }
 
@@ -50,14 +49,14 @@ async fn test_server_basic_usage() {
         server.response_middleware(response_middleware).await;
         server.route("/", root_route).await;
         server.route("/websocket", websocket_route).await;
-        let test_string: String = "hello hyperlane".to_owned();
+        let test_string: String = "Hello hyperlane".to_owned();
         server
             .route(
                 "/test/panic",
                 async_func!(test_string, |data| {
                     println_success!(test_string);
-                    println_success!(format!("{:?}", data));
-                    panic!("test panic");
+                    println_success!(format!("Using external variables {:?}", data));
+                    panic!("Test panic");
                 }),
             )
             .await;

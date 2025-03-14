@@ -76,6 +76,33 @@ impl ControllerData {
     }
 
     #[inline]
+    pub async fn get_socket_addr_or_default(&self) -> SocketAddr {
+        let stream_result: OptionArcRwLockStream = self.get_stream().await;
+        if stream_result.is_none() {
+            return DEFAULT_SOCKET_ADDR;
+        }
+        let socket_addr: SocketAddr = stream_result
+            .unwrap()
+            .get_read_lock()
+            .await
+            .peer_addr()
+            .unwrap_or(DEFAULT_SOCKET_ADDR);
+        socket_addr
+    }
+
+    #[inline]
+    pub async fn get_socket_addr_string(&self) -> Option<String> {
+        let socket_addr_string_opt: Option<String> =
+            self.get_socket_addr().await.map(|data| data.to_string());
+        socket_addr_string_opt
+    }
+
+    #[inline]
+    pub async fn get_socket_addr_or_default_string(&self) -> String {
+        self.get_socket_addr_or_default().await.to_string()
+    }
+
+    #[inline]
     pub async fn get_socket_host(&self) -> OptionSocketHost {
         let addr: OptionSocketAddr = self.get_socket_addr().await;
         let socket_host_opt: OptionSocketHost =
@@ -176,28 +203,15 @@ impl ControllerData {
         &self,
         response_body: T,
     ) -> ResponseResult {
-        let body: ResponseBody = response_body.into();
-        let is_websocket: bool = self.get_request_upgrade_type().await.is_websocket();
-        let body_list: Vec<ResponseBody> = if is_websocket {
-            WebSocketFrame::create_response_frame_list(&body)
-        } else {
-            vec![body.clone()]
-        };
         if let Some(stream_lock) = self.get_stream().await {
-            let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
-            let response: &mut Response = controller_data.get_mut_response();
-            for tmp_body in body_list {
-                let response_res: ResponseResult =
-                    response.set_body(tmp_body).send_body(&stream_lock).await;
-                if response_res.is_err() {
-                    if is_websocket {
-                        response.set_body(body.clone());
-                    }
-                    return response_res;
-                }
-            }
-            response.set_body(body.clone());
-            return Ok(());
+            let is_websocket: bool = self.get_request_upgrade_type().await.is_websocket();
+            let mut response: RwLockWriteControllerData = self.get_write_lock().await;
+            let response_res: ResponseResult = response
+                .get_mut_response()
+                .set_body(response_body)
+                .send_body(&stream_lock, is_websocket)
+                .await;
+            return response_res;
         }
         Err(ResponseError::NotFoundStream)
     }
