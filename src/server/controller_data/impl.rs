@@ -233,6 +233,15 @@ impl ControllerData {
     }
 
     #[inline]
+    pub async fn flush(&self) -> ResponseResult {
+        if let Some(stream_lock) = self.get_stream().await {
+            let mut controller_data: RwLockWriteControllerData = self.get_write_lock().await;
+            return controller_data.get_mut_response().flush(&stream_lock).await;
+        }
+        Err(ResponseError::NotFoundStream)
+    }
+
+    #[inline]
     pub async fn log_info<T, L>(&self, data: T, func: L) -> &Self
     where
         T: LogDataTrait,
