@@ -10,6 +10,8 @@ async fn test_server_basic_usage() {
             .set_response_header(CONNECTION, CONNECTION_KEEP_ALIVE)
             .await
             .set_response_header("SocketAddr", socket_addr)
+            .await
+            .set_request_header(CONTENT_TYPE, content_type_charset(TEXT_PLAIN, UTF8))
             .await;
     }
 
