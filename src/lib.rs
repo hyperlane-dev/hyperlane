@@ -43,6 +43,6 @@ pub(crate) use std::{
 };
 pub(crate) use tokio::{
     net::TcpListener,
-    sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
+    sync::{RwLockReadGuard, RwLockWriteGuard},
 };
 pub(crate) use utils::error::*;

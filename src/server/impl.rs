@@ -4,11 +4,11 @@ impl Default for Server {
     #[inline]
     fn default() -> Self {
         Self {
-            cfg: Arc::new(RwLock::new(ServerConfig::default())),
-            tmp: Arc::new(RwLock::new(Tmp::default())),
-            route_func: Arc::new(RwLock::new(hash_map!())),
-            request_middleware: Arc::new(RwLock::new(vec![])),
-            response_middleware: Arc::new(RwLock::new(vec![])),
+            cfg: arc_rwlock(ServerConfig::default()),
+            tmp: arc_rwlock(Tmp::default()),
+            route_func: arc_rwlock(hash_map!()),
+            request_middleware: arc_rwlock(vec![]),
+            response_middleware: arc_rwlock(vec![]),
         }
     }
 }
@@ -74,32 +74,44 @@ impl Server {
     }
 
     #[inline]
-    pub async fn print(&mut self, print: bool) -> &mut Self {
+    pub async fn inner_print(&mut self, print: bool) -> &mut Self {
         {
             let mut cfg: RwLockWriteGuard<'_, ServerConfig<'_>> = self.get_cfg().write().await;
-            cfg.set_print(print);
+            cfg.set_inner_print(print);
         }
         self
     }
 
     #[inline]
-    pub async fn enable_print(&mut self) -> &mut Self {
-        self.print(true).await;
-        self
-    }
-
-    #[inline]
-    pub async fn disable_print(&mut self) -> &mut Self {
-        self.print(false).await;
-        self
-    }
-
-    #[inline]
-    pub async fn open_print(&mut self, print: bool) -> &mut Self {
+    pub async fn inner_log(&mut self, print: bool) -> &mut Self {
         {
             let mut cfg: RwLockWriteGuard<'_, ServerConfig<'_>> = self.get_cfg().write().await;
-            cfg.set_print(print);
+            cfg.set_inner_log(print);
         }
+        self
+    }
+
+    #[inline]
+    pub async fn enable_inner_print(&mut self) -> &mut Self {
+        self.inner_print(true).await;
+        self
+    }
+
+    #[inline]
+    pub async fn disable_inner_print(&mut self) -> &mut Self {
+        self.inner_print(false).await;
+        self
+    }
+
+    #[inline]
+    pub async fn enable_inner_log(&mut self) -> &mut Self {
+        self.inner_log(true).await;
+        self
+    }
+
+    #[inline]
+    pub async fn disable_inner_log(&mut self) -> &mut Self {
+        self.inner_log(false).await;
         self
     }
 
@@ -275,13 +287,17 @@ impl Server {
     #[inline]
     async fn init_panic_hook(&self) {
         let tmp: Tmp = self.tmp.read().await.clone();
-        let print: bool = self.get_cfg().read().await.get_print().clone();
+        let cfg: RwLockReadGuard<'_, ServerConfig<'_>> = self.get_cfg().read().await;
+        let inner_print: bool = cfg.get_inner_print().clone();
+        let inner_log: bool = cfg.get_inner_log().clone();
         set_hook(Box::new(move |err| {
             let err_msg: String = format!("{}", err);
-            if print {
+            if inner_print {
                 println_error!(err_msg);
             }
-            handle_error(&tmp, err_msg.clone());
+            if inner_log {
+                handle_error(&tmp, err_msg.clone());
+            }
         }));
     }
 

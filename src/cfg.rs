@@ -15,12 +15,12 @@ async fn test_server_basic_usage() {
 
     async fn response_middleware(controller_data: ControllerData) {
         let _ = controller_data.send().await;
-        let request: String = controller_data.get_request().await.to_string();
-        let response: String = controller_data.get_response().await.to_string();
+        let request: String = controller_data.get_request_string().await;
+        let response: String = controller_data.get_response_string().await;
         controller_data
-            .log_info(format!("Request => {}", request), log_handler)
+            .log_info(request, log_handler)
             .await
-            .log_info(format!("Response => {}", response), log_handler)
+            .log_info(response, log_handler)
             .await;
     }
 
@@ -42,6 +42,8 @@ async fn test_server_basic_usage() {
         server.host("0.0.0.0").await;
         server.port(60000).await;
         server.log_dir("./logs").await;
+        server.enable_inner_log().await;
+        server.enable_inner_print().await;
         server.log_size(100_024_000).await;
         server.log_interval_millis(1000).await;
         server.websocket_buffer_size(4096).await;

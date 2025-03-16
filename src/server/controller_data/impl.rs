@@ -15,7 +15,7 @@ impl InnerControllerData {
 impl ControllerData {
     #[inline]
     pub(crate) fn from_controller_data(controller_data: InnerControllerData) -> Self {
-        Self(Arc::new(RwLock::new(controller_data)))
+        Self(arc_rwlock(controller_data))
     }
 
     #[inline]
@@ -38,25 +38,37 @@ impl ControllerData {
 
     #[inline]
     pub async fn get_stream(&self) -> OptionArcRwLockStream {
-        let controller_data: InnerControllerData = self.get().await;
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         controller_data.get_stream().clone()
     }
 
     #[inline]
     pub async fn get_request(&self) -> Request {
-        let controller_data: InnerControllerData = self.get().await;
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         controller_data.get_request().clone()
     }
 
     #[inline]
     pub async fn get_response(&self) -> Response {
-        let controller_data: InnerControllerData = self.get().await;
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         controller_data.get_response().clone()
     }
 
     #[inline]
+    pub async fn get_request_string(&self) -> String {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        controller_data.get_request().get_string()
+    }
+
+    #[inline]
+    pub async fn get_response_string(&self) -> String {
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
+        controller_data.get_response().get_string()
+    }
+
+    #[inline]
     pub async fn get_log(&self) -> Log {
-        let controller_data: InnerControllerData = self.get().await;
+        let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         controller_data.get_log().clone()
     }
 
