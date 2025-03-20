@@ -582,7 +582,7 @@ impl ControllerData {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         for tem in controller_data.get_request().get_headers().iter() {
             if tem.0.eq_ignore_ascii_case(UPGRADE) {
-                if tem.1.eq_ignore_ascii_case(WEBSOCKE) {
+                if tem.1.eq_ignore_ascii_case(WEBSOCKET) {
                     return true;
                 }
                 break;
@@ -600,7 +600,7 @@ impl ControllerData {
         if let Some(key) = key_opt {
             let accept_key: String = WebSocketFrame::generate_accept_key(&key);
             return self
-                .set_response_header(UPGRADE, WEBSOCKE)
+                .set_response_header(UPGRADE, WEBSOCKET)
                 .await
                 .set_response_header(CONNECTION, UPGRADE)
                 .await
