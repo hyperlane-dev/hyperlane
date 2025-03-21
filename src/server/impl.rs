@@ -134,7 +134,7 @@ impl Server {
     {
         {
             let mut mut_route_func: RwLockWriteGuard<'_, HashMap<&str, Box<dyn Func + Send>>> =
-                self.route_func.write().await;
+                self.get_route_func().write().await;
             mut_route_func.insert(
                 route,
                 Box::new(move |controller_data| Box::pin(func(controller_data))),
@@ -151,7 +151,7 @@ impl Server {
     {
         {
             let mut mut_async_middleware: RwLockWriteGuard<'_, Vec<Box<dyn Func + Send>>> =
-                self.request_middleware.write().await;
+                self.get_request_middleware().write().await;
             mut_async_middleware.push(Box::new(move |controller_data| {
                 Box::pin(func(controller_data))
             }));
@@ -167,7 +167,7 @@ impl Server {
     {
         {
             let mut mut_async_middleware: RwLockWriteGuard<'_, Vec<Box<dyn Func + Send>>> =
-                self.response_middleware.write().await;
+                self.get_response_middleware().write().await;
             mut_async_middleware.push(Box::new(move |controller_data| {
                 Box::pin(func(controller_data))
             }));
@@ -189,14 +189,14 @@ impl Server {
                 .map_err(|err| ServerError::TcpBindError(err.to_string()))
                 .unwrap();
             while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
-                let tmp_arc_lock: ArcRwLockTmp = Arc::clone(&self.tmp);
+                let tmp_arc_lock: ArcRwLockTmp = Arc::clone(self.get_tmp());
                 let stream_arc: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
                 let async_request_middleware_arc_lock: ArcRwLockHashMapMiddlewareFuncBox =
-                    Arc::clone(&self.request_middleware);
+                    Arc::clone(self.get_request_middleware());
                 let async_response_middleware_arc_lock: ArcRwLockHashMapMiddlewareFuncBox =
-                    Arc::clone(&self.response_middleware);
+                    Arc::clone(self.get_response_middleware());
                 let route_func_arc_lock: ArcRwLockHashMapRouteFuncBox =
-                    Arc::clone(&self.route_func);
+                    Arc::clone(self.get_route_func());
                 let handle_request = move || async move {
                     let log: Log = tmp_arc_lock.read().await.get_log().clone();
                     let mut enable_websocket_opt: Option<bool> = None;
