@@ -3,12 +3,12 @@ use crate::*;
 pub type RwLockWriteControllerData<'a> = RwLockWriteGuard<'a, InnerControllerData>;
 pub type RwLockReadControllerData<'a> = RwLockReadGuard<'a, InnerControllerData>;
 
-#[derive(Clone, Debug, Lombok)]
+#[derive(Clone, Debug, Lombok, Default)]
 pub struct InnerControllerData {
-    pub(super) stream: OptionArcRwLockStream,
-    pub(super) request: Request,
-    pub(super) response: Response,
-    pub(super) log: Log,
+    stream: OptionArcRwLockStream,
+    request: Request,
+    response: Response,
+    log: Log,
 }
 
 #[derive(Clone, Debug)]

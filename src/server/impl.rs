@@ -120,7 +120,7 @@ impl Server {
         Fut: Future<Output = ()> + Send + 'static,
     {
         {
-            let mut_route_func: RwLockWriteGuard<'_, DashMap<&str, Box<dyn Func + Send>>> =
+            let mut mut_route_func: RwLockWriteGuard<'_, HashMap<&str, Box<dyn Func + Send>>> =
                 self.get_route_func().write().await;
             mut_route_func.insert(
                 route,
@@ -189,14 +189,14 @@ impl Server {
                 .map_err(|err| ServerError::TcpBindError(err.to_string()))
                 .unwrap();
             while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
-                let tmp_arc_lock: ArcRwLockTmp = Arc::clone(self.get_tmp());
+                let tmp_arc_lock: ArcRwLockTmp = self.get_tmp().clone();
                 let stream_arc: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
-                let async_request_middleware_arc_lock: ArcRwLockDashMapMiddlewareFuncBox =
-                    Arc::clone(self.get_request_middleware());
-                let async_response_middleware_arc_lock: ArcRwLockDashMapMiddlewareFuncBox =
-                    Arc::clone(self.get_response_middleware());
-                let route_func_arc_lock: ArcRwLockDashMapRouteFuncBox =
-                    Arc::clone(self.get_route_func());
+                let async_request_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =
+                    self.get_request_middleware().clone();
+                let async_response_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =
+                    self.get_response_middleware().clone();
+                let route_func_arc_lock: ArcRwLockHashMapRouteFuncBox =
+                    self.get_route_func().clone();
                 let handle_request = move || async move {
                     let log: Log = tmp_arc_lock.read().await.get_log().clone();
                     let mut enable_websocket_opt: Option<bool> = None;
@@ -204,7 +204,7 @@ impl Server {
                     let mut history_request: Request = Request::default();
                     loop {
                         let mut inner_controller_data: InnerControllerData =
-                            InnerControllerData::new();
+                            InnerControllerData::default();
                         let request_obj_result: Result<Request, ServerError> =
                             Self::get_request_obj_result(
                                 &stream_arc,
@@ -286,8 +286,8 @@ impl Server {
     async fn init_panic_hook(&self) {
         let tmp: Tmp = self.get_tmp().read().await.clone();
         let cfg: RwLockReadGuard<'_, ServerConfig<'_>> = self.get_cfg().read().await;
-        let inner_print: bool = cfg.get_inner_print().clone();
-        let inner_log: bool = cfg.get_inner_log().clone();
+        let inner_print: bool = *cfg.get_inner_print();
+        let inner_log: bool = *cfg.get_inner_log();
         set_hook(Box::new(move |err| {
             let err_msg: String = format!("{}", err);
             if inner_print {

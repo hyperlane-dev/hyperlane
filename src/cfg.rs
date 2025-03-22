@@ -46,7 +46,7 @@ async fn test_server_basic_usage() {
     async fn run_server() {
         let mut server: Server = Server::new();
         server.host("0.0.0.0").await;
-        server.port(50000).await;
+        server.port(60000).await;
         server.log_dir("./logs").await;
         server.enable_inner_log().await;
         server.enable_inner_print().await;
@@ -71,7 +71,6 @@ async fn test_server_basic_usage() {
         server.listen().await;
     }
 
-    run_server().await;
     recoverable_spawn::r#async::recoverable_spawn(run_server);
     std::thread::sleep(std::time::Duration::from_secs(10));
 }

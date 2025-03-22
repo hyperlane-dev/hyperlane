@@ -1,17 +1,5 @@
 use crate::*;
 
-impl InnerControllerData {
-    #[inline]
-    pub fn new() -> Self {
-        InnerControllerData {
-            stream: None,
-            request: Request::default(),
-            response: Response::default(),
-            log: Log::default(),
-        }
-    }
-}
-
 impl ControllerData {
     #[inline]
     pub(crate) fn from_controller_data(controller_data: InnerControllerData) -> Self {
@@ -556,11 +544,9 @@ impl ControllerData {
     pub async fn judge_enable_keep_alive(&self) -> bool {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         let headers: &RequestHeaders = controller_data.get_request().get_headers();
-        if let Some(value) = headers.par_iter().find_map_first(|header| {
-            let key: &String = header.key();
+        if let Some(value) = headers.iter().find_map(|(key, value)| {
             if key.eq_ignore_ascii_case(CONNECTION) {
-                let value: &String = header.value();
-                Some(value.clone())
+                Some(value)
             } else {
                 None
             }
@@ -587,9 +573,7 @@ impl ControllerData {
     pub async fn judge_enable_websocket(&self) -> bool {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         let headers: &RequestHeaders = controller_data.get_request().get_headers();
-        headers.par_iter().any(|header| {
-            let key: &String = header.key();
-            let value: &String = header.value();
+        headers.iter().any(|(key, value)| {
             key.eq_ignore_ascii_case(UPGRADE) && value.eq_ignore_ascii_case(WEBSOCKET)
         })
     }
