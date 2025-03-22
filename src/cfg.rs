@@ -1,3 +1,5 @@
+use crate::*;
+
 #[tokio::test]
 async fn test_server_basic_usage() {
     use crate::*;

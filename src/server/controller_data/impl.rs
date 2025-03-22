@@ -556,10 +556,12 @@ impl ControllerData {
     pub async fn judge_enable_keep_alive(&self) -> bool {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         for tem in controller_data.get_request().get_headers().iter() {
-            if tem.0.eq_ignore_ascii_case(CONNECTION) {
-                if tem.1.eq_ignore_ascii_case(CONNECTION_KEEP_ALIVE) {
+            let key: &String = tem.key();
+            let value: &String = tem.value();
+            if key.eq_ignore_ascii_case(CONNECTION) {
+                if value.eq_ignore_ascii_case(CONNECTION_KEEP_ALIVE) {
                     return true;
-                } else if tem.1.eq_ignore_ascii_case(CONNECTION_CLOSE) {
+                } else if value.eq_ignore_ascii_case(CONNECTION_CLOSE) {
                     return false;
                 }
                 break;
@@ -581,8 +583,10 @@ impl ControllerData {
     pub async fn judge_enable_websocket(&self) -> bool {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
         for tem in controller_data.get_request().get_headers().iter() {
-            if tem.0.eq_ignore_ascii_case(UPGRADE) {
-                if tem.1.eq_ignore_ascii_case(WEBSOCKET) {
+            let key: &String = tem.key();
+            let value: &String = tem.value();
+            if key.eq_ignore_ascii_case(UPGRADE) {
+                if value.eq_ignore_ascii_case(WEBSOCKET) {
                     return true;
                 }
                 break;

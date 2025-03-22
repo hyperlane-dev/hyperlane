@@ -1,3 +1,3 @@
 use crate::*;
 
-pub type ArcRwLockHashMapMiddlewareFuncBox = ArcRwLock<VecBoxFunc>;
+pub type ArcRwLockDashMapMiddlewareFuncBox = ArcRwLock<VecBoxFunc>;
