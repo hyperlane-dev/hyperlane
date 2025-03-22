@@ -179,7 +179,7 @@ impl Server {
     pub async fn listen(&mut self) -> &mut Self {
         {
             self.init().await;
-            let cfg: RwLockReadGuard<'_, ServerConfig<'_>> = self.get_cfg().read().await;
+            let cfg: ServerConfig<'_> = self.get_cfg().read().await.clone();
             let host: &str = *cfg.get_host();
             let port: usize = *cfg.get_port();
             let websocket_buffer_size: usize = *cfg.get_websocket_buffer_size();
@@ -278,14 +278,14 @@ impl Server {
 
     #[inline]
     async fn init_log(&self) {
-        let tmp: RwLockReadGuard<'_, Tmp> = self.get_tmp().read().await;
+        let tmp: Tmp = self.get_tmp().read().await.clone();
         log_run(tmp.get_log());
     }
 
     #[inline]
     async fn init_panic_hook(&self) {
         let tmp: Tmp = self.get_tmp().read().await.clone();
-        let cfg: RwLockReadGuard<'_, ServerConfig<'_>> = self.get_cfg().read().await;
+        let cfg: ServerConfig<'_> = self.get_cfg().read().await.clone();
         let inner_print: bool = *cfg.get_inner_print();
         let inner_log: bool = *cfg.get_inner_log();
         set_hook(Box::new(move |err| {
