@@ -1,10 +1,10 @@
 use crate::*;
 
-#[derive(Clone, Lombok)]
+#[derive(Clone, Lombok, Default)]
 pub struct Server {
-    pub cfg: ArcRwLock<ServerConfig<'static>>,
-    pub route_func: ArcRwLockDashMapRouteFuncBox,
-    pub request_middleware: ArcRwLockDashMapMiddlewareFuncBox,
-    pub response_middleware: ArcRwLockDashMapMiddlewareFuncBox,
-    pub tmp: ArcRwLock<Tmp>,
+    cfg: ArcRwLock<ServerConfig<'static>>,
+    route_func: ArcRwLockDashMapRouteFuncBox,
+    request_middleware: ArcRwLockDashMapMiddlewareFuncBox,
+    response_middleware: ArcRwLockDashMapMiddlewareFuncBox,
+    tmp: ArcRwLock<Tmp>,
 }

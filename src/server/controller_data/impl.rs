@@ -555,16 +555,20 @@ impl ControllerData {
     #[inline]
     pub async fn judge_enable_keep_alive(&self) -> bool {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
-        for tem in controller_data.get_request().get_headers().iter() {
-            let key: &String = tem.key();
-            let value: &String = tem.value();
+        let headers: &RequestHeaders = controller_data.get_request().get_headers();
+        if let Some(value) = headers.par_iter().find_map_first(|header| {
+            let key: &String = header.key();
             if key.eq_ignore_ascii_case(CONNECTION) {
-                if value.eq_ignore_ascii_case(CONNECTION_KEEP_ALIVE) {
-                    return true;
-                } else if value.eq_ignore_ascii_case(CONNECTION_CLOSE) {
-                    return false;
-                }
-                break;
+                let value: &String = header.value();
+                Some(value.clone())
+            } else {
+                None
+            }
+        }) {
+            if value.eq_ignore_ascii_case(CONNECTION_KEEP_ALIVE) {
+                return true;
+            } else if value.eq_ignore_ascii_case(CONNECTION_CLOSE) {
+                return false;
             }
         }
         let enable_keep_alive: bool = controller_data
@@ -582,17 +586,12 @@ impl ControllerData {
     #[inline]
     pub async fn judge_enable_websocket(&self) -> bool {
         let controller_data: RwLockReadControllerData = self.get_read_lock().await;
-        for tem in controller_data.get_request().get_headers().iter() {
-            let key: &String = tem.key();
-            let value: &String = tem.value();
-            if key.eq_ignore_ascii_case(UPGRADE) {
-                if value.eq_ignore_ascii_case(WEBSOCKET) {
-                    return true;
-                }
-                break;
-            }
-        }
-        return false;
+        let headers: &RequestHeaders = controller_data.get_request().get_headers();
+        headers.par_iter().any(|header| {
+            let key: &String = header.key();
+            let value: &String = header.value();
+            key.eq_ignore_ascii_case(UPGRADE) && value.eq_ignore_ascii_case(WEBSOCKET)
+        })
     }
 
     #[inline]

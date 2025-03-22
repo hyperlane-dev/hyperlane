@@ -1,18 +1,5 @@
 use crate::*;
 
-impl Default for Server {
-    #[inline]
-    fn default() -> Self {
-        Self {
-            cfg: arc_rwlock(ServerConfig::default()),
-            tmp: arc_rwlock(Tmp::default()),
-            route_func: arc_rwlock(DashMap::new()),
-            request_middleware: arc_rwlock(vec![]),
-            response_middleware: arc_rwlock(vec![]),
-        }
-    }
-}
-
 impl Server {
     #[inline]
     pub fn new() -> Self {
@@ -176,6 +163,19 @@ impl Server {
     }
 
     #[inline]
+    async fn get_request_obj_result(
+        stream_arc: &ArcRwLockStream,
+        websocket_handshake_finish: bool,
+        websocket_buffer_size: usize,
+    ) -> RequestNewResult {
+        if websocket_handshake_finish {
+            Request::websocket_request_from_stream(&stream_arc, websocket_buffer_size).await
+        } else {
+            Request::http_request_from_stream(&stream_arc).await
+        }
+    }
+
+    #[inline]
     pub async fn listen(&mut self) -> &mut Self {
         {
             self.init().await;
@@ -206,17 +206,15 @@ impl Server {
                         let mut inner_controller_data: InnerControllerData =
                             InnerControllerData::new();
                         let request_obj_result: Result<Request, ServerError> =
-                            if websocket_handshake_finish {
-                                Request::websocket_request_from_stream(
-                                    &stream_arc,
-                                    websocket_buffer_size,
-                                )
-                                .await
-                            } else {
-                                Request::http_request_from_stream(&stream_arc).await
-                            }
+                            Self::get_request_obj_result(
+                                &stream_arc,
+                                websocket_handshake_finish,
+                                websocket_buffer_size,
+                            )
+                            .await
                             .map_err(|err| ServerError::InvalidHttpRequest(err));
-                        if request_obj_result.is_err() && enable_websocket_opt.is_none() {
+                        let init_enable_websocket_opt: bool = enable_websocket_opt.is_some();
+                        if request_obj_result.is_err() && !init_enable_websocket_opt {
                             let _ = inner_controller_data
                                 .get_mut_response()
                                 .close(&stream_arc)
@@ -227,7 +225,7 @@ impl Server {
                         if websocket_handshake_finish {
                             history_request.set_body(request_obj.get_body().clone());
                             request_obj = history_request.clone();
-                        } else {
+                        } else if !init_enable_websocket_opt {
                             history_request = request_obj.clone();
                         }
                         let route: String = request_obj.get_path().clone();
@@ -237,13 +235,13 @@ impl Server {
                             .set_log(log.clone());
                         let controller_data: ControllerData =
                             ControllerData::from_controller_data(inner_controller_data);
-                        if enable_websocket_opt.is_none() {
+                        if !init_enable_websocket_opt {
                             enable_websocket_opt =
                                 Some(controller_data.judge_enable_websocket().await);
                         }
                         let enable_websocket: bool = enable_websocket_opt.unwrap_or_default();
                         if enable_websocket {
-                            let handle_res: Result<(), ResponseError> = controller_data
+                            let handle_res: ResponseResult = controller_data
                                 .handle_websocket(&mut websocket_handshake_finish)
                                 .await;
                             if handle_res.is_err() {
@@ -286,7 +284,7 @@ impl Server {
 
     #[inline]
     async fn init_panic_hook(&self) {
-        let tmp: Tmp = self.tmp.read().await.clone();
+        let tmp: Tmp = self.get_tmp().read().await.clone();
         let cfg: RwLockReadGuard<'_, ServerConfig<'_>> = self.get_cfg().read().await;
         let inner_print: bool = cfg.get_inner_print().clone();
         let inner_log: bool = cfg.get_inner_log().clone();
