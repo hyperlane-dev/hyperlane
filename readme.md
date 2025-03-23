@@ -80,7 +80,7 @@ async fn websocket_route(controller_data: ControllerData) {
 }
 
 async fn run_server() {
-    let mut server: Server = Server::new();
+    let server: Server = Server::new();
     server.host("0.0.0.0").await;
     server.port(60000).await;
     server.log_dir("./logs").await;

@@ -12,9 +12,7 @@ pub use hyperlane_log::*;
 pub use hyperlane_time::*;
 pub use recoverable_spawn::*;
 pub use recoverable_thread_pool::*;
-pub use server::{
-    config::r#type::*, controller_data::r#type::*, error::r#type::Error as ServerError, r#type::*,
-};
+pub use server::{config::r#type::*, controller_data::r#type::*, error::r#type::*, r#type::*};
 pub use server_manager::*;
 
 pub(crate) use ahash::RandomState;
@@ -26,6 +24,7 @@ pub(crate) use server::{
     tmp::r#type::*,
 };
 pub(crate) use std::{
+    error::Error as StdError,
     fmt::{self, Display},
     future::Future,
     net::SocketAddr,
