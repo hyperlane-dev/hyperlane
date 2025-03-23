@@ -1,7 +1,7 @@
 use crate::*;
 
-pub type RwLockWriteControllerData<'a> = RwLockWriteGuard<'a, InnerControllerData>;
-pub type RwLockReadControllerData<'a> = RwLockReadGuard<'a, InnerControllerData>;
+pub type RwLockWriteInnerControllerData<'a> = RwLockWriteGuard<'a, InnerControllerData>;
+pub type RwLockReadInnerControllerData<'a> = RwLockReadGuard<'a, InnerControllerData>;
 
 #[derive(Clone, Debug, Lombok, Default)]
 pub struct InnerControllerData {

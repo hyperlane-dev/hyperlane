@@ -1,10 +1,8 @@
-use super::r#type::Error;
 use crate::*;
-use std::error::Error as StdError;
 
-impl StdError for Error {}
+impl StdError for ServerError {}
 
-impl Display for Error {
+impl Display for ServerError {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

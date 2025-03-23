@@ -1,7 +1,7 @@
 use crate::*;
 
 #[derive(Debug)]
-pub enum Error {
+pub enum ServerError {
     TcpBindError(String),
     HttpReadError(String),
     InvalidHttpRequest(RequestError),
