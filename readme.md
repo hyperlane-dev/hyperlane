@@ -79,7 +79,8 @@ async fn websocket_route(controller_data: ControllerData) {
     let _ = controller_data.send_response_body(request_body).await;
 }
 
-async fn run_server() {
+#[tokio::main]
+async fn main() {
     let server: Server = Server::new();
     server.host("0.0.0.0").await;
     server.port(60000).await;
@@ -100,7 +101,7 @@ async fn run_server() {
             "/test/panic",
             async_func!(test_string, |controller_data| {
                 println_success!(test_string);
-                print_success!(controller_data.get_request().await.get_string());
+                println_success!(controller_data.get_request().await.get_string());
                 panic!("Test panic");
             }),
         )

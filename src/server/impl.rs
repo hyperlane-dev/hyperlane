@@ -302,14 +302,14 @@ impl Server {
     async fn init_panic_hook(&self) {
         let tmp: Tmp = self.get_tmp().read().await.clone();
         let cfg: ServerConfig<'_> = self.get_cfg().read().await.clone();
-        let inner_print: bool = *cfg.get_inner_print();
-        let inner_log: bool = *cfg.get_inner_log();
+        let enable_inner_print: bool = *cfg.get_inner_print();
+        let enable_inner_log: bool = *cfg.get_inner_log() && tmp.get_log().is_enable();
         set_hook(Box::new(move |err| {
             let err_msg: String = format!("{}", err);
-            if inner_print {
+            if enable_inner_print {
                 println_error!(err_msg);
             }
-            if inner_log {
+            if enable_inner_log {
                 handle_error(&tmp, err_msg.clone());
             }
         }));

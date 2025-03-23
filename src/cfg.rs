@@ -43,7 +43,7 @@ async fn test_server_basic_usage() {
         let _ = controller_data.send_response_body(request_body).await;
     }
 
-    async fn run_server() {
+    async fn main() {
         let server: Server = Server::new();
         server.host("0.0.0.0").await;
         server.port(60000).await;
@@ -64,7 +64,7 @@ async fn test_server_basic_usage() {
                 "/test/panic",
                 async_func!(test_string, |controller_data| {
                     println_success!(test_string);
-                    print_success!(controller_data.get_request().await.get_string());
+                    println_success!(controller_data.get_request().await.get_string());
                     panic!("Test panic");
                 }),
             )
@@ -72,6 +72,6 @@ async fn test_server_basic_usage() {
         server.listen().await;
     }
 
-    recoverable_spawn::r#async::recoverable_spawn(run_server);
+    recoverable_spawn::r#async::recoverable_spawn(main);
     std::thread::sleep(std::time::Duration::from_secs(10));
 }
