@@ -268,6 +268,7 @@ impl Server {
                             let _ = controller_data.close().await;
                             return;
                         }
+                        yield_now().await;
                     }
                 };
                 tokio::spawn(handle_request());
