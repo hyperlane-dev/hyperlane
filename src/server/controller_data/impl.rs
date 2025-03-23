@@ -533,18 +533,21 @@ impl ControllerData {
     pub async fn judge_enable_keep_alive(&self) -> bool {
         let controller_data: RwLockReadInnerControllerData = self.get_read_lock().await;
         let headers: &RequestHeaders = controller_data.get_request().get_headers();
-        if let Some(value) = headers.iter().find_map(|(key, value)| {
+        if let Some(enable_keep_alive) = headers.iter().find_map(|tem_header| {
+            let (key, value) = tem_header.pair();
             if key.eq_ignore_ascii_case(CONNECTION) {
-                Some(value)
+                if value.eq_ignore_ascii_case(CONNECTION_KEEP_ALIVE) {
+                    Some(true)
+                } else if value.eq_ignore_ascii_case(CONNECTION_CLOSE) {
+                    Some(false)
+                } else {
+                    None
+                }
             } else {
                 None
             }
         }) {
-            if value.eq_ignore_ascii_case(CONNECTION_KEEP_ALIVE) {
-                return true;
-            } else if value.eq_ignore_ascii_case(CONNECTION_CLOSE) {
-                return false;
-            }
+            return enable_keep_alive;
         }
         let enable_keep_alive: bool = controller_data
             .get_request()
@@ -565,7 +568,8 @@ impl ControllerData {
             .get_request()
             .get_headers()
             .iter()
-            .any(|(key, value)| {
+            .any(|tem_header| {
+                let (key, value) = tem_header.pair();
                 key.eq_ignore_ascii_case(UPGRADE) && value.eq_ignore_ascii_case(WEBSOCKET)
             })
     }

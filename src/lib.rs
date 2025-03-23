@@ -15,7 +15,7 @@ pub use recoverable_thread_pool::*;
 pub use server::{config::r#type::*, controller_data::r#type::*, error::r#type::*, r#type::*};
 pub use server_manager::*;
 
-pub(crate) use ahash::RandomState;
+pub(crate) use core::hash::BuildHasherDefault;
 pub(crate) use server::{
     config::constant::*,
     func::{r#trait::*, r#type::*},
@@ -37,4 +37,5 @@ pub(crate) use tokio::{
     sync::{RwLockReadGuard, RwLockWriteGuard},
     task::yield_now,
 };
+pub(crate) use twox_hash::XxHash3_64;
 pub(crate) use utils::error::*;
