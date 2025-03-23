@@ -11,5 +11,5 @@ pub struct InnerControllerData {
     log: Log,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ControllerData(pub(super) ArcRwLock<InnerControllerData>);

@@ -1,5 +1,18 @@
 use crate::*;
 
+impl Default for Server {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            cfg: arc_rwlock(ServerConfig::default()),
+            route_func: Arc::new(dash_map()),
+            request_middleware: arc_rwlock(vec![]),
+            response_middleware: arc_rwlock(vec![]),
+            tmp: arc_rwlock(Tmp::default()),
+        }
+    }
+}
+
 impl Server {
     #[inline]
     pub fn new() -> Self {
@@ -120,8 +133,7 @@ impl Server {
         Fut: Future<Output = ()> + Send + 'static,
     {
         {
-            let mut mut_route_func: RwLockWriteGuard<'_, HashMap<&str, Box<dyn Func + Send>>> =
-                self.get_route_func().write().await;
+            let mut_route_func: &ArcDashMapRouteFuncBox = self.get_route_func();
             mut_route_func.insert(
                 route,
                 Box::new(move |controller_data| Box::pin(func(controller_data))),
@@ -195,8 +207,7 @@ impl Server {
                     self.get_request_middleware().clone();
                 let async_response_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =
                     self.get_response_middleware().clone();
-                let route_func_arc_lock: ArcRwLockHashMapRouteFuncBox =
-                    self.get_route_func().clone();
+                let route_func_arc_lock: ArcDashMapRouteFuncBox = self.get_route_func().clone();
                 let handle_request = move || async move {
                     let log: Log = tmp_arc_lock.read().await.get_log().clone();
                     let mut enable_websocket_opt: Option<bool> = None;
@@ -254,9 +265,7 @@ impl Server {
                         {
                             request_middleware(controller_data.clone()).await;
                         }
-                        if let Some(async_func) =
-                            route_func_arc_lock.read().await.get(route.as_str())
-                        {
+                        if let Some(async_func) = route_func_arc_lock.get(route.as_str()) {
                             async_func(controller_data.clone()).await;
                         }
                         for response_middleware in
