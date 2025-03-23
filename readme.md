@@ -98,9 +98,9 @@ async fn run_server() {
     server
         .route(
             "/test/panic",
-            async_func!(test_string, |data| {
+            async_func!(test_string, |controller_data| {
                 println_success!(test_string);
-                println_success!(format!("Using external variables {:?}", data));
+                print_success!(controller_data.get_request().await.get_string());
                 panic!("Test panic");
             }),
         )

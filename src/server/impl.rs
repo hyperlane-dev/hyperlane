@@ -47,6 +47,32 @@ impl Server {
         self
     }
 
+    pub async fn enable_log(&self) -> &Self {
+        self.get_cfg()
+            .write()
+            .await
+            .set_log_size(DEFAULT_LOG_FILE_SIZE);
+        self.get_tmp()
+            .write()
+            .await
+            .get_mut_log()
+            .set_file_size(DEFAULT_LOG_FILE_SIZE);
+        self
+    }
+
+    pub async fn disable_log(&self) -> &Self {
+        self.get_cfg()
+            .write()
+            .await
+            .set_log_size(DISABLE_LOG_FILE_SIZE);
+        self.get_tmp()
+            .write()
+            .await
+            .get_mut_log()
+            .set_file_size(DISABLE_LOG_FILE_SIZE);
+        self
+    }
+
     pub async fn http_line_buffer_size(&self, buffer_size: usize) -> &Self {
         let buffer_size: usize = if buffer_size == 0 {
             DEFAULT_BUFFER_SIZE
