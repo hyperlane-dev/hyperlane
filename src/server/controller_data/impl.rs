@@ -1,57 +1,46 @@
 use crate::*;
 
 impl ControllerData {
-    #[inline]
     pub(crate) fn from_controller_data(controller_data: InnerControllerData) -> Self {
         Self(arc_rwlock(controller_data))
     }
 
-    #[inline]
     pub async fn get(&self) -> InnerControllerData {
         self.get_read_lock().await.clone()
     }
 
-    #[inline]
     pub async fn get_read_lock(&self) -> RwLockReadInnerControllerData {
         self.0.read().await
     }
 
-    #[inline]
     pub async fn get_write_lock(&self) -> RwLockWriteInnerControllerData {
         self.0.write().await
     }
 
-    #[inline]
     pub async fn get_stream(&self) -> OptionArcRwLockStream {
         self.get_read_lock().await.get_stream().clone()
     }
 
-    #[inline]
     pub async fn get_request(&self) -> Request {
         self.get_read_lock().await.get_request().clone()
     }
 
-    #[inline]
     pub async fn get_response(&self) -> Response {
         self.get_read_lock().await.get_response().clone()
     }
 
-    #[inline]
     pub async fn get_request_string(&self) -> String {
         self.get_read_lock().await.get_request().get_string()
     }
 
-    #[inline]
     pub async fn get_response_string(&self) -> String {
         self.get_read_lock().await.get_response().get_string()
     }
 
-    #[inline]
     pub async fn get_log(&self) -> Log {
         self.get_read_lock().await.get_log().clone()
     }
 
-    #[inline]
     pub async fn get_socket_addr(&self) -> OptionSocketAddr {
         let stream_result: OptionArcRwLockStream = self.get_stream().await;
         if stream_result.is_none() {
@@ -66,7 +55,6 @@ impl ControllerData {
         socket_addr_opt
     }
 
-    #[inline]
     pub async fn get_socket_addr_or_default(&self) -> SocketAddr {
         let stream_result: OptionArcRwLockStream = self.get_stream().await;
         if stream_result.is_none() {
@@ -81,31 +69,26 @@ impl ControllerData {
         socket_addr
     }
 
-    #[inline]
     pub async fn get_socket_addr_string(&self) -> Option<String> {
         self.get_socket_addr().await.map(|data| data.to_string())
     }
 
-    #[inline]
     pub async fn get_socket_addr_or_default_string(&self) -> String {
         self.get_socket_addr_or_default().await.to_string()
     }
 
-    #[inline]
     pub async fn get_socket_host(&self) -> OptionSocketHost {
         self.get_socket_addr()
             .await
             .map(|socket_addr: SocketAddr| socket_addr.ip())
     }
 
-    #[inline]
     pub async fn get_socket_port(&self) -> OptionSocketPort {
         self.get_socket_addr()
             .await
             .map(|socket_addr: SocketAddr| socket_addr.port())
     }
 
-    #[inline]
     fn inner_is_websocket(&self, controller_data: &RwLockWriteInnerControllerData) -> bool {
         return controller_data
             .get_request()
@@ -113,7 +96,6 @@ impl ControllerData {
             .is_websocket();
     }
 
-    #[inline]
     async fn inner_send_response<T: Into<ResponseBody>>(
         &self,
         status_code: usize,
@@ -137,7 +119,6 @@ impl ControllerData {
         Err(ResponseError::NotFoundStream)
     }
 
-    #[inline]
     pub async fn send_response<T: Into<ResponseBody>>(
         &self,
         status_code: usize,
@@ -147,14 +128,12 @@ impl ControllerData {
             .await
     }
 
-    #[inline]
     pub async fn send(&self) -> ResponseResult {
         let status_code: ResponseStatusCode = self.get_response_status_code().await;
         let response_body: ResponseBody = self.get_response_body().await;
         self.send_response(status_code, response_body).await
     }
 
-    #[inline]
     pub async fn send_response_once<T: Into<ResponseBody>>(
         &self,
         status_code: usize,
@@ -178,14 +157,12 @@ impl ControllerData {
         Err(ResponseError::NotFoundStream)
     }
 
-    #[inline]
     pub async fn send_once(&self) -> ResponseResult {
         let status_code: ResponseStatusCode = self.get_response_status_code().await;
         let response_body: ResponseBody = self.get_response_body().await;
         self.send_response_once(status_code, response_body).await
     }
 
-    #[inline]
     pub async fn send_response_body<T: Into<ResponseBody>>(
         &self,
         response_body: T,
@@ -204,13 +181,11 @@ impl ControllerData {
         Err(ResponseError::NotFoundStream)
     }
 
-    #[inline]
     pub async fn send_body(&self) -> ResponseResult {
         let body: ResponseBody = self.get_response_body().await;
         self.send_response_body(body).await
     }
 
-    #[inline]
     pub async fn close(&self) -> ResponseResult {
         if let Some(stream_lock) = self.get_stream().await {
             return self
@@ -223,7 +198,6 @@ impl ControllerData {
         Err(ResponseError::NotFoundStream)
     }
 
-    #[inline]
     pub async fn flush(&self) -> ResponseResult {
         if let Some(stream_lock) = self.get_stream().await {
             return self
@@ -236,7 +210,6 @@ impl ControllerData {
         Err(ResponseError::NotFoundStream)
     }
 
-    #[inline]
     pub async fn log_info<T, L>(&self, data: T, func: L) -> &Self
     where
         T: LogDataTrait,
@@ -246,7 +219,6 @@ impl ControllerData {
         self
     }
 
-    #[inline]
     pub async fn log_debug<T, L>(&self, data: T, func: L) -> &Self
     where
         T: LogDataTrait,
@@ -256,7 +228,6 @@ impl ControllerData {
         self
     }
 
-    #[inline]
     pub async fn log_error<T, L>(&self, data: T, func: L) -> &Self
     where
         T: LogDataTrait,
@@ -266,7 +237,6 @@ impl ControllerData {
         self
     }
 
-    #[inline]
     pub async fn get_request_method(&self) -> RequestMethod {
         self.get_read_lock()
             .await
@@ -275,17 +245,14 @@ impl ControllerData {
             .clone()
     }
 
-    #[inline]
     pub async fn get_request_host(&self) -> RequestHost {
         self.get_read_lock().await.get_request().get_host().clone()
     }
 
-    #[inline]
     pub async fn get_request_path(&self) -> RequestPath {
         self.get_read_lock().await.get_request().get_path().clone()
     }
 
-    #[inline]
     pub async fn get_request_querys(&self) -> RequestQuerys {
         self.get_read_lock()
             .await
@@ -294,7 +261,6 @@ impl ControllerData {
             .clone()
     }
 
-    #[inline]
     pub async fn get_request_query<T: Into<RequestHeadersKey>>(
         &self,
         key: T,
@@ -307,17 +273,14 @@ impl ControllerData {
             .map(|data| data.clone())
     }
 
-    #[inline]
     pub async fn get_request_body(&self) -> RequestBody {
         self.get_read_lock().await.get_request().get_body().clone()
     }
 
-    #[inline]
     pub async fn get_request_body_string(&self) -> String {
         String::from_utf8_lossy(self.get_read_lock().await.get_request().get_body()).to_string()
     }
 
-    #[inline]
     pub async fn get_request_header<K>(&self, key: K) -> Option<RequestHeadersValue>
     where
         K: Into<RequestHeadersKey>,
@@ -325,7 +288,6 @@ impl ControllerData {
         self.get_read_lock().await.get_request().get_header(key)
     }
 
-    #[inline]
     pub async fn get_request_headers(&self) -> RequestHeaders {
         self.get_read_lock()
             .await
@@ -334,7 +296,6 @@ impl ControllerData {
             .clone()
     }
 
-    #[inline]
     pub async fn get_request_upgrade_type(&self) -> UpgradeType {
         self.get_read_lock()
             .await
@@ -343,13 +304,11 @@ impl ControllerData {
             .clone()
     }
 
-    #[inline]
     pub async fn set_request(&self, request_data: Request) -> &Self {
         *self.get_write_lock().await.get_mut_request() = request_data;
         self
     }
 
-    #[inline]
     pub async fn set_request_method<T>(&self, method: T) -> &Self
     where
         T: Into<RequestMethod>,
@@ -361,7 +320,6 @@ impl ControllerData {
         self
     }
 
-    #[inline]
     pub async fn set_request_host<T>(&self, host: T) -> &Self
     where
         T: Into<RequestHost>,
@@ -370,7 +328,6 @@ impl ControllerData {
         self
     }
 
-    #[inline]
     pub async fn set_request_path<T>(&self, path: T) -> &Self
     where
         T: Into<RequestPath>,
@@ -379,7 +336,6 @@ impl ControllerData {
         self
     }
 
-    #[inline]
     pub async fn set_request_query<K, V>(&self, key: K, value: V) -> &Self
     where
         K: Into<RequestQuerysKey>,
@@ -392,7 +348,6 @@ impl ControllerData {
         self
     }
 
-    #[inline]
     pub async fn set_request_querys<T>(&self, querys: T) -> &Self
     where
         T: Into<RequestQuerys>,
@@ -404,7 +359,6 @@ impl ControllerData {
         self
     }
 
-    #[inline]
     pub async fn set_request_header<K, V>(&self, key: K, value: V) -> &Self
     where
         K: Into<String>,
@@ -417,7 +371,6 @@ impl ControllerData {
         self
     }
 
-    #[inline]
     pub async fn set_request_headers(&self, headers: RequestHeaders) -> &Self {
         self.get_write_lock()
             .await
@@ -426,13 +379,11 @@ impl ControllerData {
         self
     }
 
-    #[inline]
     pub async fn set_request_body<T: Into<RequestBody>>(&self, body: T) -> &Self {
         self.get_write_lock().await.get_mut_request().set_body(body);
         self
     }
 
-    #[inline]
     pub async fn get_response_headers(&self) -> ResponseHeaders {
         self.get_read_lock()
             .await
@@ -441,7 +392,6 @@ impl ControllerData {
             .clone()
     }
 
-    #[inline]
     pub async fn get_response_header<K>(&self, key: K) -> Option<ResponseHeadersValue>
     where
         K: Into<ResponseHeadersKey>,
@@ -449,17 +399,14 @@ impl ControllerData {
         self.get_read_lock().await.get_response().get_header(key)
     }
 
-    #[inline]
     pub async fn get_response_body(&self) -> ResponseBody {
         self.get_read_lock().await.get_response().get_body().clone()
     }
 
-    #[inline]
     pub async fn get_response_body_string(&self) -> String {
         String::from_utf8_lossy(self.get_read_lock().await.get_response().get_body()).to_string()
     }
 
-    #[inline]
     pub async fn get_response_reason_phrase(&self) -> ResponseReasonPhrase {
         self.get_read_lock()
             .await
@@ -468,7 +415,6 @@ impl ControllerData {
             .clone()
     }
 
-    #[inline]
     pub async fn get_response_status_code(&self) -> ResponseStatusCode {
         self.get_read_lock()
             .await
@@ -477,7 +423,6 @@ impl ControllerData {
             .clone()
     }
 
-    #[inline]
     pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self
     where
         K: Into<String>,
@@ -490,7 +435,6 @@ impl ControllerData {
         self
     }
 
-    #[inline]
     pub async fn set_response_headers(&self, headers: ResponseHeaders) -> &Self {
         self.get_write_lock()
             .await
@@ -499,7 +443,6 @@ impl ControllerData {
         self
     }
 
-    #[inline]
     pub async fn set_response_body<T: Into<ResponseBody>>(&self, body: T) -> &Self {
         self.get_write_lock()
             .await
@@ -508,7 +451,6 @@ impl ControllerData {
         self
     }
 
-    #[inline]
     pub async fn set_response_reason_phrase<T: Into<ResponseReasonPhrase>>(
         &self,
         reason_phrase: T,
@@ -520,7 +462,6 @@ impl ControllerData {
         self
     }
 
-    #[inline]
     pub async fn set_response_status_code(&self, status_code: ResponseStatusCode) -> &Self {
         self.get_write_lock()
             .await
@@ -529,7 +470,6 @@ impl ControllerData {
         self
     }
 
-    #[inline]
     pub async fn judge_enable_keep_alive(&self) -> bool {
         let controller_data: RwLockReadInnerControllerData = self.get_read_lock().await;
         let headers: &RequestHeaders = controller_data.get_request().get_headers();
@@ -553,12 +493,10 @@ impl ControllerData {
         return enable_keep_alive;
     }
 
-    #[inline]
     pub async fn judge_unenable_keep_alive(&self) -> bool {
         !self.judge_enable_keep_alive().await
     }
 
-    #[inline]
     pub async fn judge_enable_websocket(&self) -> bool {
         self.get_read_lock()
             .await
@@ -568,7 +506,6 @@ impl ControllerData {
             .any(|(key, value)| key == UPGRADE && value.to_ascii_lowercase() == (WEBSOCKET))
     }
 
-    #[inline]
     pub(crate) async fn handle_websocket(&self, is_handshake: &mut bool) -> ResponseResult {
         if *is_handshake {
             return Ok(());

@@ -37,5 +37,4 @@ pub(crate) use tokio::{
     sync::{RwLockReadGuard, RwLockWriteGuard},
     task::yield_now,
 };
-pub(crate) use twox_hash::XxHash3_64;
 pub(crate) use utils::error::*;

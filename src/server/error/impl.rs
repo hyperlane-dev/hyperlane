@@ -3,7 +3,6 @@ use crate::*;
 impl StdError for ServerError {}
 
 impl Display for ServerError {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::TcpBindError(data) => write!(f, "Tcp bind error{}{}", COLON_SPACE, data),

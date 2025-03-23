@@ -1,7 +1,6 @@
 use crate::*;
 
 impl Default for Server {
-    #[inline]
     fn default() -> Self {
         Self {
             cfg: arc_rwlock(ServerConfig::default()),
@@ -14,24 +13,20 @@ impl Default for Server {
 }
 
 impl Server {
-    #[inline]
     pub fn new() -> Self {
         Self::default()
     }
 
-    #[inline]
     pub async fn host(&self, host: &'static str) -> &Self {
         self.get_cfg().write().await.set_host(host);
         self
     }
 
-    #[inline]
     pub async fn port(&self, port: usize) -> &Self {
         self.get_cfg().write().await.set_port(port);
         self
     }
 
-    #[inline]
     pub async fn log_dir(&self, log_dir: &'static str) -> &Self {
         self.get_cfg().write().await.set_log_dir(log_dir);
         self.get_tmp()
@@ -42,7 +37,6 @@ impl Server {
         self
     }
 
-    #[inline]
     pub async fn log_size(&self, log_size: usize) -> &Self {
         self.get_cfg().write().await.set_log_size(log_size);
         self.get_tmp()
@@ -53,7 +47,6 @@ impl Server {
         self
     }
 
-    #[inline]
     pub async fn http_line_buffer_size(&self, buffer_size: usize) -> &Self {
         let buffer_size: usize = if buffer_size == 0 {
             DEFAULT_BUFFER_SIZE
@@ -67,7 +60,6 @@ impl Server {
         self
     }
 
-    #[inline]
     pub async fn websocket_buffer_size(&self, buffer_size: usize) -> &Self {
         let buffer_size: usize = if buffer_size == 0 {
             DEFAULT_BUFFER_SIZE
@@ -81,43 +73,36 @@ impl Server {
         self
     }
 
-    #[inline]
     pub async fn inner_print(&self, print: bool) -> &Self {
         self.get_cfg().write().await.set_inner_print(print);
         self
     }
 
-    #[inline]
     pub async fn inner_log(&self, print: bool) -> &Self {
         self.get_cfg().write().await.set_inner_log(print);
         self
     }
 
-    #[inline]
     pub async fn enable_inner_print(&self) -> &Self {
         self.inner_print(true).await;
         self
     }
 
-    #[inline]
     pub async fn disable_inner_print(&self) -> &Self {
         self.inner_print(false).await;
         self
     }
 
-    #[inline]
     pub async fn enable_inner_log(&self) -> &Self {
         self.inner_log(true).await;
         self
     }
 
-    #[inline]
     pub async fn disable_inner_log(&self) -> &Self {
         self.inner_log(false).await;
         self
     }
 
-    #[inline]
     pub async fn log_interval_millis(&self, interval_millis: usize) -> &Self {
         self.get_cfg()
             .write()
@@ -131,7 +116,6 @@ impl Server {
         self
     }
 
-    #[inline]
     pub async fn route<R, F, Fut>(&self, route: R, func: F) -> &Self
     where
         R: ToString,
@@ -145,7 +129,6 @@ impl Server {
         self
     }
 
-    #[inline]
     pub async fn request_middleware<F, Fut>(&self, func: F) -> &Self
     where
         F: FuncWithoutPin<Fut>,
@@ -161,7 +144,6 @@ impl Server {
         self
     }
 
-    #[inline]
     pub async fn response_middleware<F, Fut>(&self, func: F) -> &Self
     where
         F: FuncWithoutPin<Fut>,
@@ -176,7 +158,6 @@ impl Server {
         self
     }
 
-    #[inline]
     async fn get_request_obj_result(
         stream_arc: &ArcRwLockStream,
         http_line_buffer_size: usize,
@@ -190,7 +171,6 @@ impl Server {
         }
     }
 
-    #[inline]
     pub async fn listen(&self) -> &Self {
         {
             self.init().await;
@@ -289,12 +269,10 @@ impl Server {
         self
     }
 
-    #[inline]
     async fn init_log(&self) {
         log_run(self.get_tmp().read().await.get_log());
     }
 
-    #[inline]
     async fn init_panic_hook(&self) {
         let tmp: Tmp = self.get_tmp().read().await.clone();
         let cfg: ServerConfig<'_> = self.get_cfg().read().await.clone();
@@ -311,7 +289,6 @@ impl Server {
         }));
     }
 
-    #[inline]
     async fn init(&self) {
         self.init_panic_hook().await;
         self.init_log().await;
