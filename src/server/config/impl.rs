@@ -12,6 +12,7 @@ impl<'a> Default for ServerConfig<'a> {
             inner_print: DEFAULT_INNER_PRINT,
             inner_log: DEFAULT_INNER_LOG,
             websocket_buffer_size: DEFAULT_BUFFER_SIZE,
+            http_line_buffer_size: DEFAULT_BUFFER_SIZE,
         }
     }
 }

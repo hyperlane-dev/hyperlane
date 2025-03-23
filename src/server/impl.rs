@@ -5,7 +5,7 @@ impl Default for Server {
     fn default() -> Self {
         Self {
             cfg: arc_rwlock(ServerConfig::default()),
-            route_func: Arc::new(dash_map()),
+            route_func: arc_rwlock(hash_map_xxhash3_64()),
             request_middleware: arc_rwlock(vec![]),
             response_middleware: arc_rwlock(vec![]),
             tmp: arc_rwlock(Tmp::default()),
@@ -50,6 +50,20 @@ impl Server {
             .await
             .get_mut_log()
             .set_file_size(log_size);
+        self
+    }
+
+    #[inline]
+    pub async fn http_line_buffer_size(&self, buffer_size: usize) -> &Self {
+        let buffer_size: usize = if buffer_size == 0 {
+            DEFAULT_BUFFER_SIZE
+        } else {
+            buffer_size
+        };
+        self.get_cfg()
+            .write()
+            .await
+            .set_http_line_buffer_size(buffer_size);
         self
     }
 
@@ -118,14 +132,14 @@ impl Server {
     }
 
     #[inline]
-    pub async fn route<F, Fut>(&self, route: &'static str, func: F) -> &Self
+    pub async fn route<R, F, Fut>(&self, route: R, func: F) -> &Self
     where
+        R: ToString,
         F: FuncWithoutPin<Fut>,
         Fut: Future<Output = ()> + Send + 'static,
     {
-        let mut_route_func: &ArcDashMapRouteFuncBox = self.get_route_func();
-        mut_route_func.insert(
-            route,
+        self.get_route_func().write().await.insert(
+            route.to_string(),
             Box::new(move |controller_data| Box::pin(func(controller_data))),
         );
         self
@@ -165,13 +179,14 @@ impl Server {
     #[inline]
     async fn get_request_obj_result(
         stream_arc: &ArcRwLockStream,
+        http_line_buffer_size: usize,
         websocket_handshake_finish: bool,
         websocket_buffer_size: usize,
     ) -> RequestNewResult {
         if websocket_handshake_finish {
             Request::websocket_request_from_stream(&stream_arc, websocket_buffer_size).await
         } else {
-            Request::http_request_from_stream(&stream_arc).await
+            Request::http_request_from_stream(&stream_arc, http_line_buffer_size).await
         }
     }
 
@@ -183,6 +198,7 @@ impl Server {
             let host: &str = *cfg.get_host();
             let port: usize = *cfg.get_port();
             let websocket_buffer_size: usize = *cfg.get_websocket_buffer_size();
+            let http_line_buffer_size: usize = *cfg.get_http_line_buffer_size();
             let addr: String = format!("{}{}{}", host, COLON_SPACE_SYMBOL, port);
             let tcp_listener: TcpListener = TcpListener::bind(&addr)
                 .await
@@ -191,11 +207,12 @@ impl Server {
             while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
                 let tmp_arc_lock: ArcRwLockTmp = self.get_tmp().clone();
                 let stream_arc: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
-                let async_request_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =
+                let request_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =
                     self.get_request_middleware().clone();
-                let async_response_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =
+                let response_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =
                     self.get_response_middleware().clone();
-                let route_func_arc_lock: ArcDashMapRouteFuncBox = self.get_route_func().clone();
+                let route_func_arc_lock: ArcRwLockHashMapRouteFuncBox =
+                    self.get_route_func().clone();
                 let handle_request = move || async move {
                     let log: Log = tmp_arc_lock.read().await.get_log().clone();
                     let mut enable_websocket_opt: Option<bool> = None;
@@ -207,6 +224,7 @@ impl Server {
                         let request_obj_result: Result<Request, ServerError> =
                             Self::get_request_obj_result(
                                 &stream_arc,
+                                http_line_buffer_size,
                                 websocket_handshake_finish,
                                 websocket_buffer_size,
                             )
@@ -248,16 +266,13 @@ impl Server {
                                 return;
                             }
                         }
-                        for request_middleware in
-                            async_request_middleware_arc_lock.read().await.iter()
-                        {
+                        for request_middleware in request_middleware_arc_lock.read().await.iter() {
                             request_middleware(controller_data.clone()).await;
                         }
-                        if let Some(async_func) = route_func_arc_lock.get(route.as_str()) {
-                            async_func(controller_data.clone()).await;
+                        if let Some(route_func) = route_func_arc_lock.read().await.get(&route) {
+                            route_func(controller_data.clone()).await;
                         }
-                        for response_middleware in
-                            async_response_middleware_arc_lock.read().await.iter()
+                        for response_middleware in response_middleware_arc_lock.read().await.iter()
                         {
                             response_middleware(controller_data.clone()).await;
                         }
