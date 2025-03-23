@@ -1,4 +1,4 @@
 use crate::*;
 
-pub type DashMapRouteFuncBox = DashMap<&'static str, BoxFunc, BuildHasherDefault<XxHash3_64>>;
-pub type ArcDashMapRouteFuncBox = Arc<DashMapRouteFuncBox>;
+pub type HashMapRouteFuncBox = HashMap<String, BoxFunc, BuildHasherDefault<XxHash3_64>>;
+pub type ArcRwLockHashMapRouteFuncBox = ArcRwLock<HashMapRouteFuncBox>;

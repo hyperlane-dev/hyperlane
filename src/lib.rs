@@ -24,13 +24,13 @@ pub(crate) use server::{
     tmp::r#type::*,
 };
 pub(crate) use std::{
+    collections::HashMap,
     error::Error as StdError,
     fmt::{self, Display},
     future::Future,
     net::SocketAddr,
     panic::set_hook,
     pin::Pin,
-    sync::Arc,
 };
 pub(crate) use tokio::{
     net::TcpListener,

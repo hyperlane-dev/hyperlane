@@ -533,19 +533,16 @@ impl ControllerData {
     pub async fn judge_enable_keep_alive(&self) -> bool {
         let controller_data: RwLockReadInnerControllerData = self.get_read_lock().await;
         let headers: &RequestHeaders = controller_data.get_request().get_headers();
-        if let Some(enable_keep_alive) = headers.iter().find_map(|tem_header| {
-            let (key, value) = tem_header.pair();
-            if key.eq_ignore_ascii_case(CONNECTION) {
-                if value.eq_ignore_ascii_case(CONNECTION_KEEP_ALIVE) {
-                    Some(true)
-                } else if value.eq_ignore_ascii_case(CONNECTION_CLOSE) {
-                    Some(false)
-                } else {
-                    None
+        if let Some(enable_keep_alive) = headers.iter().find_map(|(key, value)| {
+            if key == CONNECTION {
+                let value_lowercase: String = value.to_ascii_lowercase();
+                if value_lowercase == CONNECTION_KEEP_ALIVE {
+                    return Some(true);
+                } else if value_lowercase == CONNECTION_CLOSE {
+                    return Some(false);
                 }
-            } else {
-                None
             }
+            return None;
         }) {
             return enable_keep_alive;
         }
@@ -568,10 +565,7 @@ impl ControllerData {
             .get_request()
             .get_headers()
             .iter()
-            .any(|tem_header| {
-                let (key, value) = tem_header.pair();
-                key.eq_ignore_ascii_case(UPGRADE) && value.eq_ignore_ascii_case(WEBSOCKET)
-            })
+            .any(|(key, value)| key == UPGRADE && value.to_ascii_lowercase() == (WEBSOCKET))
     }
 
     #[inline]
