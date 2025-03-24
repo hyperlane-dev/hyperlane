@@ -43,7 +43,7 @@ impl Server {
             .write()
             .await
             .get_mut_log()
-            .set_file_size(log_size);
+            .set_limit_file_size(log_size);
         self
     }
 
@@ -56,7 +56,7 @@ impl Server {
             .write()
             .await
             .get_mut_log()
-            .set_file_size(DEFAULT_LOG_FILE_SIZE);
+            .set_limit_file_size(DEFAULT_LOG_FILE_SIZE);
         self
     }
 
@@ -69,7 +69,7 @@ impl Server {
             .write()
             .await
             .get_mut_log()
-            .set_file_size(DISABLE_LOG_FILE_SIZE);
+            .set_limit_file_size(DISABLE_LOG_FILE_SIZE);
         self
     }
 
@@ -126,19 +126,6 @@ impl Server {
 
     pub async fn disable_inner_log(&self) -> &Self {
         self.inner_log(false).await;
-        self
-    }
-
-    pub async fn log_interval_millis(&self, interval_millis: usize) -> &Self {
-        self.get_cfg()
-            .write()
-            .await
-            .set_interval_millis(interval_millis);
-        self.get_tmp()
-            .write()
-            .await
-            .get_mut_log()
-            .set_interval_millis(interval_millis);
         self
     }
 
@@ -295,10 +282,6 @@ impl Server {
         self
     }
 
-    async fn init_log(&self) {
-        log_run(self.get_tmp().read().await.get_log());
-    }
-
     async fn init_panic_hook(&self) {
         let tmp: Tmp = self.get_tmp().read().await.clone();
         let cfg: ServerConfig<'_> = self.get_cfg().read().await.clone();
@@ -317,6 +300,5 @@ impl Server {
 
     async fn init(&self) {
         self.init_panic_hook().await;
-        self.init_log().await;
     }
 }

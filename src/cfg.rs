@@ -51,7 +51,6 @@ async fn test_server_basic_usage() {
         server.enable_inner_log().await;
         server.enable_inner_print().await;
         server.log_size(100_024_000).await;
-        server.log_interval_millis(1000).await;
         server.http_line_buffer_size(4096).await;
         server.websocket_buffer_size(4096).await;
         server.request_middleware(request_middleware).await;
