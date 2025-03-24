@@ -210,6 +210,11 @@ impl ControllerData {
         Err(ResponseError::NotFoundStream)
     }
 
+    pub async fn set_log(&self, log: Log) -> &Self {
+        *self.get_write_lock().await.get_mut_log() = log;
+        self
+    }
+
     pub async fn log_info<T, L>(&self, data: T, func: L) -> &Self
     where
         T: LogDataTrait,
