@@ -60,9 +60,9 @@ async fn response_middleware(controller_data: ControllerData) {
     let request: String = controller_data.get_request_string().await;
     let response: String = controller_data.get_response_string().await;
     controller_data
-        .log_info(request, log_handler)
+        .log_info(&request, log_handler)
         .await
-        .log_info(response, log_handler)
+        .log_info(&response, log_handler)
         .await;
 }
 
