@@ -288,12 +288,13 @@ impl Server {
         let enable_inner_print: bool = *cfg.get_inner_print();
         let enable_inner_log: bool = *cfg.get_inner_log() && tmp.get_log().is_enable();
         set_hook(Box::new(move |err| {
-            let err_msg: String = format!("{}", err);
-            if enable_inner_print {
-                println_error!(err_msg);
-            }
-            if enable_inner_log {
-                handle_error(&tmp, err_msg.clone());
+            for line in err.to_string().lines() {
+                if enable_inner_print {
+                    println_error!(line);
+                }
+                if enable_inner_log {
+                    handle_error(&tmp, line.to_string());
+                }
             }
         }));
     }

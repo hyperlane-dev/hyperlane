@@ -64,7 +64,7 @@ async fn test_server_basic_usage() {
                 async_func!(test_string, |controller_data| {
                     println_success!(test_string);
                     println_success!(controller_data.get_request().await.get_string());
-                    panic!("Test panic");
+                    panic!("Test panic\ndata: test");
                 }),
             )
             .await;
