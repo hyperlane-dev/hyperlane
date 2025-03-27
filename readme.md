@@ -40,10 +40,9 @@ git clone https://github.com/ltpp-universe/hyperlane-quick-start.git
 ```rust
 use hyperlane::*;
 
-async fn request_middleware(controller_data: ControllerData) {
-    let socket_addr: String = controller_data.get_socket_addr_or_default_string().await;
-    controller_data
-        .set_response_header(SERVER, HYPERLANE)
+async fn request_middleware(ctx: Context) {
+    let socket_addr: String = ctx.get_socket_addr_or_default_string().await;
+    ctx.set_response_header(SERVER, HYPERLANE)
         .await
         .set_response_header(CONNECTION, CONNECTION_KEEP_ALIVE)
         .await
@@ -55,28 +54,26 @@ async fn request_middleware(controller_data: ControllerData) {
         .await;
 }
 
-async fn response_middleware(controller_data: ControllerData) {
-    let _ = controller_data.send().await;
-    let request: String = controller_data.get_request_string().await;
-    let response: String = controller_data.get_response_string().await;
-    controller_data
-        .log_info(&request, log_handler)
+async fn response_middleware(ctx: Context) {
+    let _ = ctx.send().await;
+    let request: String = ctx.get_request_string().await;
+    let response: String = ctx.get_response_string().await;
+    ctx.log_info(&request, log_handler)
         .await
         .log_info(&response, log_handler)
         .await;
 }
 
-async fn root_route(controller_data: ControllerData) {
-    controller_data
-        .set_response_status_code(200)
+async fn root_route(ctx: Context) {
+    ctx.set_response_status_code(200)
         .await
         .set_response_body("Hello hyperlane => /")
         .await;
 }
 
-async fn websocket_route(controller_data: ControllerData) {
-    let request_body: Vec<u8> = controller_data.get_request_body().await;
-    let _ = controller_data.send_response_body(request_body).await;
+async fn websocket_route(ctx: Context) {
+    let request_body: Vec<u8> = ctx.get_request_body().await;
+    let _ = ctx.send_response_body(request_body).await;
 }
 
 #[tokio::main]
@@ -98,9 +95,9 @@ async fn main() {
     server
         .route(
             "/test/panic",
-            async_func!(test_string, |controller_data| {
+            async_func!(test_string, |ctx| {
                 println_success!(test_string);
-                println_success!(controller_data.get_request().await.get_string());
+                println_success!(ctx.get_request().await.get_string());
                 panic!("Test panic\ndata: test");
             }),
         )

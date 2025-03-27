@@ -1,19 +1,19 @@
 use crate::*;
 
-impl ControllerData {
-    pub(crate) fn from_controller_data(controller_data: InnerControllerData) -> Self {
-        Self(arc_rwlock(controller_data))
+impl Context {
+    pub(crate) fn from_inner_context(ctx: InnerContext) -> Self {
+        Self(arc_rwlock(ctx))
     }
 
-    pub async fn get(&self) -> InnerControllerData {
+    pub async fn get(&self) -> InnerContext {
         self.get_read_lock().await.clone()
     }
 
-    pub async fn get_read_lock(&self) -> RwLockReadInnerControllerData {
+    pub async fn get_read_lock(&self) -> RwLockReadInnerContext {
         self.0.read().await
     }
 
-    pub async fn get_write_lock(&self) -> RwLockWriteInnerControllerData {
+    pub async fn get_write_lock(&self) -> RwLockWriteInnerContext {
         self.0.write().await
     }
 
@@ -89,11 +89,8 @@ impl ControllerData {
             .map(|socket_addr: SocketAddr| socket_addr.port())
     }
 
-    fn inner_is_websocket(&self, controller_data: &RwLockWriteInnerControllerData) -> bool {
-        return controller_data
-            .get_request()
-            .get_upgrade_type()
-            .is_websocket();
+    fn inner_is_websocket(&self, ctx: &RwLockWriteInnerContext) -> bool {
+        return ctx.get_request().get_upgrade_type().is_websocket();
     }
 
     async fn inner_send_response<T: Into<ResponseBody>>(
@@ -103,12 +100,12 @@ impl ControllerData {
         handle_websocket: bool,
     ) -> ResponseResult {
         if let Some(stream_lock) = self.get_stream().await {
-            let mut controller_data: RwLockWriteInnerControllerData = self.get_write_lock().await;
-            if !handle_websocket && self.inner_is_websocket(&controller_data) {
+            let mut ctx: RwLockWriteInnerContext = self.get_write_lock().await;
+            if !handle_websocket && self.inner_is_websocket(&ctx) {
                 return Err(ResponseError::NotSupportUseThisMethod);
             }
             let body: ResponseBody = response_body.into();
-            let response_res: ResponseResult = controller_data
+            let response_res: ResponseResult = ctx
                 .get_mut_response()
                 .set_body(body)
                 .set_status_code(status_code)
@@ -140,11 +137,11 @@ impl ControllerData {
         response_body: T,
     ) -> ResponseResult {
         if let Some(stream_lock) = self.get_stream().await {
-            let mut controller_data: RwLockWriteInnerControllerData = self.get_write_lock().await;
-            if self.inner_is_websocket(&controller_data) {
+            let mut ctx: RwLockWriteInnerContext = self.get_write_lock().await;
+            if self.inner_is_websocket(&ctx) {
                 return Err(ResponseError::NotSupportUseThisMethod);
             }
-            let response: &mut Response = controller_data.get_mut_response();
+            let response: &mut Response = ctx.get_mut_response();
             let body: ResponseBody = response_body.into();
             let response_res: ResponseResult = response
                 .set_body(body)
@@ -497,8 +494,8 @@ impl ControllerData {
     }
 
     pub async fn judge_enable_keep_alive(&self) -> bool {
-        let controller_data: RwLockReadInnerControllerData = self.get_read_lock().await;
-        let headers: &RequestHeaders = controller_data.get_request().get_headers();
+        let ctx: RwLockReadInnerContext = self.get_read_lock().await;
+        let headers: &RequestHeaders = ctx.get_request().get_headers();
         if let Some(enable_keep_alive) = headers.iter().find_map(|(key, value)| {
             if key == CONNECTION {
                 let value_lowercase: String = value.to_ascii_lowercase();
@@ -512,10 +509,7 @@ impl ControllerData {
         }) {
             return enable_keep_alive;
         }
-        let enable_keep_alive: bool = controller_data
-            .get_request()
-            .get_version()
-            .is_http1_1_or_higher();
+        let enable_keep_alive: bool = ctx.get_request().get_version().is_http1_1_or_higher();
         return enable_keep_alive;
     }
 

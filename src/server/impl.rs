@@ -135,10 +135,10 @@ impl Server {
         F: FuncWithoutPin<Fut>,
         Fut: Future<Output = ()> + Send + 'static,
     {
-        self.get_route_func().write().await.insert(
-            route.to_string(),
-            Box::new(move |controller_data| Box::pin(func(controller_data))),
-        );
+        self.get_route_func()
+            .write()
+            .await
+            .insert(route.to_string(), Box::new(move |ctx| Box::pin(func(ctx))));
         self
     }
 
@@ -150,9 +150,7 @@ impl Server {
         self.get_request_middleware()
             .write()
             .await
-            .push(Box::new(move |controller_data| {
-                Box::pin(func(controller_data))
-            }));
+            .push(Box::new(move |ctx| Box::pin(func(ctx))));
 
         self
     }
@@ -165,9 +163,7 @@ impl Server {
         self.get_response_middleware()
             .write()
             .await
-            .push(Box::new(move |controller_data| {
-                Box::pin(func(controller_data))
-            }));
+            .push(Box::new(move |ctx| Box::pin(func(ctx))));
         self
     }
 
@@ -212,8 +208,7 @@ impl Server {
                     let mut websocket_handshake_finish: bool = false;
                     let mut history_request: Request = Request::default();
                     loop {
-                        let mut inner_controller_data: InnerControllerData =
-                            InnerControllerData::default();
+                        let mut inner_ctx: InnerContext = InnerContext::default();
                         let request_obj_result: Result<Request, ServerError> =
                             Self::get_request_obj_result(
                                 &stream_arc,
@@ -225,10 +220,7 @@ impl Server {
                             .map_err(|err| ServerError::InvalidHttpRequest(err));
                         let init_enable_websocket_opt: bool = enable_websocket_opt.is_some();
                         if request_obj_result.is_err() && !init_enable_websocket_opt {
-                            let _ = inner_controller_data
-                                .get_mut_response()
-                                .close(&stream_arc)
-                                .await;
+                            let _ = inner_ctx.get_mut_response().close(&stream_arc).await;
                             return;
                         }
                         let mut request_obj: Request = request_obj_result.unwrap_or_default();
@@ -239,38 +231,35 @@ impl Server {
                             history_request = request_obj.clone();
                         }
                         let route: String = request_obj.get_path().clone();
-                        inner_controller_data
+                        inner_ctx
                             .set_stream(Some(stream_arc.clone()))
                             .set_request(request_obj)
                             .set_log(log.clone());
-                        let controller_data: ControllerData =
-                            ControllerData::from_controller_data(inner_controller_data);
+                        let ctx: Context = Context::from_inner_context(inner_ctx);
                         if !init_enable_websocket_opt {
-                            enable_websocket_opt =
-                                Some(controller_data.judge_enable_websocket().await);
+                            enable_websocket_opt = Some(ctx.judge_enable_websocket().await);
                         }
                         let enable_websocket: bool = enable_websocket_opt.unwrap_or_default();
                         if enable_websocket {
-                            let handle_res: ResponseResult = controller_data
-                                .handle_websocket(&mut websocket_handshake_finish)
-                                .await;
+                            let handle_res: ResponseResult =
+                                ctx.handle_websocket(&mut websocket_handshake_finish).await;
                             if handle_res.is_err() {
-                                let _ = controller_data.close().await;
+                                let _ = ctx.close().await;
                                 return;
                             }
                         }
                         for request_middleware in request_middleware_arc_lock.read().await.iter() {
-                            request_middleware(controller_data.clone()).await;
+                            request_middleware(ctx.clone()).await;
                         }
                         if let Some(route_func) = route_func_arc_lock.read().await.get(&route) {
-                            route_func(controller_data.clone()).await;
+                            route_func(ctx.clone()).await;
                         }
                         for response_middleware in response_middleware_arc_lock.read().await.iter()
                         {
-                            response_middleware(controller_data.clone()).await;
+                            response_middleware(ctx.clone()).await;
                         }
-                        if controller_data.judge_unenable_keep_alive().await && !enable_websocket {
-                            let _ = controller_data.close().await;
+                        if ctx.judge_unenable_keep_alive().await && !enable_websocket {
+                            let _ = ctx.close().await;
                             return;
                         }
                         yield_now().await;
