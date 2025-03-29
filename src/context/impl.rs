@@ -69,7 +69,7 @@ impl Context {
         socket_addr
     }
 
-    pub async fn get_socket_addr_string(&self) -> Option<String> {
+    pub async fn get_socket_addr_string(&self) -> OptionString {
         self.get_socket_addr().await.map(|data| data.to_string())
     }
 
@@ -287,7 +287,7 @@ impl Context {
     pub async fn get_request_query<T: Into<RequestHeadersKey>>(
         &self,
         key: T,
-    ) -> Option<RequestQuerysValue> {
+    ) -> OptionRequestQuerysValue {
         self.get_read_lock()
             .await
             .get_request()
@@ -304,7 +304,7 @@ impl Context {
         String::from_utf8_lossy(self.get_read_lock().await.get_request().get_body()).to_string()
     }
 
-    pub async fn get_request_header<K>(&self, key: K) -> Option<RequestHeadersValue>
+    pub async fn get_request_header<K>(&self, key: K) -> OptionRequestHeadersValue
     where
         K: Into<RequestHeadersKey>,
     {
@@ -415,7 +415,7 @@ impl Context {
             .clone()
     }
 
-    pub async fn get_response_header<K>(&self, key: K) -> Option<ResponseHeadersValue>
+    pub async fn get_response_header<K>(&self, key: K) -> OptionResponseHeadersValue
     where
         K: Into<ResponseHeadersKey>,
     {
@@ -523,14 +523,14 @@ impl Context {
             .get_request()
             .get_headers()
             .iter()
-            .any(|(key, value)| key == UPGRADE && value.to_ascii_lowercase() == (WEBSOCKET))
+            .any(|(key, value)| key == UPGRADE && value.to_ascii_lowercase() == WEBSOCKET)
     }
 
     pub(crate) async fn handle_websocket(&self, is_handshake: &mut bool) -> ResponseResult {
         if *is_handshake {
             return Ok(());
         }
-        let key_opt: Option<String> = self.get_request_header(SEC_WEBSOCKET_KEY).await;
+        let key_opt: OptionString = self.get_request_header(SEC_WEBSOCKET_KEY).await;
         if let Some(key) = key_opt {
             let accept_key: String = WebSocketFrame::generate_accept_key(&key);
             return self

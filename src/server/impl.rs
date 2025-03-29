@@ -201,7 +201,7 @@ impl Server {
             let route_func_arc_lock: ArcRwLockHashMapRouteFuncBox = self.get_route_func().clone();
             let handle_request = move || async move {
                 let log: Log = tmp_arc_lock.read().await.get_log().clone();
-                let mut enable_websocket_opt: Option<bool> = None;
+                let mut enable_websocket_opt: OptionBool = None;
                 let mut websocket_handshake_finish: bool = false;
                 let mut history_request: Request = Request::default();
                 loop {
