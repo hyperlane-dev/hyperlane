@@ -90,7 +90,7 @@ impl Context {
     }
 
     fn inner_is_websocket(&self, ctx: &RwLockWriteInnerContext) -> bool {
-        return ctx.get_request().get_upgrade_type().is_websocket();
+        ctx.get_request().get_upgrade_type().is_websocket()
     }
 
     async fn inner_send_response<T: Into<ResponseBody>>(
