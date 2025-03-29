@@ -65,7 +65,7 @@ async fn test_server_basic_usage() {
                 }),
             )
             .await;
-        server.listen().await;
+        server.listen().await.unwrap();
     }
 
     recoverable_spawn::r#async::recoverable_spawn(main);

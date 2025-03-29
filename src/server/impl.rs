@@ -180,95 +180,90 @@ impl Server {
         }
     }
 
-    pub async fn listen(&self) -> &Self {
-        {
-            self.init().await;
-            let cfg: ServerConfig<'_> = self.get_cfg().read().await.clone();
-            let host: &str = *cfg.get_host();
-            let port: usize = *cfg.get_port();
-            let websocket_buffer_size: usize = *cfg.get_websocket_buffer_size();
-            let http_line_buffer_size: usize = *cfg.get_http_line_buffer_size();
-            let addr: String = format!("{}{}{}", host, COLON_SPACE_SYMBOL, port);
-            let tcp_listener: TcpListener = TcpListener::bind(&addr)
-                .await
-                .map_err(|err| ServerError::TcpBindError(err.to_string()))
-                .unwrap();
-            while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
-                let tmp_arc_lock: ArcRwLockTmp = self.get_tmp().clone();
-                let stream_arc: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
-                let request_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =
-                    self.get_request_middleware().clone();
-                let response_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =
-                    self.get_response_middleware().clone();
-                let route_func_arc_lock: ArcRwLockHashMapRouteFuncBox =
-                    self.get_route_func().clone();
-                let handle_request = move || async move {
-                    let log: Log = tmp_arc_lock.read().await.get_log().clone();
-                    let mut enable_websocket_opt: Option<bool> = None;
-                    let mut websocket_handshake_finish: bool = false;
-                    let mut history_request: Request = Request::default();
-                    loop {
-                        let mut inner_ctx: InnerContext = InnerContext::default();
-                        let request_obj_result: Result<Request, ServerError> =
-                            Self::get_request_obj_result(
-                                &stream_arc,
-                                http_line_buffer_size,
-                                websocket_handshake_finish,
-                                websocket_buffer_size,
-                            )
-                            .await
-                            .map_err(|err| ServerError::InvalidHttpRequest(err));
-                        let init_enable_websocket_opt: bool = enable_websocket_opt.is_some();
-                        if request_obj_result.is_err() && !init_enable_websocket_opt {
-                            let _ = inner_ctx.get_mut_response().close(&stream_arc).await;
-                            return;
-                        }
-                        let mut request_obj: Request = request_obj_result.unwrap_or_default();
-                        if websocket_handshake_finish {
-                            history_request.set_body(request_obj.get_body().clone());
-                            request_obj = history_request.clone();
-                        } else if !init_enable_websocket_opt {
-                            history_request = request_obj.clone();
-                        }
-                        let route: String = request_obj.get_path().clone();
-                        inner_ctx
-                            .set_stream(Some(stream_arc.clone()))
-                            .set_request(request_obj)
-                            .set_log(log.clone());
-                        let ctx: Context = Context::from_inner_context(inner_ctx);
-                        if !init_enable_websocket_opt {
-                            enable_websocket_opt = Some(ctx.judge_enable_websocket().await);
-                        }
-                        let enable_websocket: bool = enable_websocket_opt.unwrap_or_default();
-                        if enable_websocket {
-                            let handle_res: ResponseResult =
-                                ctx.handle_websocket(&mut websocket_handshake_finish).await;
-                            if handle_res.is_err() {
-                                let _ = ctx.close().await;
-                                return;
-                            }
-                        }
-                        for request_middleware in request_middleware_arc_lock.read().await.iter() {
-                            request_middleware(ctx.clone()).await;
-                        }
-                        if let Some(route_func) = route_func_arc_lock.read().await.get(&route) {
-                            route_func(ctx.clone()).await;
-                        }
-                        for response_middleware in response_middleware_arc_lock.read().await.iter()
-                        {
-                            response_middleware(ctx.clone()).await;
-                        }
-                        if ctx.judge_unenable_keep_alive().await && !enable_websocket {
+    pub async fn listen(&self) -> ServerResult {
+        self.init().await;
+        let cfg: ServerConfig<'_> = self.get_cfg().read().await.clone();
+        let host: &str = *cfg.get_host();
+        let port: usize = *cfg.get_port();
+        let websocket_buffer_size: usize = *cfg.get_websocket_buffer_size();
+        let http_line_buffer_size: usize = *cfg.get_http_line_buffer_size();
+        let addr: String = Context::format_host_port(host, &port);
+        let tcp_listener: TcpListener = TcpListener::bind(&addr)
+            .await
+            .map_err(|err| ServerError::TcpBindError(err.to_string()))?;
+        while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
+            let tmp_arc_lock: ArcRwLockTmp = self.get_tmp().clone();
+            let stream_arc: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
+            let request_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =
+                self.get_request_middleware().clone();
+            let response_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =
+                self.get_response_middleware().clone();
+            let route_func_arc_lock: ArcRwLockHashMapRouteFuncBox = self.get_route_func().clone();
+            let handle_request = move || async move {
+                let log: Log = tmp_arc_lock.read().await.get_log().clone();
+                let mut enable_websocket_opt: Option<bool> = None;
+                let mut websocket_handshake_finish: bool = false;
+                let mut history_request: Request = Request::default();
+                loop {
+                    let mut inner_ctx: InnerContext = InnerContext::default();
+                    let request_obj_result: ServerRequestHandleResult =
+                        Self::get_request_obj_result(
+                            &stream_arc,
+                            http_line_buffer_size,
+                            websocket_handshake_finish,
+                            websocket_buffer_size,
+                        )
+                        .await
+                        .map_err(|err| ServerError::InvalidHttpRequest(err));
+                    let init_enable_websocket_opt: bool = enable_websocket_opt.is_some();
+                    if request_obj_result.is_err() && !init_enable_websocket_opt {
+                        let _ = inner_ctx.get_mut_response().close(&stream_arc).await;
+                        return;
+                    }
+                    let mut request_obj: Request = request_obj_result.unwrap_or_default();
+                    if websocket_handshake_finish {
+                        history_request.set_body(request_obj.get_body().clone());
+                        request_obj = history_request.clone();
+                    } else if !init_enable_websocket_opt {
+                        history_request = request_obj.clone();
+                    }
+                    let route: String = request_obj.get_path().clone();
+                    inner_ctx
+                        .set_stream(Some(stream_arc.clone()))
+                        .set_request(request_obj)
+                        .set_log(log.clone());
+                    let ctx: Context = Context::from_inner_context(inner_ctx);
+                    if !init_enable_websocket_opt {
+                        enable_websocket_opt = Some(ctx.judge_enable_websocket().await);
+                    }
+                    let enable_websocket: bool = enable_websocket_opt.unwrap_or_default();
+                    if enable_websocket {
+                        let handle_res: ResponseResult =
+                            ctx.handle_websocket(&mut websocket_handshake_finish).await;
+                        if handle_res.is_err() {
                             let _ = ctx.close().await;
                             return;
                         }
-                        yield_now().await;
                     }
-                };
-                tokio::spawn(handle_request());
-            }
+                    for request_middleware in request_middleware_arc_lock.read().await.iter() {
+                        request_middleware(ctx.clone()).await;
+                    }
+                    if let Some(route_func) = route_func_arc_lock.read().await.get(&route) {
+                        route_func(ctx.clone()).await;
+                    }
+                    for response_middleware in response_middleware_arc_lock.read().await.iter() {
+                        response_middleware(ctx.clone()).await;
+                    }
+                    if ctx.judge_unenable_keep_alive().await && !enable_websocket {
+                        let _ = ctx.close().await;
+                        return;
+                    }
+                    yield_now().await;
+                }
+            };
+            tokio::spawn(handle_request());
         }
-        self
+        Ok(())
     }
 
     async fn init_panic_hook(&self) {

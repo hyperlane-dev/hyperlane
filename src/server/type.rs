@@ -1,5 +1,8 @@
 use crate::*;
 
+pub type ServerResult = Result<(), ServerError>;
+pub type ServerRequestHandleResult = Result<Request, ServerError>;
+
 #[derive(Clone, Lombok)]
 pub struct Server {
     pub(super) cfg: ArcRwLock<ServerConfig<'static>>,

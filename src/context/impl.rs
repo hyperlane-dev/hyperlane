@@ -548,4 +548,8 @@ impl Context {
         }
         Err(ResponseError::WebSocketHandShakeError)
     }
+
+    pub fn format_host_port(host: &str, port: &usize) -> String {
+        format!("{}{}{}", host, COLON_SPACE_SYMBOL, port)
+    }
 }

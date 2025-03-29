@@ -102,7 +102,7 @@ async fn main() {
             }),
         )
         .await;
-    server.listen().await;
+    server.listen().await.unwrap();
 }
 ```
 
