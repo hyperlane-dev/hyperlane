@@ -10,7 +10,7 @@ pub struct InnerContext {
     request: Request,
     response: Response,
     log: Log,
-    data: HashMapArcAnySendSync,
+    attribute: HashMapArcAnySendSync,
 }
 
 #[derive(Clone, Default)]

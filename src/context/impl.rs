@@ -553,30 +553,30 @@ impl Context {
         format!("{}{}{}", host, COLON_SPACE_SYMBOL, port)
     }
 
-    pub async fn set_data_value<T: AnySendSyncClone>(&self, key: &str, value: &T) -> &Self {
+    pub async fn set_attribute<T: AnySendSyncClone>(&self, key: &str, value: &T) -> &Self {
         self.get_write_lock()
             .await
-            .get_mut_data()
+            .get_mut_attribute()
             .insert(key.to_owned(), Arc::new(value.clone()));
         self
     }
 
-    pub async fn get_data_value<T: AnySendSyncClone>(&self, key: &str) -> Option<T> {
+    pub async fn get_attribute<T: AnySendSyncClone>(&self, key: &str) -> Option<T> {
         self.get_read_lock()
             .await
-            .get_data()
+            .get_attribute()
             .get(key)
             .and_then(|arc| arc.downcast_ref::<T>())
             .cloned()
     }
 
-    pub async fn remove_data_value(&self, key: &str) -> &Self {
-        self.get_write_lock().await.get_mut_data().remove(key);
+    pub async fn remove_attribute(&self, key: &str) -> &Self {
+        self.get_write_lock().await.get_mut_attribute().remove(key);
         self
     }
 
-    pub async fn clear_data(&self) -> &Self {
-        self.get_write_lock().await.get_mut_data().clear();
+    pub async fn clear_attribute(&self) -> &Self {
+        self.get_write_lock().await.get_mut_attribute().clear();
         self
     }
 }
