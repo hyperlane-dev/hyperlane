@@ -11,4 +11,6 @@ pub struct ServerConfig<'a> {
     pub(super) websocket_buffer_size: usize,
     pub(super) http_line_buffer_size: usize,
     pub(super) nodelay: bool,
+    pub(super) linger: OptionDuration,
+    pub(super) ttl: OptionU32,
 }

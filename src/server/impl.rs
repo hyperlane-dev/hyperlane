@@ -144,6 +144,26 @@ impl Server {
         self
     }
 
+    pub async fn set_linger(&self, linger: Option<Duration>) -> &Self {
+        self.get_cfg().write().await.set_linger(linger);
+        self
+    }
+
+    pub async fn enable_linger(&self, linger: Duration) -> &Self {
+        self.set_linger(Some(linger)).await;
+        self
+    }
+
+    pub async fn disable_linger(&self) -> &Self {
+        self.set_linger(None).await;
+        self
+    }
+
+    pub async fn set_ttl(&self, ttl: u32) -> &Self {
+        self.get_cfg().write().await.set_ttl(Some(ttl));
+        self
+    }
+
     pub async fn route<R, F, Fut>(&self, route: R, func: F) -> &Self
     where
         R: ToString,
@@ -198,19 +218,24 @@ impl Server {
     pub async fn listen(&self) -> ServerResult {
         self.init().await;
         let cfg: ServerConfig<'_> = self.get_cfg().read().await.clone();
-        let tmp: ArcRwLockTmp = self.get_tmp().clone();
+        let log: Log = self.get_tmp().read().await.get_log().clone();
         let host: &str = *cfg.get_host();
         let port: usize = *cfg.get_port();
         let nodelay: bool = *cfg.get_nodelay();
+        let linger: Option<Duration> = *cfg.get_linger();
+        let ttl_opt: Option<u32> = *cfg.get_ttl();
         let websocket_buffer_size: usize = *cfg.get_websocket_buffer_size();
         let http_line_buffer_size: usize = *cfg.get_http_line_buffer_size();
         let addr: String = Context::format_host_port(host, &port);
         let tcp_listener: TcpListener = TcpListener::bind(&addr)
             .await
             .map_err(|err| ServerError::TcpBindError(err.to_string()))?;
-        let log: Log = tmp.read().await.get_log().clone();
         while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
             let _ = stream.set_nodelay(nodelay);
+            let _ = stream.set_linger(linger);
+            if let Some(ttl) = ttl_opt {
+                let _ = stream.set_ttl(ttl);
+            }
             let log_clone: Log = log.clone();
             let stream_arc: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
             let request_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =

@@ -12,6 +12,8 @@ impl<'a> Default for ServerConfig<'a> {
             websocket_buffer_size: DEFAULT_BUFFER_SIZE,
             http_line_buffer_size: DEFAULT_BUFFER_SIZE,
             nodelay: DEFAULT_NODELAY,
+            linger: DEFAULT_LINGER,
+            ttl: DEFAULT_TTI,
         }
     }
 }

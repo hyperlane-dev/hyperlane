@@ -9,5 +9,5 @@ pub struct Server {
     pub(super) route_func: ArcRwLockHashMapRouteFuncBox,
     pub(super) request_middleware: ArcRwLockMiddlewareFuncBox,
     pub(super) response_middleware: ArcRwLockMiddlewareFuncBox,
-    pub(super) tmp: ArcRwLock<Tmp>,
+    pub(super) tmp: ArcRwLockTmp,
 }
