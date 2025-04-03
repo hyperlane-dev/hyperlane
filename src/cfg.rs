@@ -44,6 +44,7 @@ async fn test_server_basic_usage() {
         let server: Server = Server::new();
         server.host("0.0.0.0").await;
         server.port(60000).await;
+        server.enable_nodelay().await;
         server.log_dir("./logs").await;
         server.enable_inner_log().await;
         server.enable_inner_print().await;

@@ -10,4 +10,5 @@ pub struct ServerConfig<'a> {
     pub(super) inner_log: bool,
     pub(super) websocket_buffer_size: usize,
     pub(super) http_line_buffer_size: usize,
+    pub(super) nodelay: bool,
 }

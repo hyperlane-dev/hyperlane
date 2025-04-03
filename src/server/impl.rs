@@ -129,6 +129,21 @@ impl Server {
         self
     }
 
+    pub async fn set_nodelay(&self, nodelay: bool) -> &Self {
+        self.get_cfg().write().await.set_nodelay(nodelay);
+        self
+    }
+
+    pub async fn enable_nodelay(&self) -> &Self {
+        self.set_nodelay(true).await;
+        self
+    }
+
+    pub async fn disable_nodelay(&self) -> &Self {
+        self.set_nodelay(false).await;
+        self
+    }
+
     pub async fn route<R, F, Fut>(&self, route: R, func: F) -> &Self
     where
         R: ToString,
@@ -183,16 +198,20 @@ impl Server {
     pub async fn listen(&self) -> ServerResult {
         self.init().await;
         let cfg: ServerConfig<'_> = self.get_cfg().read().await.clone();
+        let tmp: ArcRwLockTmp = self.get_tmp().clone();
         let host: &str = *cfg.get_host();
         let port: usize = *cfg.get_port();
+        let nodelay: bool = *cfg.get_nodelay();
         let websocket_buffer_size: usize = *cfg.get_websocket_buffer_size();
         let http_line_buffer_size: usize = *cfg.get_http_line_buffer_size();
         let addr: String = Context::format_host_port(host, &port);
         let tcp_listener: TcpListener = TcpListener::bind(&addr)
             .await
             .map_err(|err| ServerError::TcpBindError(err.to_string()))?;
+        let log: Log = tmp.read().await.get_log().clone();
         while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
-            let tmp_arc_lock: ArcRwLockTmp = self.get_tmp().clone();
+            let _ = stream.set_nodelay(nodelay);
+            let log_clone: Log = log.clone();
             let stream_arc: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
             let request_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =
                 self.get_request_middleware().clone();
@@ -200,7 +219,6 @@ impl Server {
                 self.get_response_middleware().clone();
             let route_func_arc_lock: ArcRwLockHashMapRouteFuncBox = self.get_route_func().clone();
             let handle_request = move || async move {
-                let log: Log = tmp_arc_lock.read().await.get_log().clone();
                 let mut enable_websocket_opt: OptionBool = None;
                 let mut websocket_handshake_finish: bool = false;
                 let mut history_request: Request = Request::default();
@@ -231,7 +249,7 @@ impl Server {
                     inner_ctx
                         .set_stream(Some(stream_arc.clone()))
                         .set_request(request_obj)
-                        .set_log(log.clone());
+                        .set_log(log_clone.clone());
                     let ctx: Context = Context::from_inner_context(inner_ctx);
                     if !init_enable_websocket_opt {
                         enable_websocket_opt = Some(ctx.judge_enable_websocket().await);
