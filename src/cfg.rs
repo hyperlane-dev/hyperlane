@@ -68,6 +68,5 @@ async fn test_server_basic_usage() {
         server.listen().await.unwrap();
     }
 
-    recoverable_spawn::r#async::recoverable_spawn(main);
-    std::thread::sleep(std::time::Duration::from_secs(10));
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(60), main()).await;
 }
