@@ -297,7 +297,7 @@ impl Server {
                     for response_middleware in response_middleware_arc_lock.read().await.iter() {
                         response_middleware(ctx.clone()).await;
                     }
-                    if ctx.judge_unenable_keep_alive().await && !enable_websocket {
+                    if ctx.judge_disable_keep_alive().await && !enable_websocket {
                         let _ = ctx.close().await;
                         return;
                     }

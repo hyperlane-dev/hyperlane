@@ -525,7 +525,7 @@ impl Context {
         return enable_keep_alive;
     }
 
-    pub async fn judge_unenable_keep_alive(&self) -> bool {
+    pub async fn judge_disable_keep_alive(&self) -> bool {
         !self.judge_enable_keep_alive().await
     }
 
