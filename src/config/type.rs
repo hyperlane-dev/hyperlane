@@ -1,7 +1,9 @@
 use crate::*;
 
+pub(crate) type ArcRwLockServerConfig<'a> = ArcRwLock<ServerConfig<'a>>;
+
 #[derive(Clone, Debug, Lombok)]
-pub struct ServerConfig<'a> {
+pub(crate) struct ServerConfig<'a> {
     pub(super) host: &'a str,
     pub(super) port: usize,
     pub(super) log_dir: &'a str,

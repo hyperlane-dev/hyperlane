@@ -1,3 +1,3 @@
 use crate::*;
 
-pub type ArcRwLockMiddlewareFuncBox = ArcRwLock<VecArcFunc>;
+pub(crate) type ArcRwLockMiddlewareFuncBox = ArcRwLock<VecArcFunc>;

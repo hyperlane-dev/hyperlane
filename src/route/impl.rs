@@ -56,7 +56,7 @@ impl RouteMatcher {
     }
 
     pub fn add(&mut self, pattern: &str, handler: ArcFunc) {
-        let route_pattern = RoutePattern::new(pattern);
+        let route_pattern: RoutePattern = RoutePattern::new(pattern);
         self.0.push((route_pattern, handler));
     }
 
@@ -67,13 +67,5 @@ impl RouteMatcher {
             }
         }
         None
-    }
-
-    pub fn from_hash_map(map: &HashMapRouteFuncBox) -> Self {
-        let mut matcher: RouteMatcher = Self::new();
-        for (route, handler) in map.iter() {
-            matcher.add(route, handler.clone());
-        }
-        matcher
     }
 }

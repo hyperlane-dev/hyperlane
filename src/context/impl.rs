@@ -114,11 +114,24 @@ impl Context {
         self
     }
 
-    pub async fn add_route_param(&self, name: String, value: String) -> &Self {
+    pub async fn add_route_param(&self, name: &str, value: &str) -> &Self {
         self.get_write_lock()
             .await
             .get_mut_route_params()
-            .insert(name, value);
+            .insert(name.to_owned(), value.to_owned());
+        self
+    }
+
+    pub async fn remove_route_param(&self, name: &str) -> &Self {
+        self.get_write_lock()
+            .await
+            .get_mut_route_params()
+            .remove(name);
+        self
+    }
+
+    pub async fn clear_route_param(&self) -> &Self {
+        self.get_write_lock().await.get_mut_route_params().clear();
         self
     }
 

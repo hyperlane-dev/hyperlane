@@ -95,7 +95,7 @@ async fn main() {
     let test_string: String = "Hello hyperlane".to_owned();
     server
         .route(
-            "/test/:text/",
+            "/test/:text",
             async_func!(test_string, |ctx| {
                 let param: RouteParams = ctx.get_route_params().await;
                 print_success!(format!("{:?}", param));

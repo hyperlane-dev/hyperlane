@@ -1,20 +1,31 @@
 use crate::*;
 
 pub type ServerResult = Result<(), ServerError>;
-pub type ServerRequestHandleResult = Result<Request, ServerError>;
 
 #[derive(Clone, Lombok)]
 pub struct Server {
-    pub(super) cfg: ArcRwLock<ServerConfig<'static>>,
+    #[get(pub(crate))]
+    #[set(pub(crate))]
+    pub(super) cfg: ArcRwLockServerConfig<'static>,
+    #[get(pub(crate))]
+    #[set(pub(crate))]
     pub(super) route: ArcRwLockHashMapRouteFuncBox,
+    #[get(pub(crate))]
+    #[set(pub(crate))]
     pub(super) route_matcher: ArcRwLockRouteMatcher,
+    #[get(pub(crate))]
+    #[set(pub(crate))]
     pub(super) request_middleware: ArcRwLockMiddlewareFuncBox,
+    #[get(pub(crate))]
+    #[set(pub(crate))]
     pub(super) response_middleware: ArcRwLockMiddlewareFuncBox,
+    #[get(pub(crate))]
+    #[set(pub(crate))]
     pub(super) tmp: ArcRwLockTmp,
 }
 
 #[derive(Clone)]
-pub struct RequestHandlerImmutableParams<'a> {
+pub(crate) struct RequestHandlerImmutableParams<'a> {
     pub(super) stream: &'a ArcRwLockStream,
     pub(super) log: &'a Log,
     pub(super) buffer_size: usize,
