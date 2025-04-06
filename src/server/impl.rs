@@ -317,7 +317,7 @@ impl Server {
             if let Some((handler_func, params)) =
                 handler.route_matcher.read().await.match_route(route)
             {
-                ctx.set_route_params(params).await;
+                ctx.set_route_params(&params).await;
                 handler_func(ctx.clone()).await;
             }
         }

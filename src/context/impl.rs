@@ -97,20 +97,33 @@ impl Context {
             .map(|socket_addr: SocketAddr| socket_addr.ip())
     }
 
+    pub async fn get_route_params_lock(&self) -> ArcRwLockRouteParams {
+        self.get_read_lock().await.get_route_params().clone()
+    }
+
+    pub async fn get_route_params(&self) -> RouteParams {
+        self.get_read_lock()
+            .await
+            .get_route_params()
+            .read()
+            .await
+            .clone()
+    }
+
     pub async fn get_route_param(&self, name: &str) -> Option<String> {
         self.get_read_lock()
             .await
             .get_route_params()
+            .read()
+            .await
             .get(name)
             .cloned()
     }
 
-    pub async fn get_route_params(&self) -> RouteParams {
-        self.get_read_lock().await.get_route_params().clone()
-    }
-
-    pub async fn set_route_params(&self, params: RouteParams) -> &Self {
-        self.get_write_lock().await.set_route_params(params);
+    pub async fn set_route_params(&self, params: &RouteParams) -> &Self {
+        self.get_write_lock()
+            .await
+            .set_route_params(arc_rwlock(params.clone()));
         self
     }
 
@@ -118,6 +131,8 @@ impl Context {
         self.get_write_lock()
             .await
             .get_mut_route_params()
+            .write()
+            .await
             .insert(name.to_owned(), value.to_owned());
         self
     }
@@ -126,12 +141,19 @@ impl Context {
         self.get_write_lock()
             .await
             .get_mut_route_params()
+            .write()
+            .await
             .remove(name);
         self
     }
 
     pub async fn clear_route_param(&self) -> &Self {
-        self.get_write_lock().await.get_mut_route_params().clear();
+        self.get_write_lock()
+            .await
+            .get_mut_route_params()
+            .write()
+            .await
+            .clear();
         self
     }
 

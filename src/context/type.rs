@@ -11,7 +11,7 @@ pub struct InnerContext {
     response: Response,
     log: Log,
     attribute: HashMapArcAnySendSync,
-    route_params: RouteParams,
+    route_params: ArcRwLockRouteParams,
 }
 
 #[derive(Clone, Default)]
