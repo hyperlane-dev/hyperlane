@@ -97,6 +97,31 @@ impl Context {
             .map(|socket_addr: SocketAddr| socket_addr.ip())
     }
 
+    pub async fn get_route_param(&self, name: &str) -> Option<String> {
+        self.get_read_lock()
+            .await
+            .get_route_params()
+            .get(name)
+            .cloned()
+    }
+
+    pub async fn get_route_params(&self) -> RouteParams {
+        self.get_read_lock().await.get_route_params().clone()
+    }
+
+    pub async fn set_route_params(&self, params: RouteParams) -> &Self {
+        self.get_write_lock().await.set_route_params(params);
+        self
+    }
+
+    pub async fn add_route_param(&self, name: String, value: String) -> &Self {
+        self.get_write_lock()
+            .await
+            .get_mut_route_params()
+            .insert(name, value);
+        self
+    }
+
     pub async fn get_socket_port(&self) -> OptionSocketPort {
         self.get_socket_addr()
             .await

@@ -7,6 +7,7 @@ pub type ServerRequestHandleResult = Result<Request, ServerError>;
 pub struct Server {
     pub(super) cfg: ArcRwLock<ServerConfig<'static>>,
     pub(super) route: ArcRwLockHashMapRouteFuncBox,
+    pub(super) route_matcher: ArcRwLockRouteMatcher,
     pub(super) request_middleware: ArcRwLockMiddlewareFuncBox,
     pub(super) response_middleware: ArcRwLockMiddlewareFuncBox,
     pub(super) tmp: ArcRwLockTmp,
@@ -20,4 +21,5 @@ pub struct RequestHandlerImmutableParams<'a> {
     pub(super) request_middleware: &'a ArcRwLockMiddlewareFuncBox,
     pub(super) response_middleware: &'a ArcRwLockMiddlewareFuncBox,
     pub(super) route_func: &'a ArcRwLockHashMapRouteFuncBox,
+    pub(super) route_matcher: &'a ArcRwLockRouteMatcher,
 }

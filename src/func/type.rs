@@ -1,4 +1,4 @@
 use crate::*;
 
-pub type BoxFunc = Box<dyn Func>;
-pub type VecBoxFunc = Vec<BoxFunc>;
+pub type ArcFunc = Arc<dyn Func>;
+pub type VecArcFunc = Vec<ArcFunc>;

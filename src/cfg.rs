@@ -59,11 +59,12 @@ async fn test_server_basic_usage() {
         let test_string: String = "Hello hyperlane".to_owned();
         server
             .route(
-                "/test/panic",
+                "/test/:text/",
                 async_func!(test_string, |ctx| {
+                    let param: RouteParams = ctx.get_route_params().await;
+                    print_success!(format!("{:?}", param));
                     println_success!(test_string);
-                    println_success!(ctx.get_request().await.get_string());
-                    panic!("Test panic\ndata: test");
+                    panic!("Test panic\n\ndata: test");
                 }),
             )
             .await;

@@ -5,6 +5,7 @@ impl Default for Server {
         Self {
             cfg: arc_rwlock(ServerConfig::default()),
             route: arc_rwlock(hash_map_xxhash3_64()),
+            route_matcher: arc_rwlock(RouteMatcher::new()),
             request_middleware: arc_rwlock(vec![]),
             response_middleware: arc_rwlock(vec![]),
             tmp: arc_rwlock(Tmp::default()),
@@ -170,10 +171,16 @@ impl Server {
         F: FuncWithoutPin<Fut>,
         Fut: Future<Output = ()> + Send + 'static,
     {
+        let route_str: String = route.to_string();
+        let arc_func = Arc::new(move |ctx| {
+            Box::pin(func(ctx))
+                as Pin<Box<(dyn std::future::Future<Output = ()> + std::marker::Send + 'static)>>
+        });
         self.get_route()
             .write()
             .await
-            .insert(route.to_string(), Box::new(move |ctx| Box::pin(func(ctx))));
+            .insert(route_str.clone(), arc_func.clone());
+        self.route_matcher.write().await.add(&route_str, arc_func);
         self
     }
 
@@ -185,8 +192,7 @@ impl Server {
         self.get_request_middleware()
             .write()
             .await
-            .push(Box::new(move |ctx| Box::pin(func(ctx))));
-
+            .push(Arc::new(move |ctx| Box::pin(func(ctx))));
         self
     }
 
@@ -198,7 +204,7 @@ impl Server {
         self.get_response_middleware()
             .write()
             .await
-            .push(Box::new(move |ctx| Box::pin(func(ctx))));
+            .push(Arc::new(move |ctx| Box::pin(func(ctx))));
         self
     }
 
@@ -250,6 +256,7 @@ impl Server {
             let response_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =
                 self.get_response_middleware().clone();
             let route_func_arc_lock: ArcRwLockHashMapRouteFuncBox = self.get_route().clone();
+            let route_matcher_arc_lock: ArcRwLock<RouteMatcher> = self.route_matcher.clone();
             tokio::spawn(async move {
                 let request_result: RequestReaderHandleResult =
                     Request::http_request_from_stream(&stream, http_line_buffer_size).await;
@@ -269,6 +276,7 @@ impl Server {
                                 &request_middleware_arc_lock,
                                 &response_middleware_arc_lock,
                                 &route_func_arc_lock,
+                                &route_matcher_arc_lock,
                             );
                         Self::handle_websocket_connection(&mut handler, &mut request).await;
                     }
@@ -281,6 +289,7 @@ impl Server {
                                 &request_middleware_arc_lock,
                                 &response_middleware_arc_lock,
                                 &route_func_arc_lock,
+                                &route_matcher_arc_lock,
                             );
                         Self::handle_http_connection(&mut handler, &mut request).await;
                     }
@@ -304,6 +313,13 @@ impl Server {
         }
         if let Some(route_handler) = handler.route_func.read().await.get(route) {
             route_handler(ctx.clone()).await;
+        } else {
+            if let Some((handler_func, params)) =
+                handler.route_matcher.read().await.match_route(route)
+            {
+                ctx.set_route_params(params).await;
+                handler_func(ctx.clone()).await;
+            }
         }
         for middleware in handler.response_middleware.read().await.iter() {
             middleware(ctx.clone()).await;
@@ -360,6 +376,7 @@ impl<'a> RequestHandlerImmutableParams<'a> {
         request_middleware: &'a ArcRwLockMiddlewareFuncBox,
         response_middleware: &'a ArcRwLockMiddlewareFuncBox,
         route_func: &'a ArcRwLockHashMapRouteFuncBox,
+        route_matcher: &'a ArcRwLock<RouteMatcher>,
     ) -> Self {
         Self {
             stream,
@@ -368,6 +385,7 @@ impl<'a> RequestHandlerImmutableParams<'a> {
             request_middleware,
             response_middleware,
             route_func,
+            route_matcher,
         }
     }
 }
