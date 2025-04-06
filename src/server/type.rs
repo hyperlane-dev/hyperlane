@@ -6,7 +6,7 @@ pub type ServerResult = Result<(), ServerError>;
 pub struct Server {
     #[get(pub(crate))]
     #[set(pub(crate))]
-    pub(super) cfg: ArcRwLockServerConfig<'static>,
+    pub(super) config: ArcRwLockServerConfig<'static>,
     #[get(pub(crate))]
     #[set(pub(crate))]
     pub(super) route: ArcRwLockHashMapRouteFuncBox,

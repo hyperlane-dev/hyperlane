@@ -3,7 +3,7 @@ use crate::*;
 impl Default for Server {
     fn default() -> Self {
         Self {
-            cfg: arc_rwlock(ServerConfig::default()),
+            config: arc_rwlock(ServerConfig::default()),
             route: arc_rwlock(hash_map_xxhash3_64()),
             route_matcher: arc_rwlock(RouteMatcher::new()),
             request_middleware: arc_rwlock(vec![]),
@@ -19,17 +19,17 @@ impl Server {
     }
 
     pub async fn host(&self, host: &'static str) -> &Self {
-        self.get_cfg().write().await.set_host(host);
+        self.get_config().write().await.set_host(host);
         self
     }
 
     pub async fn port(&self, port: usize) -> &Self {
-        self.get_cfg().write().await.set_port(port);
+        self.get_config().write().await.set_port(port);
         self
     }
 
     pub async fn log_dir(&self, log_dir: &'static str) -> &Self {
-        self.get_cfg().write().await.set_log_dir(log_dir);
+        self.get_config().write().await.set_log_dir(log_dir);
         self.get_tmp()
             .write()
             .await
@@ -39,7 +39,7 @@ impl Server {
     }
 
     pub async fn log_size(&self, log_size: usize) -> &Self {
-        self.get_cfg().write().await.set_log_size(log_size);
+        self.get_config().write().await.set_log_size(log_size);
         self.get_tmp()
             .write()
             .await
@@ -49,7 +49,7 @@ impl Server {
     }
 
     pub async fn enable_log(&self) -> &Self {
-        self.get_cfg()
+        self.get_config()
             .write()
             .await
             .set_log_size(DEFAULT_LOG_FILE_SIZE);
@@ -62,7 +62,7 @@ impl Server {
     }
 
     pub async fn disable_log(&self) -> &Self {
-        self.get_cfg()
+        self.get_config()
             .write()
             .await
             .set_log_size(DISABLE_LOG_FILE_SIZE);
@@ -80,7 +80,7 @@ impl Server {
         } else {
             buffer_size
         };
-        self.get_cfg()
+        self.get_config()
             .write()
             .await
             .set_http_line_buffer_size(buffer_size);
@@ -93,7 +93,7 @@ impl Server {
         } else {
             buffer_size
         };
-        self.get_cfg()
+        self.get_config()
             .write()
             .await
             .set_websocket_buffer_size(buffer_size);
@@ -101,12 +101,12 @@ impl Server {
     }
 
     pub async fn inner_print(&self, print: bool) -> &Self {
-        self.get_cfg().write().await.set_inner_print(print);
+        self.get_config().write().await.set_inner_print(print);
         self
     }
 
     pub async fn inner_log(&self, print: bool) -> &Self {
-        self.get_cfg().write().await.set_inner_log(print);
+        self.get_config().write().await.set_inner_log(print);
         self
     }
 
@@ -131,7 +131,7 @@ impl Server {
     }
 
     pub async fn set_nodelay(&self, nodelay: bool) -> &Self {
-        self.get_cfg().write().await.set_nodelay(nodelay);
+        self.get_config().write().await.set_nodelay(nodelay);
         self
     }
 
@@ -146,7 +146,7 @@ impl Server {
     }
 
     pub async fn set_linger(&self, linger: Option<Duration>) -> &Self {
-        self.get_cfg().write().await.set_linger(linger);
+        self.get_config().write().await.set_linger(linger);
         self
     }
 
@@ -161,7 +161,7 @@ impl Server {
     }
 
     pub async fn set_ttl(&self, ttl: u32) -> &Self {
-        self.get_cfg().write().await.set_ttl(Some(ttl));
+        self.get_config().write().await.set_ttl(Some(ttl));
         self
     }
 
@@ -210,9 +210,9 @@ impl Server {
 
     async fn init_panic_hook(&self) {
         let tmp: Tmp = self.get_tmp().read().await.clone();
-        let cfg: ServerConfig<'_> = self.get_cfg().read().await.clone();
-        let enable_inner_print: bool = *cfg.get_inner_print();
-        let enable_inner_log: bool = *cfg.get_inner_log() && tmp.get_log().is_enable();
+        let config: ServerConfig<'_> = self.get_config().read().await.clone();
+        let enable_inner_print: bool = *config.get_inner_print();
+        let enable_inner_log: bool = *config.get_inner_log() && tmp.get_log().is_enable();
         set_hook(Box::new(move |err| {
             let err_string: String = err.to_string();
             if enable_inner_print {
@@ -230,15 +230,15 @@ impl Server {
 
     pub async fn listen(&self) -> ServerResult {
         self.init().await;
-        let cfg: ServerConfig<'_> = self.get_cfg().read().await.clone();
+        let config: ServerConfig<'_> = self.get_config().read().await.clone();
         let log: Log = self.get_tmp().read().await.get_log().clone();
-        let host: &str = *cfg.get_host();
-        let port: usize = *cfg.get_port();
-        let nodelay: bool = *cfg.get_nodelay();
-        let linger: Option<Duration> = *cfg.get_linger();
-        let ttl_opt: Option<u32> = *cfg.get_ttl();
-        let websocket_buffer_size: usize = *cfg.get_websocket_buffer_size();
-        let http_line_buffer_size: usize = *cfg.get_http_line_buffer_size();
+        let host: &str = *config.get_host();
+        let port: usize = *config.get_port();
+        let nodelay: bool = *config.get_nodelay();
+        let linger: Option<Duration> = *config.get_linger();
+        let ttl_opt: Option<u32> = *config.get_ttl();
+        let websocket_buffer_size: usize = *config.get_websocket_buffer_size();
+        let http_line_buffer_size: usize = *config.get_http_line_buffer_size();
         let addr: String = Context::format_host_port(host, &port);
         let tcp_listener: TcpListener = TcpListener::bind(&addr)
             .await
