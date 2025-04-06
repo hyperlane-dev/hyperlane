@@ -5,6 +5,20 @@ impl Context {
         Self(arc_rwlock(ctx))
     }
 
+    pub(crate) fn from_stream_request_log(
+        stream: &ArcRwLockStream,
+        request: &Request,
+        log: &Log,
+    ) -> Self {
+        let mut inner_ctx: InnerContext = InnerContext::default();
+        inner_ctx
+            .set_stream(Some(stream.clone()))
+            .set_request(request.clone())
+            .set_log(log.clone());
+        let ctx: Context = Context::from_inner_context(inner_ctx);
+        ctx
+    }
+
     pub async fn get(&self) -> InnerContext {
         self.get_read_lock().await.clone()
     }
@@ -505,7 +519,7 @@ impl Context {
         self
     }
 
-    pub async fn judge_enable_keep_alive(&self) -> bool {
+    pub async fn is_enable_keep_alive(&self) -> bool {
         let ctx: RwLockReadInnerContext = self.get_read_lock().await;
         let headers: &RequestHeaders = ctx.get_request().get_headers();
         if let Some(enable_keep_alive) = headers.iter().find_map(|(key, value)| {
@@ -525,23 +539,23 @@ impl Context {
         return enable_keep_alive;
     }
 
-    pub async fn judge_disable_keep_alive(&self) -> bool {
-        !self.judge_enable_keep_alive().await
+    pub async fn is_disable_keep_alive(&self) -> bool {
+        !self.is_enable_keep_alive().await
     }
 
-    pub async fn judge_enable_websocket(&self) -> bool {
+    pub async fn is_enable_websocket(&self) -> bool {
         self.get_read_lock()
             .await
             .get_request()
-            .get_headers()
-            .iter()
-            .any(|(key, value)| key == UPGRADE && value.to_ascii_lowercase() == WEBSOCKET)
+            .get_upgrade_type()
+            .is_websocket()
     }
 
-    pub(crate) async fn handle_websocket(&self, is_handshake: &mut bool) -> ResponseResult {
-        if *is_handshake {
-            return Ok(());
-        }
+    pub async fn is_disable_websocket(&self) -> bool {
+        !self.is_enable_websocket().await
+    }
+
+    pub(crate) async fn handle_websocket(&self) -> ResponseResult {
         let key_opt: OptionString = self.get_request_header(SEC_WEBSOCKET_KEY).await;
         if let Some(key) = key_opt {
             let accept_key: String = WebSocketFrame::generate_accept_key(&key);
@@ -553,10 +567,7 @@ impl Context {
                 .set_response_header(SEC_WEB_SOCKET_ACCEPT, accept_key)
                 .await
                 .inner_send_response(101, "", true)
-                .await
-                .map(|_| {
-                    *is_handshake = true;
-                });
+                .await;
         }
         Err(ResponseError::WebSocketHandShakeError)
     }
