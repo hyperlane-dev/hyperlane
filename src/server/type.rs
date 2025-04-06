@@ -13,9 +13,8 @@ pub struct Server {
 }
 
 #[derive(Clone)]
-pub struct RequestHandlerParams<'a> {
+pub struct RequestHandlerImmutableParams<'a> {
     pub(super) stream: &'a ArcRwLockStream,
-    pub(super) request: Request,
     pub(super) log: &'a Log,
     pub(super) buffer_size: usize,
     pub(super) request_middleware: &'a ArcRwLockMiddlewareFuncBox,
