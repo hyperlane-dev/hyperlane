@@ -36,8 +36,8 @@ impl RoutePattern {
         let mut params: RouteParams = hash_map_xxhash3_64();
         for (idx, segment) in self.0.iter().enumerate() {
             match segment {
-                RouteSegment::Static(s) => {
-                    if s != path_segments[idx] {
+                RouteSegment::Static(path) => {
+                    if path != path_segments[idx] {
                         return None;
                     }
                 }
@@ -57,6 +57,13 @@ impl RouteMatcher {
 
     pub fn add(&mut self, pattern: &str, handler: ArcFunc) {
         let route_pattern: RoutePattern = RoutePattern::new(pattern);
+        let has_same_pattern: bool = self
+            .0
+            .iter()
+            .any(|(tmp_pattern, _)| tmp_pattern == &route_pattern);
+        if has_same_pattern {
+            panic!("Route pattern already exists: {}", pattern);
+        }
         self.0.push((route_pattern, handler));
     }
 
