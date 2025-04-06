@@ -172,10 +172,7 @@ impl Server {
         Fut: Future<Output = ()> + Send + 'static,
     {
         let route_str: String = route.to_string();
-        let arc_func = Arc::new(move |ctx| {
-            Box::pin(func(ctx))
-                as Pin<Box<(dyn std::future::Future<Output = ()> + std::marker::Send + 'static)>>
-        });
+        let arc_func = Arc::new(move |ctx: Context| Box::pin(func(ctx)) as PinBoxFutureSend);
         self.get_route()
             .write()
             .await
@@ -192,7 +189,7 @@ impl Server {
         self.get_request_middleware()
             .write()
             .await
-            .push(Arc::new(move |ctx| Box::pin(func(ctx))));
+            .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
         self
     }
 
@@ -204,7 +201,7 @@ impl Server {
         self.get_response_middleware()
             .write()
             .await
-            .push(Arc::new(move |ctx| Box::pin(func(ctx))));
+            .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
         self
     }
 
@@ -256,7 +253,7 @@ impl Server {
             let response_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =
                 self.get_response_middleware().clone();
             let route_func_arc_lock: ArcRwLockHashMapRouteFuncBox = self.get_route().clone();
-            let route_matcher_arc_lock: ArcRwLock<RouteMatcher> = self.route_matcher.clone();
+            let route_matcher_arc_lock: ArcRwLockRouteMatcher = self.route_matcher.clone();
             tokio::spawn(async move {
                 let request_result: RequestReaderHandleResult =
                     Request::http_request_from_stream(&stream, http_line_buffer_size).await;
