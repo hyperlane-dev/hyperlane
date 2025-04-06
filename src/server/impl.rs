@@ -177,7 +177,12 @@ impl Server {
             .write()
             .await
             .insert(route_str.clone(), arc_func.clone());
-        self.route_matcher.write().await.add(&route_str, arc_func);
+        let add_route_matcher_result: ResultAddRoute =
+            self.route_matcher.write().await.add(&route_str, arc_func);
+        if let Err(err) = add_route_matcher_result {
+            println_error!(err);
+            exit(1);
+        }
         self
     }
 
@@ -350,15 +355,15 @@ impl Server {
         handler: &mut RequestHandlerImmutableParams<'a>,
         first_request: &mut Request,
     ) {
-        let handle_res: bool = Self::handle_request_common(handler, first_request).await;
-        if !handle_res {
+        let handle_result: bool = Self::handle_request_common(handler, first_request).await;
+        if !handle_result {
             return;
         }
         let stream: ArcRwLockStream = handler.stream.clone();
         let buffer_size: usize = handler.buffer_size;
         while let Ok(mut request) = Request::http_request_from_stream(&stream, buffer_size).await {
-            let handle_res: bool = Self::handle_request_common(handler, &mut request).await;
-            if !handle_res {
+            let handle_result: bool = Self::handle_request_common(handler, &mut request).await;
+            if !handle_result {
                 return;
             }
         }

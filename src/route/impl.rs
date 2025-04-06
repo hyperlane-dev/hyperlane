@@ -55,16 +55,17 @@ impl RouteMatcher {
         Self(Vec::new())
     }
 
-    pub fn add(&mut self, pattern: &str, handler: ArcFunc) {
+    pub fn add(&mut self, pattern: &str, handler: ArcFunc) -> ResultAddRoute {
         let route_pattern: RoutePattern = RoutePattern::new(pattern);
         let has_same_pattern: bool = self
             .0
             .iter()
             .any(|(tmp_pattern, _)| tmp_pattern == &route_pattern);
         if has_same_pattern {
-            panic!("Route pattern already exists: {}", pattern);
+            return Err(RouteError::DuplicatePattern(pattern.to_string()));
         }
         self.0.push((route_pattern, handler));
+        return Ok(());
     }
 
     pub fn match_route(&self, path: &str) -> OptionTupleArcFuncRouteParams {

@@ -7,6 +7,7 @@ pub(crate) type HashMapRouteFuncBox = HashMap<String, ArcFunc, BuildHasherDefaul
 pub(crate) type ArcRwLockHashMapRouteFuncBox = ArcRwLock<HashMapRouteFuncBox>;
 pub(crate) type TupleArcFuncRouteParams = (ArcFunc, RouteParams);
 pub(crate) type OptionTupleArcFuncRouteParams = Option<TupleArcFuncRouteParams>;
+pub(crate) type ResultAddRoute = Result<(), RouteError>;
 
 pub type RouteParams = HashMap<String, String, BuildHasherDefault<XxHash3_64>>;
 pub type ArcRwLockRouteParams = ArcRwLock<RouteParams>;

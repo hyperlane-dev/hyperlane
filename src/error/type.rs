@@ -7,3 +7,8 @@ pub enum ServerError {
     InvalidHttpRequest(RequestError),
     Unknown,
 }
+
+#[derive(Debug)]
+pub(crate) enum RouteError {
+    DuplicatePattern(String),
+}

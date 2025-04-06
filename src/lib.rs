@@ -39,6 +39,7 @@ pub(crate) use std::{
     net::SocketAddr,
     panic::set_hook,
     pin::Pin,
+    process::exit,
     sync::Arc,
     time::Duration,
 };
