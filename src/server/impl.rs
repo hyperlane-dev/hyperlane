@@ -4,7 +4,7 @@ impl Default for Server {
     fn default() -> Self {
         Self {
             cfg: arc_rwlock(ServerConfig::default()),
-            route_func: arc_rwlock(hash_map_xxhash3_64()),
+            route: arc_rwlock(hash_map_xxhash3_64()),
             request_middleware: arc_rwlock(vec![]),
             response_middleware: arc_rwlock(vec![]),
             tmp: arc_rwlock(Tmp::default()),
@@ -170,7 +170,7 @@ impl Server {
         F: FuncWithoutPin<Fut>,
         Fut: Future<Output = ()> + Send + 'static,
     {
-        self.get_route_func()
+        self.get_route()
             .write()
             .await
             .insert(route.to_string(), Box::new(move |ctx| Box::pin(func(ctx))));
@@ -202,19 +202,6 @@ impl Server {
         self
     }
 
-    async fn get_request_obj_result(
-        stream_arc: &ArcRwLockStream,
-        http_line_buffer_size: usize,
-        websocket_handshake_finish: bool,
-        websocket_buffer_size: usize,
-    ) -> RequestNewResult {
-        if websocket_handshake_finish {
-            Request::websocket_request_from_stream(&stream_arc, websocket_buffer_size).await
-        } else {
-            Request::http_request_from_stream(&stream_arc, http_line_buffer_size).await
-        }
-    }
-
     pub async fn listen(&self) -> ServerResult {
         self.init().await;
         let cfg: ServerConfig<'_> = self.get_cfg().read().await.clone();
@@ -237,76 +224,144 @@ impl Server {
                 let _ = stream.set_ttl(ttl);
             }
             let log_clone: Log = log.clone();
-            let stream_arc: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
+            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
             let request_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =
                 self.get_request_middleware().clone();
             let response_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =
                 self.get_response_middleware().clone();
-            let route_func_arc_lock: ArcRwLockHashMapRouteFuncBox = self.get_route_func().clone();
-            let handle_request = move || async move {
-                let mut enable_websocket_opt: OptionBool = None;
-                let mut websocket_handshake_finish: bool = false;
-                let mut history_request: Request = Request::default();
-                loop {
-                    let mut inner_ctx: InnerContext = InnerContext::default();
-                    let request_obj_result: ServerRequestHandleResult =
-                        Self::get_request_obj_result(
-                            &stream_arc,
-                            http_line_buffer_size,
-                            websocket_handshake_finish,
-                            websocket_buffer_size,
-                        )
-                        .await
-                        .map_err(|err| ServerError::InvalidHttpRequest(err));
-                    let init_enable_websocket_opt: bool = enable_websocket_opt.is_some();
-                    if request_obj_result.is_err() && !init_enable_websocket_opt {
-                        let _ = inner_ctx.get_mut_response().close(&stream_arc).await;
-                        return;
-                    }
-                    let mut request_obj: Request = request_obj_result.unwrap_or_default();
-                    if websocket_handshake_finish {
-                        history_request.set_body(request_obj.get_body().clone());
-                        request_obj = history_request.clone();
-                    } else if !init_enable_websocket_opt {
-                        history_request = request_obj.clone();
-                    }
-                    let route: String = request_obj.get_path().clone();
-                    inner_ctx
-                        .set_stream(Some(stream_arc.clone()))
-                        .set_request(request_obj)
-                        .set_log(log_clone.clone());
-                    let ctx: Context = Context::from_inner_context(inner_ctx);
-                    if !init_enable_websocket_opt {
-                        enable_websocket_opt = Some(ctx.judge_enable_websocket().await);
-                    }
-                    let enable_websocket: bool = enable_websocket_opt.unwrap_or_default();
-                    if enable_websocket {
-                        let handle_res: ResponseResult =
-                            ctx.handle_websocket(&mut websocket_handshake_finish).await;
-                        if handle_res.is_err() {
-                            let _ = ctx.close().await;
-                            return;
-                        }
-                    }
-                    for request_middleware in request_middleware_arc_lock.read().await.iter() {
-                        request_middleware(ctx.clone()).await;
-                    }
-                    if let Some(route_func) = route_func_arc_lock.read().await.get(&route) {
-                        route_func(ctx.clone()).await;
-                    }
-                    for response_middleware in response_middleware_arc_lock.read().await.iter() {
-                        response_middleware(ctx.clone()).await;
-                    }
-                    if ctx.judge_disable_keep_alive().await && !enable_websocket {
-                        let _ = ctx.close().await;
-                        return;
-                    }
-                    yield_now().await;
+            let route_func_arc_lock: ArcRwLockHashMapRouteFuncBox = self.get_route().clone();
+            tokio::spawn(async move {
+                let request_result: RequestReaderHandleResult =
+                    Request::http_request_from_stream(&stream, http_line_buffer_size).await;
+                if request_result.is_err() {
+                    let _ = stream.close().await;
+                    return;
                 }
-            };
-            tokio::spawn(handle_request());
+                let mut request: Request = request_result.unwrap_or_default();
+                let is_websocket: bool = request.get_upgrade_type().is_websocket();
+                match is_websocket {
+                    true => {
+                        Self::handle_websocket_connection(
+                            &stream,
+                            &mut request,
+                            &log_clone,
+                            websocket_buffer_size,
+                            &request_middleware_arc_lock,
+                            &response_middleware_arc_lock,
+                            &route_func_arc_lock,
+                        )
+                        .await;
+                    }
+                    false => {
+                        Self::handle_http_connection(
+                            &stream,
+                            &mut request,
+                            &log_clone,
+                            http_line_buffer_size,
+                            &request_middleware_arc_lock,
+                            &response_middleware_arc_lock,
+                            &route_func_arc_lock,
+                        )
+                        .await;
+                    }
+                };
+                let _ = stream.close().await;
+            });
         }
         Ok(())
+    }
+
+    async fn handle_websocket_connection(
+        stream: &ArcRwLockStream,
+        first_request: &mut Request,
+        log: &Log,
+        buffer_size: usize,
+        request_middleware: &ArcRwLockMiddlewareFuncBox,
+        response_middleware: &ArcRwLockMiddlewareFuncBox,
+        route_func: &ArcRwLockHashMapRouteFuncBox,
+    ) {
+        let ctx: Context = Context::from_stream_request_log(&stream, &first_request, &log);
+        if ctx.handle_websocket().await.is_err() {
+            return;
+        }
+        let route: String = first_request.get_path().clone();
+        while let Ok(request) = Request::websocket_request_from_stream(&stream, buffer_size).await {
+            first_request.set_body(request.get_body().clone());
+            ctx.set_request(first_request.clone()).await;
+            for middleware in request_middleware.read().await.iter() {
+                middleware(ctx.clone()).await;
+            }
+            if let Some(route_handler) = route_func.read().await.get(&route) {
+                route_handler(ctx.clone()).await;
+            }
+            for middleware in response_middleware.read().await.iter() {
+                middleware(ctx.clone()).await;
+            }
+            yield_now().await;
+        }
+    }
+
+    async fn handle_http_common(
+        stream: &ArcRwLockStream,
+        request: &Request,
+        log: &Log,
+        request_middleware: &ArcRwLockMiddlewareFuncBox,
+        response_middleware: &ArcRwLockMiddlewareFuncBox,
+        route_func: &ArcRwLockHashMapRouteFuncBox,
+    ) -> bool {
+        let ctx: Context = Context::from_stream_request_log(&stream, &request, &log);
+        let route: String = request.get_path().clone();
+        for middleware in request_middleware.read().await.iter() {
+            middleware(ctx.clone()).await;
+        }
+        if let Some(route_handler) = route_func.read().await.get(&route) {
+            route_handler(ctx.clone()).await;
+        }
+        for middleware in response_middleware.read().await.iter() {
+            middleware(ctx.clone()).await;
+        }
+        yield_now().await;
+        if request.is_disable_keep_alive() {
+            return false;
+        }
+        return true;
+    }
+
+    async fn handle_http_connection(
+        stream: &ArcRwLockStream,
+        first_request: &mut Request,
+        log: &Log,
+        buffer_size: usize,
+        request_middleware: &ArcRwLockMiddlewareFuncBox,
+        response_middleware: &ArcRwLockMiddlewareFuncBox,
+        route_func: &ArcRwLockHashMapRouteFuncBox,
+    ) {
+        let handle_res: bool = Self::handle_http_common(
+            &stream,
+            &first_request,
+            &log,
+            &request_middleware,
+            &response_middleware,
+            &route_func,
+        )
+        .await;
+        if !handle_res {
+            return;
+        }
+        while let Ok(request) = Request::http_request_from_stream(&stream, buffer_size).await {
+            let handle_res: bool = Self::handle_http_common(
+                &stream,
+                &request,
+                &log,
+                &request_middleware,
+                &response_middleware,
+                &route_func,
+            )
+            .await;
+            if !handle_res {
+                return;
+            }
+        }
     }
 
     async fn init_panic_hook(&self) {
