@@ -1,5 +1,5 @@
 use crate::*;
 
-pub fn handle_error(tmp: &Tmp, err_str: &str) {
-    tmp.get_log().error(err_str, common_log);
+pub fn handle_error<T: ToString>(tmp: &Tmp, err: T) {
+    tmp.get_log().error(err, common_log);
 }

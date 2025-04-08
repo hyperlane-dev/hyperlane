@@ -286,33 +286,37 @@ impl Context {
         self
     }
 
-    pub async fn log_info<L>(&self, data: &str, func: L) -> &Self
+    pub async fn log_info<T, L>(&self, data: T, func: L) -> &Self
     where
-        L: LogFuncTrait,
+        T: ToString,
+        L: LogFuncTrait<T>,
     {
         self.get_read_lock().await.get_log().info(data, func);
         self
     }
 
-    pub async fn log_debug<L>(&self, data: &str, func: L) -> &Self
+    pub async fn log_debug<T, L>(&self, data: T, func: L) -> &Self
     where
-        L: LogFuncTrait,
+        T: ToString,
+        L: LogFuncTrait<T>,
     {
         self.get_read_lock().await.get_log().debug(data, func);
         self
     }
 
-    pub async fn log_error<L>(&self, data: &str, func: L) -> &Self
+    pub async fn log_error<T, L>(&self, data: T, func: L) -> &Self
     where
-        L: LogFuncTrait,
+        T: ToString,
+        L: LogFuncTrait<T>,
     {
         self.get_read_lock().await.get_log().error(data, func);
         self
     }
 
-    pub async fn async_log_info<L>(&self, data: &str, func: L) -> &Self
+    pub async fn async_log_info<T, L>(&self, data: T, func: L) -> &Self
     where
-        L: LogFuncTrait,
+        T: ToString,
+        L: LogFuncTrait<T>,
     {
         self.get_read_lock()
             .await
@@ -322,9 +326,10 @@ impl Context {
         self
     }
 
-    pub async fn async_log_debug<L>(&self, data: &str, func: L) -> &Self
+    pub async fn async_log_debug<T, L>(&self, data: T, func: L) -> &Self
     where
-        L: LogFuncTrait,
+        T: ToString,
+        L: LogFuncTrait<T>,
     {
         self.get_read_lock()
             .await
@@ -334,9 +339,10 @@ impl Context {
         self
     }
 
-    pub async fn async_log_error<L>(&self, data: &str, func: L) -> &Self
+    pub async fn async_log_error<T, L>(&self, data: T, func: L) -> &Self
     where
-        L: LogFuncTrait,
+        T: ToString,
+        L: LogFuncTrait<T>,
     {
         self.get_read_lock()
             .await
