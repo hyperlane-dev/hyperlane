@@ -282,7 +282,7 @@ impl Context {
     }
 
     pub async fn set_log(&self, log: Log) -> &Self {
-        *self.get_write_lock().await.get_mut_log() = log;
+        self.get_write_lock().await.set_log(log);
         self
     }
 
@@ -420,7 +420,7 @@ impl Context {
     }
 
     pub async fn set_request(&self, request_data: Request) -> &Self {
-        *self.get_write_lock().await.get_mut_request() = request_data;
+        self.get_write_lock().await.set_request(request_data);
         self
     }
 
@@ -536,6 +536,11 @@ impl Context {
             .get_response()
             .get_status_code()
             .clone()
+    }
+
+    pub async fn set_response(&self, response: Response) -> &Self {
+        self.get_write_lock().await.set_response(response);
+        self
     }
 
     pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self
