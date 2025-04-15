@@ -120,40 +120,10 @@ impl Context {
             .cloned()
     }
 
-    pub async fn set_route_params(&self, params: RouteParams) -> &Self {
+    pub(crate) async fn set_route_params(&self, params: RouteParams) -> &Self {
         self.get_write_lock()
             .await
             .set_route_params(arc_rwlock(params));
-        self
-    }
-
-    pub async fn add_route_param(&self, name: &str, value: &str) -> &Self {
-        self.get_write_lock()
-            .await
-            .get_mut_route_params()
-            .write()
-            .await
-            .insert(name.to_owned(), value.to_owned());
-        self
-    }
-
-    pub async fn remove_route_param(&self, name: &str) -> &Self {
-        self.get_write_lock()
-            .await
-            .get_mut_route_params()
-            .write()
-            .await
-            .remove(name);
-        self
-    }
-
-    pub async fn clear_route_param(&self) -> &Self {
-        self.get_write_lock()
-            .await
-            .get_mut_route_params()
-            .write()
-            .await
-            .clear();
         self
     }
 
