@@ -270,7 +270,7 @@ impl Server {
                 let is_websocket: bool = request.get_upgrade_type().is_websocket();
                 match is_websocket {
                     true => {
-                        let mut handler: RequestHandlerImmutableParams =
+                        let handler: RequestHandlerImmutableParams =
                             RequestHandlerImmutableParams::new(
                                 &stream,
                                 &log_clone,
@@ -280,10 +280,10 @@ impl Server {
                                 &route_func_arc_lock,
                                 &route_matcher_arc_lock,
                             );
-                        Self::handle_websocket_connection(&mut handler, &mut request).await;
+                        Self::handle_websocket_connection(&handler, &mut request).await;
                     }
                     false => {
-                        let mut handler: RequestHandlerImmutableParams =
+                        let handler: RequestHandlerImmutableParams =
                             RequestHandlerImmutableParams::new(
                                 &stream,
                                 &log_clone,
@@ -293,7 +293,7 @@ impl Server {
                                 &route_func_arc_lock,
                                 &route_matcher_arc_lock,
                             );
-                        Self::handle_http_connection(&mut handler, &mut request).await;
+                        Self::handle_http_connection(&handler, &request).await;
                     }
                 };
                 let _ = stream.close().await;
@@ -303,8 +303,8 @@ impl Server {
     }
 
     async fn handle_request_common<'a>(
-        handler: &mut RequestHandlerImmutableParams<'a>,
-        request: &mut Request,
+        handler: &RequestHandlerImmutableParams<'a>,
+        request: &Request,
     ) -> bool {
         let stream: &ArcRwLockStream = handler.stream;
         let log: &Log = handler.log;
@@ -315,13 +315,11 @@ impl Server {
         }
         if let Some(route_handler) = handler.route_func.read().await.get(route) {
             route_handler(ctx.clone()).await;
-        } else {
-            if let Some((handler_func, params)) =
-                handler.route_matcher.read().await.match_route(route)
-            {
-                ctx.set_route_params(&params).await;
-                handler_func(ctx.clone()).await;
-            }
+        } else if let Some((handler_func, params)) =
+            handler.route_matcher.read().await.match_route(route)
+        {
+            ctx.set_route_params(params).await;
+            handler_func(ctx.clone()).await;
         }
         for middleware in handler.response_middleware.read().await.iter() {
             middleware(ctx.clone()).await;
@@ -334,7 +332,7 @@ impl Server {
     }
 
     async fn handle_websocket_connection<'a>(
-        handler: &mut RequestHandlerImmutableParams<'a>,
+        handler: &RequestHandlerImmutableParams<'a>,
         first_request: &mut Request,
     ) {
         let stream: &ArcRwLockStream = handler.stream;
@@ -352,8 +350,8 @@ impl Server {
     }
 
     async fn handle_http_connection<'a>(
-        handler: &mut RequestHandlerImmutableParams<'a>,
-        first_request: &mut Request,
+        handler: &RequestHandlerImmutableParams<'a>,
+        first_request: &Request,
     ) {
         let handle_result: bool = Self::handle_request_common(handler, first_request).await;
         if !handle_result {
@@ -361,8 +359,8 @@ impl Server {
         }
         let stream: ArcRwLockStream = handler.stream.clone();
         let buffer_size: usize = handler.buffer_size;
-        while let Ok(mut request) = Request::http_request_from_stream(&stream, buffer_size).await {
-            let handle_result: bool = Self::handle_request_common(handler, &mut request).await;
+        while let Ok(request) = Request::http_request_from_stream(&stream, buffer_size).await {
+            let handle_result: bool = Self::handle_request_common(handler, &request).await;
             if !handle_result {
                 return;
             }

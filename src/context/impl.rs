@@ -120,10 +120,10 @@ impl Context {
             .cloned()
     }
 
-    pub async fn set_route_params(&self, params: &RouteParams) -> &Self {
+    pub async fn set_route_params(&self, params: RouteParams) -> &Self {
         self.get_write_lock()
             .await
-            .set_route_params(arc_rwlock(params.clone()));
+            .set_route_params(arc_rwlock(params));
         self
     }
 

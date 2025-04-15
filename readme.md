@@ -98,9 +98,9 @@ async fn main() {
             "/test/:text",
             async_func!(test_string, |ctx| {
                 let param: RouteParams = ctx.get_route_params().await;
-                print_success!(format!("{:?}", param));
+                println_success!(format!("{:?}", param));
                 println_success!(test_string);
-                panic!("Test panic\n\ndata: test");
+                panic!("Test panic");
             }),
         )
         .await;
