@@ -13,22 +13,21 @@ pub use async_func::*;
 pub use clonelicious::*;
 pub use color_output::*;
 pub use file_operation::*;
-pub use func::r#trait::*;
 pub use http_type::*;
 pub use hyperlane_log::*;
 pub use recoverable_spawn::*;
 pub use recoverable_thread_pool::*;
 pub use server_manager::*;
 
-pub use context::r#type::*;
-pub use error::r#type::*;
-pub use route::r#type::*;
-pub use server::r#type::*;
+pub use context::*;
+pub use error::*;
+pub use func::*;
+pub use server::*;
 
-pub(crate) use config::r#type::*;
+pub(crate) use config::*;
 pub(crate) use core::hash::BuildHasherDefault;
-pub(crate) use func::r#type::*;
-pub(crate) use middleware::r#type::*;
+pub(crate) use middleware::*;
+pub(crate) use route::*;
 pub(crate) use std::{
     collections::HashMap,
     error::Error as StdError,
@@ -41,10 +40,10 @@ pub(crate) use std::{
     sync::Arc,
     time::Duration,
 };
-pub(crate) use tmp::r#type::*;
+pub(crate) use tmp::*;
 pub(crate) use tokio::{
     net::TcpListener,
     sync::{RwLockReadGuard, RwLockWriteGuard},
     task::yield_now,
 };
-pub(crate) use utils::error::*;
+pub(crate) use utils::*;

@@ -1,5 +1,29 @@
 use crate::*;
 
+impl PartialEq for RouteSegment {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (RouteSegment::Static(segment1), RouteSegment::Static(segment2)) => {
+                segment1 == segment2
+            }
+            (RouteSegment::Dynamic(_), RouteSegment::Dynamic(_)) => true,
+            _ => false,
+        }
+    }
+}
+
+impl PartialEq for RoutePattern {
+    fn eq(&self, other: &Self) -> bool {
+        if self.0.len() != other.0.len() {
+            return false;
+        }
+        self.0
+            .iter()
+            .zip(other.0.iter())
+            .all(|(segment1, segment2)| segment1 == segment2)
+    }
+}
+
 impl RoutePattern {
     pub fn new(route: &str) -> Self {
         let segments: VecRouteSegment = Self::parse_route(route);
