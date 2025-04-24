@@ -312,23 +312,28 @@ impl Server {
         let ctx: Context = Context::from_stream_request_log(stream, request, log);
         for middleware in handler.request_middleware.read().await.iter() {
             middleware(ctx.clone()).await;
+            if ctx.get_aborted().await {
+                break;
+            }
         }
-        if let Some(route_handler) = handler.route_func.read().await.get(route) {
-            route_handler(ctx.clone()).await;
-        } else if let Some((handler_func, params)) =
-            handler.route_matcher.read().await.match_route(route)
-        {
-            ctx.set_route_params(params).await;
-            handler_func(ctx.clone()).await;
-        }
-        for middleware in handler.response_middleware.read().await.iter() {
-            middleware(ctx.clone()).await;
+        if !ctx.get_aborted().await {
+            if let Some(route_handler) = handler.route_func.read().await.get(route) {
+                route_handler(ctx.clone()).await;
+            } else if let Some((handler_func, params)) =
+                handler.route_matcher.read().await.match_route(route)
+            {
+                ctx.set_route_params(params).await;
+                handler_func(ctx.clone()).await;
+            }
+            for middleware in handler.response_middleware.read().await.iter() {
+                if ctx.get_aborted().await {
+                    break;
+                }
+                middleware(ctx.clone()).await;
+            }
         }
         yield_now().await;
-        if request.is_disable_keep_alive() {
-            return false;
-        }
-        return true;
+        request.is_enable_keep_alive()
     }
 
     async fn handle_websocket_connection<'a>(

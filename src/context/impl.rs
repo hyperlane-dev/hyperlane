@@ -643,4 +643,18 @@ impl Context {
         self.get_write_lock().await.get_mut_attribute().clear();
         self
     }
+
+    pub async fn get_aborted(&self) -> bool {
+        *self.get_write_lock().await.get_aborted()
+    }
+
+    pub async fn set_aborted(&self, aborted: bool) -> &Self {
+        self.get_write_lock().await.set_aborted(aborted);
+        self
+    }
+
+    pub async fn aborted(&self) -> &Self {
+        self.set_aborted(true).await;
+        self
+    }
 }
