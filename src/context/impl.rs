@@ -363,7 +363,14 @@ impl Context {
     }
 
     pub async fn get_request_body_string(&self) -> String {
-        String::from_utf8_lossy(self.get_read_lock().await.get_request().get_body()).to_string()
+        self.get_read_lock().await.get_request().get_body_string()
+    }
+
+    pub async fn get_request_body_json<T>(&self) -> ResultSerdeJsonError<T>
+    where
+        T: DeserializeOwned,
+    {
+        self.get_read_lock().await.get_request().get_body_json()
     }
 
     pub async fn get_request_header<K>(&self, key: K) -> OptionRequestHeadersValue
@@ -489,7 +496,14 @@ impl Context {
     }
 
     pub async fn get_response_body_string(&self) -> String {
-        String::from_utf8_lossy(self.get_read_lock().await.get_response().get_body()).to_string()
+        self.get_read_lock().await.get_response().get_body_string()
+    }
+
+    pub async fn get_response_body_json<T>(&self) -> ResultSerdeJsonError<T>
+    where
+        T: DeserializeOwned,
+    {
+        self.get_read_lock().await.get_response().get_body_json()
     }
 
     pub async fn get_response_reason_phrase(&self) -> ResponseReasonPhrase {

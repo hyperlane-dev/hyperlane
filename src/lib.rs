@@ -29,6 +29,7 @@ pub(crate) use tmp::*;
 pub(crate) use utils::*;
 
 pub(crate) use core::hash::BuildHasherDefault;
+pub(crate) use serde::de::DeserializeOwned;
 pub(crate) use std::{
     collections::HashMap,
     error::Error as StdError,
