@@ -96,7 +96,7 @@ async fn main() {
     server
         .route(
             "/test/:text",
-            async_func!(test_string, |ctx| {
+            future_fn!(test_string, |ctx| {
                 let param: RouteParams = ctx.get_route_params().await;
                 println_success!(format!("{:?}", param));
                 println_success!(test_string);
