@@ -671,4 +671,9 @@ impl Context {
         self.set_aborted(true).await;
         self
     }
+
+    pub async fn cancel_aborted(&self) -> &Self {
+        self.set_aborted(false).await;
+        self
+    }
 }
