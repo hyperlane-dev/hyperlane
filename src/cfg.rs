@@ -68,7 +68,7 @@ async fn test_server_basic_usage() {
                 }),
             )
             .await;
-        server.listen().await.unwrap();
+        server.run().await.unwrap();
     }
 
     let _ = tokio::time::timeout(std::time::Duration::from_secs(60), main()).await;

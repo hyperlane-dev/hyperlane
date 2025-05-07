@@ -230,7 +230,7 @@ impl Server {
         self.init_panic_hook().await;
     }
 
-    pub async fn listen(&self) -> ServerResult {
+    pub async fn run(&self) -> ServerResult {
         self.init().await;
         let config: ServerConfig<'_> = self.get_config().read().await.clone();
         let log: Log = self.get_tmp().read().await.get_log().clone();
