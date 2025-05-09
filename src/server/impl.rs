@@ -4,7 +4,7 @@ impl Default for Server {
     fn default() -> Self {
         Self {
             config: arc_rwlock(ServerConfig::default()),
-            route: arc_rwlock(hash_map_xxhash3_64()),
+            route: arc_rwlock(hash_map_xx_hash3_64()),
             route_matcher: arc_rwlock(RouteMatcher::new()),
             request_middleware: arc_rwlock(vec![]),
             response_middleware: arc_rwlock(vec![]),

@@ -57,7 +57,7 @@ impl RoutePattern {
         if path_segments.len() != self.0.len() {
             return None;
         }
-        let mut params: RouteParams = hash_map_xxhash3_64();
+        let mut params: RouteParams = hash_map_xx_hash3_64();
         for (idx, segment) in self.0.iter().enumerate() {
             match segment {
                 RouteSegment::Static(path) => {
