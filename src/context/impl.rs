@@ -19,11 +19,11 @@ impl Context {
         ctx
     }
 
-    pub(super) async fn get_read_lock(&self) -> RwLockReadInnerContext {
+    async fn get_read_lock(&self) -> RwLockReadInnerContext {
         self.0.read().await
     }
 
-    pub(super) async fn get_write_lock(&self) -> RwLockWriteInnerContext {
+    async fn get_write_lock(&self) -> RwLockWriteInnerContext {
         self.0.write().await
     }
 
