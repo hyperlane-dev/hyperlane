@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "4.98.1"
+version = "4.99.0"
 edition = "2024"
 authors = ["ltpp-universe <root@ltpp.vip>"] 
 license = "MIT"
@@ -18,8 +18,8 @@ exclude = [
 ]
 
 [dependencies]
-future-fn = "0.2.1"
-clonelicious = "1.1.1"
+future-fn = "0.2.2"
+clonelicious = "2.0.1"
 color-output = "6.6.1"
 file-operation = "0.5.9"
 hyperlane-log = "1.16.2"
