@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(Clone, Lombok)]
+#[derive(Clone, Data)]
 pub struct Server {
     #[get(pub(crate))]
     #[set(pub(crate))]

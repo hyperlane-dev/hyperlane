@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(Clone, Lombok, Default)]
+#[derive(Clone, Data, Default)]
 pub struct InnerContext {
     stream: OptionArcRwLockStream,
     request: Request,

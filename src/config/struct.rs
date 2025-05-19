@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(Clone, Debug, Lombok)]
+#[derive(Clone, Debug, Data)]
 pub(crate) struct ServerConfig<'a> {
     pub(super) host: &'a str,
     pub(super) port: usize,
