@@ -60,7 +60,7 @@ async fn test_server_basic_usage() {
         server
             .route(
                 "/test/:text",
-                future_fn!(test_string, |ctx| {
+                future_fn!(test_string, |ctx: Context| {
                     let param: RouteParams = ctx.get_route_params().await;
                     println_success!(format!("{:?}", param));
                     println_success!(test_string);

@@ -7,7 +7,7 @@
 [![](https://img.shields.io/crates/v/hyperlane.svg)](https://crates.io/crates/hyperlane)
 [![](https://img.shields.io/crates/d/hyperlane.svg)](https://img.shields.io/crates/d/hyperlane.svg)
 [![](https://docs.rs/hyperlane/badge.svg)](https://docs.rs/hyperlane)
-[![](https://github.com/ltpp-universe/hyperlane/workflows/Rust/badge.svg)](https://github.com/ltpp-universe/hyperlane/actions?query=workflow:Rust)
+[![](https://github.com/eastspire/hyperlane/workflows/Rust/badge.svg)](https://github.com/eastspire/hyperlane/actions?query=workflow:Rust)
 [![](https://img.shields.io/crates/l/hyperlane.svg)](./LICENSE)
 
 </center>
@@ -28,11 +28,11 @@ cargo add hyperlane
 
 ## Quick start
 
-- [hyperlane-quick-start git](https://github.com/ltpp-universe/hyperlane-quick-start)
+- [hyperlane-quick-start git](https://github.com/eastspire/hyperlane-quick-start)
 - [hyperlane-quick-start docs](https://docs.ltpp.vip/hyperlane/quick-start/)
 
 ```sh
-git clone https://github.com/ltpp-universe/hyperlane-quick-start.git
+git clone https://github.com/eastspire/hyperlane-quick-start.git
 ```
 
 ## Use
@@ -96,7 +96,7 @@ async fn main() {
     server
         .route(
             "/test/:text",
-            future_fn!(test_string, |ctx| {
+            future_fn!(test_string, |ctx: Context| {
                 let param: RouteParams = ctx.get_route_params().await;
                 println_success!(format!("{:?}", param));
                 println_success!(test_string);
@@ -118,4 +118,4 @@ Contributions are welcome! Please open an issue or submit a pull request.
 
 ## Contact
 
-For any inquiries, please reach out to the author at [ltpp-universe <root@ltpp.vip>](mailto:root@ltpp.vip).
+For any inquiries, please reach out to the author at [eastspire <root@ltpp.vip>](mailto:root@ltpp.vip).

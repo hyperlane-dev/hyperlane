@@ -1,12 +1,12 @@
 [package]
 name = "hyperlane"
-version = "4.99.0"
+version = "4.99.1"
 edition = "2024"
-authors = ["ltpp-universe <root@ltpp.vip>"] 
+authors = ["eastspire <root@ltpp.vip>"] 
 license = "MIT"
 description = """Hyperlane is a lightweight and high-performance Rust HTTP server library designed to simplify network service development. It supports HTTP request parsing, response building, and TCP communication, making it ideal for building modern web services. Additionally, it provides support for request and response middleware, WebSocket, and Server-Sent Events (SSE), enabling flexible and efficient real-time communication. Built with pure Rust and standard library, Hyperlane offers true cross-platform compatibility across Windows, Linux and macOS, with the same API experience on all platforms, powered by Tokio's async runtime for seamless networking without platform-specific dependencies."""
 keywords = ["http", "request", "response", "tcp", "cross-platform"]
-repository = "https://github.com/ltpp-universe/hyperlane.git"
+repository = "https://github.com/eastspire/hyperlane.git"
 categories = ["network-programming", "web-programming"]
 exclude = [
     "target",
@@ -18,15 +18,15 @@ exclude = [
 ]
 
 [dependencies]
-future-fn = "0.2.2"
-clonelicious = "2.0.1"
-color-output = "6.6.1"
-file-operation = "0.5.9"
-hyperlane-log = "1.16.2"
-recoverable-spawn = "3.7.2"
-recoverable-thread-pool = "2.3.2"
-http-type = "3.69.1"
-server-manager = "3.2.1"
+future-fn = "0.2.3"
+clonelicious = "2.0.2"
+color-output = "6.6.2"
+file-operation = "0.5.10"
+hyperlane-log = "1.16.4"
+recoverable-spawn = "3.7.3"
+recoverable-thread-pool = "2.3.3"
+http-type = "3.69.2"
+server-manager = "3.2.2"
 
 [profile.dev]
 incremental = false
