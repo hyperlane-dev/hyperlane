@@ -118,4 +118,4 @@ Contributions are welcome! Please open an issue or submit a pull request.
 
 ## Contact
 
-For any inquiries, please reach out to the author at [eastspire <root@ltpp.vip>](mailto:root@ltpp.vip).
+For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root@ltpp.vip).
