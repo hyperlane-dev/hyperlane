@@ -202,21 +202,13 @@ impl Context {
     ) -> ResponseResult {
         if let Some(stream_lock) = self.get_stream().await {
             let is_websocket: bool = self.get_request_upgrade_type().await.is_websocket();
-            let response_res: ResponseResult = if is_websocket {
-                self.get_write_lock()
-                    .await
-                    .get_mut_response()
-                    .set_body(response_body)
-                    .send_websocket_body(&stream_lock)
-                    .await
-            } else {
-                self.get_write_lock()
-                    .await
-                    .get_mut_response()
-                    .set_body(response_body)
-                    .send_body(&stream_lock)
-                    .await
-            };
+            let response_res: ResponseResult = self
+                .get_write_lock()
+                .await
+                .get_mut_response()
+                .set_body(response_body)
+                .send_body_with_websocket_flag(&stream_lock, is_websocket)
+                .await;
             return response_res;
         }
         Err(ResponseError::NotFoundStream)
