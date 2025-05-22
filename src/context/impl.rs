@@ -5,11 +5,7 @@ impl Context {
         Self(arc_rwlock(ctx))
     }
 
-    pub(crate) fn from_stream_request_log(
-        stream: &ArcRwLockStream,
-        request: &Request,
-        log: &Log,
-    ) -> Self {
+    pub fn from_stream_request_log(stream: &ArcRwLockStream, request: &Request, log: &Log) -> Self {
         let mut inner_ctx: InnerContext = InnerContext::default();
         inner_ctx
             .set_stream(Some(stream.clone()))
@@ -206,13 +202,21 @@ impl Context {
     ) -> ResponseResult {
         if let Some(stream_lock) = self.get_stream().await {
             let is_websocket: bool = self.get_request_upgrade_type().await.is_websocket();
-            let response_res: ResponseResult = self
-                .get_write_lock()
-                .await
-                .get_mut_response()
-                .set_body(response_body)
-                .send_body(&stream_lock, is_websocket)
-                .await;
+            let response_res: ResponseResult = if is_websocket {
+                self.get_write_lock()
+                    .await
+                    .get_mut_response()
+                    .set_body(response_body)
+                    .send_websocket_body(&stream_lock)
+                    .await
+            } else {
+                self.get_write_lock()
+                    .await
+                    .get_mut_response()
+                    .set_body(response_body)
+                    .send_body(&stream_lock)
+                    .await
+            };
             return response_res;
         }
         Err(ResponseError::NotFoundStream)
@@ -606,7 +610,7 @@ impl Context {
         !self.is_enable_websocket().await
     }
 
-    pub(crate) async fn handle_websocket(&self) -> ResponseResult {
+    pub async fn handle_websocket(&self) -> ResponseResult {
         let key_opt: OptionString = self.get_request_header(SEC_WEBSOCKET_KEY).await;
         if let Some(key) = key_opt {
             let accept_key: String = WebSocketFrame::generate_accept_key(&key);
