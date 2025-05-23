@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(Clone, Data)]
+#[derive(Clone, Getter, Setter)]
 pub struct Server {
     #[get(pub(crate))]
     #[set(pub(crate))]
@@ -25,8 +25,8 @@ pub struct Server {
 #[derive(Clone)]
 pub(crate) struct RequestHandlerImmutableParams<'a> {
     pub(super) stream: &'a ArcRwLockStream,
-    pub(super) log: &'a Log,
-    pub(super) buffer_size: usize,
+    pub(super) tmp: &'a ArcRwLockTmp,
+    pub(super) config: &'a ServerConfig<'a>,
     pub(super) request_middleware: &'a ArcRwLockMiddlewareFuncBox,
     pub(super) response_middleware: &'a ArcRwLockMiddlewareFuncBox,
     pub(super) route_func: &'a ArcRwLockHashMapRouteFuncBox,

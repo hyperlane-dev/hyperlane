@@ -52,6 +52,7 @@ async fn test_server_basic_usage() {
         server.log_size(100_024_000).await;
         server.http_line_buffer_size(4096).await;
         server.websocket_buffer_size(4096).await;
+        server.enable_inner_websocket_handle("/websocket").await;
         server.request_middleware(request_middleware).await;
         server.response_middleware(response_middleware).await;
         server.route("/", root_route).await;

@@ -14,6 +14,30 @@ impl<'a> Default for ServerConfig<'a> {
             nodelay: DEFAULT_NODELAY,
             linger: DEFAULT_LINGER,
             ttl: DEFAULT_TTI,
+            enable_inner_websocket_handle: arc_rwlock(hash_set_xx_hash3_64()),
         }
+    }
+}
+
+impl<'a> ServerConfig<'a> {
+    pub async fn contains_inner_websocket_handle(&self, route: &'a str) -> bool {
+        self.get_enable_inner_websocket_handle()
+            .read()
+            .await
+            .contains(route)
+    }
+
+    pub async fn enable_inner_websocket_handle(&self, route: String) -> bool {
+        self.get_enable_inner_websocket_handle()
+            .write()
+            .await
+            .insert(route)
+    }
+
+    pub async fn disable_inner_websocket_handle(&self, route: String) -> bool {
+        self.get_enable_inner_websocket_handle()
+            .write()
+            .await
+            .remove(&route)
     }
 }

@@ -135,6 +135,24 @@ impl Server {
         self
     }
 
+    pub async fn enable_inner_websocket_handle<'a, R: ToString>(&self, route: R) -> &Self {
+        self.get_config()
+            .write()
+            .await
+            .enable_inner_websocket_handle(route.to_string())
+            .await;
+        self
+    }
+
+    pub async fn disable_inner_websocket_handle<'a, R: ToString>(&self, route: R) -> &Self {
+        self.get_config()
+            .write()
+            .await
+            .disable_inner_websocket_handle(route.to_string())
+            .await;
+        self
+    }
+
     pub async fn enable_nodelay(&self) -> &Self {
         self.set_nodelay(true).await;
         self
@@ -233,13 +251,12 @@ impl Server {
     pub async fn run(&self) -> ServerResult {
         self.init().await;
         let config: ServerConfig<'_> = self.get_config().read().await.clone();
-        let log: Log = self.get_tmp().read().await.get_log().clone();
+        let tmp: ArcRwLockTmp = self.get_tmp().clone();
         let host: &str = *config.get_host();
         let port: usize = *config.get_port();
         let nodelay: bool = *config.get_nodelay();
         let linger: Option<Duration> = *config.get_linger();
         let ttl_opt: Option<u32> = *config.get_ttl();
-        let websocket_buffer_size: usize = *config.get_websocket_buffer_size();
         let http_line_buffer_size: usize = *config.get_http_line_buffer_size();
         let addr: String = Context::format_host_port(host, &port);
         let tcp_listener: TcpListener = TcpListener::bind(&addr)
@@ -251,7 +268,8 @@ impl Server {
             if let Some(ttl) = ttl_opt {
                 let _ = stream.set_ttl(ttl);
             }
-            let log_clone: Log = log.clone();
+            let config_clone: ServerConfig<'_> = config.clone();
+            let tmp_clone: ArcRwLockTmp = tmp.clone();
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
             let request_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =
                 self.get_request_middleware().clone();
@@ -268,31 +286,20 @@ impl Server {
                 }
                 let mut request: Request = request_result.unwrap_or_default();
                 let is_websocket: bool = request.get_upgrade_type().is_websocket();
+                let handler: RequestHandlerImmutableParams = RequestHandlerImmutableParams::new(
+                    &stream,
+                    &tmp_clone,
+                    &config_clone,
+                    &request_middleware_arc_lock,
+                    &response_middleware_arc_lock,
+                    &route_func_arc_lock,
+                    &route_matcher_arc_lock,
+                );
                 match is_websocket {
                     true => {
-                        let handler: RequestHandlerImmutableParams =
-                            RequestHandlerImmutableParams::new(
-                                &stream,
-                                &log_clone,
-                                websocket_buffer_size,
-                                &request_middleware_arc_lock,
-                                &response_middleware_arc_lock,
-                                &route_func_arc_lock,
-                                &route_matcher_arc_lock,
-                            );
                         Self::handle_websocket_connection(&handler, &mut request).await;
                     }
                     false => {
-                        let handler: RequestHandlerImmutableParams =
-                            RequestHandlerImmutableParams::new(
-                                &stream,
-                                &log_clone,
-                                http_line_buffer_size,
-                                &request_middleware_arc_lock,
-                                &response_middleware_arc_lock,
-                                &route_func_arc_lock,
-                                &route_matcher_arc_lock,
-                            );
                         Self::handle_http_connection(&handler, &request).await;
                     }
                 };
@@ -307,7 +314,8 @@ impl Server {
         request: &Request,
     ) -> bool {
         let stream: &ArcRwLockStream = handler.stream;
-        let log: &Log = handler.log;
+        let tmp: RwLockReadGuard<'_, Tmp> = handler.tmp.read().await;
+        let log: &Log = tmp.get_log();
         let route: &String = request.get_path();
         let ctx: Context = Context::from_stream_request_log(stream, request, log);
         for middleware in handler.request_middleware.read().await.iter() {
@@ -341,15 +349,25 @@ impl Server {
         first_request: &mut Request,
     ) {
         let stream: &ArcRwLockStream = handler.stream;
-        let buffer_size: usize = handler.buffer_size;
-        let log: &Log = handler.log;
+        let buffer_size: usize = *handler.config.get_websocket_buffer_size();
+        let tmp: RwLockReadGuard<'_, Tmp> = handler.tmp.read().await;
+        let log: &Log = tmp.get_log();
         let ctx: Context = Context::from_stream_request_log(stream, first_request, log);
         if ctx.handle_websocket().await.is_err() {
             return;
         }
-        while let Ok(request) = Request::websocket_request_from_stream(stream, buffer_size).await {
-            let body: RequestBody = request.get_body().clone();
-            first_request.set_body(body);
+        let route: &String = first_request.get_path();
+        let contains_inner_websocket_handle: bool =
+            handler.config.contains_inner_websocket_handle(route).await;
+        if contains_inner_websocket_handle {
+            while let Ok(request) =
+                Request::websocket_request_from_stream(stream, buffer_size).await
+            {
+                let body: RequestBody = request.get_body().clone();
+                first_request.set_body(body);
+                let _ = Self::handle_request_common(handler, first_request).await;
+            }
+        } else {
             let _ = Self::handle_request_common(handler, first_request).await;
         }
     }
@@ -363,7 +381,7 @@ impl Server {
             return;
         }
         let stream: ArcRwLockStream = handler.stream.clone();
-        let buffer_size: usize = handler.buffer_size;
+        let buffer_size: usize = *handler.config.get_http_line_buffer_size();
         while let Ok(request) = Request::http_request_from_stream(&stream, buffer_size).await {
             let handle_result: bool = Self::handle_request_common(handler, &request).await;
             if !handle_result {
@@ -376,8 +394,8 @@ impl Server {
 impl<'a> RequestHandlerImmutableParams<'a> {
     pub fn new(
         stream: &'a ArcRwLockStream,
-        log: &'a Log,
-        buffer_size: usize,
+        tmp: &'a ArcRwLockTmp,
+        config: &'a ServerConfig<'a>,
         request_middleware: &'a ArcRwLockMiddlewareFuncBox,
         response_middleware: &'a ArcRwLockMiddlewareFuncBox,
         route_func: &'a ArcRwLockHashMapRouteFuncBox,
@@ -385,8 +403,8 @@ impl<'a> RequestHandlerImmutableParams<'a> {
     ) -> Self {
         Self {
             stream,
-            log,
-            buffer_size,
+            tmp,
+            config,
             request_middleware,
             response_middleware,
             route_func,

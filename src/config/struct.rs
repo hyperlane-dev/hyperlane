@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(Clone, Debug, Data)]
+#[derive(Clone, Debug, Setter, Getter)]
 pub(crate) struct ServerConfig<'a> {
     pub(super) host: &'a str,
     pub(super) port: usize,
@@ -13,4 +13,6 @@ pub(crate) struct ServerConfig<'a> {
     pub(super) nodelay: bool,
     pub(super) linger: OptionDuration,
     pub(super) ttl: OptionU32,
+    #[set(skip)]
+    pub(super) enable_inner_websocket_handle: ArcRwLock<HashSetXxHash3_64<String>>,
 }
