@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(Clone, Debug, Setter, Getter)]
+#[derive(Clone, Setter, Getter)]
 pub(crate) struct ServerConfig<'a> {
     pub(super) host: &'a str,
     pub(super) port: usize,
@@ -15,4 +15,6 @@ pub(crate) struct ServerConfig<'a> {
     pub(super) ttl: OptionU32,
     #[set(skip)]
     pub(super) enable_inner_websocket_handle: ArcRwLock<HashSetXxHash3_64<String>>,
+    #[set(skip)]
+    pub(super) route_matcher: ArcRwLockRouteMatcher,
 }
