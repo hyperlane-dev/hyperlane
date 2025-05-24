@@ -5,7 +5,7 @@ impl Context {
         Self(arc_rwlock(ctx))
     }
 
-    pub fn from_stream_request_log(stream: &ArcRwLockStream, request: &Request) -> Self {
+    pub fn from_stream_request(stream: &ArcRwLockStream, request: &Request) -> Self {
         let mut inner_ctx: InnerContext = InnerContext::default();
         inner_ctx
             .set_stream(Some(stream.clone()))

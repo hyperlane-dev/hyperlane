@@ -269,7 +269,7 @@ impl Server {
         let stream: &ArcRwLockStream = handler.stream;
 
         let route: &String = request.get_path();
-        let ctx: Context = Context::from_stream_request_log(stream, request);
+        let ctx: Context = Context::from_stream_request(stream, request);
         for middleware in handler.request_middleware.read().await.iter() {
             middleware(ctx.clone()).await;
             if ctx.get_aborted().await {
@@ -307,7 +307,7 @@ impl Server {
     ) {
         let stream: &ArcRwLockStream = handler.stream;
         let buffer_size: usize = *handler.config.get_websocket_buffer_size();
-        let ctx: Context = Context::from_stream_request_log(stream, first_request);
+        let ctx: Context = Context::from_stream_request(stream, first_request);
         if ctx.handle_websocket().await.is_err() {
             return;
         }

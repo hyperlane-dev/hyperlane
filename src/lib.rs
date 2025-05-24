@@ -1,13 +1,14 @@
 pub(crate) mod cfg;
 pub(crate) mod config;
 pub(crate) mod context;
+pub(crate) mod error;
 pub(crate) mod handler;
 pub(crate) mod middleware;
-pub(crate) mod print;
 pub(crate) mod route;
 pub(crate) mod server;
 
 pub use context::*;
+pub use error::*;
 pub use handler::*;
 pub use server::*;
 
@@ -15,7 +16,6 @@ pub use http_type::*;
 
 pub(crate) use config::*;
 pub(crate) use middleware::*;
-pub(crate) use print::*;
 pub(crate) use route::*;
 
 pub(crate) use core::hash::BuildHasherDefault;
