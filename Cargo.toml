@@ -21,16 +21,8 @@ exclude = [
 future-fn = "0.2.5"
 clonelicious = "2.0.3"
 color-output = "6.6.3"
-file-operation = "0.5.12"
 hyperlane-log = "1.16.8"
-recoverable-spawn = "3.7.11"
-recoverable-thread-pool = "2.3.7"
 http-type = "3.75.2"
-server-manager = "3.2.4"
-hyperlane-broadcast = "0.2.3"
-bin-encode-decode = "1.0.1"
-compare_version = "1.0.0"
-chunkify = "0.6.2"
 
 [profile.dev]
 incremental = false

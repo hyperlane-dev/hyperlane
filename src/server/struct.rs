@@ -17,15 +17,11 @@ pub struct Server {
     #[get(pub(crate))]
     #[set(pub(crate))]
     pub(super) response_middleware: ArcRwLockMiddlewareFuncBox,
-    #[get(pub(crate))]
-    #[set(pub(crate))]
-    pub(super) tmp: ArcRwLockTmp,
 }
 
 #[derive(Clone)]
 pub(crate) struct RequestHandlerImmutableParams<'a> {
     pub(super) stream: &'a ArcRwLockStream,
-    pub(super) tmp: &'a ArcRwLockTmp,
     pub(super) config: &'a ServerConfig<'a>,
     pub(super) request_middleware: &'a ArcRwLockMiddlewareFuncBox,
     pub(super) response_middleware: &'a ArcRwLockMiddlewareFuncBox,

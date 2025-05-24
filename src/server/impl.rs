@@ -8,7 +8,6 @@ impl Default for Server {
             route_matcher: arc_rwlock(RouteMatcher::new()),
             request_middleware: arc_rwlock(vec![]),
             response_middleware: arc_rwlock(vec![]),
-            tmp: arc_rwlock(Tmp::default()),
         }
     }
 }
@@ -29,8 +28,7 @@ impl Server {
     }
 
     pub async fn log_dir(&self, log_dir: &'static str) -> &Self {
-        self.get_config().write().await.set_log_dir(log_dir);
-        self.get_tmp()
+        self.get_config()
             .write()
             .await
             .get_mut_log()
@@ -39,8 +37,7 @@ impl Server {
     }
 
     pub async fn log_size(&self, log_size: usize) -> &Self {
-        self.get_config().write().await.set_log_size(log_size);
-        self.get_tmp()
+        self.get_config()
             .write()
             .await
             .get_mut_log()
@@ -52,10 +49,6 @@ impl Server {
         self.get_config()
             .write()
             .await
-            .set_log_size(DEFAULT_LOG_FILE_SIZE);
-        self.get_tmp()
-            .write()
-            .await
             .get_mut_log()
             .set_limit_file_size(DEFAULT_LOG_FILE_SIZE);
         self
@@ -63,10 +56,6 @@ impl Server {
 
     pub async fn disable_log(&self) -> &Self {
         self.get_config()
-            .write()
-            .await
-            .set_log_size(DISABLE_LOG_FILE_SIZE);
-        self.get_tmp()
             .write()
             .await
             .get_mut_log()
@@ -247,17 +236,17 @@ impl Server {
     }
 
     async fn init_panic_hook(&self) {
-        let tmp: Tmp = self.get_tmp().read().await.clone();
         let config: ServerConfig<'_> = self.get_config().read().await.clone();
         let enable_inner_print: bool = *config.get_inner_print();
-        let enable_inner_log: bool = *config.get_inner_log() && tmp.get_log().is_enable();
+        let log: Log = config.get_log().clone();
+        let enable_inner_log: bool = *config.get_inner_log() && log.is_enable();
         set_hook(Box::new(move |err| {
             let err_string: String = err.to_string();
             if enable_inner_print {
                 println_error!(err_string);
             }
             if enable_inner_log {
-                handle_error(&tmp, &err_string);
+                handle_error(&log, &err_string);
             }
         }));
     }
@@ -269,7 +258,6 @@ impl Server {
     pub async fn run(&self) -> ServerResult {
         self.init().await;
         let config: ServerConfig<'_> = self.get_config().read().await.clone();
-        let tmp: ArcRwLockTmp = self.get_tmp().clone();
         let host: &str = *config.get_host();
         let port: usize = *config.get_port();
         let nodelay: bool = *config.get_nodelay();
@@ -287,7 +275,6 @@ impl Server {
                 let _ = stream.set_ttl(ttl);
             }
             let config_clone: ServerConfig<'_> = config.clone();
-            let tmp_clone: ArcRwLockTmp = tmp.clone();
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
             let request_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =
                 self.get_request_middleware().clone();
@@ -306,7 +293,6 @@ impl Server {
                 let is_websocket: bool = request.get_upgrade_type().is_websocket();
                 let handler: RequestHandlerImmutableParams = RequestHandlerImmutableParams::new(
                     &stream,
-                    &tmp_clone,
                     &config_clone,
                     &request_middleware_arc_lock,
                     &response_middleware_arc_lock,
@@ -332,8 +318,7 @@ impl Server {
         request: &Request,
     ) -> bool {
         let stream: &ArcRwLockStream = handler.stream;
-        let tmp: RwLockReadGuard<'_, Tmp> = handler.tmp.read().await;
-        let log: &Log = tmp.get_log();
+        let log: &Log = handler.config.get_log();
         let route: &String = request.get_path();
         let ctx: Context = Context::from_stream_request_log(stream, request, log);
         let request_middleware: RwLockReadGuardVecArcFunc = handler.request_middleware.read().await;
@@ -380,8 +365,7 @@ impl Server {
     ) {
         let stream: &ArcRwLockStream = handler.stream;
         let buffer_size: usize = *handler.config.get_websocket_buffer_size();
-        let tmp: RwLockReadGuard<'_, Tmp> = handler.tmp.read().await;
-        let log: &Log = tmp.get_log();
+        let log: &Log = handler.config.get_log();
         let ctx: Context = Context::from_stream_request_log(stream, first_request, log);
         if ctx.handle_websocket().await.is_err() {
             return;
@@ -433,7 +417,6 @@ impl Server {
 impl<'a> RequestHandlerImmutableParams<'a> {
     pub fn new(
         stream: &'a ArcRwLockStream,
-        tmp: &'a ArcRwLockTmp,
         config: &'a ServerConfig<'a>,
         request_middleware: &'a ArcRwLockMiddlewareFuncBox,
         response_middleware: &'a ArcRwLockMiddlewareFuncBox,
@@ -442,7 +425,6 @@ impl<'a> RequestHandlerImmutableParams<'a> {
     ) -> Self {
         Self {
             stream,
-            tmp,
             config,
             request_middleware,
             response_middleware,
