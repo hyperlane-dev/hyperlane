@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "4.105.0"
+version = "4.105.1"
 edition = "2024"
 authors = ["root@ltpp.vip"] 
 license = "MIT"
@@ -22,10 +22,10 @@ future-fn = "0.2.5"
 clonelicious = "2.0.3"
 color-output = "6.6.3"
 file-operation = "0.5.12"
-hyperlane-log = "1.16.6"
-recoverable-spawn = "3.7.10"
-recoverable-thread-pool = "2.3.5"
-http-type = "3.75.0"
+hyperlane-log = "1.16.7"
+recoverable-spawn = "3.7.11"
+recoverable-thread-pool = "2.3.6"
+http-type = "3.75.1"
 server-manager = "3.2.4"
 hyperlane-broadcast = "0.2.2"
 
