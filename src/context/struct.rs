@@ -5,7 +5,6 @@ pub struct InnerContext {
     stream: OptionArcRwLockStream,
     request: Request,
     response: Response,
-    log: Log,
     attribute: HashMapArcAnySendSync,
     route_params: ArcRwLockRouteParams,
     aborted: bool,

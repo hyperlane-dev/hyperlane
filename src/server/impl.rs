@@ -27,42 +27,6 @@ impl Server {
         self
     }
 
-    pub async fn log_dir(&self, log_dir: &'static str) -> &Self {
-        self.get_config()
-            .write()
-            .await
-            .get_mut_log()
-            .set_path(log_dir.into());
-        self
-    }
-
-    pub async fn log_size(&self, log_size: usize) -> &Self {
-        self.get_config()
-            .write()
-            .await
-            .get_mut_log()
-            .set_limit_file_size(log_size);
-        self
-    }
-
-    pub async fn enable_log(&self) -> &Self {
-        self.get_config()
-            .write()
-            .await
-            .get_mut_log()
-            .set_limit_file_size(DEFAULT_LOG_FILE_SIZE);
-        self
-    }
-
-    pub async fn disable_log(&self) -> &Self {
-        self.get_config()
-            .write()
-            .await
-            .get_mut_log()
-            .set_limit_file_size(DISABLE_LOG_FILE_SIZE);
-        self
-    }
-
     pub async fn http_line_buffer_size(&self, buffer_size: usize) -> &Self {
         let buffer_size: usize = if buffer_size == 0 {
             DEFAULT_BUFFER_SIZE
@@ -89,33 +53,14 @@ impl Server {
         self
     }
 
-    pub async fn inner_print(&self, print: bool) -> &Self {
-        self.get_config().write().await.set_inner_print(print);
-        self
-    }
-
-    pub async fn inner_log(&self, print: bool) -> &Self {
-        self.get_config().write().await.set_inner_log(print);
-        self
-    }
-
-    pub async fn enable_inner_print(&self) -> &Self {
-        self.inner_print(true).await;
-        self
-    }
-
-    pub async fn disable_inner_print(&self) -> &Self {
-        self.inner_print(false).await;
-        self
-    }
-
-    pub async fn enable_inner_log(&self) -> &Self {
-        self.inner_log(true).await;
-        self
-    }
-
-    pub async fn disable_inner_log(&self) -> &Self {
-        self.inner_log(false).await;
+    pub async fn error_handle<F>(&self, func: F) -> &Self
+    where
+        F: ErrorHandle + Send + Sync + 'static,
+    {
+        self.get_config()
+            .write()
+            .await
+            .set_error_handle(Arc::new(func));
         self
     }
 
@@ -124,7 +69,10 @@ impl Server {
         self
     }
 
-    pub async fn enable_inner_http_handle<'a, R: ToString>(&self, route: R) -> &Self {
+    pub async fn enable_inner_http_handle<'a, R>(&self, route: R) -> &Self
+    where
+        R: ToString,
+    {
         self.get_config()
             .write()
             .await
@@ -133,7 +81,10 @@ impl Server {
         self
     }
 
-    pub async fn disable_inner_http_handle<'a, R: ToString>(&self, route: R) -> &Self {
+    pub async fn disable_inner_http_handle<'a, R>(&self, route: R) -> &Self
+    where
+        R: ToString,
+    {
         self.get_config()
             .write()
             .await
@@ -142,7 +93,10 @@ impl Server {
         self
     }
 
-    pub async fn enable_inner_websocket_handle<'a, R: ToString>(&self, route: R) -> &Self {
+    pub async fn enable_inner_websocket_handle<'a, R>(&self, route: R) -> &Self
+    where
+        R: ToString,
+    {
         self.get_config()
             .write()
             .await
@@ -151,7 +105,10 @@ impl Server {
         self
     }
 
-    pub async fn disable_inner_websocket_handle<'a, R: ToString>(&self, route: R) -> &Self {
+    pub async fn disable_inner_websocket_handle<'a, R>(&self, route: R) -> &Self
+    where
+        R: ToString,
+    {
         self.get_config()
             .write()
             .await
@@ -205,8 +162,7 @@ impl Server {
         let add_route_matcher_result: ResultAddRoute =
             self.route_matcher.write().await.add(&route_str, arc_func);
         if let Err(err) = add_route_matcher_result {
-            println_error!(err);
-            exit(1);
+            panic!("{}", err);
         }
         self
     }
@@ -237,17 +193,10 @@ impl Server {
 
     async fn init_panic_hook(&self) {
         let config: ServerConfig<'_> = self.get_config().read().await.clone();
-        let enable_inner_print: bool = *config.get_inner_print();
-        let log: Log = config.get_log().clone();
-        let enable_inner_log: bool = *config.get_inner_log() && log.is_enable();
-        set_hook(Box::new(move |err| {
-            let err_string: String = err.to_string();
-            if enable_inner_print {
-                println_error!(err_string);
-            }
-            if enable_inner_log {
-                handle_error(&log, &err_string);
-            }
+        let error_handle: ArcErrorHandle = config.get_error_handle().clone();
+        set_hook(Box::new(move |err: &'_ PanicHookInfo<'_>| {
+            let data: String = err.to_string();
+            error_handle(data);
         }));
     }
 
@@ -318,9 +267,9 @@ impl Server {
         request: &Request,
     ) -> bool {
         let stream: &ArcRwLockStream = handler.stream;
-        let log: &Log = handler.config.get_log();
+
         let route: &String = request.get_path();
-        let ctx: Context = Context::from_stream_request_log(stream, request, log);
+        let ctx: Context = Context::from_stream_request_log(stream, request);
         for middleware in handler.request_middleware.read().await.iter() {
             middleware(ctx.clone()).await;
             if ctx.get_aborted().await {
@@ -358,8 +307,7 @@ impl Server {
     ) {
         let stream: &ArcRwLockStream = handler.stream;
         let buffer_size: usize = *handler.config.get_websocket_buffer_size();
-        let log: &Log = handler.config.get_log();
-        let ctx: Context = Context::from_stream_request_log(stream, first_request, log);
+        let ctx: Context = Context::from_stream_request_log(stream, first_request);
         if ctx.handle_websocket().await.is_err() {
             return;
         }

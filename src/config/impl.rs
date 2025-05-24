@@ -5,8 +5,6 @@ impl<'a> Default for ServerConfig<'a> {
         Self {
             host: DEFAULT_HOST,
             port: DEFAULT_WEB_PORT,
-            inner_print: DEFAULT_INNER_PRINT,
-            inner_log: DEFAULT_INNER_LOG,
             websocket_buffer_size: DEFAULT_BUFFER_SIZE,
             http_line_buffer_size: DEFAULT_BUFFER_SIZE,
             nodelay: DEFAULT_NODELAY,
@@ -15,7 +13,7 @@ impl<'a> Default for ServerConfig<'a> {
             disable_inner_http_handle: arc_rwlock(hash_set_xx_hash3_64()),
             disable_inner_websocket_handle: arc_rwlock(hash_set_xx_hash3_64()),
             route_matcher: arc_rwlock(RouteMatcher::new()),
-            log: Log::default(),
+            error_handle: Arc::new(print_error_handle),
         }
     }
 }

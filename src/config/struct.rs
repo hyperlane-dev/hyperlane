@@ -1,11 +1,9 @@
 use crate::*;
 
-#[derive(Clone, Setter, Getter, GetterMut)]
+#[derive(Clone, Setter, Getter)]
 pub(crate) struct ServerConfig<'a> {
     pub(super) host: &'a str,
     pub(super) port: usize,
-    pub(super) inner_print: bool,
-    pub(super) inner_log: bool,
     pub(super) websocket_buffer_size: usize,
     pub(super) http_line_buffer_size: usize,
     pub(super) nodelay: bool,
@@ -17,5 +15,5 @@ pub(crate) struct ServerConfig<'a> {
     pub(super) disable_inner_websocket_handle: ArcRwLock<HashSetXxHash3_64<String>>,
     #[set(skip)]
     pub(super) route_matcher: ArcRwLockRouteMatcher,
-    pub(super) log: Log,
+    pub(super) error_handle: ArcErrorHandle,
 }

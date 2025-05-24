@@ -3,22 +3,20 @@ pub(crate) mod config;
 pub(crate) mod context;
 pub(crate) mod handler;
 pub(crate) mod middleware;
+pub(crate) mod print;
 pub(crate) mod route;
 pub(crate) mod server;
-pub(crate) mod utils;
 
 pub use context::*;
 pub use handler::*;
 pub use server::*;
 
-pub use color_output::*;
 pub use http_type::*;
-pub use hyperlane_log::*;
 
 pub(crate) use config::*;
 pub(crate) use middleware::*;
+pub(crate) use print::*;
 pub(crate) use route::*;
-pub(crate) use utils::*;
 
 pub(crate) use core::hash::BuildHasherDefault;
 pub(crate) use serde::de::DeserializeOwned;
@@ -28,9 +26,8 @@ pub(crate) use std::{
     fmt::{self, Display},
     future::Future,
     net::SocketAddr,
-    panic::set_hook,
+    panic::{PanicHookInfo, set_hook},
     pin::Pin,
-    process::exit,
     sync::Arc,
     time::Duration,
 };

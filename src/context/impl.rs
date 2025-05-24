@@ -5,12 +5,11 @@ impl Context {
         Self(arc_rwlock(ctx))
     }
 
-    pub fn from_stream_request_log(stream: &ArcRwLockStream, request: &Request, log: &Log) -> Self {
+    pub fn from_stream_request_log(stream: &ArcRwLockStream, request: &Request) -> Self {
         let mut inner_ctx: InnerContext = InnerContext::default();
         inner_ctx
             .set_stream(Some(stream.clone()))
-            .set_request(request.clone())
-            .set_log(log.clone());
+            .set_request(request.clone());
         let ctx: Context = Context::from_inner_context(inner_ctx);
         ctx
     }
@@ -41,10 +40,6 @@ impl Context {
 
     pub async fn get_response_string(&self) -> String {
         self.get_read_lock().await.get_response().get_string()
-    }
-
-    pub async fn get_log(&self) -> Log {
-        self.get_read_lock().await.get_log().clone()
     }
 
     pub async fn get_socket_addr(&self) -> OptionSocketAddr {
@@ -241,77 +236,6 @@ impl Context {
                 .await;
         }
         Err(ResponseError::NotFoundStream)
-    }
-
-    pub async fn set_log(&self, log: Log) -> &Self {
-        self.get_write_lock().await.set_log(log);
-        self
-    }
-
-    pub async fn log_info<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: ToString,
-        L: LogFuncTrait<T>,
-    {
-        self.get_read_lock().await.get_log().info(data, func);
-        self
-    }
-
-    pub async fn log_debug<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: ToString,
-        L: LogFuncTrait<T>,
-    {
-        self.get_read_lock().await.get_log().debug(data, func);
-        self
-    }
-
-    pub async fn log_error<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: ToString,
-        L: LogFuncTrait<T>,
-    {
-        self.get_read_lock().await.get_log().error(data, func);
-        self
-    }
-
-    pub async fn async_log_info<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: ToString,
-        L: LogFuncTrait<T>,
-    {
-        self.get_read_lock()
-            .await
-            .get_log()
-            .async_info(data, func)
-            .await;
-        self
-    }
-
-    pub async fn async_log_debug<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: ToString,
-        L: LogFuncTrait<T>,
-    {
-        self.get_read_lock()
-            .await
-            .get_log()
-            .async_debug(data, func)
-            .await;
-        self
-    }
-
-    pub async fn async_log_error<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: ToString,
-        L: LogFuncTrait<T>,
-    {
-        self.get_read_lock()
-            .await
-            .get_log()
-            .async_error(data, func)
-            .await;
-        self
     }
 
     pub async fn get_request_method(&self) -> RequestMethod {

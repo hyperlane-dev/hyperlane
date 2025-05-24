@@ -48,8 +48,6 @@ async fn request_middleware(ctx: Context) {
         .await
         .set_response_header(CONTENT_TYPE, content_type_charset(TEXT_PLAIN, UTF8))
         .await
-        .set_response_header(DATE, gmt())
-        .await
         .set_response_header("SocketAddr", socket_addr)
         .await;
 }
@@ -96,8 +94,7 @@ async fn main() {
     server
         .route("/test/:text", move |ctx: Context| async move {
             let param: RouteParams = ctx.get_route_params().await;
-            println_success!(format!("{:?}", param));
-            panic!("Test panic");
+            panic!("Test panic {:?}", param);
         })
         .await;
     server.run().await.unwrap();
