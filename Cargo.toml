@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "5.0.0"
+version = "5.0.1"
 edition = "2024"
 authors = ["root@ltpp.vip"] 
 license = "MIT"
@@ -14,6 +14,7 @@ exclude = [
     "sh",
     ".github",
     "logs",
+    "img",
     "**/*.log"
 ]
 
