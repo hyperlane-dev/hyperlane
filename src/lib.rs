@@ -12,8 +12,11 @@ pub use context::*;
 pub use handler::*;
 pub use server::*;
 
+pub use bin_encode_decode::*;
+pub use chunkify::*;
 pub use clonelicious::*;
 pub use color_output::*;
+pub use compare_version::*;
 pub use file_operation::*;
 pub use future_fn::*;
 pub use http_type::*;
