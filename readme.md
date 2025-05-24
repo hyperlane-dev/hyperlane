@@ -54,12 +54,6 @@ async fn request_middleware(ctx: Context) {
 
 async fn response_middleware(ctx: Context) {
     let _ = ctx.send().await;
-    let request: String = ctx.get_request_string().await;
-    let response: String = ctx.get_response_string().await;
-    ctx.log_info(&request, log_handler)
-        .await
-        .log_info(&response, log_handler)
-        .await;
 }
 
 async fn root_route(ctx: Context) {
@@ -81,10 +75,11 @@ async fn main() {
     server.port(60000).await;
     server.enable_nodelay().await;
     server.disable_linger().await;
-    server.log_dir("./logs").await;
-    server.enable_inner_log().await;
-    server.enable_inner_print().await;
-    server.log_size(100_024_000).await;
+    server
+        .error_handle(|data: String| {
+            println!("{}", data);
+        })
+        .await;
     server.http_line_buffer_size(4096).await;
     server.websocket_buffer_size(4096).await;
     server.request_middleware(request_middleware).await;
