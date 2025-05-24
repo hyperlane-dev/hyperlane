@@ -82,6 +82,7 @@ async fn main() {
     server.host("0.0.0.0").await;
     server.port(60000).await;
     server.enable_nodelay().await;
+    server.disable_linger().await;
     server.log_dir("./logs").await;
     server.enable_inner_log().await;
     server.enable_inner_print().await;
@@ -92,17 +93,12 @@ async fn main() {
     server.response_middleware(response_middleware).await;
     server.route("/", root_route).await;
     server.route("/websocket", websocket_route).await;
-    let test_string: String = "Hello hyperlane".to_owned();
     server
-        .route(
-            "/test/:text",
-            future_fn!(test_string, |ctx: Context| {
-                let param: RouteParams = ctx.get_route_params().await;
-                println_success!(format!("{:?}", param));
-                println_success!(test_string);
-                panic!("Test panic");
-            }),
-        )
+        .route("/test/:text", move |ctx: Context| async move {
+            let param: RouteParams = ctx.get_route_params().await;
+            println_success!(format!("{:?}", param));
+            panic!("Test panic");
+        })
         .await;
     server.run().await.unwrap();
 }
