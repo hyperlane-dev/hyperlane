@@ -14,7 +14,9 @@ pub(crate) struct ServerConfig<'a> {
     pub(super) linger: OptionDuration,
     pub(super) ttl: OptionU32,
     #[set(skip)]
-    pub(super) enable_inner_websocket_handle: ArcRwLock<HashSetXxHash3_64<String>>,
+    pub(super) disable_inner_http_handle: ArcRwLock<HashSetXxHash3_64<String>>,
+    #[set(skip)]
+    pub(super) disable_inner_websocket_handle: ArcRwLock<HashSetXxHash3_64<String>>,
     #[set(skip)]
     pub(super) route_matcher: ArcRwLockRouteMatcher,
 }

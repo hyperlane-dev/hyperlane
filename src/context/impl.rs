@@ -668,4 +668,21 @@ impl Context {
         self.set_aborted(false).await;
         self
     }
+
+    pub async fn http_request_from_stream(&self, buffer_size: usize) -> RequestReaderHandleResult {
+        if let Some(stream) = self.get_stream().await.as_ref() {
+            return Request::http_request_from_stream(stream, buffer_size).await;
+        };
+        Err(RequestError::GetTcpStreamError)
+    }
+
+    pub async fn websocket_request_from_stream(
+        &self,
+        buffer_size: usize,
+    ) -> RequestReaderHandleResult {
+        if let Some(stream) = self.get_stream().await.as_ref() {
+            return Request::websocket_request_from_stream(stream, buffer_size).await;
+        };
+        Err(RequestError::GetTcpStreamError)
+    }
 }

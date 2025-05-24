@@ -135,6 +135,24 @@ impl Server {
         self
     }
 
+    pub async fn enable_inner_http_handle<'a, R: ToString>(&self, route: R) -> &Self {
+        self.get_config()
+            .write()
+            .await
+            .enable_inner_http_handle(route.to_string())
+            .await;
+        self
+    }
+
+    pub async fn disable_inner_http_handle<'a, R: ToString>(&self, route: R) -> &Self {
+        self.get_config()
+            .write()
+            .await
+            .disable_inner_http_handle(route.to_string())
+            .await;
+        self
+    }
+
     pub async fn enable_inner_websocket_handle<'a, R: ToString>(&self, route: R) -> &Self {
         self.get_config()
             .write()
@@ -369,17 +387,17 @@ impl Server {
             return;
         }
         let route: &String = first_request.get_path();
-        let contains_inner_websocket_handle: bool =
-            handler.config.contains_inner_websocket_handle(route).await;
-        if contains_inner_websocket_handle {
-            while let Ok(request) =
-                Request::websocket_request_from_stream(stream, buffer_size).await
-            {
-                let body: RequestBody = request.get_body().clone();
-                first_request.set_body(body);
-                let _ = Self::handle_request_common(handler, first_request).await;
-            }
-        } else {
+        let contains_disable_inner_websocket_handle: bool = handler
+            .config
+            .contains_disable_inner_websocket_handle(route)
+            .await;
+        if contains_disable_inner_websocket_handle {
+            while Self::handle_request_common(handler, first_request).await {}
+            return;
+        }
+        while let Ok(request) = Request::websocket_request_from_stream(stream, buffer_size).await {
+            let body: RequestBody = request.get_body().clone();
+            first_request.set_body(body);
             let _ = Self::handle_request_common(handler, first_request).await;
         }
     }
@@ -393,7 +411,16 @@ impl Server {
             return;
         }
         let stream: ArcRwLockStream = handler.stream.clone();
+        let route: &String = first_request.get_path();
+        let contains_disable_inner_http_handle: bool = handler
+            .config
+            .contains_disable_inner_http_handle(route)
+            .await;
         let buffer_size: usize = *handler.config.get_http_line_buffer_size();
+        if contains_disable_inner_http_handle {
+            while Self::handle_request_common(handler, first_request).await {}
+            return;
+        }
         while let Ok(request) = Request::http_request_from_stream(&stream, buffer_size).await {
             let handle_result: bool = Self::handle_request_common(handler, &request).await;
             if !handle_result {
