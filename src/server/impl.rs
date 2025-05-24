@@ -321,39 +321,32 @@ impl Server {
         let log: &Log = handler.config.get_log();
         let route: &String = request.get_path();
         let ctx: Context = Context::from_stream_request_log(stream, request, log);
-        let request_middleware: RwLockReadGuardVecArcFunc = handler.request_middleware.read().await;
-        for middleware in request_middleware.iter() {
+        for middleware in handler.request_middleware.read().await.iter() {
             middleware(ctx.clone()).await;
             if ctx.get_aborted().await {
                 break;
             }
         }
-        drop(request_middleware);
         if !ctx.get_aborted().await {
             let mut route_handled: bool = false;
-            let route_func: RwLockReadGuardHashMapRouteFuncBox = handler.route_func.read().await;
-            if let Some(route_handler) = route_func.get(route) {
+            if let Some(route_handler) = handler.route_func.read().await.get(route) {
                 route_handler(ctx.clone()).await;
                 route_handled = true;
             }
-            drop(route_func);
             if !route_handled {
-                let route_matcher: RwLockReadGuardRouteMatcher = handler.route_matcher.read().await;
-                if let Some((handler_func, params)) = route_matcher.match_route(route) {
+                if let Some((handler_func, params)) =
+                    handler.route_matcher.read().await.match_route(route)
+                {
                     ctx.set_route_params(params).await;
                     handler_func(ctx.clone()).await;
                 }
-                drop(route_matcher);
             }
-            let response_middleware: RwLockReadGuardVecArcFunc =
-                handler.response_middleware.read().await;
-            for middleware in response_middleware.iter() {
+            for middleware in handler.response_middleware.read().await.iter() {
                 if ctx.get_aborted().await {
                     break;
                 }
                 middleware(ctx.clone()).await;
             }
-            drop(response_middleware);
         }
         yield_now().await;
         request.is_enable_keep_alive()
