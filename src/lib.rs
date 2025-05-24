@@ -12,6 +12,7 @@ pub use handler::*;
 pub use server::*;
 
 pub use clonelicious::*;
+pub use color_output::*;
 pub use future_fn::*;
 pub use http_type::*;
 pub use hyperlane_log::*;
