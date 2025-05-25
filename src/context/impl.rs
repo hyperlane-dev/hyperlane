@@ -124,12 +124,15 @@ impl Context {
         ctx.get_request().get_upgrade_type().is_websocket()
     }
 
-    async fn inner_send_response<T: Into<ResponseBody>>(
+    async fn inner_send_response<T>(
         &self,
         status_code: usize,
         response_body: T,
         handle_websocket: bool,
-    ) -> ResponseResult {
+    ) -> ResponseResult
+    where
+        T: Into<ResponseBody>,
+    {
         if let Some(stream_lock) = self.get_stream().await {
             let mut ctx: RwLockWriteInnerContext = self.get_write_lock().await;
             if !handle_websocket && self.inner_is_websocket(&ctx) {
@@ -147,11 +150,10 @@ impl Context {
         Err(ResponseError::NotFoundStream)
     }
 
-    pub async fn send_response<T: Into<ResponseBody>>(
-        &self,
-        status_code: usize,
-        response_body: T,
-    ) -> ResponseResult {
+    pub async fn send_response<T>(&self, status_code: usize, response_body: T) -> ResponseResult
+    where
+        T: Into<ResponseBody>,
+    {
         self.inner_send_response(status_code, response_body, false)
             .await
     }
@@ -162,11 +164,14 @@ impl Context {
         self.send_response(status_code, response_body).await
     }
 
-    pub async fn send_response_once<T: Into<ResponseBody>>(
+    pub async fn send_response_once<T>(
         &self,
         status_code: usize,
         response_body: T,
-    ) -> ResponseResult {
+    ) -> ResponseResult
+    where
+        T: Into<ResponseBody>,
+    {
         if let Some(stream_lock) = self.get_stream().await {
             let mut ctx: RwLockWriteInnerContext = self.get_write_lock().await;
             if self.inner_is_websocket(&ctx) {
@@ -191,10 +196,10 @@ impl Context {
         self.send_response_once(status_code, response_body).await
     }
 
-    pub async fn send_response_body<T: Into<ResponseBody>>(
-        &self,
-        response_body: T,
-    ) -> ResponseResult {
+    pub async fn send_response_body<T>(&self, response_body: T) -> ResponseResult
+    where
+        T: Into<ResponseBody>,
+    {
         if let Some(stream_lock) = self.get_stream().await {
             let is_websocket: bool = self.get_request_upgrade_type().await.is_websocket();
             let response_res: ResponseResult = self
@@ -262,10 +267,10 @@ impl Context {
             .clone()
     }
 
-    pub async fn get_request_query<T: Into<RequestHeadersKey>>(
-        &self,
-        key: T,
-    ) -> OptionRequestQuerysValue {
+    pub async fn get_request_query<T>(&self, key: T) -> OptionRequestQuerysValue
+    where
+        T: Into<RequestHeadersKey>,
+    {
         self.get_read_lock()
             .await
             .get_request()
@@ -387,7 +392,10 @@ impl Context {
         self
     }
 
-    pub async fn set_request_body<T: Into<RequestBody>>(&self, body: T) -> &Self {
+    pub async fn set_request_body<T>(&self, body: T) -> &Self
+    where
+        T: Into<RequestBody>,
+    {
         self.get_write_lock().await.get_mut_request().set_body(body);
         self
     }
@@ -463,7 +471,10 @@ impl Context {
         self
     }
 
-    pub async fn set_response_body<T: Into<ResponseBody>>(&self, body: T) -> &Self {
+    pub async fn set_response_body<T>(&self, body: T) -> &Self
+    where
+        T: Into<ResponseBody>,
+    {
         self.get_write_lock()
             .await
             .get_mut_response()
@@ -471,10 +482,10 @@ impl Context {
         self
     }
 
-    pub async fn set_response_reason_phrase<T: Into<ResponseReasonPhrase>>(
-        &self,
-        reason_phrase: T,
-    ) -> &Self {
+    pub async fn set_response_reason_phrase<T>(&self, reason_phrase: T) -> &Self
+    where
+        T: Into<ResponseReasonPhrase>,
+    {
         self.get_write_lock()
             .await
             .get_mut_response()
@@ -547,7 +558,10 @@ impl Context {
         format!("{}{}{}", host, COLON_SPACE_SYMBOL, port)
     }
 
-    pub async fn set_attribute<T: AnySendSyncClone>(&self, key: &str, value: &T) -> &Self {
+    pub async fn set_attribute<T>(&self, key: &str, value: &T) -> &Self
+    where
+        T: AnySendSyncClone,
+    {
         self.get_write_lock()
             .await
             .get_mut_attribute()
@@ -555,7 +569,10 @@ impl Context {
         self
     }
 
-    pub async fn get_attribute<T: AnySendSyncClone>(&self, key: &str) -> Option<T> {
+    pub async fn get_attribute<T>(&self, key: &str) -> Option<T>
+    where
+        T: AnySendSyncClone,
+    {
         self.get_read_lock()
             .await
             .get_attribute()

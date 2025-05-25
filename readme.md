@@ -46,7 +46,7 @@ async fn request_middleware(ctx: Context) {
         .await
         .set_response_header(CONNECTION, CONNECTION_KEEP_ALIVE)
         .await
-        .set_response_header(CONTENT_TYPE, content_type_charset(TEXT_PLAIN, UTF8))
+        .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
         .await
         .set_response_header("SocketAddr", socket_addr)
         .await;

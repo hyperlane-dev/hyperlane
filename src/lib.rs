@@ -15,6 +15,7 @@ pub use server::*;
 pub use http_type::*;
 
 pub(crate) use config::*;
+pub(crate) use lombok_macros::*;
 pub(crate) use middleware::*;
 pub(crate) use route::*;
 
