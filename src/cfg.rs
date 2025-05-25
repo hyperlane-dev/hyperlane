@@ -32,19 +32,20 @@ async fn test_server_basic_usage() {
         let _ = ctx.send_response_body(request_body).await;
     }
 
+    fn error_handle(error: String) {
+        eprintln!("{}", error);
+        let _ = std::io::Write::flush(&mut std::io::stderr());
+    }
+
     async fn main() {
         let server: Server = Server::new();
         server.host("0.0.0.0").await;
         server.port(60000).await;
         server.enable_nodelay().await;
         server.disable_linger().await;
-        server
-            .error_handle(|data: String| {
-                println!("{}", data);
-            })
-            .await;
         server.http_line_buffer_size(4096).await;
         server.websocket_buffer_size(4096).await;
+        server.error_handle(error_handle).await;
         server.request_middleware(request_middleware).await;
         server.response_middleware(response_middleware).await;
         server.route("/", root_route).await;
