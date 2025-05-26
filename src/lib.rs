@@ -1,4 +1,3 @@
-pub(crate) mod cfg;
 pub(crate) mod config;
 pub(crate) mod context;
 pub(crate) mod error;
@@ -6,6 +5,8 @@ pub(crate) mod handler;
 pub(crate) mod middleware;
 pub(crate) mod route;
 pub(crate) mod server;
+
+mod tests;
 
 pub use context::*;
 pub use error::*;

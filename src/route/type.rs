@@ -10,3 +10,6 @@ pub(crate) type OptionTupleArcFuncRouteParams = Option<TupleArcFuncRouteParams>;
 pub(crate) type ResultAddRoute = Result<(), RouteError>;
 pub(crate) type RouteParams = HashMap<String, String, BuildHasherDefault<XxHash3_64>>;
 pub(crate) type ArcRwLockRouteParams = ArcRwLock<RouteParams>;
+pub(crate) type ResultVecRouteSegmentRouteError = Result<VecRouteSegment, RouteError>;
+pub(crate) type ResultRoutePatternRouteError = Result<RoutePattern, RouteError>;
+pub(crate) type OptionRouteParams = Option<RouteParams>;

@@ -97,7 +97,7 @@ impl Context {
             .clone()
     }
 
-    pub async fn get_route_param(&self, name: &str) -> Option<String> {
+    pub async fn get_route_param(&self, name: &str) -> OptionString {
         self.get_read_lock()
             .await
             .get_route_params()

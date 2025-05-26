@@ -127,7 +127,7 @@ impl Server {
         self
     }
 
-    pub async fn set_linger(&self, linger: Option<Duration>) -> &Self {
+    pub async fn set_linger(&self, linger: OptionDuration) -> &Self {
         self.get_config().write().await.set_linger(linger);
         self
     }
@@ -210,8 +210,8 @@ impl Server {
         let host: &str = *config.get_host();
         let port: usize = *config.get_port();
         let nodelay: bool = *config.get_nodelay();
-        let linger: Option<Duration> = *config.get_linger();
-        let ttl_opt: Option<u32> = *config.get_ttl();
+        let linger: OptionDuration = *config.get_linger();
+        let ttl_opt: OptionU32 = *config.get_ttl();
         let http_line_buffer_size: usize = *config.get_http_line_buffer_size();
         let addr: String = Context::format_host_port(host, &port);
         let tcp_listener: TcpListener = TcpListener::bind(&addr)

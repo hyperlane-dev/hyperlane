@@ -20,6 +20,9 @@ impl StdError for RouteError {}
 impl Display for RouteError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::EmptyPattern => {
+                write!(f, "Route pattern cannot be empty")
+            }
             Self::DuplicatePattern(pattern) => {
                 write!(f, "Route pattern already exists: {}", pattern)
             }

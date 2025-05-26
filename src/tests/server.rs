@@ -1,7 +1,7 @@
 use crate::*;
 
 #[tokio::test]
-async fn test_server_basic_usage() {
+async fn test_server() {
     use crate::*;
 
     async fn request_middleware(ctx: Context) {

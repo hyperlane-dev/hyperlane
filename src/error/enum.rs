@@ -11,4 +11,5 @@ pub enum ServerError {
 #[derive(Debug)]
 pub(crate) enum RouteError {
     DuplicatePattern(String),
+    EmptyPattern,
 }

@@ -25,16 +25,19 @@ impl PartialEq for RoutePattern {
 }
 
 impl RoutePattern {
-    pub fn new(route: &str) -> Self {
-        let segments: VecRouteSegment = Self::parse_route(route);
-        Self(segments)
+    pub fn new(route: &str) -> ResultRoutePatternRouteError {
+        let segments: VecRouteSegment = Self::parse_route(route)?;
+        Ok(Self(segments))
     }
 
-    fn parse_route(route: &str) -> VecRouteSegment {
+    fn parse_route(route: &str) -> ResultVecRouteSegmentRouteError {
+        if route.is_empty() {
+            return Err(RouteError::EmptyPattern);
+        }
         let mut segments: VecRouteSegment = Vec::new();
         let route: &str = route.trim_start_matches(DEFAULT_HTTP_PATH);
         if route.is_empty() {
-            return segments;
+            return Ok(segments);
         }
         for segment in route.split(DEFAULT_HTTP_PATH) {
             if segment.starts_with(COLON_SPACE_SYMBOL) {
@@ -44,10 +47,10 @@ impl RoutePattern {
                 segments.push(RouteSegment::Static(segment.to_string()));
             }
         }
-        segments
+        Ok(segments)
     }
 
-    pub fn match_path(&self, path: &str) -> Option<RouteParams> {
+    pub fn match_path(&self, path: &str) -> OptionRouteParams {
         let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
         let path_segments: Vec<&str> = if path.is_empty() {
             Vec::new()
@@ -80,7 +83,7 @@ impl RouteMatcher {
     }
 
     pub fn add(&mut self, pattern: &str, handler: ArcFunc) -> ResultAddRoute {
-        let route_pattern: RoutePattern = RoutePattern::new(pattern);
+        let route_pattern: RoutePattern = RoutePattern::new(pattern)?;
         let has_same_pattern: bool = self
             .0
             .iter()
