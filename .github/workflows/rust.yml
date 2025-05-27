@@ -16,5 +16,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build
         run: cargo build --release --verbose
+      - name: Make test.sh executable
+        run: chmod +x ./sh/test.sh
       - name: Run tests
         run: ./sh/test.sh
