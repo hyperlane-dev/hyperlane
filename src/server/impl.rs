@@ -155,15 +155,15 @@ impl Server {
     {
         let route_str: String = route.to_string();
         let arc_func = Arc::new(move |ctx: Context| Box::pin(func(ctx)) as PinBoxFutureSend);
+        self.route_matcher
+            .write()
+            .await
+            .add(&route_str, arc_func.clone())
+            .unwrap_or_else(|err| panic!("{}", err));
         self.get_route()
             .write()
             .await
-            .insert(route_str.clone(), arc_func.clone());
-        let add_route_matcher_result: ResultAddRoute =
-            self.route_matcher.write().await.add(&route_str, arc_func);
-        if let Err(err) = add_route_matcher_result {
-            panic!("{}", err);
-        }
+            .insert(route_str.clone(), arc_func);
         self
     }
 

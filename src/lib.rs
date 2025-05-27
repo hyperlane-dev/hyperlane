@@ -1,12 +1,12 @@
-pub(crate) mod config;
-pub(crate) mod context;
-pub(crate) mod error;
-pub(crate) mod handler;
-pub(crate) mod middleware;
-pub(crate) mod route;
-pub(crate) mod server;
-
+mod config;
+mod context;
+mod error;
+mod handler;
+mod middleware;
+mod route;
+mod server;
 mod tests;
+mod utils;
 
 pub use context::*;
 pub use error::*;
@@ -39,3 +39,12 @@ pub(crate) use tokio::{
     sync::{RwLockReadGuard, RwLockWriteGuard},
     task::yield_now,
 };
+
+#[cfg(test)]
+pub(crate) use utils::r#fn::*;
+
+#[cfg(test)]
+pub(crate) use std::any::Any;
+
+#[cfg(test)]
+pub(crate) use tokio::task::{JoinError, JoinHandle};

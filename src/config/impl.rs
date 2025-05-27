@@ -35,15 +35,16 @@ impl<'a> ServerConfig<'a> {
     }
 
     pub async fn disable_inner_http_handle(&self, route: String) -> bool {
+        ServerConfig::get_route_matcher(self)
+            .write()
+            .await
+            .add(&route, Arc::new(|_| Box::pin(async move {})))
+            .unwrap_or_else(|err| panic!("{}", err));
         let result: bool = self
             .get_disable_inner_http_handle()
             .write()
             .await
             .insert(route.clone());
-        let _ = ServerConfig::get_route_matcher(self)
-            .write()
-            .await
-            .add(&route, Arc::new(|_| Box::pin(async move {})));
         result
     }
 
@@ -72,15 +73,16 @@ impl<'a> ServerConfig<'a> {
     }
 
     pub async fn disable_inner_websocket_handle(&self, route: String) -> bool {
+        ServerConfig::get_route_matcher(self)
+            .write()
+            .await
+            .add(&route, Arc::new(|_| Box::pin(async move {})))
+            .unwrap_or_else(|err| panic!("{}", err));
         let result: bool = self
             .get_disable_inner_websocket_handle()
             .write()
             .await
             .insert(route.clone());
-        let _ = ServerConfig::get_route_matcher(self)
-            .write()
-            .await
-            .add(&route, Arc::new(|_| Box::pin(async move {})));
         result
     }
 
