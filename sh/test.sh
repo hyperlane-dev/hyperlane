@@ -1,2 +1,2 @@
 #!/bin/bash
-cargo test --release --verbose -- --nocapture
+RUST_BACKTRACE=1 cargo test --release --verbose -- --nocapture
