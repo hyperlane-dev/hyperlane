@@ -502,39 +502,7 @@ impl Context {
     }
 
     pub async fn is_enable_keep_alive(&self) -> bool {
-        let ctx: RwLockReadInnerContext = self.get_read_lock().await;
-        let headers: &RequestHeaders = ctx.get_request().get_headers();
-        if let Some(enable_keep_alive) = headers.iter().find_map(|(key, value)| {
-            if key == CONNECTION {
-                let value_lowercase: String = value.to_ascii_lowercase();
-                if value_lowercase == CONNECTION_KEEP_ALIVE {
-                    return Some(true);
-                } else if value_lowercase == CONNECTION_CLOSE {
-                    return Some(false);
-                }
-            }
-            return None;
-        }) {
-            return enable_keep_alive;
-        }
-        let enable_keep_alive: bool = ctx.get_request().get_version().is_http1_1_or_higher();
-        return enable_keep_alive;
-    }
-
-    pub async fn is_disable_keep_alive(&self) -> bool {
-        !self.is_enable_keep_alive().await
-    }
-
-    pub async fn is_enable_websocket(&self) -> bool {
-        self.get_read_lock()
-            .await
-            .get_request()
-            .get_upgrade_type()
-            .is_websocket()
-    }
-
-    pub async fn is_disable_websocket(&self) -> bool {
-        !self.is_enable_websocket().await
+        self.get_request().await.is_enable_keep_alive()
     }
 
     pub async fn handle_websocket(&self) -> ResponseResult {
@@ -610,23 +578,14 @@ impl Context {
         self
     }
 
-    pub async fn reset_request(&self) -> &Self {
-        self.set_request(Request::default()).await;
-        self
-    }
-
-    pub async fn reset_response(&self) -> &Self {
-        self.set_response(Response::default()).await;
-        self
-    }
-
-    pub async fn reset_request_response(&self) -> &Self {
-        self.reset_request().await.reset_response().await;
+    pub async fn reset_body_from_request_response(&self) -> &Self {
+        self.set_request_body(RequestBody::default()).await;
+        self.set_response_body(ResponseBody::default()).await;
         self
     }
 
     pub async fn http_request_from_stream(&self, buffer_size: usize) -> RequestReaderHandleResult {
-        self.reset_request_response().await;
+        self.reset_body_from_request_response().await;
         if self.get_aborted().await {
             return Err(RequestError::RequestAborted);
         }
@@ -645,7 +604,7 @@ impl Context {
         &self,
         buffer_size: usize,
     ) -> RequestReaderHandleResult {
-        self.reset_request_response().await;
+        self.reset_body_from_request_response().await;
         if self.get_aborted().await {
             return Err(RequestError::RequestAborted);
         }

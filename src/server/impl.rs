@@ -239,7 +239,7 @@ impl Server {
                     return;
                 }
                 let mut request: Request = request_result.unwrap_or_default();
-                let is_websocket: bool = request.get_upgrade_type().is_websocket();
+                let is_websocket: bool = request.upgrade_type_is_websocket();
                 let handler: RequestHandlerImmutableParams = RequestHandlerImmutableParams::new(
                     &stream,
                     &config_clone,
@@ -267,7 +267,6 @@ impl Server {
         request: &Request,
     ) -> bool {
         let stream: &ArcRwLockStream = handler.stream;
-
         let route: &String = request.get_path();
         let ctx: Context = Context::from_stream_request(stream, request);
         for middleware in handler.request_middleware.read().await.iter() {
