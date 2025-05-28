@@ -612,7 +612,7 @@ impl Context {
             let request_res: RequestReaderHandleResult =
                 Request::websocket_request_from_stream(stream, buffer_size).await;
             if let Ok(request) = request_res.as_ref() {
-                self.set_request(request.clone()).await;
+                self.set_request_body(request.get_body().clone()).await;
             }
             return request_res;
         };
