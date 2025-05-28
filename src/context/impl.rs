@@ -610,11 +610,18 @@ impl Context {
         self
     }
 
+    pub async fn reset_request(&self) -> &Self {
+        self.set_request(Request::default()).await;
+        self
+    }
+
+    pub async fn reset_response(&self) -> &Self {
+        self.set_response(Response::default()).await;
+        self
+    }
+
     pub async fn reset_request_response(&self) -> &Self {
-        self.set_request(Request::default())
-            .await
-            .set_response(Response::default())
-            .await;
+        self.reset_request().await.reset_response().await;
         self
     }
 
@@ -626,7 +633,7 @@ impl Context {
         if let Some(stream) = self.get_stream().await.as_ref() {
             let request_res: RequestReaderHandleResult =
                 Request::http_request_from_stream(stream, buffer_size).await;
-            if let Ok(ref request) = request_res {
+            if let Ok(request) = request_res.as_ref() {
                 self.set_request(request.clone()).await;
             }
             return request_res;
@@ -645,7 +652,7 @@ impl Context {
         if let Some(stream) = self.get_stream().await.as_ref() {
             let request_res: RequestReaderHandleResult =
                 Request::websocket_request_from_stream(stream, buffer_size).await;
-            if let Ok(ref request) = request_res {
+            if let Ok(request) = request_res.as_ref() {
                 self.set_request(request.clone()).await;
             }
             return request_res;
