@@ -610,9 +610,26 @@ impl Context {
         self
     }
 
+    pub async fn reset_request_response(&self) -> &Self {
+        self.set_request(Request::default())
+            .await
+            .set_response(Response::default())
+            .await;
+        self
+    }
+
     pub async fn http_request_from_stream(&self, buffer_size: usize) -> RequestReaderHandleResult {
+        self.reset_request_response().await;
+        if self.get_aborted().await {
+            return Err(RequestError::RequestAborted);
+        }
         if let Some(stream) = self.get_stream().await.as_ref() {
-            return Request::http_request_from_stream(stream, buffer_size).await;
+            let request_res: RequestReaderHandleResult =
+                Request::http_request_from_stream(stream, buffer_size).await;
+            if let Ok(ref request) = request_res {
+                self.set_request(request.clone()).await;
+            }
+            return request_res;
         };
         Err(RequestError::GetTcpStreamError)
     }
@@ -621,8 +638,17 @@ impl Context {
         &self,
         buffer_size: usize,
     ) -> RequestReaderHandleResult {
+        self.reset_request_response().await;
+        if self.get_aborted().await {
+            return Err(RequestError::RequestAborted);
+        }
         if let Some(stream) = self.get_stream().await.as_ref() {
-            return Request::websocket_request_from_stream(stream, buffer_size).await;
+            let request_res: RequestReaderHandleResult =
+                Request::websocket_request_from_stream(stream, buffer_size).await;
+            if let Ok(ref request) = request_res {
+                self.set_request(request.clone()).await;
+            }
+            return request_res;
         };
         Err(RequestError::GetTcpStreamError)
     }
