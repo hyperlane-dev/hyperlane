@@ -319,10 +319,10 @@ impl Server {
             while Self::handle_request_common(handler, first_request).await {}
             return;
         }
-        while let Ok(request) = Request::websocket_request_from_stream(stream, buffer_size).await {
-            let body: RequestBody = request.get_body().clone();
-            first_request.set_body(body);
-            let _ = Self::handle_request_common(handler, first_request).await;
+        while let Ok(request) =
+            Request::websocket_request_from_stream(stream, buffer_size, &first_request).await
+        {
+            let _ = Self::handle_request_common(handler, &request).await;
         }
     }
 

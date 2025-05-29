@@ -317,86 +317,10 @@ impl Context {
             .clone()
     }
 
-    pub async fn set_request(&self, request_data: Request) -> &Self {
-        self.get_write_lock().await.set_request(request_data);
-        self
-    }
-
-    pub async fn set_request_method<T>(&self, method: T) -> &Self
-    where
-        T: Into<RequestMethod>,
-    {
+    async fn set_request(&self, request_data: &Request) -> &Self {
         self.get_write_lock()
             .await
-            .get_mut_request()
-            .set_method(method);
-        self
-    }
-
-    pub async fn set_request_host<T>(&self, host: T) -> &Self
-    where
-        T: Into<RequestHost>,
-    {
-        self.get_write_lock().await.get_mut_request().set_host(host);
-        self
-    }
-
-    pub async fn set_request_path<T>(&self, path: T) -> &Self
-    where
-        T: Into<RequestPath>,
-    {
-        self.get_write_lock().await.get_mut_request().set_path(path);
-        self
-    }
-
-    pub async fn set_request_query<K, V>(&self, key: K, value: V) -> &Self
-    where
-        K: Into<RequestQuerysKey>,
-        V: Into<RequestQuerysValue>,
-    {
-        self.get_write_lock()
-            .await
-            .get_mut_request()
-            .set_query(key, value);
-        self
-    }
-
-    pub async fn set_request_querys<T>(&self, querys: T) -> &Self
-    where
-        T: Into<RequestQuerys>,
-    {
-        self.get_write_lock()
-            .await
-            .get_mut_request()
-            .set_querys(querys.into());
-        self
-    }
-
-    pub async fn set_request_header<K, V>(&self, key: K, value: V) -> &Self
-    where
-        K: Into<String>,
-        V: Into<String>,
-    {
-        self.get_write_lock()
-            .await
-            .get_mut_request()
-            .set_header(key, value);
-        self
-    }
-
-    pub async fn set_request_headers(&self, headers: RequestHeaders) -> &Self {
-        self.get_write_lock()
-            .await
-            .get_mut_request()
-            .set_headers(headers);
-        self
-    }
-
-    pub async fn set_request_body<T>(&self, body: T) -> &Self
-    where
-        T: Into<RequestBody>,
-    {
-        self.get_write_lock().await.get_mut_request().set_body(body);
+            .set_request(request_data.clone());
         self
     }
 
@@ -578,14 +502,13 @@ impl Context {
         self
     }
 
-    pub async fn reset_body_from_request_response(&self) -> &Self {
-        self.set_request_body(RequestBody::default()).await;
+    pub async fn reset_response_body(&self) -> &Self {
         self.set_response_body(ResponseBody::default()).await;
         self
     }
 
     pub async fn http_request_from_stream(&self, buffer_size: usize) -> RequestReaderHandleResult {
-        self.reset_body_from_request_response().await;
+        self.reset_response_body().await;
         if self.get_aborted().await {
             return Err(RequestError::RequestAborted);
         }
@@ -593,7 +516,7 @@ impl Context {
             let request_res: RequestReaderHandleResult =
                 Request::http_request_from_stream(stream, buffer_size).await;
             if let Ok(request) = request_res.as_ref() {
-                self.set_request(request.clone()).await;
+                self.set_request(request).await;
             }
             return request_res;
         };
@@ -604,15 +527,16 @@ impl Context {
         &self,
         buffer_size: usize,
     ) -> RequestReaderHandleResult {
-        self.reset_body_from_request_response().await;
+        self.reset_response_body().await;
         if self.get_aborted().await {
             return Err(RequestError::RequestAborted);
         }
         if let Some(stream) = self.get_stream().await.as_ref() {
+            let last_request: Request = self.get_request().await;
             let request_res: RequestReaderHandleResult =
-                Request::websocket_request_from_stream(stream, buffer_size).await;
+                Request::websocket_request_from_stream(stream, buffer_size, &last_request).await;
             if let Ok(request) = request_res.as_ref() {
-                self.set_request_body(request.get_body().clone()).await;
+                self.set_request(request).await;
             }
             return request_res;
         };
