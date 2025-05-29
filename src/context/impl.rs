@@ -317,8 +317,10 @@ impl Context {
             .clone()
     }
 
-    pub async fn set_request(&self, request_data: Request) -> &Self {
-        self.get_write_lock().await.set_request(request_data);
+    async fn set_request(&self, request_data: &Request) -> &Self {
+        self.get_write_lock()
+            .await
+            .set_request(request_data.clone());
         self
     }
 
@@ -514,7 +516,7 @@ impl Context {
             let request_res: RequestReaderHandleResult =
                 Request::http_request_from_stream(stream, buffer_size).await;
             if let Ok(request) = request_res.as_ref() {
-                self.set_request(request.clone()).await;
+                self.set_request(request).await;
             }
             return request_res;
         };
@@ -534,7 +536,7 @@ impl Context {
             let request_res: RequestReaderHandleResult =
                 Request::websocket_request_from_stream(stream, buffer_size, &last_request).await;
             if let Ok(request) = request_res.as_ref() {
-                self.set_request(request.clone()).await;
+                self.set_request(request).await;
             }
             return request_res;
         };
