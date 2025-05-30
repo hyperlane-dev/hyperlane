@@ -216,7 +216,7 @@ impl Server {
         let addr: String = Context::format_host_port(host, &port);
         let tcp_listener: TcpListener = TcpListener::bind(&addr)
             .await
-            .map_err(|err| ServerError::TcpBindError(err.to_string()))?;
+            .map_err(|err| ServerError::TcpBind(err.to_string()))?;
         while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
             let _ = stream.set_nodelay(nodelay);
             let _ = stream.set_linger(linger);

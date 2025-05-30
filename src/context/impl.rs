@@ -136,7 +136,9 @@ impl Context {
         if let Some(stream_lock) = self.get_stream().await {
             let mut ctx: RwLockWriteInnerContext = self.get_write_lock().await;
             if !handle_websocket && self.inner_is_websocket(&ctx) {
-                return Err(ResponseError::NotSupportUseThisMethod);
+                return Err(ResponseError::MethodNotSupported(
+                    "websocket does not support calling this method".to_owned(),
+                ));
             }
             let body: ResponseBody = response_body.into();
             let response_res: ResponseResult = ctx
@@ -172,22 +174,10 @@ impl Context {
     where
         T: Into<ResponseBody>,
     {
-        if let Some(stream_lock) = self.get_stream().await {
-            let mut ctx: RwLockWriteInnerContext = self.get_write_lock().await;
-            if self.inner_is_websocket(&ctx) {
-                return Err(ResponseError::NotSupportUseThisMethod);
-            }
-            let response: &mut Response = ctx.get_mut_response();
-            let body: ResponseBody = response_body.into();
-            let response_res: ResponseResult = response
-                .set_body(body)
-                .set_status_code(status_code)
-                .send(&stream_lock)
-                .await;
-            let _ = response.close(&stream_lock).await;
-            return response_res;
-        }
-        Err(ResponseError::NotFoundStream)
+        self.inner_send_response(status_code, response_body, false)
+            .await?;
+        self.close().await?;
+        Ok(())
     }
 
     pub async fn send_once(&self) -> ResponseResult {
@@ -443,7 +433,10 @@ impl Context {
                 .inner_send_response(101, "", true)
                 .await;
         }
-        Err(ResponseError::WebSocketHandShakeError)
+        Err(ResponseError::WebSocketHandShake(format!(
+            "missing {} header",
+            SEC_WEBSOCKET_KEY
+        )))
     }
 
     pub fn format_host_port(host: &str, port: &usize) -> String {
@@ -520,7 +513,7 @@ impl Context {
             }
             return request_res;
         };
-        Err(RequestError::GetTcpStreamError)
+        Err(RequestError::GetTcpStream)
     }
 
     pub async fn websocket_request_from_stream(
@@ -540,6 +533,6 @@ impl Context {
             }
             return request_res;
         };
-        Err(RequestError::GetTcpStreamError)
+        Err(RequestError::GetTcpStream)
     }
 }

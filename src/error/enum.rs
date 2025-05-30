@@ -2,14 +2,14 @@ use crate::*;
 
 #[derive(Debug)]
 pub enum ServerError {
-    TcpBindError(String),
-    HttpReadError(String),
-    InvalidHttpRequest(RequestError),
-    Unknown,
+    TcpBind(String),
+    Unknown(String),
+    HttpRead(String),
+    InvalidHttpRequest(Request),
 }
 
 #[derive(Debug)]
 pub(crate) enum RouteError {
-    DuplicatePattern(String),
     EmptyPattern,
+    DuplicatePattern(String),
 }
