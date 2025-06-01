@@ -7,6 +7,7 @@ impl PartialEq for RouteSegment {
                 segment1 == segment2
             }
             (RouteSegment::Dynamic(_), RouteSegment::Dynamic(_)) => true,
+            (RouteSegment::Regex(name1, _), RouteSegment::Regex(name2, _)) => name1 == name2,
             _ => false,
         }
     }
@@ -40,11 +41,27 @@ impl RoutePattern {
             return Ok(segments);
         }
         for segment in route.split(DEFAULT_HTTP_PATH) {
-            if segment.starts_with(COLON_SPACE_SYMBOL) {
-                let param_name: String = segment[1..].to_string();
-                segments.push(RouteSegment::Dynamic(param_name));
+            if segment.starts_with(DYNAMIC_ROUTE_LEFT_BRACKET)
+                && segment.ends_with(DYNAMIC_ROUTE_RIGHT_BRACKET)
+            {
+                let content: &str = &segment[1..segment.len() - 1];
+                if let Some((name, pattern)) = content.split_once(':') {
+                    match Regex::new(pattern) {
+                        Ok(regex) => {
+                            segments.push(RouteSegment::Regex(name.to_owned(), regex));
+                        }
+                        Err(err) => {
+                            return Err(RouteError::InvalidRegexPattern(format!(
+                                "Invalid regex pattern '{}{}{}",
+                                pattern, COLON_SPACE, err
+                            )));
+                        }
+                    }
+                } else {
+                    segments.push(RouteSegment::Dynamic(content.to_owned()));
+                }
             } else {
-                segments.push(RouteSegment::Static(segment.to_string()));
+                segments.push(RouteSegment::Static(segment.to_owned()));
             }
         }
         Ok(segments)
@@ -69,7 +86,18 @@ impl RoutePattern {
                     }
                 }
                 RouteSegment::Dynamic(param_name) => {
-                    params.insert(param_name.clone(), path_segments[idx].to_string());
+                    params.insert(param_name.clone(), path_segments[idx].to_owned());
+                }
+                RouteSegment::Regex(param_name, regex) => {
+                    let segment: &str = path_segments[idx];
+                    if !regex.is_match(segment)
+                        || regex
+                            .find(segment)
+                            .map_or(false, |m| m.start() != 0 || m.end() != segment.len())
+                    {
+                        return None;
+                    }
+                    params.insert(param_name.clone(), segment.to_owned());
                 }
             }
         }
@@ -89,7 +117,7 @@ impl RouteMatcher {
             .iter()
             .any(|(tmp_pattern, _)| tmp_pattern == &route_pattern);
         if has_same_pattern {
-            return Err(RouteError::DuplicatePattern(pattern.to_string()));
+            return Err(RouteError::DuplicatePattern(pattern.to_owned()));
         }
         self.0.push((route_pattern, handler));
         return Ok(());

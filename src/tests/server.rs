@@ -32,6 +32,11 @@ async fn test_server() {
         let _ = ctx.send_response_body(request_body).await;
     }
 
+    async fn dynamic_routing(ctx: Context) {
+        let param: RouteParams = ctx.get_route_params().await;
+        panic!("Test panic {:?}", param);
+    }
+
     fn error_handle(error: String) {
         eprintln!("{}", error);
         let _ = std::io::Write::flush(&mut std::io::stderr());
@@ -50,11 +55,9 @@ async fn test_server() {
         server.response_middleware(response_middleware).await;
         server.route("/", root_route).await;
         server.route("/websocket", websocket_route).await;
+        server.route("/dynamic/{routing}", dynamic_routing).await;
         server
-            .route("/test/:text", move |ctx: Context| async move {
-                let param: RouteParams = ctx.get_route_params().await;
-                panic!("Test panic {:?}", param);
-            })
+            .route("/dynamic/routing/{number:\\d+}", dynamic_routing)
             .await;
         server.run().await.unwrap();
     }

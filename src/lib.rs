@@ -33,6 +33,7 @@ pub(crate) use std::{
 };
 
 pub(crate) use lombok_macros::*;
+pub(crate) use regex::Regex;
 pub(crate) use serde::de::DeserializeOwned;
 pub(crate) use tokio::{
     net::TcpListener,

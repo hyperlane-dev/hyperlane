@@ -26,6 +26,9 @@ impl Display for RouteError {
             Self::DuplicatePattern(err) => {
                 write!(f, "Route pattern already exists{}{}", COLON_SPACE, err)
             }
+            Self::InvalidRegexPattern(err) => {
+                write!(f, "Invalid regex pattern{}{}", COLON_SPACE, err)
+            }
         }
     }
 }

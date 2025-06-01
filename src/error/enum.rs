@@ -12,4 +12,5 @@ pub enum ServerError {
 pub(crate) enum RouteError {
     EmptyPattern,
     DuplicatePattern(String),
+    InvalidRegexPattern(String),
 }
