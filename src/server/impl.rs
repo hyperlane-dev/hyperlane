@@ -269,35 +269,31 @@ impl Server {
         let stream: &ArcRwLockStream = handler.stream;
         let route: &String = request.get_path();
         let ctx: Context = Context::from_stream_request(stream, request);
+        let return_handle = || async {
+            yield_now().await;
+            request.is_enable_keep_alive()
+        };
         for middleware in handler.request_middleware.read().await.iter() {
             middleware(ctx.clone()).await;
             if ctx.get_aborted().await {
-                break;
+                return return_handle().await;
             }
         }
-        if !ctx.get_aborted().await {
-            let mut route_handled: bool = false;
-            if let Some(route_handler) = handler.route_func.read().await.get(route) {
-                route_handler(ctx.clone()).await;
-                route_handled = true;
-            }
-            if !route_handled {
-                if let Some((handler_func, params)) =
-                    handler.route_matcher.read().await.match_route(route)
-                {
-                    ctx.set_route_params(params).await;
-                    handler_func(ctx.clone()).await;
-                }
-            }
-            for middleware in handler.response_middleware.read().await.iter() {
-                if ctx.get_aborted().await {
-                    break;
-                }
-                middleware(ctx.clone()).await;
-            }
+        if let Some(route_handler) = handler.route_func.read().await.get(route) {
+            route_handler(ctx.clone()).await;
+        } else if let Some((handler_func, params)) =
+            handler.route_matcher.read().await.match_route(route)
+        {
+            ctx.set_route_params(params).await;
+            handler_func(ctx.clone()).await;
         }
-        yield_now().await;
-        request.is_enable_keep_alive()
+        for middleware in handler.response_middleware.read().await.iter() {
+            if ctx.get_aborted().await {
+                return return_handle().await;
+            }
+            middleware(ctx.clone()).await;
+        }
+        return_handle().await
     }
 
     async fn handle_websocket_connection<'a>(
