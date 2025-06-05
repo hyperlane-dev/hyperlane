@@ -271,7 +271,7 @@ impl Server {
         let ctx: Context = Context::from_stream_request(stream, request);
         let return_handle = || async {
             yield_now().await;
-            request.is_enable_keep_alive()
+            request.is_enable_keep_alive() && !ctx.get_aborted().await
         };
         for middleware in handler.request_middleware.read().await.iter() {
             middleware(ctx.clone()).await;
