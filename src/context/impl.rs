@@ -387,7 +387,7 @@ impl Context {
     {
         self.write()
             .await
-            .get_mut_attribute()
+            .get_mut_attributes()
             .insert(key.to_owned(), Arc::new(value.clone()));
         self
     }
@@ -398,19 +398,19 @@ impl Context {
     {
         self.read()
             .await
-            .get_attribute()
+            .get_attributes()
             .get(key)
             .and_then(|arc| arc.downcast_ref::<T>())
             .cloned()
     }
 
     pub async fn remove_attribute(&self, key: &str) -> &Self {
-        self.write().await.get_mut_attribute().remove(key);
+        self.write().await.get_mut_attributes().remove(key);
         self
     }
 
     pub async fn clear_attribute(&self) -> &Self {
-        self.write().await.get_mut_attribute().clear();
+        self.write().await.get_mut_attributes().clear();
         self
     }
 
