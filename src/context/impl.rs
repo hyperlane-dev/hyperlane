@@ -14,32 +14,32 @@ impl Context {
         ctx
     }
 
-    async fn get_read_lock(&self) -> RwLockReadInnerContext {
+    async fn read(&self) -> RwLockReadInnerContext {
         self.0.read().await
     }
 
-    async fn get_write_lock(&self) -> RwLockWriteInnerContext {
+    async fn write(&self) -> RwLockWriteInnerContext {
         self.0.write().await
     }
 
     pub async fn get_stream(&self) -> OptionArcRwLockStream {
-        self.get_read_lock().await.get_stream().clone()
+        self.read().await.get_stream().clone()
     }
 
     pub async fn get_request(&self) -> Request {
-        self.get_read_lock().await.get_request().clone()
+        self.read().await.get_request().clone()
     }
 
     pub async fn get_response(&self) -> Response {
-        self.get_read_lock().await.get_response().clone()
+        self.read().await.get_response().clone()
     }
 
     pub async fn get_request_string(&self) -> String {
-        self.get_read_lock().await.get_request().get_string()
+        self.read().await.get_request().get_string()
     }
 
     pub async fn get_response_string(&self) -> String {
-        self.get_read_lock().await.get_response().get_string()
+        self.read().await.get_response().get_string()
     }
 
     pub async fn get_socket_addr(&self) -> OptionSocketAddr {
@@ -47,12 +47,8 @@ impl Context {
         if stream_result.is_none() {
             return None;
         }
-        let socket_addr_opt: OptionSocketAddr = stream_result
-            .unwrap()
-            .get_read_lock()
-            .await
-            .peer_addr()
-            .ok();
+        let socket_addr_opt: OptionSocketAddr =
+            stream_result.unwrap().read().await.peer_addr().ok();
         socket_addr_opt
     }
 
@@ -63,7 +59,7 @@ impl Context {
         }
         let socket_addr: SocketAddr = stream_result
             .unwrap()
-            .get_read_lock()
+            .read()
             .await
             .peer_addr()
             .unwrap_or(DEFAULT_SOCKET_ADDR);
@@ -85,20 +81,15 @@ impl Context {
     }
 
     pub async fn get_route_params_lock(&self) -> ArcRwLockRouteParams {
-        self.get_read_lock().await.get_route_params().clone()
+        self.read().await.get_route_params().clone()
     }
 
     pub async fn get_route_params(&self) -> RouteParams {
-        self.get_read_lock()
-            .await
-            .get_route_params()
-            .read()
-            .await
-            .clone()
+        self.read().await.get_route_params().read().await.clone()
     }
 
     pub async fn get_route_param(&self, name: &str) -> OptionString {
-        self.get_read_lock()
+        self.read()
             .await
             .get_route_params()
             .read()
@@ -108,9 +99,7 @@ impl Context {
     }
 
     pub(crate) async fn set_route_params(&self, params: RouteParams) -> &Self {
-        self.get_write_lock()
-            .await
-            .set_route_params(arc_rwlock(params));
+        self.write().await.set_route_params(arc_rwlock(params));
         self
     }
 
@@ -121,7 +110,7 @@ impl Context {
     }
 
     fn inner_is_websocket(&self, ctx: &RwLockWriteInnerContext) -> bool {
-        ctx.get_request().get_upgrade_type().is_websocket()
+        ctx.get_request().upgrade_type_is_websocket()
     }
 
     async fn inner_send_response<T>(
@@ -133,21 +122,22 @@ impl Context {
     where
         T: Into<ResponseBody>,
     {
+        if self.get_closed().await {
+            return Err(ResponseError::ConnectionClosed);
+        }
         if let Some(stream_lock) = self.get_stream().await {
-            let mut ctx: RwLockWriteInnerContext = self.get_write_lock().await;
+            let mut ctx: RwLockWriteInnerContext = self.write().await;
             if !handle_websocket && self.inner_is_websocket(&ctx) {
                 return Err(ResponseError::MethodNotSupported(
                     "websocket does not support calling this method".to_owned(),
                 ));
             }
-            let body: ResponseBody = response_body.into();
-            let response_res: ResponseResult = ctx
+            let response_res: ResponseData = ctx
                 .get_mut_response()
-                .set_body(body)
+                .set_body(response_body)
                 .set_status_code(status_code)
-                .send(&stream_lock)
-                .await;
-            return response_res;
+                .build();
+            return stream_lock.send(&response_res).await;
         }
         Err(ResponseError::NotFoundStream)
     }
@@ -176,7 +166,7 @@ impl Context {
     {
         self.inner_send_response(status_code, response_body, false)
             .await?;
-        self.close().await?;
+        self.closed().await;
         Ok(())
     }
 
@@ -190,16 +180,19 @@ impl Context {
     where
         T: Into<ResponseBody>,
     {
+        if self.get_closed().await {
+            return Err(ResponseError::ConnectionClosed);
+        }
         if let Some(stream_lock) = self.get_stream().await {
             let is_websocket: bool = self.get_request_upgrade_type().await.is_websocket();
-            let response_res: ResponseResult = self
-                .get_write_lock()
+            let response_body: ResponseBody = response_body.into();
+            self.write()
                 .await
                 .get_mut_response()
-                .set_body(response_body)
-                .send_body_with_websocket_flag(&stream_lock, is_websocket)
+                .set_body(response_body.clone());
+            return stream_lock
+                .send_body_with_websocket_flag(&response_body, is_websocket)
                 .await;
-            return response_res;
         }
         Err(ResponseError::NotFoundStream)
     }
@@ -209,59 +202,35 @@ impl Context {
         self.send_response_body(body).await
     }
 
-    pub async fn close(&self) -> ResponseResult {
-        if let Some(stream_lock) = self.get_stream().await {
-            return self
-                .get_write_lock()
-                .await
-                .get_mut_response()
-                .close(&stream_lock)
-                .await;
-        }
-        Err(ResponseError::NotFoundStream)
-    }
-
     pub async fn flush(&self) -> ResponseResult {
         if let Some(stream_lock) = self.get_stream().await {
-            return self
-                .get_write_lock()
-                .await
-                .get_mut_response()
-                .flush(&stream_lock)
-                .await;
+            stream_lock.flush().await;
+            return Ok(());
         }
         Err(ResponseError::NotFoundStream)
     }
 
     pub async fn get_request_method(&self) -> RequestMethod {
-        self.get_read_lock()
-            .await
-            .get_request()
-            .get_method()
-            .clone()
+        self.read().await.get_request().get_method().clone()
     }
 
     pub async fn get_request_host(&self) -> RequestHost {
-        self.get_read_lock().await.get_request().get_host().clone()
+        self.read().await.get_request().get_host().clone()
     }
 
     pub async fn get_request_path(&self) -> RequestPath {
-        self.get_read_lock().await.get_request().get_path().clone()
+        self.read().await.get_request().get_path().clone()
     }
 
     pub async fn get_request_querys(&self) -> RequestQuerys {
-        self.get_read_lock()
-            .await
-            .get_request()
-            .get_querys()
-            .clone()
+        self.read().await.get_request().get_querys().clone()
     }
 
     pub async fn get_request_query<T>(&self, key: T) -> OptionRequestQuerysValue
     where
         T: Into<RequestHeadersKey>,
     {
-        self.get_read_lock()
+        self.read()
             .await
             .get_request()
             .get_querys()
@@ -270,98 +239,76 @@ impl Context {
     }
 
     pub async fn get_request_body(&self) -> RequestBody {
-        self.get_read_lock().await.get_request().get_body().clone()
+        self.read().await.get_request().get_body().clone()
     }
 
     pub async fn get_request_body_string(&self) -> String {
-        self.get_read_lock().await.get_request().get_body_string()
+        self.read().await.get_request().get_body_string()
     }
 
     pub async fn get_request_body_json<T>(&self) -> ResultSerdeJsonError<T>
     where
         T: DeserializeOwned,
     {
-        self.get_read_lock().await.get_request().get_body_json()
+        self.read().await.get_request().get_body_json()
     }
 
     pub async fn get_request_header<K>(&self, key: K) -> OptionRequestHeadersValue
     where
         K: Into<RequestHeadersKey>,
     {
-        self.get_read_lock().await.get_request().get_header(key)
+        self.read().await.get_request().get_header(key)
     }
 
     pub async fn get_request_headers(&self) -> RequestHeaders {
-        self.get_read_lock()
-            .await
-            .get_request()
-            .get_headers()
-            .clone()
+        self.read().await.get_request().get_headers().clone()
     }
 
     pub async fn get_request_upgrade_type(&self) -> UpgradeType {
-        self.get_read_lock()
-            .await
-            .get_request()
-            .get_upgrade_type()
-            .clone()
+        self.read().await.get_request().get_upgrade_type().clone()
     }
 
     async fn set_request(&self, request_data: &Request) -> &Self {
-        self.get_write_lock()
-            .await
-            .set_request(request_data.clone());
+        self.write().await.set_request(request_data.clone());
         self
     }
 
     pub async fn get_response_headers(&self) -> ResponseHeaders {
-        self.get_read_lock()
-            .await
-            .get_response()
-            .get_headers()
-            .clone()
+        self.read().await.get_response().get_headers().clone()
     }
 
     pub async fn get_response_header<K>(&self, key: K) -> OptionResponseHeadersValue
     where
         K: Into<ResponseHeadersKey>,
     {
-        self.get_read_lock().await.get_response().get_header(key)
+        self.read().await.get_response().get_header(key)
     }
 
     pub async fn get_response_body(&self) -> ResponseBody {
-        self.get_read_lock().await.get_response().get_body().clone()
+        self.read().await.get_response().get_body().clone()
     }
 
     pub async fn get_response_body_string(&self) -> String {
-        self.get_read_lock().await.get_response().get_body_string()
+        self.read().await.get_response().get_body_string()
     }
 
     pub async fn get_response_body_json<T>(&self) -> ResultSerdeJsonError<T>
     where
         T: DeserializeOwned,
     {
-        self.get_read_lock().await.get_response().get_body_json()
+        self.read().await.get_response().get_body_json()
     }
 
     pub async fn get_response_reason_phrase(&self) -> ResponseReasonPhrase {
-        self.get_read_lock()
-            .await
-            .get_response()
-            .get_reason_phrase()
-            .clone()
+        self.read().await.get_response().get_reason_phrase().clone()
     }
 
     pub async fn get_response_status_code(&self) -> ResponseStatusCode {
-        self.get_read_lock()
-            .await
-            .get_response()
-            .get_status_code()
-            .clone()
+        self.read().await.get_response().get_status_code().clone()
     }
 
     pub async fn set_response(&self, response: Response) -> &Self {
-        self.get_write_lock().await.set_response(response);
+        self.write().await.set_response(response);
         self
     }
 
@@ -370,18 +317,12 @@ impl Context {
         K: Into<String>,
         V: Into<String>,
     {
-        self.get_write_lock()
-            .await
-            .get_mut_response()
-            .set_header(key, value);
+        self.write().await.get_mut_response().set_header(key, value);
         self
     }
 
     pub async fn set_response_headers(&self, headers: ResponseHeaders) -> &Self {
-        self.get_write_lock()
-            .await
-            .get_mut_response()
-            .set_headers(headers);
+        self.write().await.get_mut_response().set_headers(headers);
         self
     }
 
@@ -389,10 +330,7 @@ impl Context {
     where
         T: Into<ResponseBody>,
     {
-        self.get_write_lock()
-            .await
-            .get_mut_response()
-            .set_body(body);
+        self.write().await.get_mut_response().set_body(body);
         self
     }
 
@@ -400,7 +338,7 @@ impl Context {
     where
         T: Into<ResponseReasonPhrase>,
     {
-        self.get_write_lock()
+        self.write()
             .await
             .get_mut_response()
             .set_reason_phrase(reason_phrase);
@@ -408,7 +346,7 @@ impl Context {
     }
 
     pub async fn set_response_status_code(&self, status_code: ResponseStatusCode) -> &Self {
-        self.get_write_lock()
+        self.write()
             .await
             .get_mut_response()
             .set_status_code(status_code);
@@ -447,7 +385,7 @@ impl Context {
     where
         T: AnySendSyncClone,
     {
-        self.get_write_lock()
+        self.write()
             .await
             .get_mut_attribute()
             .insert(key.to_owned(), Arc::new(value.clone()));
@@ -458,7 +396,7 @@ impl Context {
     where
         T: AnySendSyncClone,
     {
-        self.get_read_lock()
+        self.read()
             .await
             .get_attribute()
             .get(key)
@@ -467,21 +405,21 @@ impl Context {
     }
 
     pub async fn remove_attribute(&self, key: &str) -> &Self {
-        self.get_write_lock().await.get_mut_attribute().remove(key);
+        self.write().await.get_mut_attribute().remove(key);
         self
     }
 
     pub async fn clear_attribute(&self) -> &Self {
-        self.get_write_lock().await.get_mut_attribute().clear();
+        self.write().await.get_mut_attribute().clear();
         self
     }
 
     pub async fn get_aborted(&self) -> bool {
-        *self.get_write_lock().await.get_aborted()
+        *self.write().await.get_aborted()
     }
 
     pub async fn set_aborted(&self, aborted: bool) -> &Self {
-        self.get_write_lock().await.set_aborted(aborted);
+        self.write().await.set_aborted(aborted);
         self
     }
 
@@ -492,6 +430,25 @@ impl Context {
 
     pub async fn cancel_aborted(&self) -> &Self {
         self.set_aborted(false).await;
+        self
+    }
+
+    pub async fn get_closed(&self) -> bool {
+        *self.write().await.get_closed()
+    }
+
+    pub async fn set_closed(&self, closed: bool) -> &Self {
+        self.write().await.set_closed(closed);
+        self
+    }
+
+    pub async fn closed(&self) -> &Self {
+        self.set_closed(true).await;
+        self
+    }
+
+    pub async fn cancel_closed(&self) -> &Self {
+        self.set_closed(false).await;
         self
     }
 

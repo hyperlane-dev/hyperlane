@@ -235,7 +235,6 @@ impl Server {
                 let request_result: RequestReaderHandleResult =
                     Request::http_request_from_stream(&stream, http_line_buffer_size).await;
                 if request_result.is_err() {
-                    let _ = stream.close().await;
                     return;
                 }
                 let mut request: Request = request_result.unwrap_or_default();
@@ -256,7 +255,6 @@ impl Server {
                         Self::handle_http_connection(&handler, &request).await;
                     }
                 };
-                let _ = stream.close().await;
             });
         }
         Ok(())
@@ -269,14 +267,27 @@ impl Server {
         let stream: &ArcRwLockStream = handler.stream;
         let route: &String = request.get_path();
         let ctx: Context = Context::from_stream_request(stream, request);
-        let return_handle = || async {
+        let request_keepalive: bool = request.is_enable_keep_alive();
+        let get_aborted_closed = || async {
+            let aborted: bool = ctx.get_aborted().await;
+            let closed: bool = ctx.get_closed().await;
+            (aborted, closed)
+        };
+        let return_handle = |closed: bool| async move {
             yield_now().await;
-            request.is_enable_keep_alive() && !ctx.get_aborted().await
+            !closed && request_keepalive
+        };
+        let check_need_return = || async {
+            let (aborted, closed) = get_aborted_closed().await;
+            if aborted || closed {
+                return Some(return_handle(closed).await);
+            }
+            None
         };
         for middleware in handler.request_middleware.read().await.iter() {
             middleware(ctx.clone()).await;
-            if ctx.get_aborted().await {
-                return return_handle().await;
+            if let Some(result) = check_need_return().await {
+                return result;
             }
         }
         if let Some(route_handler) = handler.route_func.read().await.get(route) {
@@ -286,14 +297,17 @@ impl Server {
         {
             ctx.set_route_params(params).await;
             handler_func(ctx.clone()).await;
+            if let Some(result) = check_need_return().await {
+                return result;
+            }
         }
         for middleware in handler.response_middleware.read().await.iter() {
-            if ctx.get_aborted().await {
-                return return_handle().await;
-            }
             middleware(ctx.clone()).await;
+            if let Some(result) = check_need_return().await {
+                return result;
+            }
         }
-        return_handle().await
+        return_handle(false).await
     }
 
     async fn handle_websocket_connection<'a>(

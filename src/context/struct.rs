@@ -8,6 +8,7 @@ pub struct InnerContext {
     attribute: HashMapArcAnySendSync,
     route_params: ArcRwLockRouteParams,
     aborted: bool,
+    closed: bool,
 }
 
 #[derive(Clone, Default)]
