@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "5.18.0"
+version = "5.18.1"
 edition = "2024"
 authors = ["root@ltpp.vip"] 
 license = "MIT"
@@ -19,7 +19,7 @@ exclude = [
 ]
 
 [dependencies]
-http-type = "4.18.0"
+http-type = "4.18.1"
 lombok-macros = "1.12.0"
 serde = "1.0.219"
 regex = "1.10.2"

@@ -330,7 +330,7 @@ impl Server {
             return;
         }
         while let Ok(request) =
-            Request::websocket_request_from_stream(stream, buffer_size, &first_request).await
+            Request::websocket_request_from_stream(stream, buffer_size, first_request).await
         {
             let _ = Self::handle_request_common(handler, &request).await;
         }

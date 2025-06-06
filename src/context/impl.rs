@@ -482,11 +482,17 @@ impl Context {
             return Err(RequestError::RequestAborted);
         }
         if let Some(stream) = self.get_stream().await.as_ref() {
-            let last_request: Request = self.get_request().await;
+            let mut last_request: Request = self.get_request().await;
             let request_res: RequestReaderHandleResult =
-                Request::websocket_request_from_stream(stream, buffer_size, &last_request).await;
-            if let Ok(request) = request_res.as_ref() {
-                self.set_request(request).await;
+                Request::websocket_request_from_stream(stream, buffer_size, &mut last_request)
+                    .await;
+            match request_res.as_ref() {
+                Ok(request) => {
+                    self.set_request(&request).await;
+                }
+                Err(_) => {
+                    self.set_request(&last_request).await;
+                }
             }
             return request_res;
         };
