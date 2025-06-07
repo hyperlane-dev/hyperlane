@@ -323,19 +323,19 @@ impl Server {
         handler: &RequestHandlerImmutableParams<'a>,
         first_request: &mut Request,
     ) {
+        let route: &String = first_request.get_path();
         let stream: &ArcRwLockStream = handler.stream;
         let buffer_size: usize = *handler.config.get_ws_buffer_size();
         let ctx: Context = Context::from_stream_request(stream, first_request);
-        if ctx.upgrade_to_ws().await.is_err() {
-            return;
-        }
-        let route: &String = first_request.get_path();
-        handler
+        let route_handler_func: OptionArcFunc = handler
             .route_matcher
             .read()
             .await
             .resolve_route(&ctx, route)
             .await;
+        if route_handler_func.is_none() || ctx.upgrade_to_ws().await.is_err() {
+            return;
+        }
         for on_ws_connected in handler.on_ws_connected.read().await.iter() {
             on_ws_connected(ctx.clone()).await;
         }
