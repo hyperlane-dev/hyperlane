@@ -109,15 +109,11 @@ impl Context {
             .map(|socket_addr: SocketAddr| socket_addr.port())
     }
 
-    fn inner_is_websocket(&self, ctx: &RwLockWriteInnerContext) -> bool {
-        ctx.get_request().upgrade_type_is_websocket()
-    }
-
     async fn inner_send_response<T>(
         &self,
         status_code: usize,
         response_body: T,
-        handle_websocket: bool,
+        handle_ws: bool,
     ) -> ResponseResult
     where
         T: Into<ResponseBody>,
@@ -126,13 +122,14 @@ impl Context {
             return Err(ResponseError::ConnectionClosed);
         }
         if let Some(stream_lock) = self.get_stream().await {
-            let mut ctx: RwLockWriteInnerContext = self.write().await;
-            if !handle_websocket && self.inner_is_websocket(&ctx) {
+            let is_ws: bool = self.get_request_upgrade_type().await.is_ws();
+            let mut ctx_write_lock: RwLockWriteInnerContext = self.write().await;
+            if !handle_ws && is_ws {
                 return Err(ResponseError::MethodNotSupported(
                     "websocket does not support calling this method".to_owned(),
                 ));
             }
-            let response_res: ResponseData = ctx
+            let response_res: ResponseData = ctx_write_lock
                 .get_mut_response()
                 .set_body(response_body)
                 .set_status_code(status_code)
@@ -184,14 +181,14 @@ impl Context {
             return Err(ResponseError::ConnectionClosed);
         }
         if let Some(stream_lock) = self.get_stream().await {
-            let is_websocket: bool = self.get_request_upgrade_type().await.is_websocket();
+            let is_ws: bool = self.get_request_upgrade_type().await.is_ws();
             let response_body: ResponseBody = response_body.into();
             self.write()
                 .await
                 .get_mut_response()
                 .set_body(response_body.clone());
             return stream_lock
-                .send_body_with_websocket_flag(&response_body, is_websocket)
+                .send_body_conditional(&response_body, is_ws)
                 .await;
         }
         Err(ResponseError::NotFoundStream)
@@ -357,7 +354,7 @@ impl Context {
         self.get_request().await.is_enable_keep_alive()
     }
 
-    pub async fn handle_websocket(&self) -> ResponseResult {
+    pub async fn upgrade_to_ws(&self) -> ResponseResult {
         let key_opt: OptionString = self.get_request_header(SEC_WEBSOCKET_KEY).await;
         if let Some(key) = key_opt {
             let accept_key: String = WebSocketFrame::generate_accept_key(&key);
@@ -473,10 +470,7 @@ impl Context {
         Err(RequestError::GetTcpStream)
     }
 
-    pub async fn websocket_request_from_stream(
-        &self,
-        buffer_size: usize,
-    ) -> RequestReaderHandleResult {
+    pub async fn ws_request_from_stream(&self, buffer_size: usize) -> RequestReaderHandleResult {
         self.reset_response_body().await;
         if self.get_aborted().await {
             return Err(RequestError::RequestAborted);
@@ -484,8 +478,7 @@ impl Context {
         if let Some(stream) = self.get_stream().await.as_ref() {
             let mut last_request: Request = self.get_request().await;
             let request_res: RequestReaderHandleResult =
-                Request::websocket_request_from_stream(stream, buffer_size, &mut last_request)
-                    .await;
+                Request::ws_request_from_stream(stream, buffer_size, &mut last_request).await;
             match request_res.as_ref() {
                 Ok(request) => {
                     self.set_request(&request).await;

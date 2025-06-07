@@ -8,7 +8,7 @@ impl Default for Server {
             route_matcher: arc_rwlock(RouteMatcher::new()),
             request_middleware: arc_rwlock(vec![]),
             response_middleware: arc_rwlock(vec![]),
-            websocket_shake_callback: arc_rwlock(vec![]),
+            on_ws_handshake: arc_rwlock(vec![]),
         }
     }
 }
@@ -41,7 +41,7 @@ impl Server {
         self
     }
 
-    pub async fn websocket_buffer_size(&self, buffer_size: usize) -> &Self {
+    pub async fn ws_buffer_size(&self, buffer_size: usize) -> &Self {
         let buffer_size: usize = if buffer_size == 0 {
             DEFAULT_BUFFER_SIZE
         } else {
@@ -50,7 +50,7 @@ impl Server {
         self.get_config()
             .write()
             .await
-            .set_websocket_buffer_size(buffer_size);
+            .set_ws_buffer_size(buffer_size);
         self
     }
 
@@ -94,26 +94,26 @@ impl Server {
         self
     }
 
-    pub async fn enable_inner_websocket_handle<'a, R>(&self, route: R) -> &Self
+    pub async fn enable_inner_ws_handle<'a, R>(&self, route: R) -> &Self
     where
         R: ToString,
     {
         self.get_config()
             .write()
             .await
-            .enable_inner_websocket_handle(route.to_string())
+            .enable_inner_ws_handle(route.to_string())
             .await;
         self
     }
 
-    pub async fn disable_inner_websocket_handle<'a, R>(&self, route: R) -> &Self
+    pub async fn disable_inner_ws_handle<'a, R>(&self, route: R) -> &Self
     where
         R: ToString,
     {
         self.get_config()
             .write()
             .await
-            .disable_inner_websocket_handle(route.to_string())
+            .disable_inner_ws_handle(route.to_string())
             .await;
         self
     }
@@ -148,12 +148,12 @@ impl Server {
         self
     }
 
-    pub async fn websocket_shake_callback<F, Fut>(&self, func: F) -> &Self
+    pub async fn on_ws_handshake<F, Fut>(&self, func: F) -> &Self
     where
         F: FuncWithoutPin<Fut>,
         Fut: Future<Output = ()> + Send + 'static,
     {
-        self.get_websocket_shake_callback()
+        self.get_on_ws_handshake()
             .write()
             .await
             .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
@@ -244,8 +244,7 @@ impl Server {
                 self.get_response_middleware().clone();
             let route_func_arc_lock: ArcRwLockHashMapRouteFuncBox = self.get_route().clone();
             let route_matcher_arc_lock: ArcRwLockRouteMatcher = self.route_matcher.clone();
-            let websocket_shake_callback_arc_lock: ArcRwLockVecArcFunc =
-                self.get_websocket_shake_callback().clone();
+            let on_ws_handshake_arc_lock: ArcRwLockVecArcFunc = self.get_on_ws_handshake().clone();
             tokio::spawn(async move {
                 let request_result: RequestReaderHandleResult =
                     Request::http_request_from_stream(&stream, http_line_buffer_size).await;
@@ -253,7 +252,7 @@ impl Server {
                     return;
                 }
                 let mut request: Request = request_result.unwrap_or_default();
-                let is_websocket: bool = request.upgrade_type_is_websocket();
+                let is_ws: bool = request.is_ws();
                 let handler: RequestHandlerImmutableParams = RequestHandlerImmutableParams::new(
                     &stream,
                     &config_clone,
@@ -261,11 +260,11 @@ impl Server {
                     &response_middleware_arc_lock,
                     &route_func_arc_lock,
                     &route_matcher_arc_lock,
-                    &websocket_shake_callback_arc_lock,
+                    &on_ws_handshake_arc_lock,
                 );
-                match is_websocket {
+                match is_ws {
                     true => {
-                        Self::handle_websocket_connection(&handler, &mut request).await;
+                        Self::handle_ws_connection(&handler, &mut request).await;
                     }
                     false => {
                         Self::handle_http_connection(&handler, &request).await;
@@ -326,30 +325,28 @@ impl Server {
         return_handle(false).await
     }
 
-    async fn handle_websocket_connection<'a>(
+    async fn handle_ws_connection<'a>(
         handler: &RequestHandlerImmutableParams<'a>,
         first_request: &mut Request,
     ) {
         let stream: &ArcRwLockStream = handler.stream;
-        let buffer_size: usize = *handler.config.get_websocket_buffer_size();
+        let buffer_size: usize = *handler.config.get_ws_buffer_size();
         let ctx: Context = Context::from_stream_request(stream, first_request);
-        if ctx.handle_websocket().await.is_err() {
+        if ctx.upgrade_to_ws().await.is_err() {
             return;
         }
-        for websocket_shake_callback in handler.websocket_shake_callback.read().await.iter() {
-            websocket_shake_callback(ctx.clone()).await;
+        for on_ws_handshake in handler.on_ws_handshake.read().await.iter() {
+            on_ws_handshake(ctx.clone()).await;
         }
         let route: &String = first_request.get_path();
-        let contains_disable_inner_websocket_handle: bool = handler
-            .config
-            .contains_disable_inner_websocket_handle(route)
-            .await;
-        if contains_disable_inner_websocket_handle {
+        let contains_disable_inner_ws_handle: bool =
+            handler.config.contains_disable_inner_ws_handle(route).await;
+        if contains_disable_inner_ws_handle {
             while Self::handle_request_common(handler, first_request).await {}
             return;
         }
         while let Ok(request) =
-            Request::websocket_request_from_stream(stream, buffer_size, first_request).await
+            Request::ws_request_from_stream(stream, buffer_size, first_request).await
         {
             let _ = Self::handle_request_common(handler, &request).await;
         }
@@ -391,7 +388,7 @@ impl<'a> RequestHandlerImmutableParams<'a> {
         response_middleware: &'a ArcRwLockVecArcFunc,
         route_func: &'a ArcRwLockHashMapRouteFuncBox,
         route_matcher: &'a ArcRwLock<RouteMatcher>,
-        websocket_shake_callback: &'a ArcRwLockVecArcFunc,
+        on_ws_handshake: &'a ArcRwLockVecArcFunc,
     ) -> Self {
         Self {
             stream,
@@ -400,7 +397,7 @@ impl<'a> RequestHandlerImmutableParams<'a> {
             response_middleware,
             route_func,
             route_matcher,
-            websocket_shake_callback,
+            on_ws_handshake,
         }
     }
 }

@@ -51,11 +51,11 @@ async fn test_disable_inner_http_handle_duplicate_route() {
 }
 
 #[tokio::test]
-async fn test_disable_inner_websocket_handle_empty_route() {
+async fn test_disable_inner_ws_handle_empty_route() {
     assert_panic_message_contains(
         || async {
             let server: Server = Server::new();
-            server.disable_inner_websocket_handle("").await;
+            server.disable_inner_ws_handle("").await;
         },
         "Route pattern cannot be empty",
     )
@@ -63,12 +63,12 @@ async fn test_disable_inner_websocket_handle_empty_route() {
 }
 
 #[tokio::test]
-async fn test_disable_inner_websocket_handle_duplicate_route() {
+async fn test_disable_inner_ws_handle_duplicate_route() {
     assert_panic_message_contains(
         || async {
             let server: Server = Server::new();
-            server.disable_inner_websocket_handle("/").await;
-            server.disable_inner_websocket_handle("/").await;
+            server.disable_inner_ws_handle("/").await;
+            server.disable_inner_ws_handle("/").await;
         },
         "Route pattern already exists: /",
     )

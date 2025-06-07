@@ -63,12 +63,12 @@ async fn root_route(ctx: Context) {
         .await;
 }
 
-async fn websocket_route(ctx: Context) {
+async fn ws_route(ctx: Context) {
     let request_body: Vec<u8> = ctx.get_request_body().await;
     let _ = ctx.send_response_body(request_body).await;
 }
 
-async fn dynamic_routing(ctx: Context) {
+async fn dynamic_route(ctx: Context) {
     let param: RouteParams = ctx.get_route_params().await;
     panic!("Test panic {:?}", param);
 }
@@ -86,15 +86,15 @@ async fn main() {
     server.enable_nodelay().await;
     server.disable_linger().await;
     server.http_line_buffer_size(4096).await;
-    server.websocket_buffer_size(4096).await;
+    server.ws_buffer_size(4096).await;
     server.error_handle(error_handle).await;
     server.request_middleware(request_middleware).await;
     server.response_middleware(response_middleware).await;
     server.route("/", root_route).await;
-    server.route("/websocket", websocket_route).await;
-    server.route("/dynamic/{routing}", dynamic_routing).await;
+    server.route("/ws", ws_route).await;
+    server.route("/dynamic/{routing}", dynamic_route).await;
     server
-        .route("/dynamic/routing/{number:\\d+}", dynamic_routing)
+        .route("/dynamic/routing/{number:\\d+}", dynamic_route)
         .await;
     server.run().await.unwrap();
 }

@@ -5,13 +5,13 @@ impl<'a> Default for ServerConfig<'a> {
         Self {
             host: DEFAULT_HOST,
             port: DEFAULT_WEB_PORT,
-            websocket_buffer_size: DEFAULT_BUFFER_SIZE,
+            ws_buffer_size: DEFAULT_BUFFER_SIZE,
             http_line_buffer_size: DEFAULT_BUFFER_SIZE,
             nodelay: DEFAULT_NODELAY,
             linger: DEFAULT_LINGER,
             ttl: DEFAULT_TTI,
             disable_inner_http_handle: arc_rwlock(hash_set_xx_hash3_64()),
-            disable_inner_websocket_handle: arc_rwlock(hash_set_xx_hash3_64()),
+            disable_inner_ws_handle: arc_rwlock(hash_set_xx_hash3_64()),
             route_matcher: arc_rwlock(RouteMatcher::new()),
             error_handle: Arc::new(print_error_handle),
         }
@@ -57,9 +57,9 @@ impl<'a> ServerConfig<'a> {
         result
     }
 
-    pub async fn contains_disable_inner_websocket_handle(&self, route: &'a str) -> bool {
+    pub async fn contains_disable_inner_ws_handle(&self, route: &'a str) -> bool {
         if self
-            .get_disable_inner_websocket_handle()
+            .get_disable_inner_ws_handle()
             .read()
             .await
             .contains(route)
@@ -72,23 +72,23 @@ impl<'a> ServerConfig<'a> {
         false
     }
 
-    pub async fn disable_inner_websocket_handle(&self, route: String) -> bool {
+    pub async fn disable_inner_ws_handle(&self, route: String) -> bool {
         ServerConfig::get_route_matcher(self)
             .write()
             .await
             .add(&route, Arc::new(|_| Box::pin(async move {})))
             .unwrap_or_else(|err| panic!("{}", err));
         let result: bool = self
-            .get_disable_inner_websocket_handle()
+            .get_disable_inner_ws_handle()
             .write()
             .await
             .insert(route.clone());
         result
     }
 
-    pub async fn enable_inner_websocket_handle(&self, route: String) -> bool {
+    pub async fn enable_inner_ws_handle(&self, route: String) -> bool {
         let result: bool = self
-            .get_disable_inner_websocket_handle()
+            .get_disable_inner_ws_handle()
             .write()
             .await
             .remove(&route);
