@@ -268,16 +268,6 @@ impl Server {
         Ok(())
     }
 
-    async fn need_return(ctx: &Context, request_keepalive: bool) -> Option<bool> {
-        let aborted: bool = ctx.get_aborted().await;
-        let closed: bool = ctx.get_closed().await;
-        if aborted || closed {
-            yield_now().await;
-            return Some(!closed && request_keepalive);
-        }
-        None
-    }
-
     async fn handle_request_common<'a>(
         handler: &RequestHandlerImmutableParams<'a>,
         request: &Request,
@@ -294,19 +284,19 @@ impl Server {
             .await;
         for middleware in handler.request_middleware.read().await.iter() {
             middleware(ctx.clone()).await;
-            if let Some(result) = Self::need_return(&ctx, request_keepalive).await {
+            if let Some(result) = ctx.should_exit_with_keep_alive(request_keepalive).await {
                 return result;
             }
         }
         if let Some(handler_func) = route_handler_func {
             handler_func(ctx.clone()).await;
-            if let Some(result) = Self::need_return(&ctx, request_keepalive).await {
+            if let Some(result) = ctx.should_exit_with_keep_alive(request_keepalive).await {
                 return result;
             }
         }
         for middleware in handler.response_middleware.read().await.iter() {
             middleware(ctx.clone()).await;
-            if let Some(result) = Self::need_return(&ctx, request_keepalive).await {
+            if let Some(result) = ctx.should_exit_with_keep_alive(request_keepalive).await {
                 return result;
             }
         }
@@ -333,7 +323,7 @@ impl Server {
             .await;
         for on_ws_connected in handler.on_ws_connected.read().await.iter() {
             on_ws_connected(ctx.clone()).await;
-            if Self::need_return(&ctx, true).await.is_some() {
+            if ctx.should_exit_with_keep_alive(true).await.is_some() {
                 return;
             }
         }

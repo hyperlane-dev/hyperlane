@@ -6,11 +6,11 @@ impl Context {
     }
 
     pub fn from_stream_request(stream: &ArcRwLockStream, request: &Request) -> Self {
-        let mut inner_ctx: InnerContext = InnerContext::default();
-        inner_ctx
+        let mut internal_ctx: InnerContext = InnerContext::default();
+        internal_ctx
             .set_stream(Some(stream.clone()))
             .set_request(request.clone());
-        let ctx: Context = Context::from_internal_context(inner_ctx);
+        let ctx: Context = Context::from_internal_context(internal_ctx);
         ctx
     }
 
@@ -109,7 +109,7 @@ impl Context {
             .map(|socket_addr: SocketAddr| socket_addr.port())
     }
 
-    async fn inner_send_response<T>(
+    async fn internal_send_response<T>(
         &self,
         status_code: usize,
         response_body: T,
@@ -143,7 +143,7 @@ impl Context {
     where
         T: Into<ResponseBody>,
     {
-        self.inner_send_response(status_code, response_body, false)
+        self.internal_send_response(status_code, response_body, false)
             .await
     }
 
@@ -161,7 +161,7 @@ impl Context {
     where
         T: Into<ResponseBody>,
     {
-        self.inner_send_response(status_code, response_body, false)
+        self.internal_send_response(status_code, response_body, false)
             .await?;
         self.closed().await;
         Ok(())
@@ -365,7 +365,7 @@ impl Context {
                 .await
                 .set_response_header(SEC_WEB_SOCKET_ACCEPT, accept_key)
                 .await
-                .inner_send_response(101, "", true)
+                .internal_send_response(101, "", true)
                 .await;
         }
         Err(ResponseError::WebSocketHandShake(format!(
@@ -449,6 +449,12 @@ impl Context {
         self
     }
 
+    pub async fn check_early_exit(&self) -> bool {
+        let aborted: bool = self.get_aborted().await;
+        let closed: bool = self.get_closed().await;
+        aborted || closed
+    }
+
     pub async fn reset_response_body(&self) -> &Self {
         self.set_response_body(ResponseBody::default()).await;
         self
@@ -490,5 +496,18 @@ impl Context {
             return request_res;
         };
         Err(RequestError::GetTcpStream)
+    }
+
+    pub(crate) async fn should_exit_with_keep_alive(
+        &self,
+        request_keepalive: bool,
+    ) -> Option<bool> {
+        let aborted: bool = self.get_aborted().await;
+        let closed: bool = self.get_closed().await;
+        if aborted || closed {
+            yield_now().await;
+            return Some(!closed && request_keepalive);
+        }
+        None
     }
 }
