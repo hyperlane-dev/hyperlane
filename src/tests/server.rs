@@ -37,7 +37,7 @@ async fn test_server() {
         panic!("Test panic {:?}", param);
     }
 
-    fn error_handle(error: String) {
+    fn error_handler(error: String) {
         eprintln!("{}", error);
         let _ = std::io::Write::flush(&mut std::io::stderr());
     }
@@ -50,7 +50,7 @@ async fn test_server() {
         server.disable_linger().await;
         server.http_line_buffer_size(4096).await;
         server.ws_buffer_size(4096).await;
-        server.error_handle(error_handle).await;
+        server.error_handler(error_handler).await;
         server.request_middleware(request_middleware).await;
         server.response_middleware(response_middleware).await;
         server.route("/", root_route).await;

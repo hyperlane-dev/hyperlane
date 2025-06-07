@@ -54,14 +54,14 @@ impl Server {
         self
     }
 
-    pub async fn error_handle<F>(&self, func: F) -> &Self
+    pub async fn error_handler<F>(&self, func: F) -> &Self
     where
         F: ErrorHandle + Send + Sync + 'static,
     {
         self.get_config()
             .write()
             .await
-            .set_error_handle(Arc::new(func));
+            .set_error_handler(Arc::new(func));
         self
     }
 
@@ -70,50 +70,50 @@ impl Server {
         self
     }
 
-    pub async fn enable_inner_http_handle<'a, R>(&self, route: R) -> &Self
+    pub async fn enable_internal_http_handler<'a, R>(&self, route: R) -> &Self
     where
         R: ToString,
     {
         self.get_config()
             .write()
             .await
-            .enable_inner_http_handle(route.to_string())
+            .enable_internal_http_handler(route.to_string())
             .await;
         self
     }
 
-    pub async fn disable_inner_http_handle<'a, R>(&self, route: R) -> &Self
+    pub async fn disable_internal_http_handler<'a, R>(&self, route: R) -> &Self
     where
         R: ToString,
     {
         self.get_config()
             .write()
             .await
-            .disable_inner_http_handle(route.to_string())
+            .disable_internal_http_handler(route.to_string())
             .await;
         self
     }
 
-    pub async fn enable_inner_ws_handle<'a, R>(&self, route: R) -> &Self
+    pub async fn enable_internal_ws_handler<'a, R>(&self, route: R) -> &Self
     where
         R: ToString,
     {
         self.get_config()
             .write()
             .await
-            .enable_inner_ws_handle(route.to_string())
+            .enable_internal_ws_handler(route.to_string())
             .await;
         self
     }
 
-    pub async fn disable_inner_ws_handle<'a, R>(&self, route: R) -> &Self
+    pub async fn disable_internal_ws_handler<'a, R>(&self, route: R) -> &Self
     where
         R: ToString,
     {
         self.get_config()
             .write()
             .await
-            .disable_inner_ws_handle(route.to_string())
+            .disable_internal_ws_handler(route.to_string())
             .await;
         self
     }
@@ -206,10 +206,10 @@ impl Server {
 
     async fn init_panic_hook(&self) {
         let config: ServerConfig<'_> = self.get_config().read().await.clone();
-        let error_handle: ArcErrorHandle = config.get_error_handle().clone();
+        let error_handler: ArcErrorHandle = config.get_error_handler().clone();
         set_hook(Box::new(move |err: &'_ PanicHookInfo<'_>| {
             let data: String = err.to_string();
-            error_handle(data);
+            error_handler(data);
         }));
     }
 
@@ -288,14 +288,14 @@ impl Server {
             let closed: bool = ctx.get_closed().await;
             (aborted, closed)
         };
-        let return_handle = |closed: bool| async move {
+        let return_handler = |closed: bool| async move {
             yield_now().await;
             !closed && request_keepalive
         };
         let check_need_return = || async {
             let (aborted, closed) = get_aborted_closed().await;
             if aborted || closed {
-                return Some(return_handle(closed).await);
+                return Some(return_handler(closed).await);
             }
             None
         };
@@ -322,7 +322,7 @@ impl Server {
                 return result;
             }
         }
-        return_handle(false).await
+        return_handler(false).await
     }
 
     async fn handle_ws_connection<'a>(
@@ -339,9 +339,11 @@ impl Server {
             on_ws_handshake(ctx.clone()).await;
         }
         let route: &String = first_request.get_path();
-        let contains_disable_inner_ws_handle: bool =
-            handler.config.contains_disable_inner_ws_handle(route).await;
-        if contains_disable_inner_ws_handle {
+        let contains_disable_internal_ws_handler: bool = handler
+            .config
+            .contains_disable_internal_ws_handler(route)
+            .await;
+        if contains_disable_internal_ws_handler {
             while Self::handle_request_common(handler, first_request).await {}
             return;
         }
@@ -362,12 +364,12 @@ impl Server {
         }
         let stream: &ArcRwLockStream = handler.stream;
         let route: &String = first_request.get_path();
-        let contains_disable_inner_http_handle: bool = handler
+        let contains_disable_internal_http_handler: bool = handler
             .config
-            .contains_disable_inner_http_handle(route)
+            .contains_disable_internal_http_handler(route)
             .await;
         let buffer_size: usize = *handler.config.get_http_line_buffer_size();
-        if contains_disable_inner_http_handle {
+        if contains_disable_internal_http_handler {
             while Self::handle_request_common(handler, first_request).await {}
             return;
         }

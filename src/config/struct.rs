@@ -10,10 +10,10 @@ pub(crate) struct ServerConfig<'a> {
     pub(super) linger: OptionDuration,
     pub(super) ttl: OptionU32,
     #[set(skip)]
-    pub(super) disable_inner_http_handle: ArcRwLock<HashSetXxHash3_64<String>>,
+    pub(super) disable_internal_http_handler: ArcRwLock<HashSetXxHash3_64<String>>,
     #[set(skip)]
-    pub(super) disable_inner_ws_handle: ArcRwLock<HashSetXxHash3_64<String>>,
+    pub(super) disable_internal_ws_handler: ArcRwLock<HashSetXxHash3_64<String>>,
     #[set(skip)]
     pub(super) route_matcher: ArcRwLockRouteMatcher,
-    pub(super) error_handle: ArcErrorHandle,
+    pub(super) error_handler: ArcErrorHandle,
 }
