@@ -20,9 +20,6 @@ pub struct Server {
     #[get(pub(crate))]
     #[set(pub(crate))]
     pub(super) websocket_shake_callback: ArcRwLockVecArcFunc,
-    // #[get(pub(crate))]
-    // #[set(pub(crate))]
-    // pub(super) shutdown: ArcRwLockShutdown,
 }
 
 #[derive(Clone)]
