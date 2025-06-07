@@ -16,7 +16,7 @@ pub struct Server {
     pub(super) response_middleware: ArcRwLockVecArcFunc,
     #[get(pub(crate))]
     #[set(pub(crate))]
-    pub(super) on_ws_handshake: ArcRwLockVecArcFunc,
+    pub(super) on_ws_connected: ArcRwLockVecArcFunc,
 }
 
 #[derive(Clone)]
@@ -26,5 +26,5 @@ pub(crate) struct RequestHandlerImmutableParams<'a> {
     pub(super) request_middleware: &'a ArcRwLockVecArcFunc,
     pub(super) response_middleware: &'a ArcRwLockVecArcFunc,
     pub(super) route_matcher: &'a ArcRwLockRouteMatcher,
-    pub(super) on_ws_handshake: &'a ArcRwLockVecArcFunc,
+    pub(super) on_ws_connected: &'a ArcRwLockVecArcFunc,
 }

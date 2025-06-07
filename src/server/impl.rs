@@ -7,7 +7,7 @@ impl Default for Server {
             route_matcher: arc_rwlock(RouteMatcher::new()),
             request_middleware: arc_rwlock(vec![]),
             response_middleware: arc_rwlock(vec![]),
-            on_ws_handshake: arc_rwlock(vec![]),
+            on_ws_connected: arc_rwlock(vec![]),
         }
     }
 }
@@ -147,12 +147,12 @@ impl Server {
         self
     }
 
-    pub async fn on_ws_handshake<F, Fut>(&self, func: F) -> &Self
+    pub async fn on_ws_connected<F, Fut>(&self, func: F) -> &Self
     where
         F: FuncWithoutPin<Fut>,
         Fut: Future<Output = ()> + Send + 'static,
     {
-        self.get_on_ws_handshake()
+        self.get_on_ws_connected()
             .write()
             .await
             .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
@@ -238,7 +238,7 @@ impl Server {
             let response_middleware_arc_lock: ArcRwLockVecArcFunc =
                 self.get_response_middleware().clone();
             let route_matcher_arc_lock: ArcRwLockRouteMatcher = self.route_matcher.clone();
-            let on_ws_handshake_arc_lock: ArcRwLockVecArcFunc = self.get_on_ws_handshake().clone();
+            let on_ws_connected_arc_lock: ArcRwLockVecArcFunc = self.get_on_ws_connected().clone();
             tokio::spawn(async move {
                 let request_result: RequestReaderHandleResult =
                     Request::http_request_from_stream(&stream, http_line_buffer_size).await;
@@ -253,7 +253,7 @@ impl Server {
                     &request_middleware_arc_lock,
                     &response_middleware_arc_lock,
                     &route_matcher_arc_lock,
-                    &on_ws_handshake_arc_lock,
+                    &on_ws_connected_arc_lock,
                 );
                 match is_ws {
                     true => {
@@ -336,8 +336,8 @@ impl Server {
             .await
             .resolve_route(&ctx, route)
             .await;
-        for on_ws_handshake in handler.on_ws_handshake.read().await.iter() {
-            on_ws_handshake(ctx.clone()).await;
+        for on_ws_connected in handler.on_ws_connected.read().await.iter() {
+            on_ws_connected(ctx.clone()).await;
         }
         let route: &String = first_request.get_path();
         let contains_disable_internal_ws_handler: bool = handler
@@ -390,7 +390,7 @@ impl<'a> RequestHandlerImmutableParams<'a> {
         request_middleware: &'a ArcRwLockVecArcFunc,
         response_middleware: &'a ArcRwLockVecArcFunc,
         route_matcher: &'a ArcRwLock<RouteMatcher>,
-        on_ws_handshake: &'a ArcRwLockVecArcFunc,
+        on_ws_connected: &'a ArcRwLockVecArcFunc,
     ) -> Self {
         Self {
             stream,
@@ -398,7 +398,7 @@ impl<'a> RequestHandlerImmutableParams<'a> {
             request_middleware,
             response_middleware,
             route_matcher,
-            on_ws_handshake,
+            on_ws_connected,
         }
     }
 }
