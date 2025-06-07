@@ -123,13 +123,13 @@ impl RouteMatcher {
         return Ok(());
     }
 
-    pub(crate) fn match_route(&self, path: &str) -> OptionRouteParams {
+    pub(crate) fn match_route(&self, path: &str) -> bool {
         for (pattern, _) in &self.0 {
-            if let Some(params) = pattern.match_path(path) {
-                return Some(params);
+            if pattern.match_path(path).is_some() {
+                return true;
             }
         }
-        None
+        false
     }
 
     pub(crate) async fn resolve_route(&self, ctx: &Context, path: &str) -> OptionArcFunc {

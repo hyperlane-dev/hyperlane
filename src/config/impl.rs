@@ -19,7 +19,7 @@ impl<'a> Default for ServerConfig<'a> {
 }
 
 impl<'a> ServerConfig<'a> {
-    pub async fn contains_disable_internal_http_handler(&self, route: &'a str) -> bool {
+    pub(crate) async fn contains_disable_internal_http_handler(&self, route: &'a str) -> bool {
         if self
             .get_disable_internal_http_handler()
             .read()
@@ -28,13 +28,10 @@ impl<'a> ServerConfig<'a> {
         {
             return true;
         }
-        if let Some(_) = self.get_route_matcher().read().await.match_route(route) {
-            return true;
-        }
-        false
+        self.get_route_matcher().read().await.match_route(route)
     }
 
-    pub async fn disable_internal_http_handler(&self, route: String) -> bool {
+    pub(crate) async fn disable_internal_http_handler(&self, route: String) -> bool {
         ServerConfig::get_route_matcher(self)
             .write()
             .await
@@ -48,7 +45,7 @@ impl<'a> ServerConfig<'a> {
         result
     }
 
-    pub async fn enable_internal_http_handler(&self, route: String) -> bool {
+    pub(crate) async fn enable_internal_http_handler(&self, route: String) -> bool {
         let result: bool = self
             .get_disable_internal_http_handler()
             .write()
@@ -57,7 +54,7 @@ impl<'a> ServerConfig<'a> {
         result
     }
 
-    pub async fn contains_disable_internal_ws_handler(&self, route: &'a str) -> bool {
+    pub(crate) async fn contains_disable_internal_ws_handler(&self, route: &'a str) -> bool {
         if self
             .get_disable_internal_ws_handler()
             .read()
@@ -66,13 +63,10 @@ impl<'a> ServerConfig<'a> {
         {
             return true;
         }
-        if let Some(_) = self.get_route_matcher().read().await.match_route(route) {
-            return true;
-        }
-        false
+        self.get_route_matcher().read().await.match_route(route)
     }
 
-    pub async fn disable_internal_ws_handler(&self, route: String) -> bool {
+    pub(crate) async fn disable_internal_ws_handler(&self, route: String) -> bool {
         ServerConfig::get_route_matcher(self)
             .write()
             .await
@@ -86,7 +80,7 @@ impl<'a> ServerConfig<'a> {
         result
     }
 
-    pub async fn enable_internal_ws_handler(&self, route: String) -> bool {
+    pub(crate) async fn enable_internal_ws_handler(&self, route: String) -> bool {
         let result: bool = self
             .get_disable_internal_ws_handler()
             .write()

@@ -384,7 +384,7 @@ impl Server {
 }
 
 impl<'a> RequestHandlerImmutableParams<'a> {
-    pub fn new(
+    fn new(
         stream: &'a ArcRwLockStream,
         config: &'a ServerConfig<'a>,
         request_middleware: &'a ArcRwLockVecArcFunc,
