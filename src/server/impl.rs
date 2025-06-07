@@ -4,7 +4,6 @@ impl Default for Server {
     fn default() -> Self {
         Self {
             config: arc_rwlock(ServerConfig::default()),
-            route: arc_rwlock(hash_map_xx_hash3_64()),
             route_matcher: arc_rwlock(RouteMatcher::new()),
             request_middleware: arc_rwlock(vec![]),
             response_middleware: arc_rwlock(vec![]),
@@ -171,12 +170,8 @@ impl Server {
         self.route_matcher
             .write()
             .await
-            .add(&route_str, arc_func.clone())
+            .add(&route_str, arc_func)
             .unwrap_or_else(|err| panic!("{}", err));
-        self.get_route()
-            .write()
-            .await
-            .insert(route_str.clone(), arc_func);
         self
     }
 
@@ -242,7 +237,6 @@ impl Server {
                 self.get_request_middleware().clone();
             let response_middleware_arc_lock: ArcRwLockVecArcFunc =
                 self.get_response_middleware().clone();
-            let route_func_arc_lock: ArcRwLockHashMapRouteFuncBox = self.get_route().clone();
             let route_matcher_arc_lock: ArcRwLockRouteMatcher = self.route_matcher.clone();
             let on_ws_handshake_arc_lock: ArcRwLockVecArcFunc = self.get_on_ws_handshake().clone();
             tokio::spawn(async move {
@@ -258,7 +252,6 @@ impl Server {
                     &config_clone,
                     &request_middleware_arc_lock,
                     &response_middleware_arc_lock,
-                    &route_func_arc_lock,
                     &route_matcher_arc_lock,
                     &on_ws_handshake_arc_lock,
                 );
@@ -299,18 +292,19 @@ impl Server {
             }
             None
         };
+        let route_handler_func: OptionArcFunc = handler
+            .route_matcher
+            .read()
+            .await
+            .resolve_route(&ctx, route)
+            .await;
         for middleware in handler.request_middleware.read().await.iter() {
             middleware(ctx.clone()).await;
             if let Some(result) = check_need_return().await {
                 return result;
             }
         }
-        if let Some(route_handler) = handler.route_func.read().await.get(route) {
-            route_handler(ctx.clone()).await;
-        } else if let Some((handler_func, params)) =
-            handler.route_matcher.read().await.match_route(route)
-        {
-            ctx.set_route_params(params).await;
+        if let Some(handler_func) = route_handler_func {
             handler_func(ctx.clone()).await;
             if let Some(result) = check_need_return().await {
                 return result;
@@ -335,6 +329,13 @@ impl Server {
         if ctx.upgrade_to_ws().await.is_err() {
             return;
         }
+        let route: &String = first_request.get_path();
+        handler
+            .route_matcher
+            .read()
+            .await
+            .resolve_route(&ctx, route)
+            .await;
         for on_ws_handshake in handler.on_ws_handshake.read().await.iter() {
             on_ws_handshake(ctx.clone()).await;
         }
@@ -388,7 +389,6 @@ impl<'a> RequestHandlerImmutableParams<'a> {
         config: &'a ServerConfig<'a>,
         request_middleware: &'a ArcRwLockVecArcFunc,
         response_middleware: &'a ArcRwLockVecArcFunc,
-        route_func: &'a ArcRwLockHashMapRouteFuncBox,
         route_matcher: &'a ArcRwLock<RouteMatcher>,
         on_ws_handshake: &'a ArcRwLockVecArcFunc,
     ) -> Self {
@@ -397,7 +397,6 @@ impl<'a> RequestHandlerImmutableParams<'a> {
             config,
             request_middleware,
             response_middleware,
-            route_func,
             route_matcher,
             on_ws_handshake,
         }

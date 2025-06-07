@@ -7,9 +7,6 @@ pub struct Server {
     pub(super) config: ArcRwLockServerConfig<'static>,
     #[get(pub(crate))]
     #[set(pub(crate))]
-    pub(super) route: ArcRwLockHashMapRouteFuncBox,
-    #[get(pub(crate))]
-    #[set(pub(crate))]
     pub(super) route_matcher: ArcRwLockRouteMatcher,
     #[get(pub(crate))]
     #[set(pub(crate))]
@@ -28,7 +25,6 @@ pub(crate) struct RequestHandlerImmutableParams<'a> {
     pub(super) config: &'a ServerConfig<'a>,
     pub(super) request_middleware: &'a ArcRwLockVecArcFunc,
     pub(super) response_middleware: &'a ArcRwLockVecArcFunc,
-    pub(super) route_func: &'a ArcRwLockHashMapRouteFuncBox,
     pub(super) route_matcher: &'a ArcRwLockRouteMatcher,
     pub(super) on_ws_handshake: &'a ArcRwLockVecArcFunc,
 }

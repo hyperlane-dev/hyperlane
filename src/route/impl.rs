@@ -26,7 +26,7 @@ impl PartialEq for RoutePattern {
 }
 
 impl RoutePattern {
-    pub fn new(route: &str) -> ResultRoutePatternRouteError {
+    pub(crate) fn new(route: &str) -> ResultRoutePatternRouteError {
         let segments: VecRouteSegment = Self::parse_route(route)?;
         Ok(Self(segments))
     }
@@ -67,7 +67,7 @@ impl RoutePattern {
         Ok(segments)
     }
 
-    pub fn match_path(&self, path: &str) -> OptionRouteParams {
+    pub(crate) fn match_path(&self, path: &str) -> OptionRouteParams {
         let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
         let path_segments: Vec<&str> = if path.is_empty() {
             Vec::new()
@@ -106,11 +106,11 @@ impl RoutePattern {
 }
 
 impl RouteMatcher {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self(Vec::new())
     }
 
-    pub fn add(&mut self, pattern: &str, handler: ArcFunc) -> ResultAddRoute {
+    pub(crate) fn add(&mut self, pattern: &str, handler: ArcFunc) -> ResultAddRoute {
         let route_pattern: RoutePattern = RoutePattern::new(pattern)?;
         let has_same_pattern: bool = self
             .0
@@ -123,10 +123,20 @@ impl RouteMatcher {
         return Ok(());
     }
 
-    pub fn match_route(&self, path: &str) -> OptionTupleArcFuncRouteParams {
+    pub(crate) fn match_route(&self, path: &str) -> OptionRouteParams {
+        for (pattern, _) in &self.0 {
+            if let Some(params) = pattern.match_path(path) {
+                return Some(params);
+            }
+        }
+        None
+    }
+
+    pub(crate) async fn resolve_route(&self, ctx: &Context, path: &str) -> OptionArcFunc {
         for (pattern, handler) in &self.0 {
             if let Some(params) = pattern.match_path(path) {
-                return Some((handler.clone(), params));
+                ctx.set_route_params(params).await;
+                return Some(handler.clone());
             }
         }
         None

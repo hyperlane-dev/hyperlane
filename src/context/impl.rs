@@ -378,14 +378,14 @@ impl Context {
         format!("{}{}{}", host, COLON_SPACE_SYMBOL, port)
     }
 
-    pub async fn set_attribute<T>(&self, key: &str, value: &T) -> &Self
+    pub async fn set_attribute<T>(&self, key: &str, value: T) -> &Self
     where
         T: AnySendSyncClone,
     {
         self.write()
             .await
             .get_mut_attributes()
-            .insert(key.to_owned(), Arc::new(value.clone()));
+            .insert(key.to_owned(), Arc::new(value));
         self
     }
 
