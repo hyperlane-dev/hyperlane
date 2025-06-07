@@ -268,6 +268,16 @@ impl Server {
         Ok(())
     }
 
+    async fn need_return(ctx: &Context, request_keepalive: bool) -> Option<bool> {
+        let aborted: bool = ctx.get_aborted().await;
+        let closed: bool = ctx.get_closed().await;
+        if aborted || closed {
+            yield_now().await;
+            return Some(!closed && request_keepalive);
+        }
+        None
+    }
+
     async fn handle_request_common<'a>(
         handler: &RequestHandlerImmutableParams<'a>,
         request: &Request,
@@ -276,22 +286,6 @@ impl Server {
         let route: &String = request.get_path();
         let ctx: Context = Context::from_stream_request(stream, request);
         let request_keepalive: bool = request.is_enable_keep_alive();
-        let get_aborted_closed = || async {
-            let aborted: bool = ctx.get_aborted().await;
-            let closed: bool = ctx.get_closed().await;
-            (aborted, closed)
-        };
-        let return_handler = |closed: bool| async move {
-            yield_now().await;
-            !closed && request_keepalive
-        };
-        let check_need_return = || async {
-            let (aborted, closed) = get_aborted_closed().await;
-            if aborted || closed {
-                return Some(return_handler(closed).await);
-            }
-            None
-        };
         let route_handler_func: OptionArcFunc = handler
             .route_matcher
             .read()
@@ -299,24 +293,25 @@ impl Server {
             .resolve_route(&ctx, route)
             .await;
         for middleware in handler.request_middleware.read().await.iter() {
-            if let Some(result) = check_need_return().await {
+            middleware(ctx.clone()).await;
+            if let Some(result) = Self::need_return(&ctx, request_keepalive).await {
                 return result;
             }
-            middleware(ctx.clone()).await;
         }
         if let Some(handler_func) = route_handler_func {
-            if let Some(result) = check_need_return().await {
+            handler_func(ctx.clone()).await;
+            if let Some(result) = Self::need_return(&ctx, request_keepalive).await {
                 return result;
             }
-            handler_func(ctx.clone()).await;
         }
         for middleware in handler.response_middleware.read().await.iter() {
-            if let Some(result) = check_need_return().await {
+            middleware(ctx.clone()).await;
+            if let Some(result) = Self::need_return(&ctx, request_keepalive).await {
                 return result;
             }
-            middleware(ctx.clone()).await;
         }
-        return_handler(false).await
+        yield_now().await;
+        request_keepalive
     }
 
     async fn handle_ws_connection<'a>(
@@ -338,6 +333,9 @@ impl Server {
             .await;
         for on_ws_connected in handler.on_ws_connected.read().await.iter() {
             on_ws_connected(ctx.clone()).await;
+            if Self::need_return(&ctx, true).await.is_some() {
+                return;
+            }
         }
         let route: &String = first_request.get_path();
         let contains_disable_internal_ws_handler: bool = handler
