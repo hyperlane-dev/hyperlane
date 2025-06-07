@@ -2,7 +2,6 @@ mod config;
 mod context;
 mod error;
 mod handler;
-mod middleware;
 mod route;
 mod server;
 mod tests;
@@ -16,7 +15,6 @@ pub use server::*;
 pub use http_type::*;
 
 pub(crate) use config::*;
-pub(crate) use middleware::*;
 pub(crate) use route::*;
 
 pub(crate) use core::hash::BuildHasherDefault;

@@ -8,6 +8,7 @@ impl Default for Server {
             route_matcher: arc_rwlock(RouteMatcher::new()),
             request_middleware: arc_rwlock(vec![]),
             response_middleware: arc_rwlock(vec![]),
+            websocket_shake_callback: arc_rwlock(vec![]),
         }
     }
 }
@@ -147,6 +148,18 @@ impl Server {
         self
     }
 
+    pub async fn websocket_shake_callback<F, Fut>(&self, func: F) -> &Self
+    where
+        F: FuncWithoutPin<Fut>,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        self.get_websocket_shake_callback()
+            .write()
+            .await
+            .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
+        self
+    }
+
     pub async fn route<R, F, Fut>(&self, route: R, func: F) -> &Self
     where
         R: ToString,
@@ -225,12 +238,14 @@ impl Server {
             }
             let config_clone: ServerConfig<'_> = config.clone();
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
-            let request_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =
+            let request_middleware_arc_lock: ArcRwLockVecArcFunc =
                 self.get_request_middleware().clone();
-            let response_middleware_arc_lock: ArcRwLockMiddlewareFuncBox =
+            let response_middleware_arc_lock: ArcRwLockVecArcFunc =
                 self.get_response_middleware().clone();
             let route_func_arc_lock: ArcRwLockHashMapRouteFuncBox = self.get_route().clone();
             let route_matcher_arc_lock: ArcRwLockRouteMatcher = self.route_matcher.clone();
+            let websocket_shake_callback_arc_lock: ArcRwLockVecArcFunc =
+                self.get_websocket_shake_callback().clone();
             tokio::spawn(async move {
                 let request_result: RequestReaderHandleResult =
                     Request::http_request_from_stream(&stream, http_line_buffer_size).await;
@@ -246,6 +261,7 @@ impl Server {
                     &response_middleware_arc_lock,
                     &route_func_arc_lock,
                     &route_matcher_arc_lock,
+                    &websocket_shake_callback_arc_lock,
                 );
                 match is_websocket {
                     true => {
@@ -320,6 +336,9 @@ impl Server {
         if ctx.handle_websocket().await.is_err() {
             return;
         }
+        for websocket_shake_callback in handler.websocket_shake_callback.read().await.iter() {
+            websocket_shake_callback(ctx.clone()).await;
+        }
         let route: &String = first_request.get_path();
         let contains_disable_inner_websocket_handle: bool = handler
             .config
@@ -344,7 +363,7 @@ impl Server {
         if !handle_result {
             return;
         }
-        let stream: ArcRwLockStream = handler.stream.clone();
+        let stream: &ArcRwLockStream = handler.stream;
         let route: &String = first_request.get_path();
         let contains_disable_inner_http_handle: bool = handler
             .config
@@ -355,7 +374,7 @@ impl Server {
             while Self::handle_request_common(handler, first_request).await {}
             return;
         }
-        while let Ok(request) = Request::http_request_from_stream(&stream, buffer_size).await {
+        while let Ok(request) = Request::http_request_from_stream(stream, buffer_size).await {
             let handle_result: bool = Self::handle_request_common(handler, &request).await;
             if !handle_result {
                 return;
@@ -368,10 +387,11 @@ impl<'a> RequestHandlerImmutableParams<'a> {
     pub fn new(
         stream: &'a ArcRwLockStream,
         config: &'a ServerConfig<'a>,
-        request_middleware: &'a ArcRwLockMiddlewareFuncBox,
-        response_middleware: &'a ArcRwLockMiddlewareFuncBox,
+        request_middleware: &'a ArcRwLockVecArcFunc,
+        response_middleware: &'a ArcRwLockVecArcFunc,
         route_func: &'a ArcRwLockHashMapRouteFuncBox,
         route_matcher: &'a ArcRwLock<RouteMatcher>,
+        websocket_shake_callback: &'a ArcRwLockVecArcFunc,
     ) -> Self {
         Self {
             stream,
@@ -380,6 +400,7 @@ impl<'a> RequestHandlerImmutableParams<'a> {
             response_middleware,
             route_func,
             route_matcher,
+            websocket_shake_callback,
         }
     }
 }

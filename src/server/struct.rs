@@ -13,18 +13,25 @@ pub struct Server {
     pub(super) route_matcher: ArcRwLockRouteMatcher,
     #[get(pub(crate))]
     #[set(pub(crate))]
-    pub(super) request_middleware: ArcRwLockMiddlewareFuncBox,
+    pub(super) request_middleware: ArcRwLockVecArcFunc,
     #[get(pub(crate))]
     #[set(pub(crate))]
-    pub(super) response_middleware: ArcRwLockMiddlewareFuncBox,
+    pub(super) response_middleware: ArcRwLockVecArcFunc,
+    #[get(pub(crate))]
+    #[set(pub(crate))]
+    pub(super) websocket_shake_callback: ArcRwLockVecArcFunc,
+    // #[get(pub(crate))]
+    // #[set(pub(crate))]
+    // pub(super) shutdown: ArcRwLockShutdown,
 }
 
 #[derive(Clone)]
 pub(crate) struct RequestHandlerImmutableParams<'a> {
     pub(super) stream: &'a ArcRwLockStream,
     pub(super) config: &'a ServerConfig<'a>,
-    pub(super) request_middleware: &'a ArcRwLockMiddlewareFuncBox,
-    pub(super) response_middleware: &'a ArcRwLockMiddlewareFuncBox,
+    pub(super) request_middleware: &'a ArcRwLockVecArcFunc,
+    pub(super) response_middleware: &'a ArcRwLockVecArcFunc,
     pub(super) route_func: &'a ArcRwLockHashMapRouteFuncBox,
     pub(super) route_matcher: &'a ArcRwLockRouteMatcher,
+    pub(super) websocket_shake_callback: &'a ArcRwLockVecArcFunc,
 }
