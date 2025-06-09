@@ -13,6 +13,7 @@ pub use handler::*;
 pub use server::*;
 
 pub use http_type::*;
+pub use hyperlane_macro::*;
 
 pub(crate) use config::*;
 pub(crate) use route::*;

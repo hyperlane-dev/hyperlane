@@ -56,6 +56,7 @@ async fn response_middleware(ctx: Context) {
     let _ = ctx.send().await;
 }
 
+#[methods(get, post)]
 async fn root_route(ctx: Context) {
     ctx.set_response_status_code(200)
         .await
@@ -63,6 +64,7 @@ async fn root_route(ctx: Context) {
         .await;
 }
 
+#[get]
 async fn ws_route(ctx: Context) {
     let key: String = ctx.get_request_header(SEC_WEBSOCKET_KEY).await.unwrap();
     let request_body: Vec<u8> = ctx.get_request_body().await;
@@ -70,6 +72,7 @@ async fn ws_route(ctx: Context) {
     let _ = ctx.set_response_body(request_body).await.send_body().await;
 }
 
+#[post]
 async fn sse_route(ctx: Context) {
     let _ = ctx
         .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
