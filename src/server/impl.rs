@@ -7,6 +7,7 @@ impl Default for Server {
             route_matcher: arc_rwlock(RouteMatcher::new()),
             request_middleware: arc_rwlock(vec![]),
             response_middleware: arc_rwlock(vec![]),
+            before_ws_upgrade: arc_rwlock(vec![]),
             on_ws_connected: arc_rwlock(vec![]),
         }
     }
@@ -147,6 +148,18 @@ impl Server {
         self
     }
 
+    pub async fn before_ws_upgrade<F, Fut>(&self, func: F) -> &Self
+    where
+        F: FuncWithoutPin<Fut>,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        self.get_before_ws_upgrade()
+            .write()
+            .await
+            .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
+        self
+    }
+
     pub async fn on_ws_connected<F, Fut>(&self, func: F) -> &Self
     where
         F: FuncWithoutPin<Fut>,
@@ -238,6 +251,8 @@ impl Server {
             let response_middleware_arc_lock: ArcRwLockVecArcFunc =
                 self.get_response_middleware().clone();
             let route_matcher_arc_lock: ArcRwLockRouteMatcher = self.route_matcher.clone();
+            let before_ws_upgrade_arc_lock: ArcRwLockVecArcFunc =
+                self.get_before_ws_upgrade().clone();
             let on_ws_connected_arc_lock: ArcRwLockVecArcFunc = self.get_on_ws_connected().clone();
             tokio::spawn(async move {
                 let request_result: RequestReaderHandleResult =
@@ -247,12 +262,13 @@ impl Server {
                 }
                 let mut request: Request = request_result.unwrap_or_default();
                 let is_ws: bool = request.is_ws();
-                let handler: RequestHandlerImmutableParams = RequestHandlerImmutableParams::new(
+                let handler: HandlerState = HandlerState::new(
                     &stream,
                     &config_clone,
                     &request_middleware_arc_lock,
                     &response_middleware_arc_lock,
                     &route_matcher_arc_lock,
+                    &before_ws_upgrade_arc_lock,
                     &on_ws_connected_arc_lock,
                 );
                 match is_ws {
@@ -268,66 +284,130 @@ impl Server {
         Ok(())
     }
 
-    async fn handle_request_common<'a>(
-        handler: &RequestHandlerImmutableParams<'a>,
-        request: &Request,
-    ) -> bool {
+    async fn execute_before_ws_upgrade<'a>(
+        handler: &HandlerState<'a>,
+        ctx: &Context,
+        request_keepalive: bool,
+    ) -> Option<bool> {
+        for before_ws_upgrade in handler.before_ws_upgrade.read().await.iter() {
+            before_ws_upgrade(ctx.clone()).await;
+            if let Some(result) = ctx.should_exit_with_keep_alive(request_keepalive).await {
+                return Some(result);
+            }
+        }
+        None
+    }
+
+    async fn execute_on_ws_connected<'a>(
+        handler: &HandlerState<'a>,
+        ctx: &Context,
+        request_keepalive: bool,
+    ) -> Option<bool> {
+        for on_ws_connected in handler.on_ws_connected.read().await.iter() {
+            on_ws_connected(ctx.clone()).await;
+            if let Some(result) = ctx.should_exit_with_keep_alive(request_keepalive).await {
+                return Some(result);
+            }
+        }
+        None
+    }
+
+    async fn execute_request_middleware<'a>(
+        ctx: &Context,
+        handler: &HandlerState<'a>,
+        request_keepalive: bool,
+    ) -> Option<bool> {
+        for middleware in handler.request_middleware.read().await.iter() {
+            middleware(ctx.clone()).await;
+            if let Some(result) = ctx.should_exit_with_keep_alive(request_keepalive).await {
+                return Some(result);
+            }
+        }
+        None
+    }
+
+    async fn execute_route_handler<'a>(
+        ctx: &Context,
+        route_handler: &OptionArcFunc,
+        request_keepalive: bool,
+    ) -> Option<bool> {
+        if let Some(func) = route_handler {
+            func(ctx.clone()).await;
+            if let Some(result) = ctx.should_exit_with_keep_alive(request_keepalive).await {
+                return Some(result);
+            }
+        }
+        None
+    }
+
+    async fn execute_response_middleware<'a>(
+        ctx: &Context,
+        handler: &HandlerState<'a>,
+        request_keepalive: bool,
+    ) -> Option<bool> {
+        for middleware in handler.response_middleware.read().await.iter() {
+            middleware(ctx.clone()).await;
+            if let Some(result) = ctx.should_exit_with_keep_alive(request_keepalive).await {
+                return Some(result);
+            }
+        }
+        None
+    }
+
+    async fn handle_request_common<'a>(handler: &HandlerState<'a>, request: &Request) -> bool {
         let stream: &ArcRwLockStream = handler.stream;
-        let route: &String = request.get_path();
+        let route: &str = request.get_path();
         let ctx: Context = Context::from_stream_request(stream, request);
         let request_keepalive: bool = request.is_enable_keep_alive();
-        let route_handler_func: OptionArcFunc = handler
+        let route_handler: OptionArcFunc = handler
             .route_matcher
             .read()
             .await
             .resolve_route(&ctx, route)
             .await;
-        for middleware in handler.request_middleware.read().await.iter() {
-            middleware(ctx.clone()).await;
-            if let Some(result) = ctx.should_exit_with_keep_alive(request_keepalive).await {
-                return result;
-            }
+        if let Some(result) =
+            Self::execute_request_middleware(&ctx, handler, request_keepalive).await
+        {
+            return result;
         }
-        if let Some(handler_func) = route_handler_func {
-            handler_func(ctx.clone()).await;
-            if let Some(result) = ctx.should_exit_with_keep_alive(request_keepalive).await {
-                return result;
-            }
+        if let Some(result) =
+            Self::execute_route_handler(&ctx, &route_handler, request_keepalive).await
+        {
+            return result;
         }
-        for middleware in handler.response_middleware.read().await.iter() {
-            middleware(ctx.clone()).await;
-            if let Some(result) = ctx.should_exit_with_keep_alive(request_keepalive).await {
-                return result;
-            }
+        if let Some(result) =
+            Self::execute_response_middleware(&ctx, handler, request_keepalive).await
+        {
+            return result;
         }
         yield_now().await;
         request_keepalive
     }
 
-    async fn handle_ws_connection<'a>(
-        handler: &RequestHandlerImmutableParams<'a>,
-        first_request: &mut Request,
-    ) {
+    async fn handle_ws_connection<'a>(handler: &HandlerState<'a>, first_request: &mut Request) {
+        let route: &String = first_request.get_path();
         let stream: &ArcRwLockStream = handler.stream;
         let ctx: Context = Context::from_stream_request(stream, first_request);
-        if ctx.upgrade_to_ws().await.is_err() {
-            return;
-        }
-        let route: &String = first_request.get_path();
-        let buffer_size: usize = *handler.config.get_ws_buffer_size();
         handler
             .route_matcher
             .read()
             .await
             .resolve_route(&ctx, route)
             .await;
-        for on_ws_connected in handler.on_ws_connected.read().await.iter() {
-            on_ws_connected(ctx.clone()).await;
-            if ctx.should_exit_with_keep_alive(true).await.is_some() {
-                return;
-            }
+        let should_exit: bool = {
+            Self::execute_before_ws_upgrade(handler, &ctx, true)
+                .await
+                .is_some()
+                || ctx.upgrade_to_ws().await.is_err()
+                || Self::execute_on_ws_connected(handler, &ctx, true)
+                    .await
+                    .is_some()
+        };
+        if should_exit {
+            return;
         }
         let route: &String = first_request.get_path();
+        let buffer_size: usize = *handler.config.get_ws_buffer_size();
         let contains_disable_internal_ws_handler: bool = handler
             .config
             .contains_disable_internal_ws_handler(route)
@@ -343,10 +423,7 @@ impl Server {
         }
     }
 
-    async fn handle_http_connection<'a>(
-        handler: &RequestHandlerImmutableParams<'a>,
-        first_request: &Request,
-    ) {
+    async fn handle_http_connection<'a>(handler: &HandlerState<'a>, first_request: &Request) {
         let handle_result: bool = Self::handle_request_common(handler, first_request).await;
         if !handle_result {
             return;
@@ -371,13 +448,14 @@ impl Server {
     }
 }
 
-impl<'a> RequestHandlerImmutableParams<'a> {
+impl<'a> HandlerState<'a> {
     fn new(
         stream: &'a ArcRwLockStream,
         config: &'a ServerConfig<'a>,
         request_middleware: &'a ArcRwLockVecArcFunc,
         response_middleware: &'a ArcRwLockVecArcFunc,
         route_matcher: &'a ArcRwLock<RouteMatcher>,
+        before_ws_upgrade: &'a ArcRwLockVecArcFunc,
         on_ws_connected: &'a ArcRwLockVecArcFunc,
     ) -> Self {
         Self {
@@ -386,6 +464,7 @@ impl<'a> RequestHandlerImmutableParams<'a> {
             request_middleware,
             response_middleware,
             route_matcher,
+            before_ws_upgrade,
             on_ws_connected,
         }
     }
