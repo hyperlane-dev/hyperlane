@@ -87,7 +87,7 @@ async fn test_server() {
         server.route("/sse", sse_route).await;
         server.route("/dynamic/{routing}", dynamic_route).await;
         server
-            .route("/dynamic/routing/{number:\\d+}", dynamic_route)
+            .route("/dynamic/routing/{file:^.*$}", dynamic_route)
             .await;
         server.run().await.unwrap();
     }

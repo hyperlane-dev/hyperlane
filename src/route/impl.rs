@@ -74,30 +74,46 @@ impl RoutePattern {
         } else {
             path.split(DEFAULT_HTTP_PATH).collect()
         };
-        if path_segments.len() != self.0.len() {
+        let route_segments_len: usize = self.0.len();
+        let path_segments_len: usize = path_segments.len();
+        let is_tail_regex: bool = matches!(self.0.last(), Some(RouteSegment::Regex(_, _)));
+        if (!is_tail_regex && path_segments_len != route_segments_len)
+            || (is_tail_regex && path_segments_len < route_segments_len - 1)
+        {
             return None;
         }
         let mut params: RouteParams = hash_map_xx_hash3_64();
         for (idx, segment) in self.0.iter().enumerate() {
             match segment {
                 RouteSegment::Static(path) => {
-                    if path != path_segments[idx] {
+                    if path_segments.get(idx).copied() != Some(path.as_str()) {
                         return None;
                     }
                 }
                 RouteSegment::Dynamic(param_name) => {
-                    params.insert(param_name.clone(), path_segments[idx].to_owned());
+                    let Some(value) = path_segments.get(idx) else {
+                        return None;
+                    };
+                    params.insert(param_name.clone(), (*value).to_owned());
                 }
                 RouteSegment::Regex(param_name, regex) => {
-                    let segment: &str = path_segments[idx];
-                    if !regex.is_match(segment)
+                    let segment_value: String = if idx == route_segments_len - 1 {
+                        path_segments[idx..].join(DEFAULT_HTTP_PATH)
+                    } else {
+                        match path_segments.get(idx) {
+                            Some(val) => val.to_string(),
+                            None => return None,
+                        }
+                    };
+                    if !regex.is_match(&segment_value)
                         || regex
-                            .find(segment)
-                            .map_or(false, |m| m.start() != 0 || m.end() != segment.len())
+                            .find(&segment_value)
+                            .map_or(false, |m| m.start() != 0 || m.end() != segment_value.len())
                     {
                         return None;
                     }
-                    params.insert(param_name.clone(), segment.to_owned());
+                    params.insert(param_name.clone(), segment_value);
+                    break;
                 }
             }
         }

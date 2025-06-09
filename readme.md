@@ -105,7 +105,6 @@ fn error_handler(error: String) {
     let _ = std::io::Write::flush(&mut std::io::stderr());
 }
 
-#[tokio::main]
 async fn main() {
     let server: Server = Server::new();
     server.host("0.0.0.0").await;
@@ -124,7 +123,7 @@ async fn main() {
     server.route("/sse", sse_route).await;
     server.route("/dynamic/{routing}", dynamic_route).await;
     server
-        .route("/dynamic/routing/{number:\\d+}", dynamic_route)
+        .route("/dynamic/routing/{file:^.*$}", dynamic_route)
         .await;
     server.run().await.unwrap();
 }
