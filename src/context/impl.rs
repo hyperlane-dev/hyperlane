@@ -80,10 +80,6 @@ impl Context {
             .map(|socket_addr: SocketAddr| socket_addr.ip())
     }
 
-    pub async fn get_route_params_lock(&self) -> ArcRwLockRouteParams {
-        self.read().await.get_route_params().clone()
-    }
-
     pub async fn get_route_params(&self) -> RouteParams {
         self.read().await.get_route_params().read().await.clone()
     }

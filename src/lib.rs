@@ -10,13 +10,13 @@ mod utils;
 pub use context::*;
 pub use error::*;
 pub use handler::*;
+pub use route::*;
 pub use server::*;
 
 pub use http_type::*;
 pub use hyperlane_macros::*;
 
 pub(crate) use config::*;
-pub(crate) use route::*;
 
 pub(crate) use core::hash::BuildHasherDefault;
 pub(crate) use std::{
