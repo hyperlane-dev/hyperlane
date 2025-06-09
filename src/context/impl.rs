@@ -139,7 +139,7 @@ impl Context {
         Err(ResponseError::NotFoundStream)
     }
 
-    pub async fn send_response<T>(&self, status_code: usize, response_body: T) -> ResponseResult
+    pub async fn send_status_body<T>(&self, status_code: usize, response_body: T) -> ResponseResult
     where
         T: Into<ResponseBody>,
     {
@@ -150,10 +150,10 @@ impl Context {
     pub async fn send(&self) -> ResponseResult {
         let status_code: ResponseStatusCode = self.get_response_status_code().await;
         let response_body: ResponseBody = self.get_response_body().await;
-        self.send_response(status_code, response_body).await
+        self.send_status_body(status_code, response_body).await
     }
 
-    pub async fn send_response_once<T>(
+    pub async fn send_once_status_body<T>(
         &self,
         status_code: usize,
         response_body: T,
@@ -170,7 +170,7 @@ impl Context {
     pub async fn send_once(&self) -> ResponseResult {
         let status_code: ResponseStatusCode = self.get_response_status_code().await;
         let response_body: ResponseBody = self.get_response_body().await;
-        self.send_response_once(status_code, response_body).await
+        self.send_once_status_body(status_code, response_body).await
     }
 
     pub async fn send_response_body<T>(&self, response_body: T) -> ResponseResult

@@ -64,13 +64,19 @@ async fn root_route(ctx: Context) {
 }
 
 async fn ws_route(ctx: Context) {
+    let key: String = ctx.get_request_header(SEC_WEBSOCKET_KEY).await.unwrap();
     let request_body: Vec<u8> = ctx.get_request_body().await;
+    let _ = ctx.send_response_body(key).await;
     let _ = ctx.send_response_body(request_body).await;
 }
 
 async fn dynamic_route(ctx: Context) {
     let param: RouteParams = ctx.get_route_params().await;
     panic!("Test panic {:?}", param);
+}
+
+async fn on_ws_connected(ctx: Context) {
+    let _ = ctx.send_response_body("connected").await;
 }
 
 fn error_handler(error: String) {
@@ -88,6 +94,8 @@ async fn main() {
     server.http_line_buffer_size(4096).await;
     server.ws_buffer_size(4096).await;
     server.error_handler(error_handler).await;
+    server.on_ws_connected(on_ws_connected).await;
+    server.before_ws_upgrade(request_middleware).await;
     server.request_middleware(request_middleware).await;
     server.response_middleware(response_middleware).await;
     server.route("/", root_route).await;
