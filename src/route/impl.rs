@@ -105,15 +105,17 @@ impl RoutePattern {
                             None => return None,
                         }
                     };
-                    if !regex.is_match(&segment_value)
-                        || regex
-                            .find(&segment_value)
-                            .map_or(false, |m| m.start() != 0 || m.end() != segment_value.len())
-                    {
+                    let not_match: bool = !regex.is_match(&segment_value)
+                        || regex.find(&segment_value).map_or(false, |value| {
+                            value.start() != 0 || value.end() != segment_value.len()
+                        });
+                    if not_match {
                         return None;
                     }
                     params.insert(param_name.clone(), segment_value);
-                    break;
+                    if idx == route_segments_len - 1 {
+                        break;
+                    }
                 }
             }
         }
