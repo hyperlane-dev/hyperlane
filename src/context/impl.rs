@@ -109,99 +109,54 @@ impl Context {
             .map(|socket_addr: SocketAddr| socket_addr.port())
     }
 
-    async fn internal_send_response<T>(
-        &self,
-        status_code: usize,
-        response_body: T,
-        handle_ws: bool,
-    ) -> ResponseResult
-    where
-        T: Into<ResponseBody>,
-    {
+    async fn internal_send_handler(&self, upgrade_ws: bool) -> ResponseResult {
         if self.get_closed().await {
             return Err(ResponseError::ConnectionClosed);
         }
-        if let Some(stream_lock) = self.get_stream().await {
+        if let Some(stream) = self.get_stream().await {
             let is_ws: bool = self.get_request_upgrade_type().await.is_ws();
-            let mut ctx_write_lock: RwLockWriteInnerContext = self.write().await;
-            if !handle_ws && is_ws {
+            if !upgrade_ws && is_ws {
                 return Err(ResponseError::MethodNotSupported(
                     "websocket does not support calling this method".to_owned(),
                 ));
             }
-            let response_res: ResponseData = ctx_write_lock
-                .get_mut_response()
-                .set_body(response_body)
-                .set_status_code(status_code)
-                .build();
-            return stream_lock.send(&response_res).await;
+            let response_res: ResponseData = self.write().await.get_mut_response().build();
+            return stream.send(&response_res).await;
         }
         Err(ResponseError::NotFoundStream)
-    }
-
-    pub async fn send_status_body<T>(&self, status_code: usize, response_body: T) -> ResponseResult
-    where
-        T: Into<ResponseBody>,
-    {
-        self.internal_send_response(status_code, response_body, false)
-            .await
     }
 
     pub async fn send(&self) -> ResponseResult {
-        let status_code: ResponseStatusCode = self.get_response_status_code().await;
-        let response_body: ResponseBody = self.get_response_body().await;
-        self.send_status_body(status_code, response_body).await
-    }
-
-    pub async fn send_once_status_body<T>(
-        &self,
-        status_code: usize,
-        response_body: T,
-    ) -> ResponseResult
-    where
-        T: Into<ResponseBody>,
-    {
-        self.internal_send_response(status_code, response_body, false)
-            .await?;
-        self.closed().await;
-        Ok(())
+        self.internal_send_handler(false).await
     }
 
     pub async fn send_once(&self) -> ResponseResult {
-        let status_code: ResponseStatusCode = self.get_response_status_code().await;
-        let response_body: ResponseBody = self.get_response_body().await;
-        self.send_once_status_body(status_code, response_body).await
+        let res: ResponseResult = self.send().await;
+        self.closed().await;
+        res
     }
 
-    pub async fn send_response_body<T>(&self, response_body: T) -> ResponseResult
-    where
-        T: Into<ResponseBody>,
-    {
+    pub async fn send_body(&self) -> ResponseResult {
         if self.get_closed().await {
             return Err(ResponseError::ConnectionClosed);
         }
-        if let Some(stream_lock) = self.get_stream().await {
+        if let Some(stream) = self.get_stream().await {
             let is_ws: bool = self.get_request_upgrade_type().await.is_ws();
-            let response_body: ResponseBody = response_body.into();
-            self.write()
-                .await
-                .get_mut_response()
-                .set_body(response_body.clone());
-            return stream_lock
-                .send_body_conditional(&response_body, is_ws)
-                .await;
+            let response_body: ResponseBody = self.get_response_body().await;
+            return stream.send_body_conditional(&response_body, is_ws).await;
         }
         Err(ResponseError::NotFoundStream)
     }
 
-    pub async fn send_body(&self) -> ResponseResult {
-        let body: ResponseBody = self.get_response_body().await;
-        self.send_response_body(body).await
+    pub async fn send_once_body(&self) -> ResponseResult {
+        let res: ResponseResult = self.send_body().await;
+        self.closed().await;
+        res
     }
 
     pub async fn flush(&self) -> ResponseResult {
-        if let Some(stream_lock) = self.get_stream().await {
-            stream_lock.flush().await;
+        if let Some(stream) = self.get_stream().await {
+            stream.flush().await;
             return Ok(());
         }
         Err(ResponseError::NotFoundStream)
@@ -359,23 +314,21 @@ impl Context {
         if let Some(key) = key_opt {
             let accept_key: String = WebSocketFrame::generate_accept_key(&key);
             return self
+                .set_response_status_code(101)
+                .await
                 .set_response_header(UPGRADE, WEBSOCKET)
                 .await
                 .set_response_header(CONNECTION, UPGRADE)
                 .await
                 .set_response_header(SEC_WEB_SOCKET_ACCEPT, accept_key)
                 .await
-                .internal_send_response(101, "", true)
+                .internal_send_handler(true)
                 .await;
         }
         Err(ResponseError::WebSocketHandShake(format!(
             "missing {} header",
             SEC_WEBSOCKET_KEY
         )))
-    }
-
-    pub fn format_host_port(host: &str, port: &usize) -> String {
-        format!("{}{}{}", host, COLON_SPACE_SYMBOL, port)
     }
 
     pub async fn set_attribute<T>(&self, key: &str, value: T) -> &Self
@@ -449,12 +402,6 @@ impl Context {
         self
     }
 
-    pub async fn check_early_exit(&self) -> bool {
-        let aborted: bool = self.get_aborted().await;
-        let closed: bool = self.get_closed().await;
-        aborted || closed
-    }
-
     pub async fn reset_response_body(&self) -> &Self {
         self.set_response_body(ResponseBody::default()).await;
         self
@@ -498,16 +445,17 @@ impl Context {
         Err(RequestError::GetTcpStream)
     }
 
-    pub(crate) async fn should_exit_with_keep_alive(
-        &self,
-        request_keepalive: bool,
-    ) -> Option<bool> {
-        let aborted: bool = self.get_aborted().await;
-        let closed: bool = self.get_closed().await;
-        if aborted || closed {
+    pub(crate) async fn should_abort(&self, lifecycle: &mut Lifecycle) {
+        let keep_alive: bool = !self.get_closed().await
+            && matches!(
+                lifecycle,
+                Lifecycle::Continue(true) | Lifecycle::Abort(true)
+            );
+        *lifecycle = if self.get_aborted().await {
             yield_now().await;
-            return Some(!closed && request_keepalive);
-        }
-        None
+            Lifecycle::Abort(keep_alive)
+        } else {
+            Lifecycle::Continue(keep_alive)
+        };
     }
 }

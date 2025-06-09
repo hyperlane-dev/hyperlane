@@ -8,7 +8,7 @@ async fn test_server() {
         let socket_addr: String = ctx.get_socket_addr_or_default_string().await;
         ctx.set_response_header(SERVER, HYPERLANE)
             .await
-            .set_response_header(CONNECTION, CONNECTION_KEEP_ALIVE)
+            .set_response_header(CONNECTION, KEEP_ALIVE)
             .await
             .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
             .await
@@ -30,8 +30,26 @@ async fn test_server() {
     async fn ws_route(ctx: Context) {
         let key: String = ctx.get_request_header(SEC_WEBSOCKET_KEY).await.unwrap();
         let request_body: Vec<u8> = ctx.get_request_body().await;
-        let _ = ctx.send_response_body(key).await;
-        let _ = ctx.send_response_body(request_body).await;
+        let _ = ctx.set_response_body(key).await.send_body().await;
+        let _ = ctx.set_response_body(request_body).await.send_body().await;
+    }
+
+    async fn sse_route(ctx: Context) {
+        let _ = ctx
+            .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+            .await
+            .set_response_status_code(200)
+            .await
+            .send()
+            .await;
+        for i in 0..10 {
+            let _ = ctx
+                .set_response_body(format!("data:{}{}", i, HTTP_DOUBLE_BR))
+                .await
+                .send_body()
+                .await;
+        }
+        let _ = ctx.closed().await;
     }
 
     async fn dynamic_route(ctx: Context) {
@@ -40,7 +58,7 @@ async fn test_server() {
     }
 
     async fn on_ws_connected(ctx: Context) {
-        let _ = ctx.send_response_body("connected").await;
+        let _ = ctx.set_response_body("connected").await.send_body().await;
     }
 
     fn error_handler(error: String) {
@@ -63,6 +81,7 @@ async fn test_server() {
         server.response_middleware(response_middleware).await;
         server.route("/", root_route).await;
         server.route("/ws", ws_route).await;
+        server.route("/sse", sse_route).await;
         server.route("/dynamic/{routing}", dynamic_route).await;
         server
             .route("/dynamic/routing/{number:\\d+}", dynamic_route)

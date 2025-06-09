@@ -18,6 +18,10 @@ impl Server {
         Self::default()
     }
 
+    fn format_host_port(host: &str, port: &usize) -> String {
+        format!("{}{}{}", host, COLON_SPACE_SYMBOL, port)
+    }
+
     pub async fn host(&self, host: &'static str) -> &Self {
         self.get_config().write().await.set_host(host);
         self
@@ -234,7 +238,7 @@ impl Server {
         let linger: OptionDuration = *config.get_linger();
         let ttl_opt: OptionU32 = *config.get_ttl();
         let http_line_buffer_size: usize = *config.get_http_line_buffer_size();
-        let addr: String = Context::format_host_port(host, &port);
+        let addr: String = Self::format_host_port(host, &port);
         let tcp_listener: TcpListener = TcpListener::bind(&addr)
             .await
             .map_err(|err| ServerError::TcpBind(err.to_string()))?;
@@ -287,123 +291,122 @@ impl Server {
     async fn execute_before_ws_upgrade<'a>(
         handler: &HandlerState<'a>,
         ctx: &Context,
-        request_keepalive: bool,
-    ) -> Option<bool> {
+        lifecycle: &mut Lifecycle,
+    ) {
         for before_ws_upgrade in handler.before_ws_upgrade.read().await.iter() {
             before_ws_upgrade(ctx.clone()).await;
-            if let Some(result) = ctx.should_exit_with_keep_alive(request_keepalive).await {
-                return Some(result);
+            ctx.should_abort(lifecycle).await;
+            if matches!(lifecycle, Lifecycle::Abort(_)) {
+                return;
             }
         }
-        None
     }
 
     async fn execute_on_ws_connected<'a>(
         handler: &HandlerState<'a>,
         ctx: &Context,
-        request_keepalive: bool,
-    ) -> Option<bool> {
+        lifecycle: &mut Lifecycle,
+    ) {
         for on_ws_connected in handler.on_ws_connected.read().await.iter() {
             on_ws_connected(ctx.clone()).await;
-            if let Some(result) = ctx.should_exit_with_keep_alive(request_keepalive).await {
-                return Some(result);
+            ctx.should_abort(lifecycle).await;
+            if matches!(lifecycle, Lifecycle::Abort(_)) {
+                return;
             }
         }
-        None
     }
 
     async fn execute_request_middleware<'a>(
         ctx: &Context,
         handler: &HandlerState<'a>,
-        request_keepalive: bool,
-    ) -> Option<bool> {
+        lifecycle: &mut Lifecycle,
+    ) {
         for middleware in handler.request_middleware.read().await.iter() {
             middleware(ctx.clone()).await;
-            if let Some(result) = ctx.should_exit_with_keep_alive(request_keepalive).await {
-                return Some(result);
+            ctx.should_abort(lifecycle).await;
+            if matches!(lifecycle, Lifecycle::Abort(_)) {
+                return;
             }
         }
-        None
     }
 
     async fn execute_route_handler<'a>(
         ctx: &Context,
         route_handler: &OptionArcFunc,
-        request_keepalive: bool,
-    ) -> Option<bool> {
+        lifecycle: &mut Lifecycle,
+    ) {
         if let Some(func) = route_handler {
             func(ctx.clone()).await;
-            if let Some(result) = ctx.should_exit_with_keep_alive(request_keepalive).await {
-                return Some(result);
+            ctx.should_abort(lifecycle).await;
+            if matches!(lifecycle, Lifecycle::Abort(_)) {
+                return;
             }
         }
-        None
     }
 
     async fn execute_response_middleware<'a>(
         ctx: &Context,
         handler: &HandlerState<'a>,
-        request_keepalive: bool,
-    ) -> Option<bool> {
+        lifecycle: &mut Lifecycle,
+    ) {
         for middleware in handler.response_middleware.read().await.iter() {
             middleware(ctx.clone()).await;
-            if let Some(result) = ctx.should_exit_with_keep_alive(request_keepalive).await {
-                return Some(result);
+            ctx.should_abort(lifecycle).await;
+            if matches!(lifecycle, Lifecycle::Abort(_)) {
+                return;
             }
         }
-        None
     }
 
     async fn handle_request_common<'a>(handler: &HandlerState<'a>, request: &Request) -> bool {
         let stream: &ArcRwLockStream = handler.stream;
         let route: &str = request.get_path();
         let ctx: Context = Context::from_stream_request(stream, request);
-        let request_keepalive: bool = request.is_enable_keep_alive();
+        let mut lifecycle: Lifecycle = Lifecycle::Continue(request.is_enable_keep_alive());
         let route_handler: OptionArcFunc = handler
             .route_matcher
             .read()
             .await
             .resolve_route(&ctx, route)
             .await;
-        if let Some(result) =
-            Self::execute_request_middleware(&ctx, handler, request_keepalive).await
-        {
-            return result;
+        Self::execute_request_middleware(&ctx, handler, &mut lifecycle).await;
+        if let Lifecycle::Abort(request_keepalive) = lifecycle {
+            return request_keepalive;
         }
-        if let Some(result) =
-            Self::execute_route_handler(&ctx, &route_handler, request_keepalive).await
-        {
-            return result;
+        Self::execute_route_handler(&ctx, &route_handler, &mut lifecycle).await;
+        if let Lifecycle::Abort(request_keepalive) = lifecycle {
+            return request_keepalive;
         }
-        if let Some(result) =
-            Self::execute_response_middleware(&ctx, handler, request_keepalive).await
-        {
-            return result;
+        Self::execute_response_middleware(&ctx, handler, &mut lifecycle).await;
+        if let Lifecycle::Abort(request_keepalive) = lifecycle {
+            return request_keepalive;
         }
         yield_now().await;
-        request_keepalive
+        match lifecycle {
+            Lifecycle::Continue(res) | Lifecycle::Abort(res) => res,
+        }
     }
 
     async fn handle_ws_connection<'a>(handler: &HandlerState<'a>, first_request: &mut Request) {
         let route: &String = first_request.get_path();
         let stream: &ArcRwLockStream = handler.stream;
         let ctx: Context = Context::from_stream_request(stream, first_request);
+        let mut lifecycle: Lifecycle = Lifecycle::Continue(true);
         handler
             .route_matcher
             .read()
             .await
             .resolve_route(&ctx, route)
             .await;
-        let should_exit: bool = {
-            Self::execute_before_ws_upgrade(handler, &ctx, true)
-                .await
-                .is_some()
-                || ctx.upgrade_to_ws().await.is_err()
-                || Self::execute_on_ws_connected(handler, &ctx, true)
-                    .await
-                    .is_some()
-        };
-        if should_exit {
+        Self::execute_before_ws_upgrade(handler, &ctx, &mut lifecycle).await;
+        if matches!(lifecycle, Lifecycle::Abort(_)) {
+            return;
+        }
+        if ctx.upgrade_to_ws().await.is_err() {
+            return;
+        }
+        Self::execute_on_ws_connected(handler, &ctx, &mut lifecycle).await;
+        if matches!(lifecycle, Lifecycle::Abort(_)) {
             return;
         }
         let route: &String = first_request.get_path();
