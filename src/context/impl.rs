@@ -194,7 +194,7 @@ impl Context {
         self.read().await.get_request().get_body_string()
     }
 
-    pub async fn get_request_body_json<T>(&self) -> ResultSerdeJsonError<T>
+    pub async fn get_request_body_json<T>(&self) -> ResultJsonError<T>
     where
         T: DeserializeOwned,
     {
@@ -240,7 +240,7 @@ impl Context {
         self.read().await.get_response().get_body_string()
     }
 
-    pub async fn get_response_body_json<T>(&self) -> ResultSerdeJsonError<T>
+    pub async fn get_response_body_json<T>(&self) -> ResultJsonError<T>
     where
         T: DeserializeOwned,
     {
