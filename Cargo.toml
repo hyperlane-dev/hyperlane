@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "5.30.0"
+version = "5.30.1"
 edition = "2024"
 authors = ["root@ltpp.vip"] 
 license = "MIT"
@@ -23,7 +23,7 @@ http-type = "4.22.1"
 lombok-macros = "1.12.1"
 serde = "1.0.219"
 regex = "1.10.2"
-hyperlane-macros = "0.4.0"
+hyperlane-macros = "0.4.1"
 
 [profile.dev]
 incremental = false

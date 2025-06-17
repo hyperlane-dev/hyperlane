@@ -28,8 +28,8 @@ async fn test_server() {
             .await;
     }
 
-    #[get]
     #[ws]
+    #[get]
     async fn ws_route(ctx: Context) {
         let key: String = ctx.get_request_header(SEC_WEBSOCKET_KEY).await.unwrap();
         let request_body: Vec<u8> = ctx.get_request_body().await;
@@ -38,7 +38,7 @@ async fn test_server() {
     }
 
     #[post]
-    async fn sse_route(ctx: Context) {
+    async fn sse_pre_hook(ctx: Context) {
         let _ = ctx
             .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
             .await
@@ -46,6 +46,15 @@ async fn test_server() {
             .await
             .send()
             .await;
+    }
+
+    async fn sse_post_hook(ctx: Context) {
+        let _ = ctx.closed().await;
+    }
+
+    #[pre_hook(sse_pre_hook)]
+    #[post_hook(sse_post_hook)]
+    async fn sse_route(ctx: Context) {
         for i in 0..10 {
             let _ = ctx
                 .set_response_body(format!("data:{}{}", i, HTTP_DOUBLE_BR))
@@ -53,7 +62,6 @@ async fn test_server() {
                 .send_body()
                 .await;
         }
-        let _ = ctx.closed().await;
     }
 
     async fn dynamic_route(ctx: Context) {

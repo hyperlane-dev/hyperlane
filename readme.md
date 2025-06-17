@@ -64,6 +64,7 @@ async fn root_route(ctx: Context) {
         .await;
 }
 
+#[ws]
 #[get]
 async fn ws_route(ctx: Context) {
     let key: String = ctx.get_request_header(SEC_WEBSOCKET_KEY).await.unwrap();
@@ -73,7 +74,7 @@ async fn ws_route(ctx: Context) {
 }
 
 #[post]
-async fn sse_route(ctx: Context) {
+async fn sse_pre_hook(ctx: Context) {
     let _ = ctx
         .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
         .await
@@ -81,6 +82,15 @@ async fn sse_route(ctx: Context) {
         .await
         .send()
         .await;
+}
+
+async fn sse_post_hook(ctx: Context) {
+    let _ = ctx.closed().await;
+}
+
+#[pre_hook(sse_pre_hook)]
+#[post_hook(sse_post_hook)]
+async fn sse_route(ctx: Context) {
     for i in 0..10 {
         let _ = ctx
             .set_response_body(format!("data:{}{}", i, HTTP_DOUBLE_BR))
@@ -88,7 +98,6 @@ async fn sse_route(ctx: Context) {
             .send_body()
             .await;
     }
-    let _ = ctx.closed().await;
 }
 
 async fn dynamic_route(ctx: Context) {
@@ -105,6 +114,7 @@ fn error_handler(error: String) {
     let _ = std::io::Write::flush(&mut std::io::stderr());
 }
 
+#[tokio::main]
 async fn main() {
     let server: Server = Server::new();
     server.host("0.0.0.0").await;

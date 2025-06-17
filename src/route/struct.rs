@@ -1,6 +1,4 @@
 use crate::*;
-use std::collections::HashMap;
-use std::fmt;
 
 #[derive(Debug, Clone)]
 pub(crate) struct RoutePattern(pub(super) VecRouteSegment);
@@ -24,20 +22,21 @@ impl fmt::Display for RoutePattern {
 #[derive(Clone)]
 pub(crate) struct RouteMatcher {
     pub(super) static_routes: HashMap<String, ArcFunc>,
-    pub(super) dynamic_and_regex_routes: Vec<(RoutePattern, ArcFunc)>,
+    pub(super) dynamic_routes: Vec<(RoutePattern, ArcFunc)>,
+    pub(super) regex_routes: Vec<(RoutePattern, ArcFunc)>,
 }
 
 impl fmt::Debug for RouteMatcher {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let static_keys: Vec<&String> = self.static_routes.keys().collect();
         let dynamic_patterns: Vec<String> = self
-            .dynamic_and_regex_routes
+            .dynamic_routes
             .iter()
             .map(|(pat, _)| format!("{:?}", pat))
             .collect();
         f.debug_struct("RouteMatcher")
             .field("static_routes", &static_keys)
-            .field("dynamic_and_regex_routes", &dynamic_patterns)
+            .field("dynamic_routes", &dynamic_patterns)
             .finish()
     }
 }
@@ -46,7 +45,8 @@ impl Default for RouteMatcher {
     fn default() -> Self {
         Self {
             static_routes: HashMap::new(),
-            dynamic_and_regex_routes: Vec::new(),
+            dynamic_routes: Vec::new(),
+            regex_routes: Vec::new(),
         }
     }
 }

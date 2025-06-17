@@ -127,13 +127,24 @@ impl RoutePattern {
             .iter()
             .all(|seg| matches!(seg, RouteSegment::Static(_)))
     }
+
+    pub(crate) fn is_dynamic(&self) -> bool {
+        self.0
+            .iter()
+            .any(|seg| matches!(seg, RouteSegment::Dynamic(_)))
+            && self
+                .0
+                .iter()
+                .all(|seg| !matches!(seg, RouteSegment::Regex(_, _)))
+    }
 }
 
 impl RouteMatcher {
     pub(crate) fn new() -> Self {
         Self {
             static_routes: HashMap::new(),
-            dynamic_and_regex_routes: Vec::new(),
+            dynamic_routes: Vec::new(),
+            regex_routes: Vec::new(),
         }
     }
 
@@ -144,16 +155,20 @@ impl RouteMatcher {
                 return Err(RouteError::DuplicatePattern(pattern.to_owned()));
             }
             self.static_routes.insert(pattern.to_string(), handler);
-        } else {
-            let has_same_pattern: bool = self
-                .dynamic_and_regex_routes
-                .iter()
-                .any(|(tmp_pattern, _)| tmp_pattern == &route_pattern);
-            if has_same_pattern {
-                return Err(RouteError::DuplicatePattern(pattern.to_owned()));
-            }
-            self.dynamic_and_regex_routes.push((route_pattern, handler));
+            return Ok(());
         }
+        let target_vec: &mut Vec<(RoutePattern, ArcFunc)> = if route_pattern.is_dynamic() {
+            &mut self.dynamic_routes
+        } else {
+            &mut self.regex_routes
+        };
+        let has_same_pattern: bool = target_vec
+            .iter()
+            .any(|(tmp_pattern, _)| tmp_pattern == &route_pattern);
+        if has_same_pattern {
+            return Err(RouteError::DuplicatePattern(pattern.to_owned()));
+        }
+        target_vec.push((route_pattern, handler));
         Ok(())
     }
 
@@ -161,7 +176,12 @@ impl RouteMatcher {
         if self.static_routes.contains_key(path) {
             return true;
         }
-        for (pattern, _) in &self.dynamic_and_regex_routes {
+        for (pattern, _) in &self.dynamic_routes {
+            if pattern.match_path(path).is_some() {
+                return true;
+            }
+        }
+        for (pattern, _) in &self.regex_routes {
             if pattern.match_path(path).is_some() {
                 return true;
             }
@@ -174,7 +194,13 @@ impl RouteMatcher {
             ctx.set_route_params(RouteParams::default()).await;
             return Some(handler.clone());
         }
-        for (pattern, handler) in &self.dynamic_and_regex_routes {
+        for (pattern, handler) in &self.dynamic_routes {
+            if let Some(params) = pattern.match_path(path) {
+                ctx.set_route_params(params).await;
+                return Some(handler.clone());
+            }
+        }
+        for (pattern, handler) in &self.regex_routes {
             if let Some(params) = pattern.match_path(path) {
                 ctx.set_route_params(params).await;
                 return Some(handler.clone());
