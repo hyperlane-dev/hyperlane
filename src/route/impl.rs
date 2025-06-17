@@ -121,28 +121,47 @@ impl RoutePattern {
         }
         Some(params)
     }
+
+    pub(crate) fn is_static(&self) -> bool {
+        self.0
+            .iter()
+            .all(|seg| matches!(seg, RouteSegment::Static(_)))
+    }
 }
 
 impl RouteMatcher {
     pub(crate) fn new() -> Self {
-        Self(Vec::new())
+        Self {
+            static_routes: HashMap::new(),
+            dynamic_and_regex_routes: Vec::new(),
+        }
     }
 
     pub(crate) fn add(&mut self, pattern: &str, handler: ArcFunc) -> ResultAddRoute {
         let route_pattern: RoutePattern = RoutePattern::new(pattern)?;
-        let has_same_pattern: bool = self
-            .0
-            .iter()
-            .any(|(tmp_pattern, _)| tmp_pattern == &route_pattern);
-        if has_same_pattern {
-            return Err(RouteError::DuplicatePattern(pattern.to_owned()));
+        if route_pattern.is_static() {
+            if self.static_routes.contains_key(pattern) {
+                return Err(RouteError::DuplicatePattern(pattern.to_owned()));
+            }
+            self.static_routes.insert(pattern.to_string(), handler);
+        } else {
+            let has_same_pattern: bool = self
+                .dynamic_and_regex_routes
+                .iter()
+                .any(|(tmp_pattern, _)| tmp_pattern == &route_pattern);
+            if has_same_pattern {
+                return Err(RouteError::DuplicatePattern(pattern.to_owned()));
+            }
+            self.dynamic_and_regex_routes.push((route_pattern, handler));
         }
-        self.0.push((route_pattern, handler));
-        return Ok(());
+        Ok(())
     }
 
     pub(crate) fn match_route(&self, path: &str) -> bool {
-        for (pattern, _) in &self.0 {
+        if self.static_routes.contains_key(path) {
+            return true;
+        }
+        for (pattern, _) in &self.dynamic_and_regex_routes {
             if pattern.match_path(path).is_some() {
                 return true;
             }
@@ -151,7 +170,11 @@ impl RouteMatcher {
     }
 
     pub(crate) async fn resolve_route(&self, ctx: &Context, path: &str) -> OptionArcFunc {
-        for (pattern, handler) in &self.0 {
+        if let Some(handler) = self.static_routes.get(path) {
+            ctx.set_route_params(RouteParams::default()).await;
+            return Some(handler.clone());
+        }
+        for (pattern, handler) in &self.dynamic_and_regex_routes {
             if let Some(params) = pattern.match_path(path) {
                 ctx.set_route_params(params).await;
                 return Some(handler.clone());

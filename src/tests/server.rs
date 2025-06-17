@@ -29,6 +29,7 @@ async fn test_server() {
     }
 
     #[get]
+    #[ws]
     async fn ws_route(ctx: Context) {
         let key: String = ctx.get_request_header(SEC_WEBSOCKET_KEY).await.unwrap();
         let request_body: Vec<u8> = ctx.get_request_body().await;

@@ -4,7 +4,6 @@ pub type RouteParams = HashMap<String, String, BuildHasherDefault<XxHash3_64>>;
 pub type ArcRwLockRouteParams = ArcRwLock<RouteParams>;
 
 pub(crate) type VecRouteSegment = Vec<RouteSegment>;
-pub(crate) type VecRoutePatternArcFunc = Vec<(RoutePattern, ArcFunc)>;
 pub(crate) type ArcRwLockRouteMatcher = ArcRwLock<RouteMatcher>;
 pub(crate) type ResultAddRoute = Result<(), RouteError>;
 pub(crate) type ResultVecRouteSegmentRouteError = Result<VecRouteSegment, RouteError>;
