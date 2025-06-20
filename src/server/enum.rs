@@ -1,4 +1,4 @@
-pub(crate) enum Lifecycle {
+pub(crate) enum LifeCycle {
     Abort(bool),
     Continue(bool),
 }

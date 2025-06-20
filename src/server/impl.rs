@@ -1,5 +1,11 @@
 use crate::*;
 
+impl LifeCycle {
+    pub(crate) fn is_abort(&self) -> bool {
+        matches!(self, LifeCycle::Abort(_))
+    }
+}
+
 impl Default for Server {
     fn default() -> Self {
         Self {
@@ -291,14 +297,14 @@ impl Server {
     async fn execute_before_ws_upgrade<'a>(
         handler: &HandlerState<'a>,
         ctx: &Context,
-        lifecycle: &mut Lifecycle,
+        lifecycle: &mut LifeCycle,
     ) {
         let middleware_guard: RwLockReadGuard<'_, Vec<Arc<dyn Func>>> =
             handler.before_ws_upgrade.read().await;
         for before_ws_upgrade in middleware_guard.iter() {
             before_ws_upgrade(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
-            if matches!(lifecycle, Lifecycle::Abort(_)) {
+            if lifecycle.is_abort() {
                 return;
             }
         }
@@ -307,14 +313,14 @@ impl Server {
     async fn execute_on_ws_connected<'a>(
         handler: &HandlerState<'a>,
         ctx: &Context,
-        lifecycle: &mut Lifecycle,
+        lifecycle: &mut LifeCycle,
     ) {
         let middleware_guard: RwLockReadGuard<'_, Vec<Arc<dyn Func>>> =
             handler.on_ws_connected.read().await;
         for on_ws_connected in middleware_guard.iter() {
             on_ws_connected(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
-            if matches!(lifecycle, Lifecycle::Abort(_)) {
+            if lifecycle.is_abort() {
                 return;
             }
         }
@@ -323,14 +329,14 @@ impl Server {
     async fn execute_request_middleware<'a>(
         ctx: &Context,
         handler: &HandlerState<'a>,
-        lifecycle: &mut Lifecycle,
+        lifecycle: &mut LifeCycle,
     ) {
         let middleware_guard: RwLockReadGuard<'_, Vec<Arc<dyn Func>>> =
             handler.request_middleware.read().await;
         for middleware in middleware_guard.iter() {
             middleware(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
-            if matches!(lifecycle, Lifecycle::Abort(_)) {
+            if lifecycle.is_abort() {
                 return;
             }
         }
@@ -339,12 +345,12 @@ impl Server {
     async fn execute_route_handler<'a>(
         ctx: &Context,
         route_handler: &OptionArcFunc,
-        lifecycle: &mut Lifecycle,
+        lifecycle: &mut LifeCycle,
     ) {
         if let Some(func) = route_handler {
             func(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
-            if matches!(lifecycle, Lifecycle::Abort(_)) {
+            if lifecycle.is_abort() {
                 return;
             }
         }
@@ -353,14 +359,14 @@ impl Server {
     async fn execute_response_middleware<'a>(
         ctx: &Context,
         handler: &HandlerState<'a>,
-        lifecycle: &mut Lifecycle,
+        lifecycle: &mut LifeCycle,
     ) {
         let middleware_guard: RwLockReadGuard<'_, Vec<Arc<dyn Func>>> =
             handler.response_middleware.read().await;
         for middleware in middleware_guard.iter() {
             middleware(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
-            if matches!(lifecycle, Lifecycle::Abort(_)) {
+            if lifecycle.is_abort() {
                 return;
             }
         }
@@ -370,7 +376,7 @@ impl Server {
         let stream: &ArcRwLockStream = handler.stream;
         let route: &str = request.get_path();
         let ctx: Context = Context::from_stream_request(stream, request);
-        let mut lifecycle: Lifecycle = Lifecycle::Continue(request.is_enable_keep_alive());
+        let mut lifecycle: LifeCycle = LifeCycle::Continue(request.is_enable_keep_alive());
         let route_handler: OptionArcFunc = handler
             .route_matcher
             .read()
@@ -378,20 +384,20 @@ impl Server {
             .resolve_route(&ctx, route)
             .await;
         Self::execute_request_middleware(&ctx, handler, &mut lifecycle).await;
-        if let Lifecycle::Abort(request_keepalive) = lifecycle {
+        if let LifeCycle::Abort(request_keepalive) = lifecycle {
             return request_keepalive;
         }
         Self::execute_route_handler(&ctx, &route_handler, &mut lifecycle).await;
-        if let Lifecycle::Abort(request_keepalive) = lifecycle {
+        if let LifeCycle::Abort(request_keepalive) = lifecycle {
             return request_keepalive;
         }
         Self::execute_response_middleware(&ctx, handler, &mut lifecycle).await;
-        if let Lifecycle::Abort(request_keepalive) = lifecycle {
+        if let LifeCycle::Abort(request_keepalive) = lifecycle {
             return request_keepalive;
         }
         yield_now().await;
         match lifecycle {
-            Lifecycle::Continue(res) | Lifecycle::Abort(res) => res,
+            LifeCycle::Continue(res) | LifeCycle::Abort(res) => res,
         }
     }
 
@@ -399,7 +405,7 @@ impl Server {
         let route: &String = first_request.get_path();
         let stream: &ArcRwLockStream = handler.stream;
         let ctx: Context = Context::from_stream_request(stream, first_request);
-        let mut lifecycle: Lifecycle = Lifecycle::Continue(true);
+        let mut lifecycle: LifeCycle = LifeCycle::Continue(true);
         handler
             .route_matcher
             .read()
@@ -407,14 +413,14 @@ impl Server {
             .resolve_route(&ctx, route)
             .await;
         Self::execute_before_ws_upgrade(handler, &ctx, &mut lifecycle).await;
-        if matches!(lifecycle, Lifecycle::Abort(_)) {
+        if lifecycle.is_abort() {
             return;
         }
         if ctx.upgrade_to_ws().await.is_err() {
             return;
         }
         Self::execute_on_ws_connected(handler, &ctx, &mut lifecycle).await;
-        if matches!(lifecycle, Lifecycle::Abort(_)) {
+        if lifecycle.is_abort() {
             return;
         }
         let route: &String = first_request.get_path();

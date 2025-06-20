@@ -444,17 +444,17 @@ impl Context {
         Err(RequestError::GetTcpStream)
     }
 
-    pub(crate) async fn should_abort(&self, lifecycle: &mut Lifecycle) {
+    pub(crate) async fn should_abort(&self, lifecycle: &mut LifeCycle) {
         let keep_alive: bool = !self.get_closed().await
             && matches!(
                 lifecycle,
-                Lifecycle::Continue(true) | Lifecycle::Abort(true)
+                LifeCycle::Continue(true) | LifeCycle::Abort(true)
             );
         *lifecycle = if self.get_aborted().await {
             yield_now().await;
-            Lifecycle::Abort(keep_alive)
+            LifeCycle::Abort(keep_alive)
         } else {
-            Lifecycle::Continue(keep_alive)
+            LifeCycle::Continue(keep_alive)
         };
     }
 }
