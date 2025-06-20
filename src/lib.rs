@@ -2,6 +2,7 @@ mod config;
 mod context;
 mod error;
 mod handler;
+mod pool;
 mod route;
 mod server;
 mod tests;
@@ -17,6 +18,7 @@ pub use http_type::*;
 pub use hyperlane_macros::*;
 
 pub(crate) use config::*;
+pub(crate) use pool::*;
 
 pub(crate) use core::hash::BuildHasherDefault;
 pub(crate) use std::{
@@ -27,7 +29,7 @@ pub(crate) use std::{
     net::SocketAddr,
     panic::{PanicHookInfo, set_hook},
     pin::Pin,
-    sync::Arc,
+    sync::{Arc, OnceLock},
     time::Duration,
 };
 
@@ -36,7 +38,7 @@ pub(crate) use regex::Regex;
 pub(crate) use serde::de::DeserializeOwned;
 pub(crate) use tokio::{
     net::TcpListener,
-    sync::{RwLockReadGuard, RwLockWriteGuard},
+    sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
     task::yield_now,
 };
 

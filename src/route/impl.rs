@@ -82,11 +82,11 @@ impl RoutePattern {
         {
             return None;
         }
-        let mut params: RouteParams = hash_map_xx_hash3_64();
+        let mut params: RouteParams = pool::get_route_params();
         for (idx, segment) in self.0.iter().enumerate() {
             match segment {
-                RouteSegment::Static(path) => {
-                    if path_segments.get(idx).copied() != Some(path.as_str()) {
+                RouteSegment::Static(expected_path) => {
+                    if path_segments.get(idx).copied() != Some(expected_path.as_str()) {
                         return None;
                     }
                 }
@@ -94,7 +94,7 @@ impl RoutePattern {
                     let Some(value) = path_segments.get(idx) else {
                         return None;
                     };
-                    params.insert(param_name.clone(), (*value).to_owned());
+                    params.insert(param_name.clone(), value.to_string());
                 }
                 RouteSegment::Regex(param_name, regex) => {
                     let segment_value: String = if idx == route_segments_len - 1 {
@@ -105,11 +105,11 @@ impl RoutePattern {
                             None => return None,
                         }
                     };
-                    let not_match: bool = !regex.is_match(&segment_value)
-                        || regex.find(&segment_value).map_or(false, |value| {
-                            value.start() != 0 || value.end() != segment_value.len()
-                        });
-                    if not_match {
+                    if let Some(mat) = regex.find(&segment_value) {
+                        if mat.start() != 0 || mat.end() != segment_value.len() {
+                            return None;
+                        }
+                    } else {
                         return None;
                     }
                     params.insert(param_name.clone(), segment_value);
@@ -142,7 +142,7 @@ impl RoutePattern {
 impl RouteMatcher {
     pub(crate) fn new() -> Self {
         Self {
-            static_routes: HashMap::new(),
+            static_routes: HashMap::with_hasher(BuildHasherDefault::<XxHash3_64>::default()),
             dynamic_routes: Vec::new(),
             regex_routes: Vec::new(),
         }

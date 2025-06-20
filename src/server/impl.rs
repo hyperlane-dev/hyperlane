@@ -251,13 +251,13 @@ impl Server {
             let config_clone: ServerConfig<'_> = config.clone();
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
             let request_middleware_arc_lock: ArcRwLockVecArcFunc =
-                self.get_request_middleware().clone();
+                Arc::clone(&self.request_middleware);
             let response_middleware_arc_lock: ArcRwLockVecArcFunc =
-                self.get_response_middleware().clone();
-            let route_matcher_arc_lock: ArcRwLockRouteMatcher = self.route_matcher.clone();
+                Arc::clone(&self.response_middleware);
+            let route_matcher_arc_lock: ArcRwLockRouteMatcher = Arc::clone(&self.route_matcher);
             let before_ws_upgrade_arc_lock: ArcRwLockVecArcFunc =
-                self.get_before_ws_upgrade().clone();
-            let on_ws_connected_arc_lock: ArcRwLockVecArcFunc = self.get_on_ws_connected().clone();
+                Arc::clone(&self.before_ws_upgrade);
+            let on_ws_connected_arc_lock: ArcRwLockVecArcFunc = Arc::clone(&self.on_ws_connected);
             tokio::spawn(async move {
                 let request_result: RequestReaderHandleResult =
                     Request::http_request_from_stream(&stream, http_line_buffer_size).await;
@@ -293,7 +293,9 @@ impl Server {
         ctx: &Context,
         lifecycle: &mut Lifecycle,
     ) {
-        for before_ws_upgrade in handler.before_ws_upgrade.read().await.iter() {
+        let middleware_guard: RwLockReadGuard<'_, Vec<Arc<dyn Func>>> =
+            handler.before_ws_upgrade.read().await;
+        for before_ws_upgrade in middleware_guard.iter() {
             before_ws_upgrade(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
             if matches!(lifecycle, Lifecycle::Abort(_)) {
@@ -307,7 +309,9 @@ impl Server {
         ctx: &Context,
         lifecycle: &mut Lifecycle,
     ) {
-        for on_ws_connected in handler.on_ws_connected.read().await.iter() {
+        let middleware_guard: RwLockReadGuard<'_, Vec<Arc<dyn Func>>> =
+            handler.on_ws_connected.read().await;
+        for on_ws_connected in middleware_guard.iter() {
             on_ws_connected(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
             if matches!(lifecycle, Lifecycle::Abort(_)) {
@@ -321,7 +325,9 @@ impl Server {
         handler: &HandlerState<'a>,
         lifecycle: &mut Lifecycle,
     ) {
-        for middleware in handler.request_middleware.read().await.iter() {
+        let middleware_guard: RwLockReadGuard<'_, Vec<Arc<dyn Func>>> =
+            handler.request_middleware.read().await;
+        for middleware in middleware_guard.iter() {
             middleware(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
             if matches!(lifecycle, Lifecycle::Abort(_)) {
@@ -349,7 +355,9 @@ impl Server {
         handler: &HandlerState<'a>,
         lifecycle: &mut Lifecycle,
     ) {
-        for middleware in handler.response_middleware.read().await.iter() {
+        let middleware_guard: RwLockReadGuard<'_, Vec<Arc<dyn Func>>> =
+            handler.response_middleware.read().await;
+        for middleware in middleware_guard.iter() {
             middleware(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
             if matches!(lifecycle, Lifecycle::Abort(_)) {

@@ -21,7 +21,7 @@ impl fmt::Display for RoutePattern {
 
 #[derive(Clone)]
 pub(crate) struct RouteMatcher {
-    pub(super) static_routes: HashMap<String, ArcFunc>,
+    pub(super) static_routes: HashMapXxHash3_64<String, ArcFunc>,
     pub(super) dynamic_routes: Vec<(RoutePattern, ArcFunc)>,
     pub(super) regex_routes: Vec<(RoutePattern, ArcFunc)>,
 }
@@ -44,7 +44,7 @@ impl fmt::Debug for RouteMatcher {
 impl Default for RouteMatcher {
     fn default() -> Self {
         Self {
-            static_routes: HashMap::new(),
+            static_routes: hash_map_xx_hash3_64(),
             dynamic_routes: Vec::new(),
             regex_routes: Vec::new(),
         }

@@ -2,13 +2,13 @@ use crate::*;
 
 #[derive(Clone, Data, Default)]
 pub struct InnerContext {
+    aborted: bool,
+    closed: bool,
     stream: OptionArcRwLockStream,
     request: Request,
     response: Response,
     attributes: HashMapArcAnySendSync,
-    route_params: ArcRwLockRouteParams,
-    aborted: bool,
-    closed: bool,
+    route_params: RouteParams,
 }
 
 #[derive(Clone, Default)]

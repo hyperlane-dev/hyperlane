@@ -81,21 +81,15 @@ impl Context {
     }
 
     pub async fn get_route_params(&self) -> RouteParams {
-        self.read().await.get_route_params().read().await.clone()
+        self.read().await.get_route_params().clone()
     }
 
     pub async fn get_route_param(&self, name: &str) -> OptionString {
-        self.read()
-            .await
-            .get_route_params()
-            .read()
-            .await
-            .get(name)
-            .cloned()
+        self.read().await.get_route_params().get(name).cloned()
     }
 
     pub(crate) async fn set_route_params(&self, params: RouteParams) -> &Self {
-        self.write().await.set_route_params(arc_rwlock(params));
+        self.write().await.set_route_params(params);
         self
     }
 

@@ -1,7 +1,6 @@
 use crate::*;
 
-pub type RouteParams = HashMap<String, String, BuildHasherDefault<XxHash3_64>>;
-pub type ArcRwLockRouteParams = ArcRwLock<RouteParams>;
+pub type RouteParams = HashMapXxHash3_64<String, String>;
 
 pub(crate) type VecRouteSegment = Vec<RouteSegment>;
 pub(crate) type ArcRwLockRouteMatcher = ArcRwLock<RouteMatcher>;
