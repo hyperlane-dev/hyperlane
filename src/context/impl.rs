@@ -221,6 +221,10 @@ impl Context {
         self
     }
 
+    pub async fn get_response_version(&self) -> ResponseVersion {
+        self.read().await.get_response().get_version().clone()
+    }
+
     pub async fn get_response_headers(&self) -> ResponseHeaders {
         self.read().await.get_response().get_headers().clone()
     }
@@ -257,6 +261,11 @@ impl Context {
 
     pub async fn set_response(&self, response: Response) -> &Self {
         self.write().await.set_response(response);
+        self
+    }
+
+    pub async fn set_response_version(&self, version: ResponseVersion) -> &Self {
+        self.write().await.get_mut_response().set_version(version);
         self
     }
 
