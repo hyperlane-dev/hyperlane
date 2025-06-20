@@ -2,6 +2,7 @@ mod config;
 mod context;
 mod error;
 mod handler;
+mod lifecycle;
 mod route;
 mod server;
 mod tests;
@@ -17,6 +18,7 @@ pub use http_type::*;
 pub use hyperlane_macros::*;
 
 pub(crate) use config::*;
+pub(crate) use lifecycle::*;
 
 pub(crate) use core::hash::BuildHasherDefault;
 pub(crate) use std::{

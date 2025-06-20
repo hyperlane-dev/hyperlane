@@ -1,10 +1,6 @@
 use crate::*;
 
-impl Lifecycle {
-    pub(crate) fn is_abort(&self) -> bool {
-        matches!(self, Lifecycle::Abort(_))
-    }
-}
+// Lifecycle impl moved to src/lifecycle/impl.rs
 
 impl Default for Server {
     fn default() -> Self {
