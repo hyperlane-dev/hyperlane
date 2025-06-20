@@ -82,7 +82,7 @@ impl RoutePattern {
         {
             return None;
         }
-        let mut params: RouteParams = pool::get_route_params();
+        let mut params: RouteParams = hash_map_xx_hash3_64();
         for (idx, segment) in self.0.iter().enumerate() {
             match segment {
                 RouteSegment::Static(expected_path) => {
