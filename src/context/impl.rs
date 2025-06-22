@@ -319,7 +319,7 @@ impl Context {
                 .await
                 .set_response_header(CONNECTION, UPGRADE)
                 .await
-                .set_response_header(SEC_WEB_SOCKET_ACCEPT, accept_key)
+                .set_response_header(SEC_WEBSOCKET_ACCEPT, accept_key)
                 .await
                 .internal_send_handler(true)
                 .await;
