@@ -390,7 +390,6 @@ impl Server {
         if let Lifecycle::Abort(request_keepalive) = lifecycle {
             return request_keepalive;
         }
-        yield_now().await;
         match lifecycle {
             Lifecycle::Continue(res) | Lifecycle::Abort(res) => res,
         }

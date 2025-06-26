@@ -451,7 +451,6 @@ impl Context {
                 Lifecycle::Continue(true) | Lifecycle::Abort(true)
             );
         *lifecycle = if self.get_aborted().await {
-            yield_now().await;
             Lifecycle::Abort(keep_alive)
         } else {
             Lifecycle::Continue(keep_alive)
