@@ -2,8 +2,6 @@ use crate::*;
 
 #[tokio::test]
 async fn test_server() {
-    use crate::*;
-
     async fn request_middleware(ctx: Context) {
         let socket_addr: String = ctx.get_socket_addr_or_default_string().await;
         ctx.set_response_header(SERVER, HYPERLANE)
