@@ -9,7 +9,7 @@ impl Default for Server {
             route_matcher: arc_rwlock(RouteMatcher::new()),
             request_middleware: arc_rwlock(vec![]),
             response_middleware: arc_rwlock(vec![]),
-            before_ws_upgrade: arc_rwlock(vec![]),
+            pre_ws_upgrade: arc_rwlock(vec![]),
             on_ws_connected: arc_rwlock(vec![]),
         }
     }
@@ -34,7 +34,7 @@ impl Server {
         self
     }
 
-    pub async fn http_line_buffer_size(&self, buffer_size: usize) -> &Self {
+    pub async fn http_buffer_size(&self, buffer_size: usize) -> &Self {
         let buffer_size: usize = if buffer_size == 0 {
             DEFAULT_BUFFER_SIZE
         } else {
@@ -43,7 +43,7 @@ impl Server {
         self.get_config()
             .write()
             .await
-            .set_http_line_buffer_size(buffer_size);
+            .set_http_buffer_size(buffer_size);
         self
     }
 
@@ -76,50 +76,50 @@ impl Server {
         self
     }
 
-    pub async fn enable_internal_http_handler<'a, R>(&self, route: R) -> &Self
+    pub async fn enable_http_handler<'a, R>(&self, route: R) -> &Self
     where
         R: ToString,
     {
         self.get_config()
             .write()
             .await
-            .enable_internal_http_handler(route.to_string())
+            .enable_http_handler(route.to_string())
             .await;
         self
     }
 
-    pub async fn disable_internal_http_handler<'a, R>(&self, route: R) -> &Self
+    pub async fn disable_http_handler<'a, R>(&self, route: R) -> &Self
     where
         R: ToString,
     {
         self.get_config()
             .write()
             .await
-            .disable_internal_http_handler(route.to_string())
+            .disable_http_handler(route.to_string())
             .await;
         self
     }
 
-    pub async fn enable_internal_ws_handler<'a, R>(&self, route: R) -> &Self
+    pub async fn enable_ws_handler<'a, R>(&self, route: R) -> &Self
     where
         R: ToString,
     {
         self.get_config()
             .write()
             .await
-            .enable_internal_ws_handler(route.to_string())
+            .enable_ws_handler(route.to_string())
             .await;
         self
     }
 
-    pub async fn disable_internal_ws_handler<'a, R>(&self, route: R) -> &Self
+    pub async fn disable_ws_handler<'a, R>(&self, route: R) -> &Self
     where
         R: ToString,
     {
         self.get_config()
             .write()
             .await
-            .disable_internal_ws_handler(route.to_string())
+            .disable_ws_handler(route.to_string())
             .await;
         self
     }
@@ -154,12 +154,12 @@ impl Server {
         self
     }
 
-    pub async fn before_ws_upgrade<F, Fut>(&self, func: F) -> &Self
+    pub async fn pre_ws_upgrade<F, Fut>(&self, func: F) -> &Self
     where
         F: FuncWithoutPin<Fut>,
         Fut: Future<Output = ()> + Send + 'static,
     {
-        self.get_before_ws_upgrade()
+        self.get_pre_ws_upgrade()
             .write()
             .await
             .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
@@ -239,7 +239,7 @@ impl Server {
         let nodelay: bool = *config.get_nodelay();
         let linger: OptionDuration = *config.get_linger();
         let ttl_opt: OptionU32 = *config.get_ttl();
-        let http_line_buffer_size: usize = *config.get_http_line_buffer_size();
+        let http_buffer_size: usize = *config.get_http_buffer_size();
         let addr: String = Self::format_host_port(host, &port);
         let tcp_listener: TcpListener = TcpListener::bind(&addr)
             .await
@@ -257,12 +257,11 @@ impl Server {
             let response_middleware_arc_lock: ArcRwLockVecArcFunc =
                 Arc::clone(&self.response_middleware);
             let route_matcher_arc_lock: ArcRwLockRouteMatcher = Arc::clone(&self.route_matcher);
-            let before_ws_upgrade_arc_lock: ArcRwLockVecArcFunc =
-                Arc::clone(&self.before_ws_upgrade);
+            let pre_ws_upgrade_arc_lock: ArcRwLockVecArcFunc = Arc::clone(&self.pre_ws_upgrade);
             let on_ws_connected_arc_lock: ArcRwLockVecArcFunc = Arc::clone(&self.on_ws_connected);
             tokio::spawn(async move {
                 let request_result: RequestReaderHandleResult =
-                    Request::http_request_from_stream(&stream, http_line_buffer_size).await;
+                    Request::http_request_from_stream(&stream, http_buffer_size).await;
                 if request_result.is_err() {
                     return;
                 }
@@ -274,7 +273,7 @@ impl Server {
                     &request_middleware_arc_lock,
                     &response_middleware_arc_lock,
                     &route_matcher_arc_lock,
-                    &before_ws_upgrade_arc_lock,
+                    &pre_ws_upgrade_arc_lock,
                     &on_ws_connected_arc_lock,
                 );
                 match is_ws {
@@ -290,15 +289,15 @@ impl Server {
         Ok(())
     }
 
-    async fn execute_before_ws_upgrade<'a>(
+    async fn execute_pre_ws_upgrade<'a>(
         handler: &HandlerState<'a>,
         ctx: &Context,
         lifecycle: &mut Lifecycle,
     ) {
         let middleware_guard: RwLockReadGuard<'_, Vec<Arc<dyn Func>>> =
-            handler.before_ws_upgrade.read().await;
-        for before_ws_upgrade in middleware_guard.iter() {
-            before_ws_upgrade(ctx.clone()).await;
+            handler.pre_ws_upgrade.read().await;
+        for pre_ws_upgrade in middleware_guard.iter() {
+            pre_ws_upgrade(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
             if lifecycle.is_abort() {
                 return;
@@ -408,7 +407,7 @@ impl Server {
             .await
             .resolve_route(&ctx, route)
             .await;
-        Self::execute_before_ws_upgrade(handler, &ctx, &mut lifecycle).await;
+        Self::execute_pre_ws_upgrade(handler, &ctx, &mut lifecycle).await;
         if lifecycle.is_abort() {
             return;
         }
@@ -421,11 +420,9 @@ impl Server {
         }
         let route: &String = first_request.get_path();
         let buffer_size: usize = *handler.config.get_ws_buffer_size();
-        let contains_disable_internal_ws_handler: bool = handler
-            .config
-            .contains_disable_internal_ws_handler(route)
-            .await;
-        if contains_disable_internal_ws_handler {
+        let contains_disable_ws_handler: bool =
+            handler.config.contains_disable_ws_handler(route).await;
+        if contains_disable_ws_handler {
             while Self::handle_request_common(handler, first_request).await {}
             return;
         }
@@ -443,12 +440,10 @@ impl Server {
         }
         let stream: &ArcRwLockStream = handler.stream;
         let route: &String = first_request.get_path();
-        let contains_disable_internal_http_handler: bool = handler
-            .config
-            .contains_disable_internal_http_handler(route)
-            .await;
-        let buffer_size: usize = *handler.config.get_http_line_buffer_size();
-        if contains_disable_internal_http_handler {
+        let contains_disable_http_handler: bool =
+            handler.config.contains_disable_http_handler(route).await;
+        let buffer_size: usize = *handler.config.get_http_buffer_size();
+        if contains_disable_http_handler {
             while Self::handle_request_common(handler, first_request).await {}
             return;
         }
@@ -468,7 +463,7 @@ impl<'a> HandlerState<'a> {
         request_middleware: &'a ArcRwLockVecArcFunc,
         response_middleware: &'a ArcRwLockVecArcFunc,
         route_matcher: &'a ArcRwLock<RouteMatcher>,
-        before_ws_upgrade: &'a ArcRwLockVecArcFunc,
+        pre_ws_upgrade: &'a ArcRwLockVecArcFunc,
         on_ws_connected: &'a ArcRwLockVecArcFunc,
     ) -> Self {
         Self {
@@ -477,7 +472,7 @@ impl<'a> HandlerState<'a> {
             request_middleware,
             response_middleware,
             route_matcher,
-            before_ws_upgrade,
+            pre_ws_upgrade,
             on_ws_connected,
         }
     }

@@ -82,11 +82,11 @@ async fn test_server() {
         server.port(60000).await;
         server.enable_nodelay().await;
         server.disable_linger().await;
-        server.http_line_buffer_size(4096).await;
+        server.http_buffer_size(4096).await;
         server.ws_buffer_size(4096).await;
         server.error_handler(error_handler).await;
         server.on_ws_connected(on_ws_connected).await;
-        server.before_ws_upgrade(request_middleware).await;
+        server.pre_ws_upgrade(request_middleware).await;
         server.request_middleware(request_middleware).await;
         server.response_middleware(response_middleware).await;
         server.route("/", root_route).await;

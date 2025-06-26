@@ -1,7 +1,7 @@
 use crate::*;
 
 impl Context {
-    pub(crate) fn from_internal_context(ctx: InnerContext) -> Self {
+    pub(crate) fn from_context(ctx: InnerContext) -> Self {
         Self(arc_rwlock(ctx))
     }
 
@@ -10,7 +10,7 @@ impl Context {
         internal_ctx
             .set_stream(Some(stream.clone()))
             .set_request(request.clone());
-        let ctx: Context = Context::from_internal_context(internal_ctx);
+        let ctx: Context = Context::from_context(internal_ctx);
         ctx
     }
 

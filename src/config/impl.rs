@@ -6,12 +6,12 @@ impl<'a> Default for ServerConfig<'a> {
             host: DEFAULT_HOST,
             port: DEFAULT_WEB_PORT,
             ws_buffer_size: DEFAULT_BUFFER_SIZE,
-            http_line_buffer_size: DEFAULT_BUFFER_SIZE,
+            http_buffer_size: DEFAULT_BUFFER_SIZE,
             nodelay: DEFAULT_NODELAY,
             linger: DEFAULT_LINGER,
             ttl: DEFAULT_TTI,
-            disable_internal_http_handler: arc_rwlock(hash_set_xx_hash3_64()),
-            disable_internal_ws_handler: arc_rwlock(hash_set_xx_hash3_64()),
+            disable_http_handler: arc_rwlock(hash_set_xx_hash3_64()),
+            disable_ws_handler: arc_rwlock(hash_set_xx_hash3_64()),
             route_matcher: arc_rwlock(RouteMatcher::new()),
             error_handler: Arc::new(print_error_handler),
         }
@@ -19,73 +19,55 @@ impl<'a> Default for ServerConfig<'a> {
 }
 
 impl<'a> ServerConfig<'a> {
-    pub(crate) async fn contains_disable_internal_http_handler(&self, route: &'a str) -> bool {
-        if self
-            .get_disable_internal_http_handler()
-            .read()
-            .await
-            .contains(route)
-        {
+    pub(crate) async fn contains_disable_http_handler(&self, route: &'a str) -> bool {
+        if self.get_disable_http_handler().read().await.contains(route) {
             return true;
         }
         self.get_route_matcher().read().await.match_route(route)
     }
 
-    pub(crate) async fn disable_internal_http_handler(&self, route: String) -> bool {
+    pub(crate) async fn disable_http_handler(&self, route: String) -> bool {
         ServerConfig::get_route_matcher(self)
             .write()
             .await
             .add(&route, Arc::new(|_| Box::pin(async move {})))
             .unwrap_or_else(|err| panic!("{}", err));
         let result: bool = self
-            .get_disable_internal_http_handler()
+            .get_disable_http_handler()
             .write()
             .await
             .insert(route.clone());
         result
     }
 
-    pub(crate) async fn enable_internal_http_handler(&self, route: String) -> bool {
-        let result: bool = self
-            .get_disable_internal_http_handler()
-            .write()
-            .await
-            .remove(&route);
+    pub(crate) async fn enable_http_handler(&self, route: String) -> bool {
+        let result: bool = self.get_disable_http_handler().write().await.remove(&route);
         result
     }
 
-    pub(crate) async fn contains_disable_internal_ws_handler(&self, route: &'a str) -> bool {
-        if self
-            .get_disable_internal_ws_handler()
-            .read()
-            .await
-            .contains(route)
-        {
+    pub(crate) async fn contains_disable_ws_handler(&self, route: &'a str) -> bool {
+        if self.get_disable_ws_handler().read().await.contains(route) {
             return true;
         }
         self.get_route_matcher().read().await.match_route(route)
     }
 
-    pub(crate) async fn disable_internal_ws_handler(&self, route: String) -> bool {
+    pub(crate) async fn disable_ws_handler(&self, route: String) -> bool {
         ServerConfig::get_route_matcher(self)
             .write()
             .await
             .add(&route, Arc::new(|_| Box::pin(async move {})))
             .unwrap_or_else(|err| panic!("{}", err));
         let result: bool = self
-            .get_disable_internal_ws_handler()
+            .get_disable_ws_handler()
             .write()
             .await
             .insert(route.clone());
         result
     }
 
-    pub(crate) async fn enable_internal_ws_handler(&self, route: String) -> bool {
-        let result: bool = self
-            .get_disable_internal_ws_handler()
-            .write()
-            .await
-            .remove(&route);
+    pub(crate) async fn enable_ws_handler(&self, route: String) -> bool {
+        let result: bool = self.get_disable_ws_handler().write().await.remove(&route);
         result
     }
 }

@@ -16,7 +16,7 @@ pub struct Server {
     pub(super) response_middleware: ArcRwLockVecArcFunc,
     #[get(pub(super))]
     #[set(pub(super))]
-    pub(super) before_ws_upgrade: ArcRwLockVecArcFunc,
+    pub(super) pre_ws_upgrade: ArcRwLockVecArcFunc,
     #[get(pub(super))]
     #[set(pub(super))]
     pub(super) on_ws_connected: ArcRwLockVecArcFunc,
@@ -29,6 +29,6 @@ pub(crate) struct HandlerState<'a> {
     pub(super) request_middleware: &'a ArcRwLockVecArcFunc,
     pub(super) response_middleware: &'a ArcRwLockVecArcFunc,
     pub(super) route_matcher: &'a ArcRwLockRouteMatcher,
-    pub(super) before_ws_upgrade: &'a ArcRwLockVecArcFunc,
+    pub(super) pre_ws_upgrade: &'a ArcRwLockVecArcFunc,
     pub(super) on_ws_connected: &'a ArcRwLockVecArcFunc,
 }
