@@ -25,5 +25,4 @@ pub struct Server {
 #[derive(Clone)]
 pub(crate) struct HandlerState<'a> {
     pub(super) stream: &'a ArcRwLockStream,
-    pub(super) config: &'a ServerConfig,
 }

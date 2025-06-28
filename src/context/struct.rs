@@ -9,7 +9,6 @@ pub struct InnerContext {
     response: Response,
     attributes: HashMapArcAnySendSync,
     route_params: RouteParams,
-    server: Server,
 }
 
 #[derive(Clone, Default)]

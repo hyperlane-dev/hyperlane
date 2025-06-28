@@ -13,19 +13,15 @@ impl Default for Server {
     }
 }
 
+impl<'a> HandlerState<'a> {
+    fn new(stream: &'a ArcRwLockStream) -> Self {
+        Self { stream }
+    }
+}
+
 impl Server {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    fn create_context(&self, stream: &ArcRwLockStream, request: &Request) -> Context {
-        let mut internal_ctx: InnerContext = InnerContext::default();
-        internal_ctx
-            .set_server(self.clone())
-            .set_stream(Some(stream.clone()))
-            .set_request(request.clone());
-        let ctx: Context = Context::from_internal_context(internal_ctx);
-        ctx
     }
 
     fn format_host_port(host: &str, port: &usize) -> String {
@@ -227,8 +223,8 @@ impl Server {
     }
 
     async fn init_panic_hook(&self) {
-        let config: ServerConfig = self.get_config().read().await.clone();
-        let error_handler: ArcErrorHandle = config.get_error_handler().clone();
+        let error_handler: ArcErrorHandle =
+            self.get_config().read().await.get_error_handler().clone();
         set_hook(Box::new(move |err: &'_ PanicHookInfo<'_>| {
             let data: String = err.to_string();
             error_handler(data);
@@ -258,7 +254,6 @@ impl Server {
             if let Some(ttl) = ttl_opt {
                 let _ = stream.set_ttl(ttl);
             }
-            let config_clone: ServerConfig = config.clone();
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
             let server: Server = self.clone();
             tokio::spawn(async move {
@@ -269,13 +264,13 @@ impl Server {
                 }
                 let mut request: Request = request_result.unwrap_or_default();
                 let is_ws: bool = request.is_ws();
-                let handler: HandlerState = HandlerState::new(&stream, &config_clone);
+                let handler: HandlerState = HandlerState::new(&stream);
                 match is_ws {
                     true => {
-                        server.handle_ws_connection(&handler, &mut request).await;
+                        server.ws_handler(&handler, &mut request).await;
                     }
                     false => {
-                        server.handle_http_connection(&handler, &request).await;
+                        server.http_handler(&handler, &request).await;
                     }
                 };
             });
@@ -283,9 +278,8 @@ impl Server {
         Ok(())
     }
 
-    async fn execute_pre_ws_upgrade(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
-        let middleware_guard: RwLockReadGuard<'_, Vec<Arc<dyn Func>>> =
-            self.pre_ws_upgrade.read().await;
+    async fn run_pre_ws_upgrade(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
+        let middleware_guard: RwLockReadGuardVecArcFunc = self.pre_ws_upgrade.read().await;
         for pre_ws_upgrade in middleware_guard.iter() {
             pre_ws_upgrade(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
@@ -295,9 +289,8 @@ impl Server {
         }
     }
 
-    async fn execute_on_ws_connected(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
-        let middleware_guard: RwLockReadGuard<'_, Vec<Arc<dyn Func>>> =
-            self.on_ws_connected.read().await;
+    async fn run_on_ws_connected(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
+        let middleware_guard: RwLockReadGuardVecArcFunc = self.on_ws_connected.read().await;
         for on_ws_connected in middleware_guard.iter() {
             on_ws_connected(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
@@ -307,9 +300,8 @@ impl Server {
         }
     }
 
-    async fn execute_request_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
-        let middleware_guard: RwLockReadGuard<'_, Vec<Arc<dyn Func>>> =
-            self.request_middleware.read().await;
+    async fn run_request_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
+        let middleware_guard: RwLockReadGuardVecArcFunc = self.request_middleware.read().await;
         for middleware in middleware_guard.iter() {
             middleware(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
@@ -319,12 +311,8 @@ impl Server {
         }
     }
 
-    async fn execute_route_handler(
-        ctx: &Context,
-        route_handler: &OptionArcFunc,
-        lifecycle: &mut Lifecycle,
-    ) {
-        if let Some(func) = route_handler {
+    async fn run_route_handler(ctx: &Context, handler: &OptionArcFunc, lifecycle: &mut Lifecycle) {
+        if let Some(func) = handler {
             func(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
             if lifecycle.is_abort() {
@@ -333,9 +321,8 @@ impl Server {
         }
     }
 
-    async fn execute_response_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
-        let middleware_guard: RwLockReadGuard<'_, Vec<Arc<dyn Func>>> =
-            self.response_middleware.read().await;
+    async fn run_response_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
+        let middleware_guard: RwLockReadGuardVecArcFunc = self.response_middleware.read().await;
         for middleware in middleware_guard.iter() {
             middleware(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
@@ -345,14 +332,10 @@ impl Server {
         }
     }
 
-    async fn handle_request_common<'a>(
-        &self,
-        handler: &HandlerState<'a>,
-        request: &Request,
-    ) -> bool {
-        let stream: &ArcRwLockStream = handler.stream;
+    async fn request_handler<'a>(&self, state: &HandlerState<'a>, request: &Request) -> bool {
+        let stream: &ArcRwLockStream = state.stream;
         let route: &str = request.get_path();
-        let ctx: Context = self.create_context(stream, request);
+        let ctx: Context = Context::create_context(stream, request);
         let mut lifecycle: Lifecycle = Lifecycle::Continue(request.is_enable_keep_alive());
         let route_handler: OptionArcFunc = self
             .route_matcher
@@ -360,15 +343,15 @@ impl Server {
             .await
             .resolve_route(&ctx, route)
             .await;
-        self.execute_request_middleware(&ctx, &mut lifecycle).await;
+        self.run_request_middleware(&ctx, &mut lifecycle).await;
         if let Lifecycle::Abort(request_keepalive) = lifecycle {
             return request_keepalive;
         }
-        Self::execute_route_handler(&ctx, &route_handler, &mut lifecycle).await;
+        Self::run_route_handler(&ctx, &route_handler, &mut lifecycle).await;
         if let Lifecycle::Abort(request_keepalive) = lifecycle {
             return request_keepalive;
         }
-        self.execute_response_middleware(&ctx, &mut lifecycle).await;
+        self.run_response_middleware(&ctx, &mut lifecycle).await;
         if let Lifecycle::Abort(request_keepalive) = lifecycle {
             return request_keepalive;
         }
@@ -377,75 +360,61 @@ impl Server {
         }
     }
 
-    async fn handle_ws_connection<'a>(
-        &self,
-        handler: &HandlerState<'a>,
-        first_request: &mut Request,
-    ) {
+    async fn ws_handler<'a>(&self, state: &HandlerState<'a>, first_request: &mut Request) {
         let route: &String = first_request.get_path();
-        let stream: &ArcRwLockStream = handler.stream;
-        let ctx: Context = self.create_context(stream, first_request);
+        let stream: &ArcRwLockStream = state.stream;
+        let ctx: Context = Context::create_context(stream, first_request);
         let mut lifecycle: Lifecycle = Lifecycle::Continue(true);
         self.route_matcher
             .read()
             .await
             .resolve_route(&ctx, route)
             .await;
-        self.execute_pre_ws_upgrade(&ctx, &mut lifecycle).await;
+        self.run_pre_ws_upgrade(&ctx, &mut lifecycle).await;
         if lifecycle.is_abort() {
             return;
         }
         if ctx.upgrade_to_ws().await.is_err() {
             return;
         }
-        self.execute_on_ws_connected(&ctx, &mut lifecycle).await;
+        self.run_on_ws_connected(&ctx, &mut lifecycle).await;
         if lifecycle.is_abort() {
             return;
         }
         let route: &String = first_request.get_path();
-        let buffer_size: usize = *handler.config.get_ws_buffer_size();
-        let contains_disable_ws_handler: bool =
-            handler.config.contains_disable_ws_handler(route).await;
+        let config: RwLockReadGuardServerConfig = self.get_config().read().await;
+        let buffer_size: usize = *config.get_ws_buffer_size();
+        let contains_disable_ws_handler: bool = config.contains_disable_ws_handler(route).await;
         if contains_disable_ws_handler {
-            while self.handle_request_common(handler, first_request).await {}
+            while self.request_handler(state, first_request).await {}
             return;
         }
         while let Ok(request) =
             Request::ws_request_from_stream(stream, buffer_size, first_request).await
         {
-            let _ = self.handle_request_common(handler, &request).await;
+            let _ = self.request_handler(state, &request).await;
         }
     }
 
-    async fn handle_http_connection<'a>(
-        &self,
-        handler: &HandlerState<'a>,
-        first_request: &Request,
-    ) {
-        let handle_result: bool = self.handle_request_common(handler, first_request).await;
+    async fn http_handler<'a>(&self, state: &HandlerState<'a>, first_request: &Request) {
+        let handle_result: bool = self.request_handler(state, first_request).await;
         if !handle_result {
             return;
         }
-        let stream: &ArcRwLockStream = handler.stream;
+        let stream: &ArcRwLockStream = state.stream;
         let route: &String = first_request.get_path();
-        let contains_disable_http_handler: bool =
-            handler.config.contains_disable_http_handler(route).await;
-        let buffer_size: usize = *handler.config.get_http_buffer_size();
+        let config: RwLockReadGuardServerConfig = self.get_config().read().await;
+        let contains_disable_http_handler: bool = config.contains_disable_http_handler(route).await;
+        let buffer_size: usize = *config.get_http_buffer_size();
         if contains_disable_http_handler {
-            while self.handle_request_common(handler, first_request).await {}
+            while self.request_handler(state, first_request).await {}
             return;
         }
         while let Ok(request) = Request::http_request_from_stream(stream, buffer_size).await {
-            let handle_result: bool = self.handle_request_common(handler, &request).await;
+            let handle_result: bool = self.request_handler(state, &request).await;
             if !handle_result {
                 return;
             }
         }
-    }
-}
-
-impl<'a> HandlerState<'a> {
-    fn new(stream: &'a ArcRwLockStream, config: &'a ServerConfig) -> Self {
-        Self { stream, config }
     }
 }

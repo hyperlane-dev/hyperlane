@@ -5,6 +5,15 @@ impl Context {
         Self(arc_rwlock(ctx))
     }
 
+    pub(crate) fn create_context(stream: &ArcRwLockStream, request: &Request) -> Context {
+        let mut internal_ctx: InnerContext = InnerContext::default();
+        internal_ctx
+            .set_stream(Some(stream.clone()))
+            .set_request(request.clone());
+        let ctx: Context = Context::from_internal_context(internal_ctx);
+        ctx
+    }
+
     async fn read(&self) -> RwLockReadInnerContext {
         self.0.read().await
     }
