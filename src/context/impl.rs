@@ -341,6 +341,10 @@ impl Context {
         self
     }
 
+    pub async fn get_attributes(&self) -> HashMapArcAnySendSync {
+        self.read().await.get_attributes().clone()
+    }
+
     pub async fn get_attribute<T>(&self, key: &str) -> Option<T>
     where
         T: AnySendSyncClone,
