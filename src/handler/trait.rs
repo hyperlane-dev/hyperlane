@@ -1,11 +1,16 @@
 use crate::*;
 
-pub trait ErrorHandle: Fn(String) {}
+pub trait ErrorHandler: Fn(String) {}
 
-pub trait Func: Fn(Context) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync {}
+pub trait FnPinBoxSendSync:
+    Fn(Context) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync
+{
+}
 
-pub trait FuncWithoutPin<Fut>: Fn(Context) -> Fut + Send + Sync + 'static
+pub trait FnSendSyncStatic<Fut>: Fn(Context) -> Fut + Send + Sync + 'static
 where
     Fut: Future<Output = ()> + Send,
 {
 }
+
+pub trait FutureSendStatic: Future<Output = ()> + Send + 'static {}

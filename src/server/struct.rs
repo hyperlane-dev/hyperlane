@@ -10,16 +10,16 @@ pub struct Server {
     pub(super) route_matcher: ArcRwLockRouteMatcher,
     #[get(pub(super))]
     #[set(pub(super))]
-    pub(super) request_middleware: ArcRwLockVecArcFunc,
+    pub(super) request_middleware: ArcRwLockVecArcFnPinBoxSendSync,
     #[get(pub(super))]
     #[set(pub(super))]
-    pub(super) response_middleware: ArcRwLockVecArcFunc,
+    pub(super) response_middleware: ArcRwLockVecArcFnPinBoxSendSync,
     #[get(pub(super))]
     #[set(pub(super))]
-    pub(super) pre_ws_upgrade: ArcRwLockVecArcFunc,
+    pub(super) pre_ws_upgrade: ArcRwLockVecArcFnPinBoxSendSync,
     #[get(pub(super))]
     #[set(pub(super))]
-    pub(super) on_ws_connected: ArcRwLockVecArcFunc,
+    pub(super) on_ws_connected: ArcRwLockVecArcFnPinBoxSendSync,
 }
 
 #[derive(Clone)]

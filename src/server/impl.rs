@@ -66,7 +66,7 @@ impl Server {
 
     pub async fn error_handler<F>(&self, func: F) -> &Self
     where
-        F: ErrorHandle + Send + Sync + 'static,
+        F: ErrorHandler + Send + Sync + 'static,
     {
         self.get_config()
             .write()
@@ -160,8 +160,8 @@ impl Server {
 
     pub async fn pre_ws_upgrade<F, Fut>(&self, func: F) -> &Self
     where
-        F: FuncWithoutPin<Fut>,
-        Fut: Future<Output = ()> + Send + 'static,
+        F: FnSendSyncStatic<Fut>,
+        Fut: FutureSendStatic,
     {
         self.get_pre_ws_upgrade()
             .write()
@@ -172,8 +172,8 @@ impl Server {
 
     pub async fn on_ws_connected<F, Fut>(&self, func: F) -> &Self
     where
-        F: FuncWithoutPin<Fut>,
-        Fut: Future<Output = ()> + Send + 'static,
+        F: FnSendSyncStatic<Fut>,
+        Fut: FutureSendStatic,
     {
         self.get_on_ws_connected()
             .write()
@@ -185,8 +185,8 @@ impl Server {
     pub async fn route<R, F, Fut>(&self, route: R, func: F) -> &Self
     where
         R: ToString,
-        F: FuncWithoutPin<Fut>,
-        Fut: Future<Output = ()> + Send + 'static,
+        F: FnSendSyncStatic<Fut>,
+        Fut: FutureSendStatic,
     {
         let route_str: String = route.to_string();
         let arc_func = Arc::new(move |ctx: Context| Box::pin(func(ctx)) as PinBoxFutureSend);
@@ -200,8 +200,8 @@ impl Server {
 
     pub async fn request_middleware<F, Fut>(&self, func: F) -> &Self
     where
-        F: FuncWithoutPin<Fut>,
-        Fut: Future<Output = ()> + Send + 'static,
+        F: FnSendSyncStatic<Fut>,
+        Fut: FutureSendStatic,
     {
         self.get_request_middleware()
             .write()
@@ -212,8 +212,8 @@ impl Server {
 
     pub async fn response_middleware<F, Fut>(&self, func: F) -> &Self
     where
-        F: FuncWithoutPin<Fut>,
-        Fut: Future<Output = ()> + Send + 'static,
+        F: FnSendSyncStatic<Fut>,
+        Fut: FutureSendStatic,
     {
         self.get_response_middleware()
             .write()
@@ -223,7 +223,7 @@ impl Server {
     }
 
     async fn init_panic_hook(&self) {
-        let error_handler: ArcErrorHandle =
+        let error_handler: ArcErrorHandler =
             self.get_config().read().await.get_error_handler().clone();
         set_hook(Box::new(move |err: &'_ PanicHookInfo<'_>| {
             let data: String = err.to_string();
@@ -279,7 +279,8 @@ impl Server {
     }
 
     async fn run_pre_ws_upgrade(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
-        let middleware_guard: RwLockReadGuardVecArcFunc = self.pre_ws_upgrade.read().await;
+        let middleware_guard: RwLockReadGuardVecArcFnPinBoxSendSync =
+            self.pre_ws_upgrade.read().await;
         for pre_ws_upgrade in middleware_guard.iter() {
             pre_ws_upgrade(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
@@ -290,7 +291,8 @@ impl Server {
     }
 
     async fn run_on_ws_connected(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
-        let middleware_guard: RwLockReadGuardVecArcFunc = self.on_ws_connected.read().await;
+        let middleware_guard: RwLockReadGuardVecArcFnPinBoxSendSync =
+            self.on_ws_connected.read().await;
         for on_ws_connected in middleware_guard.iter() {
             on_ws_connected(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
@@ -301,7 +303,8 @@ impl Server {
     }
 
     async fn run_request_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
-        let middleware_guard: RwLockReadGuardVecArcFunc = self.request_middleware.read().await;
+        let middleware_guard: RwLockReadGuardVecArcFnPinBoxSendSync =
+            self.request_middleware.read().await;
         for middleware in middleware_guard.iter() {
             middleware(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
@@ -311,7 +314,11 @@ impl Server {
         }
     }
 
-    async fn run_route_handler(ctx: &Context, handler: &OptionArcFunc, lifecycle: &mut Lifecycle) {
+    async fn run_route_handler(
+        ctx: &Context,
+        handler: &OptionArcFnPinBoxSendSync,
+        lifecycle: &mut Lifecycle,
+    ) {
         if let Some(func) = handler {
             func(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
@@ -322,7 +329,8 @@ impl Server {
     }
 
     async fn run_response_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
-        let middleware_guard: RwLockReadGuardVecArcFunc = self.response_middleware.read().await;
+        let middleware_guard: RwLockReadGuardVecArcFnPinBoxSendSync =
+            self.response_middleware.read().await;
         for middleware in middleware_guard.iter() {
             middleware(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
@@ -337,7 +345,7 @@ impl Server {
         let route: &str = request.get_path();
         let ctx: Context = Context::create_context(stream, request);
         let mut lifecycle: Lifecycle = Lifecycle::Continue(request.is_enable_keep_alive());
-        let route_handler: OptionArcFunc = self
+        let route_handler: OptionArcFnPinBoxSendSync = self
             .route_matcher
             .read()
             .await
