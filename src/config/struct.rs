@@ -45,5 +45,5 @@ pub(crate) struct ServerConfig {
     #[get(pub(crate))]
     #[get_mut(pub(crate))]
     #[set(pub(crate))]
-    pub(super) error_handler: ArcErrorHandler,
+    pub(super) error_handler: ArcErrorHandlerSendSync,
 }

@@ -189,7 +189,7 @@ impl Server {
         Fut: FutureSendStatic,
     {
         let route_str: String = route.to_string();
-        let arc_func = Arc::new(move |ctx: Context| Box::pin(func(ctx)) as PinBoxFutureSend);
+        let arc_func = Arc::new(move |ctx: Context| Box::pin(func(ctx)) as PinBoxFutureSendStatic);
         self.route_matcher
             .write()
             .await
@@ -223,7 +223,7 @@ impl Server {
     }
 
     async fn init_panic_hook(&self) {
-        let error_handler: ArcErrorHandler =
+        let error_handler: ArcErrorHandlerSendSync =
             self.get_config().read().await.get_error_handler().clone();
         set_hook(Box::new(move |err: &'_ PanicHookInfo<'_>| {
             let data: String = err.to_string();
