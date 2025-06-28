@@ -72,7 +72,7 @@ impl Server {
         self.get_config()
             .write()
             .await
-            .set_error_handler(Arc::new(move |error: String| {
+            .set_error_handler(Arc::new(move |error: PanicInfo| {
                 Box::pin(func(error)) as PinBoxFutureSendStatic
             }));
         self
@@ -229,8 +229,8 @@ impl Server {
         let config: RwLockReadGuardServerConfig<'_> = self.get_config().read().await;
         let error_handler: ArcErrorHandlerSendSync = config.get_error_handler().clone();
         set_hook(Box::new(move |err: &'_ PanicHookInfo<'_>| {
-            let data: String = err.to_string();
-            tokio::spawn(error_handler(data));
+            let panic_info: PanicInfo = PanicInfo::from_panic_hook_info(err);
+            tokio::spawn(error_handler(panic_info));
         }));
     }
 

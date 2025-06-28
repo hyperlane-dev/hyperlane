@@ -2,7 +2,7 @@ use crate::*;
 
 impl<F, Fut> ErrorHandler<Fut> for F
 where
-    F: Fn(String) -> Fut + Send + Sync + 'static,
+    F: Fn(PanicInfo) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = ()> + Send,
 {
 }

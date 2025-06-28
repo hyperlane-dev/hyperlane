@@ -32,3 +32,62 @@ impl Display for RouteError {
         }
     }
 }
+
+impl PanicInfo {
+    pub(crate) fn from_panic_hook_info(info: &PanicHookInfo<'_>) -> Self {
+        let message: String = if let Some(s) = info.payload().downcast_ref::<&str>() {
+            s.to_string()
+        } else if let Some(s) = info.payload().downcast_ref::<String>() {
+            s.clone()
+        } else {
+            "Unknown panic".to_string()
+        };
+        let location: Option<String> = info
+            .location()
+            .map(|loc| format!("{}:{}:{}", loc.file(), loc.line(), loc.column()));
+        let payload: String = info.to_string();
+        Self {
+            message,
+            location,
+            payload,
+        }
+    }
+}
+
+impl Display for PanicInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let payload: &str = self.get_payload();
+        let message: &str = self.get_message();
+        let formatted_payload: String = payload
+            .lines()
+            .map(|line| format!("Panic payload: {}", line))
+            .collect::<Vec<_>>()
+            .join(BR);
+        let formatted_message: String = message
+            .lines()
+            .map(|line| format!("Panic message: {}", line))
+            .collect::<Vec<_>>()
+            .join(BR);
+        let formatted_location: String = match self.get_location() {
+            Some(location) => {
+                let mut result: String = String::new();
+                result.push_str(BR);
+                for line in location.to_string().lines() {
+                    result.push_str("Panic location: ");
+                    result.push_str(line);
+                    result.push_str(BR);
+                }
+                if result.ends_with(BR) {
+                    result.truncate(result.len() - BR.len());
+                }
+                result
+            }
+            None => String::new(),
+        };
+        write!(
+            f,
+            "{}{}{}{}",
+            formatted_payload, BR, formatted_message, formatted_location
+        )
+    }
+}

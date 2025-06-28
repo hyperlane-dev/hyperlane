@@ -1,6 +1,6 @@
 use crate::*;
 
-pub trait ErrorHandler<Fut>: Fn(String) -> Fut + Send + Sync + 'static
+pub trait ErrorHandler<Fut>: Fn(PanicInfo) -> Fut + Send + Sync + 'static
 where
     Fut: Future<Output = ()> + Send,
 {

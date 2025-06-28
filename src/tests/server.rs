@@ -2,8 +2,8 @@ use crate::*;
 
 #[tokio::test]
 async fn test_server() {
-    async fn async_error_handler(error: String) {
-        eprintln!("Async error: {}", error);
+    async fn error_handler(error: PanicInfo) {
+        eprintln!("{}", error.to_owned());
         let _ = std::io::Write::flush(&mut std::io::stderr());
     }
 
@@ -72,7 +72,7 @@ async fn test_server() {
         server.disable_linger().await;
         server.http_buffer_size(4096).await;
         server.ws_buffer_size(4096).await;
-        server.error_handler(async_error_handler).await;
+        server.error_handler(error_handler).await;
         server.on_ws_connected(on_ws_connected).await;
         server.pre_ws_upgrade(request_middleware).await;
         server.request_middleware(request_middleware).await;
