@@ -26,9 +26,4 @@ pub struct Server {
 pub(crate) struct HandlerState<'a> {
     pub(super) stream: &'a ArcRwLockStream,
     pub(super) config: &'a ServerConfig,
-    pub(super) request_middleware: &'a ArcRwLockVecArcFunc,
-    pub(super) response_middleware: &'a ArcRwLockVecArcFunc,
-    pub(super) route_matcher: &'a ArcRwLockRouteMatcher,
-    pub(super) pre_ws_upgrade: &'a ArcRwLockVecArcFunc,
-    pub(super) on_ws_connected: &'a ArcRwLockVecArcFunc,
 }

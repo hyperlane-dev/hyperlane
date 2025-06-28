@@ -1,17 +1,8 @@
 use crate::*;
 
 impl Context {
-    pub(crate) fn from_context(ctx: InnerContext) -> Self {
+    pub(crate) fn from_internal_context(ctx: InnerContext) -> Self {
         Self(arc_rwlock(ctx))
-    }
-
-    pub fn from_stream_request(stream: &ArcRwLockStream, request: &Request) -> Self {
-        let mut internal_ctx: InnerContext = InnerContext::default();
-        internal_ctx
-            .set_stream(Some(stream.clone()))
-            .set_request(request.clone());
-        let ctx: Context = Context::from_context(internal_ctx);
-        ctx
     }
 
     async fn read(&self) -> RwLockReadInnerContext {
