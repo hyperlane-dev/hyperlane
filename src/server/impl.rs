@@ -1,7 +1,5 @@
 use crate::*;
 
-// Lifecycle impl moved to src/lifecycle/impl.rs
-
 impl Default for Server {
     fn default() -> Self {
         Self {
@@ -24,8 +22,8 @@ impl Server {
         format!("{}{}{}", host, COLON_SPACE_SYMBOL, port)
     }
 
-    pub async fn host(&self, host: &'static str) -> &Self {
-        self.get_config().write().await.set_host(host);
+    pub async fn host<T: ToString>(&self, host: T) -> &Self {
+        self.get_config().write().await.set_host(host.to_string());
         self
     }
 
@@ -219,7 +217,7 @@ impl Server {
     }
 
     async fn init_panic_hook(&self) {
-        let config: ServerConfig<'_> = self.get_config().read().await.clone();
+        let config: ServerConfig = self.get_config().read().await.clone();
         let error_handler: ArcErrorHandle = config.get_error_handler().clone();
         set_hook(Box::new(move |err: &'_ PanicHookInfo<'_>| {
             let data: String = err.to_string();
@@ -233,14 +231,14 @@ impl Server {
 
     pub async fn run(&self) -> ServerResult {
         self.init().await;
-        let config: ServerConfig<'_> = self.get_config().read().await.clone();
-        let host: &str = *config.get_host();
+        let config: ServerConfig = self.get_config().read().await.clone();
+        let host: String = config.get_host().clone();
         let port: usize = *config.get_port();
         let nodelay: bool = *config.get_nodelay();
         let linger: OptionDuration = *config.get_linger();
         let ttl_opt: OptionU32 = *config.get_ttl();
         let http_buffer_size: usize = *config.get_http_buffer_size();
-        let addr: String = Self::format_host_port(host, &port);
+        let addr: String = Self::format_host_port(&host, &port);
         let tcp_listener: TcpListener = TcpListener::bind(&addr)
             .await
             .map_err(|err| ServerError::TcpBind(err.to_string()))?;
@@ -250,7 +248,7 @@ impl Server {
             if let Some(ttl) = ttl_opt {
                 let _ = stream.set_ttl(ttl);
             }
-            let config_clone: ServerConfig<'_> = config.clone();
+            let config_clone: ServerConfig = config.clone();
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
             let request_middleware_arc_lock: ArcRwLockVecArcFunc =
                 Arc::clone(&self.request_middleware);
@@ -458,7 +456,7 @@ impl Server {
 impl<'a> HandlerState<'a> {
     fn new(
         stream: &'a ArcRwLockStream,
-        config: &'a ServerConfig<'a>,
+        config: &'a ServerConfig,
         request_middleware: &'a ArcRwLockVecArcFunc,
         response_middleware: &'a ArcRwLockVecArcFunc,
         route_matcher: &'a ArcRwLock<RouteMatcher>,

@@ -1,3 +1,3 @@
 use crate::*;
 
-pub(crate) type ArcRwLockServerConfig<'a> = ArcRwLock<ServerConfig<'a>>;
+pub(crate) type ArcRwLockServerConfig = ArcRwLock<ServerConfig>;

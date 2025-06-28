@@ -4,7 +4,7 @@ use crate::*;
 pub struct Server {
     #[get(pub(super))]
     #[set(pub(super))]
-    pub(super) config: ArcRwLockServerConfig<'static>,
+    pub(super) config: ArcRwLockServerConfig,
     #[get(pub(super))]
     #[set(pub(super))]
     pub(super) route_matcher: ArcRwLockRouteMatcher,
@@ -25,7 +25,7 @@ pub struct Server {
 #[derive(Clone)]
 pub(crate) struct HandlerState<'a> {
     pub(super) stream: &'a ArcRwLockStream,
-    pub(super) config: &'a ServerConfig<'a>,
+    pub(super) config: &'a ServerConfig,
     pub(super) request_middleware: &'a ArcRwLockVecArcFunc,
     pub(super) response_middleware: &'a ArcRwLockVecArcFunc,
     pub(super) route_matcher: &'a ArcRwLockRouteMatcher,
