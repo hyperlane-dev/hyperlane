@@ -1,6 +1,11 @@
 use crate::*;
 
-impl<T> ErrorHandler for T where T: Fn(String) {}
+impl<F, Fut> ErrorHandler<Fut> for F
+where
+    F: Fn(String) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = ()> + Send,
+{
+}
 
 impl<F> FnPinBoxSendSync for F where
     F: Fn(Context) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync

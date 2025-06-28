@@ -2,6 +2,15 @@ use crate::*;
 
 #[tokio::test]
 async fn test_server() {
+    async fn async_error_handler(error: String) {
+        eprintln!("Async error: {}", error);
+        let _ = std::io::Write::flush(&mut std::io::stderr());
+    }
+
+    async fn on_ws_connected(ctx: Context) {
+        let _ = ctx.set_response_body("connected").await.send_body().await;
+    }
+
     async fn request_middleware(ctx: Context) {
         let socket_addr: String = ctx.get_socket_addr_or_default_string().await;
         ctx.set_response_header(SERVER, HYPERLANE)
@@ -18,7 +27,6 @@ async fn test_server() {
         let _ = ctx.send().await;
     }
 
-    #[methods(get, post)]
     async fn root_route(ctx: Context) {
         ctx.set_response_status_code(200)
             .await
@@ -26,8 +34,6 @@ async fn test_server() {
             .await;
     }
 
-    #[ws]
-    #[get]
     async fn ws_route(ctx: Context) {
         let key: String = ctx.get_request_header(SEC_WEBSOCKET_KEY).await.unwrap();
         let request_body: Vec<u8> = ctx.get_request_body().await;
@@ -35,8 +41,7 @@ async fn test_server() {
         let _ = ctx.set_response_body(request_body).await.send_body().await;
     }
 
-    #[get]
-    async fn sse_pre_hook(ctx: Context) {
+    async fn sse_route(ctx: Context) {
         let _ = ctx
             .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
             .await
@@ -44,15 +49,6 @@ async fn test_server() {
             .await
             .send()
             .await;
-    }
-
-    async fn sse_post_hook(ctx: Context) {
-        let _ = ctx.closed().await;
-    }
-
-    #[pre_hook(sse_pre_hook)]
-    #[post_hook(sse_post_hook)]
-    async fn sse_route(ctx: Context) {
         for i in 0..10 {
             let _ = ctx
                 .set_response_body(format!("data:{}{}", i, HTTP_DOUBLE_BR))
@@ -60,21 +56,12 @@ async fn test_server() {
                 .send_body()
                 .await;
         }
+        let _ = ctx.closed().await;
     }
 
-    #[post]
     async fn dynamic_route(ctx: Context) {
         let param: RouteParams = ctx.get_route_params().await;
         panic!("Test panic {:?}", param);
-    }
-
-    async fn on_ws_connected(ctx: Context) {
-        let _ = ctx.set_response_body("connected").await.send_body().await;
-    }
-
-    fn error_handler(error: String) {
-        eprintln!("{}", error);
-        let _ = std::io::Write::flush(&mut std::io::stderr());
     }
 
     async fn main() {
@@ -85,7 +72,7 @@ async fn test_server() {
         server.disable_linger().await;
         server.http_buffer_size(4096).await;
         server.ws_buffer_size(4096).await;
-        server.error_handler(error_handler).await;
+        server.error_handler(async_error_handler).await;
         server.on_ws_connected(on_ws_connected).await;
         server.pre_ws_upgrade(request_middleware).await;
         server.request_middleware(request_middleware).await;

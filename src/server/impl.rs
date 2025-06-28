@@ -64,14 +64,17 @@ impl Server {
         self
     }
 
-    pub async fn error_handler<F>(&self, func: F) -> &Self
+    pub async fn error_handler<F, Fut>(&self, func: F) -> &Self
     where
-        F: ErrorHandler + Send + Sync + 'static,
+        F: ErrorHandler<Fut>,
+        Fut: FutureSendStatic,
     {
         self.get_config()
             .write()
             .await
-            .set_error_handler(Arc::new(func));
+            .set_error_handler(Arc::new(move |error: String| {
+                Box::pin(func(error)) as PinBoxFutureSendStatic
+            }));
         self
     }
 
@@ -223,11 +226,11 @@ impl Server {
     }
 
     async fn init_panic_hook(&self) {
-        let error_handler: ArcErrorHandlerSendSync =
-            self.get_config().read().await.get_error_handler().clone();
+        let config: RwLockReadGuardServerConfig<'_> = self.get_config().read().await;
+        let error_handler: ArcErrorHandlerSendSync = config.get_error_handler().clone();
         set_hook(Box::new(move |err: &'_ PanicHookInfo<'_>| {
             let data: String = err.to_string();
-            error_handler(data);
+            tokio::spawn(error_handler(data));
         }));
     }
 
@@ -390,7 +393,7 @@ impl Server {
             return;
         }
         let route: &String = first_request.get_path();
-        let config: RwLockReadGuardServerConfig = self.get_config().read().await;
+        let config: RwLockReadGuardServerConfig<'_> = self.get_config().read().await;
         let buffer_size: usize = *config.get_ws_buffer_size();
         let contains_disable_ws_handler: bool = config.contains_disable_ws_handler(route).await;
         if contains_disable_ws_handler {
@@ -411,7 +414,7 @@ impl Server {
         }
         let stream: &ArcRwLockStream = state.stream;
         let route: &String = first_request.get_path();
-        let config: RwLockReadGuardServerConfig = self.get_config().read().await;
+        let config: RwLockReadGuardServerConfig<'_> = self.get_config().read().await;
         let contains_disable_http_handler: bool = config.contains_disable_http_handler(route).await;
         let buffer_size: usize = *config.get_http_buffer_size();
         if contains_disable_http_handler {

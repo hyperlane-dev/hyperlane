@@ -15,7 +15,6 @@ pub use route::*;
 pub use server::*;
 
 pub use http_type::*;
-pub use hyperlane_macros::*;
 
 pub(crate) use config::*;
 pub(crate) use lifecycle::*;
