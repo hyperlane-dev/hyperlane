@@ -21,9 +21,9 @@ impl fmt::Display for RoutePattern {
 
 #[derive(Clone)]
 pub(crate) struct RouteMatcher {
-    pub(super) static_routes: HashMapXxHash3_64<String, ArcFunc>,
-    pub(super) dynamic_routes: Vec<(RoutePattern, ArcFunc)>,
-    pub(super) regex_routes: Vec<(RoutePattern, ArcFunc)>,
+    pub(super) static_routes: HashMapXxHash3_64<String, ArcFnPinBoxSendSync>,
+    pub(super) dynamic_routes: Vec<(RoutePattern, ArcFnPinBoxSendSync)>,
+    pub(super) regex_routes: Vec<(RoutePattern, ArcFnPinBoxSendSync)>,
 }
 
 impl fmt::Debug for RouteMatcher {

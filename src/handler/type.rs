@@ -1,8 +1,9 @@
 use crate::*;
 
-pub type ArcFunc = Arc<dyn Func>;
-pub type OptionArcFunc = Option<ArcFunc>;
-pub type VecArcFunc = Vec<ArcFunc>;
-pub type ArcErrorHandle = Arc<dyn ErrorHandle + Send + Sync + 'static>;
-pub type PinBoxFutureSend = Pin<Box<(dyn Future<Output = ()> + Send + 'static)>>;
-pub type ArcRwLockVecArcFunc = ArcRwLock<VecArcFunc>;
+pub type ArcFnPinBoxSendSync = Arc<dyn FnPinBoxSendSync>;
+pub type OptionArcFnPinBoxSendSync = Option<ArcFnPinBoxSendSync>;
+pub type VecArcFnPinBoxSendSync = Vec<ArcFnPinBoxSendSync>;
+pub type ArcErrorHandlerSendSync = Arc<dyn ErrorHandler + Send + Sync + 'static>;
+pub type PinBoxFutureSendStatic = Pin<Box<(dyn Future<Output = ()> + Send + 'static)>>;
+pub type ArcRwLockVecArcFnPinBoxSendSync = ArcRwLock<VecArcFnPinBoxSendSync>;
+pub type RwLockReadGuardVecArcFnPinBoxSendSync<'a> = RwLockReadGuard<'a, VecArcFnPinBoxSendSync>;

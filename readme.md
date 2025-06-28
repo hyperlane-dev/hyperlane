@@ -73,7 +73,7 @@ async fn ws_route(ctx: Context) {
     let _ = ctx.set_response_body(request_body).await.send_body().await;
 }
 
-#[post]
+#[get]
 async fn sse_pre_hook(ctx: Context) {
     let _ = ctx
         .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
@@ -100,6 +100,7 @@ async fn sse_route(ctx: Context) {
     }
 }
 
+#[post]
 async fn dynamic_route(ctx: Context) {
     let param: RouteParams = ctx.get_route_params().await;
     panic!("Test panic {:?}", param);
