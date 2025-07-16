@@ -261,7 +261,7 @@ impl Server {
             let server: Server = self.clone();
             tokio::spawn(async move {
                 let request_result: RequestReaderHandleResult =
-                    Request::http_request_from_stream(&stream, http_buffer_size).await;
+                    Request::http_from_stream(&stream, http_buffer_size).await;
                 if request_result.is_err() {
                     return;
                 }
@@ -400,9 +400,7 @@ impl Server {
             while self.request_handler(state, first_request).await {}
             return;
         }
-        while let Ok(request) =
-            Request::ws_request_from_stream(stream, buffer_size, first_request).await
-        {
+        while let Ok(request) = Request::ws_from_stream(stream, buffer_size, first_request).await {
             let _ = self.request_handler(state, &request).await;
         }
     }
@@ -421,7 +419,7 @@ impl Server {
             while self.request_handler(state, first_request).await {}
             return;
         }
-        while let Ok(request) = Request::http_request_from_stream(stream, buffer_size).await {
+        while let Ok(request) = Request::http_from_stream(stream, buffer_size).await {
             let handle_result: bool = self.request_handler(state, &request).await;
             if !handle_result {
                 return;

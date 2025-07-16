@@ -42,7 +42,7 @@ async fn test_server() {
 
     async fn ws_route(ctx: Context) {
         let key: RequestHeadersValueItem = ctx
-            .get_request_header_front(SEC_WEBSOCKET_KEY)
+            .get_request_header_back(SEC_WEBSOCKET_KEY)
             .await
             .unwrap();
         let request_body: Vec<u8> = ctx.get_request_body().await;

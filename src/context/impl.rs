@@ -555,14 +555,14 @@ impl Context {
         self
     }
 
-    pub async fn http_request_from_stream(&self, buffer_size: usize) -> RequestReaderHandleResult {
+    pub async fn http_from_stream(&self, buffer_size: usize) -> RequestReaderHandleResult {
         self.reset_response_body().await;
         if self.get_aborted().await {
             return Err(RequestError::RequestAborted);
         }
         if let Some(stream) = self.get_stream().await.as_ref() {
             let request_res: RequestReaderHandleResult =
-                Request::http_request_from_stream(stream, buffer_size).await;
+                Request::http_from_stream(stream, buffer_size).await;
             if let Ok(request) = request_res.as_ref() {
                 self.set_request(request).await;
             }
@@ -571,7 +571,7 @@ impl Context {
         Err(RequestError::GetTcpStream)
     }
 
-    pub async fn ws_request_from_stream(&self, buffer_size: usize) -> RequestReaderHandleResult {
+    pub async fn ws_from_stream(&self, buffer_size: usize) -> RequestReaderHandleResult {
         self.reset_response_body().await;
         if self.get_aborted().await {
             return Err(RequestError::RequestAborted);
@@ -579,7 +579,7 @@ impl Context {
         if let Some(stream) = self.get_stream().await.as_ref() {
             let mut last_request: Request = self.get_request().await;
             let request_res: RequestReaderHandleResult =
-                Request::ws_request_from_stream(stream, buffer_size, &mut last_request).await;
+                Request::ws_from_stream(stream, buffer_size, &mut last_request).await;
             match request_res.as_ref() {
                 Ok(request) => {
                     self.set_request(&request).await;
