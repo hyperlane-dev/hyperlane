@@ -246,7 +246,7 @@ impl Context {
     }
 
     pub async fn get_request_cookies(&self) -> Cookies {
-        self.get_request_header_front(COOKIE)
+        self.get_request_header_back(COOKIE)
             .await
             .map(|data| Cookie::parse(&data))
             .unwrap_or_default()
@@ -331,7 +331,7 @@ impl Context {
     }
 
     pub async fn get_response_cookies(&self) -> Cookies {
-        self.get_response_header_front(COOKIE)
+        self.get_response_header_back(COOKIE)
             .await
             .map(|data| Cookie::parse(&data))
             .unwrap_or_default()
