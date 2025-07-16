@@ -28,14 +28,23 @@ async fn test_server() {
     }
 
     async fn root_route(ctx: Context) {
+        let cookie1: String = CookieBuilder::new("key1", "key2").http_only().build();
+        let cookie2: String = CookieBuilder::new("key2", "key2").http_only().build();
         ctx.set_response_status_code(200)
+            .await
+            .set_response_header(SET_COOKIE, cookie1)
+            .await
+            .set_response_header(SET_COOKIE, cookie2)
             .await
             .set_response_body("Hello hyperlane => /")
             .await;
     }
 
     async fn ws_route(ctx: Context) {
-        let key: String = ctx.get_request_header(SEC_WEBSOCKET_KEY).await.unwrap();
+        let key: RequestHeadersValueItem = ctx
+            .get_request_header_front(SEC_WEBSOCKET_KEY)
+            .await
+            .unwrap();
         let request_body: Vec<u8> = ctx.get_request_body().await;
         let _ = ctx.set_response_body(key).await.send_body().await;
         let _ = ctx.set_response_body(request_body).await.send_body().await;

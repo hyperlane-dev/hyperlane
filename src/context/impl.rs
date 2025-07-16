@@ -172,12 +172,7 @@ impl Context {
     where
         T: Into<RequestHeadersKey>,
     {
-        self.read()
-            .await
-            .get_request()
-            .get_querys()
-            .get(&key.into())
-            .map(|data| data.clone())
+        self.read().await.get_request().get_query(key)
     }
 
     pub async fn get_request_body(&self) -> RequestBody {
@@ -206,6 +201,50 @@ impl Context {
         self.read().await.get_request().get_headers().clone()
     }
 
+    pub async fn get_request_header_front<K>(&self, key: K) -> OptionRequestHeadersValueItem
+    where
+        K: Into<RequestHeadersKey>,
+    {
+        self.read().await.get_request().get_header_front(key)
+    }
+
+    pub async fn get_request_header_back<K>(&self, key: K) -> OptionRequestHeadersValueItem
+    where
+        K: Into<RequestHeadersKey>,
+    {
+        self.read().await.get_request().get_header_back(key)
+    }
+
+    pub async fn get_request_header_len<K>(&self, key: K) -> usize
+    where
+        K: Into<RequestHeadersKey>,
+    {
+        self.read().await.get_request().get_header_len(key)
+    }
+
+    pub async fn get_request_headers_values_len(&self) -> usize {
+        self.read().await.get_request().get_headers_values_len()
+    }
+
+    pub async fn get_request_headers_len(&self) -> usize {
+        self.read().await.get_request().get_headers_len()
+    }
+
+    pub async fn has_request_header<K>(&self, key: K) -> bool
+    where
+        K: Into<RequestHeadersKey>,
+    {
+        self.read().await.get_request().has_header(key)
+    }
+
+    pub async fn has_request_header_value<K, V>(&self, key: K, value: V) -> bool
+    where
+        K: Into<RequestHeadersKey>,
+        V: Into<RequestHeadersValueItem>,
+    {
+        self.read().await.get_request().has_header_value(key, value)
+    }
+
     pub async fn get_request_upgrade_type(&self) -> UpgradeType {
         self.read().await.get_request().get_upgrade_type().clone()
     }
@@ -228,6 +267,53 @@ impl Context {
         K: Into<ResponseHeadersKey>,
     {
         self.read().await.get_response().get_header(key)
+    }
+
+    pub async fn get_response_header_front<K>(&self, key: K) -> OptionResponseHeadersValueItem
+    where
+        K: Into<ResponseHeadersKey>,
+    {
+        self.read().await.get_response().get_header_front(key)
+    }
+
+    pub async fn get_response_header_back<K>(&self, key: K) -> OptionResponseHeadersValueItem
+    where
+        K: Into<ResponseHeadersKey>,
+    {
+        self.read().await.get_response().get_header_back(key)
+    }
+
+    pub async fn get_response_has_header<K>(&self, key: K) -> bool
+    where
+        K: Into<ResponseHeadersKey>,
+    {
+        self.read().await.get_response().has_header(key)
+    }
+
+    pub async fn has_response_header_value<K, V>(&self, key: K, value: V) -> bool
+    where
+        K: Into<ResponseHeadersKey>,
+        V: Into<ResponseHeadersValueItem>,
+    {
+        self.read()
+            .await
+            .get_response()
+            .has_header_value(key, value)
+    }
+
+    pub async fn get_response_headers_len(&self) -> usize {
+        self.read().await.get_response().get_headers_len()
+    }
+
+    pub async fn get_response_header_len<K>(&self, key: K) -> usize
+    where
+        K: Into<ResponseHeadersKey>,
+    {
+        self.read().await.get_response().get_header_len(key)
+    }
+
+    pub async fn get_response_headers_values_len(&self) -> usize {
+        self.read().await.get_response().get_headers_values_len()
     }
 
     pub async fn get_response_body(&self) -> ResponseBody {
@@ -272,8 +358,40 @@ impl Context {
         self
     }
 
-    pub async fn set_response_headers(&self, headers: ResponseHeaders) -> &Self {
-        self.write().await.get_mut_response().set_headers(headers);
+    pub async fn replace_response_header<K, V>(&self, key: K, value: V) -> &Self
+    where
+        K: Into<ResponseHeadersKey>,
+        V: Into<String>,
+    {
+        self.write()
+            .await
+            .get_mut_response()
+            .replace_header(key, value);
+        self
+    }
+
+    pub async fn remove_response_header<K>(&self, key: K) -> &Self
+    where
+        K: Into<ResponseHeadersKey>,
+    {
+        self.write().await.get_mut_response().remove_header(key);
+        self
+    }
+
+    pub async fn remove_response_header_value<K, V>(&self, key: K, value: V) -> &Self
+    where
+        K: Into<ResponseHeadersKey>,
+        V: Into<String>,
+    {
+        self.write()
+            .await
+            .get_mut_response()
+            .remove_header_value(key, value);
+        self
+    }
+
+    pub async fn clear_response_headers(&self) -> &Self {
+        self.write().await.get_mut_response().clear_headers();
         self
     }
 
@@ -309,9 +427,8 @@ impl Context {
     }
 
     pub async fn upgrade_to_ws(&self) -> ResponseResult {
-        let key_opt: OptionString = self.get_request_header(SEC_WEBSOCKET_KEY).await;
-        if let Some(key) = key_opt {
-            let accept_key: String = WebSocketFrame::generate_accept_key(&key);
+        if let Some(key) = &self.get_request_header_back(SEC_WEBSOCKET_KEY).await {
+            let accept_key: String = WebSocketFrame::generate_accept_key(key);
             return self
                 .set_response_status_code(101)
                 .await
