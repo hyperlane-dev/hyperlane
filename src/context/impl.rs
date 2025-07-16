@@ -245,8 +245,19 @@ impl Context {
         self.read().await.get_request().has_header_value(key, value)
     }
 
+    pub async fn get_request_cookies(&self) -> Cookies {
+        self.read().await.get_request().get_cookies()
+    }
+
+    pub async fn get_request_cookie<K>(&self, key: K) -> OptionCookiesValue
+    where
+        K: Into<CookieKey>,
+    {
+        self.read().await.get_request().get_cookie(key)
+    }
+
     pub async fn get_request_upgrade_type(&self) -> UpgradeType {
-        self.read().await.get_request().get_upgrade_type().clone()
+        self.read().await.get_request().get_upgrade_type()
     }
 
     async fn set_request(&self, request_data: &Request) -> &Self {
