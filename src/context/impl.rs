@@ -246,14 +246,17 @@ impl Context {
     }
 
     pub async fn get_request_cookies(&self) -> Cookies {
-        self.read().await.get_request().get_cookies()
+        self.get_request_header_front(COOKIE)
+            .await
+            .map(|data| Cookie::parse(&data))
+            .unwrap_or_default()
     }
 
     pub async fn get_request_cookie<K>(&self, key: K) -> OptionCookiesValue
     where
         K: Into<CookieKey>,
     {
-        self.read().await.get_request().get_cookie(key)
+        self.get_request_cookies().await.get(&key.into()).cloned()
     }
 
     pub async fn get_request_upgrade_type(&self) -> UpgradeType {
@@ -325,6 +328,20 @@ impl Context {
 
     pub async fn get_response_headers_values_len(&self) -> usize {
         self.read().await.get_response().get_headers_values_len()
+    }
+
+    pub async fn get_response_cookies(&self) -> Cookies {
+        self.get_response_header_front(COOKIE)
+            .await
+            .map(|data| Cookie::parse(&data))
+            .unwrap_or_default()
+    }
+
+    pub async fn get_response_cookie<K>(&self, key: K) -> OptionCookiesValue
+    where
+        K: Into<CookieKey>,
+    {
+        self.get_response_cookies().await.get(&key.into()).cloned()
     }
 
     pub async fn get_response_body(&self) -> ResponseBody {
