@@ -13,9 +13,7 @@ impl Default for ServerConfig {
             disable_http_hook: hash_set_xx_hash3_64(),
             disable_ws_hook: hash_set_xx_hash3_64(),
             route_matcher: RouteMatcher::new(),
-            error_hook: Arc::new(|ctx: Context, error: PanicInfo| {
-                Box::pin(default_error_hook(ctx, error))
-            }),
+            error_hook: Arc::new(|ctx: Context| Box::pin(default_error_hook(ctx))),
         }
     }
 }

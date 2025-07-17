@@ -62,8 +62,9 @@ impl PanicHook {
         let panic_info_struct: PanicInfo = PanicInfo::from_panic_hook_info(panic_info);
         let default_ctx: Context = Context::default();
         tokio::spawn(async move {
+            let _ = default_ctx.set_panic_info(panic_info_struct).await;
             let handler_clone: ArcErrorHandlerSendSync = handler.clone();
-            handler_clone(default_ctx, panic_info_struct).await;
+            handler_clone(default_ctx).await;
         });
     }
 

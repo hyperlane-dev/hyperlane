@@ -69,11 +69,12 @@ impl Server {
         F: ErrorHandler<Fut>,
         Fut: FutureSendStatic,
     {
-        self.get_config().write().await.set_error_hook(Arc::new(
-            move |ctx: Context, error: PanicInfo| {
-                Box::pin(func(ctx, error)) as PinBoxFutureSendStatic
-            },
-        ));
+        self.get_config()
+            .write()
+            .await
+            .set_error_hook(Arc::new(move |ctx: Context| {
+                Box::pin(func(ctx)) as PinBoxFutureSendStatic
+            }));
         self
     }
 
@@ -237,8 +238,9 @@ impl Server {
         let error_hook: ArcErrorHandlerSendSync =
             self.get_config().read().await.get_error_hook().clone();
         tokio::spawn(async move {
+            let _ = ctx.set_panic_info(panic_info).await;
             let handler_func = error_hook.as_ref();
-            handler_func(ctx, panic_info).await;
+            handler_func(ctx).await;
         });
     }
 

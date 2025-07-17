@@ -479,10 +479,11 @@ impl Context {
     where
         T: AnySendSyncClone,
     {
+        let attribute_key: AttributeKey = AttributeKey::External(key.to_string());
         self.write()
             .await
             .get_mut_attributes()
-            .insert(key.to_owned(), Arc::new(value));
+            .insert(attribute_key.to_string(), Arc::new(value));
         self
     }
 
@@ -494,22 +495,62 @@ impl Context {
     where
         T: AnySendSyncClone,
     {
+        let attribute_key: AttributeKey = AttributeKey::External(key.to_string());
         self.read()
             .await
             .get_attributes()
-            .get(key)
+            .get(&attribute_key.to_string())
             .and_then(|arc| arc.downcast_ref::<T>())
             .cloned()
     }
 
     pub async fn remove_attribute(&self, key: &str) -> &Self {
-        self.write().await.get_mut_attributes().remove(key);
+        let attribute_key: AttributeKey = AttributeKey::External(key.to_string());
+        self.write()
+            .await
+            .get_mut_attributes()
+            .remove(&attribute_key.to_string());
         self
+    }
+
+    async fn set_internal_attribute<T>(&self, key: InternalAttributeKey, value: T) -> &Self
+    where
+        T: AnySendSyncClone,
+    {
+        let attribute_key: AttributeKey = AttributeKey::Internal(key);
+        self.write()
+            .await
+            .get_mut_attributes()
+            .insert(attribute_key.to_string(), Arc::new(value));
+        self
+    }
+
+    async fn get_internal_attribute<T>(&self, key: InternalAttributeKey) -> Option<T>
+    where
+        T: AnySendSyncClone,
+    {
+        let attribute_key: AttributeKey = AttributeKey::Internal(key);
+        self.read()
+            .await
+            .get_attributes()
+            .get(&attribute_key.to_string())
+            .and_then(|arc| arc.downcast_ref::<T>())
+            .cloned()
     }
 
     pub async fn clear_attribute(&self) -> &Self {
         self.write().await.get_mut_attributes().clear();
         self
+    }
+
+    pub async fn set_panic_info(&self, panic_info: PanicInfo) -> &Self {
+        self.set_internal_attribute(InternalAttributeKey::PanicInfo, panic_info)
+            .await
+    }
+
+    pub async fn get_panic_info(&self) -> Option<PanicInfo> {
+        self.get_internal_attribute(InternalAttributeKey::PanicInfo)
+            .await
     }
 
     pub async fn get_aborted(&self) -> bool {
@@ -604,5 +645,34 @@ impl Context {
         } else {
             Lifecycle::Continue(keep_alive)
         };
+    }
+}
+
+impl From<&str> for AttributeKey {
+    fn from(key: &str) -> Self {
+        AttributeKey::External(key.to_string())
+    }
+}
+
+impl From<String> for AttributeKey {
+    fn from(key: String) -> Self {
+        AttributeKey::External(key)
+    }
+}
+
+impl From<InternalAttributeKey> for AttributeKey {
+    fn from(key: InternalAttributeKey) -> Self {
+        AttributeKey::Internal(key)
+    }
+}
+
+impl ToString for AttributeKey {
+    fn to_string(&self) -> String {
+        match self {
+            AttributeKey::External(key) => key.clone(),
+            AttributeKey::Internal(internal_key) => match internal_key {
+                InternalAttributeKey::PanicInfo => "__internal_panic_info".to_string(),
+            },
+        }
     }
 }
