@@ -6,6 +6,7 @@ mod lifecycle;
 mod panic;
 mod route;
 mod server;
+mod tests;
 mod tracker;
 mod utils;
 
@@ -51,7 +52,7 @@ pub(crate) use tokio::{
 };
 
 #[cfg(test)]
-pub(crate) use utils::r#fn::*;
+pub(crate) use utils::*;
 
 #[cfg(test)]
 pub(crate) use std::any::Any;
