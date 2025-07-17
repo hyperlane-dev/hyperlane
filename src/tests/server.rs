@@ -2,7 +2,10 @@ use crate::*;
 
 #[tokio::test]
 async fn test_server() {
-    async fn ws_connected_hook(ctx: Context) {
+    async fn connected_hook(ctx: Context) {
+        if !ctx.get_request().await.is_ws() {
+            return;
+        }
         let _ = ctx.set_response_body("connected").await.send_body().await;
     }
 
@@ -77,7 +80,7 @@ async fn test_server() {
         server.http_buffer(4096).await;
         server.ws_buffer(4096).await;
         server.error_hook(default_error_hook).await;
-        server.ws_connected_hook(ws_connected_hook).await;
+        server.connected_hook(connected_hook).await;
         server.pre_upgrade_hook(request_middleware).await;
         server.request_middleware(request_middleware).await;
         server.response_middleware(response_middleware).await;

@@ -19,10 +19,11 @@ pub struct Server {
     pub(super) pre_upgrade_hook: ArcRwLockVecArcFnPinBoxSendSync,
     #[get(pub(super))]
     #[set(pub(super))]
-    pub(super) ws_connected_hook: ArcRwLockVecArcFnPinBoxSendSync,
+    pub(super) connected_hook: ArcRwLockVecArcFnPinBoxSendSync,
 }
 
 #[derive(Clone)]
 pub(crate) struct HandlerState<'a> {
     pub(super) stream: &'a ArcRwLockStream,
+    pub(super) ctx: &'a Context,
 }

@@ -263,11 +263,6 @@ impl Context {
         self.read().await.get_request().get_upgrade_type()
     }
 
-    async fn set_request(&self, request_data: &Request) -> &Self {
-        self.write().await.set_request(request_data.clone());
-        self
-    }
-
     pub async fn get_response_version(&self) -> ResponseVersion {
         self.read().await.get_response().get_version().clone()
     }
@@ -365,6 +360,11 @@ impl Context {
 
     pub async fn get_response_status_code(&self) -> ResponseStatusCode {
         self.read().await.get_response().get_status_code().clone()
+    }
+
+    pub(crate) async fn set_request(&self, request_data: &Request) -> &Self {
+        self.write().await.set_request(request_data.clone());
+        self
     }
 
     pub async fn set_response(&self, response: Response) -> &Self {
