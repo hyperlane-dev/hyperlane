@@ -227,11 +227,10 @@ impl Server {
     async fn init_panic_hook(&self) {
         let config: RwLockReadGuardServerConfig<'_> = self.get_config().read().await;
         let error_handler: ArcErrorHandlerSendSync = config.get_error_handler().clone();
-        set_hook(Box::new(move |err: &'_ PanicHookInfo<'_>| {
-            let panic_info: PanicInfo = PanicInfo::from_panic_hook_info(err);
-            let default_ctx: Context = Context::default();
-            tokio::spawn(error_handler(default_ctx, panic_info));
-        }));
+
+        let panic_hook: &'static PanicHook = panic_hook();
+        panic_hook.set_error_handler(error_handler);
+        panic_hook.initialize_once();
     }
 
     async fn handle_panic_with_context(&self, panic_info: PanicInfo, ctx: Context) {
@@ -252,17 +251,7 @@ impl Server {
         } else {
             EMPTY_STR.to_string()
         };
-        let panic_info: PanicInfo = PanicInfo::new(
-            message,
-            None,
-            EMPTY_STR.to_string(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        );
+        let panic_info: PanicInfo = PanicInfo::new(message, None, EMPTY_STR.to_string());
         self.handle_panic_with_context(panic_info, ctx).await;
     }
 
@@ -404,19 +393,7 @@ impl Server {
         let stream: &ArcRwLockStream = state.stream;
         let route: &str = request.get_path();
         let ctx: Context = Context::create_context(stream, request);
-        let request_id: String = generate_request_id();
-        let method: String = request.get_method().to_string();
-        let path: String = request.get_path().to_string();
-        let remote_addr: Option<String> = ctx.get_socket_addr_string().await;
-        let user_agent: Option<String> = ctx.get_request_header_back("User-Agent").await;
-        let request_context: RequestContextRef = Arc::new(RequestContext::new(
-            request_id,
-            method,
-            path,
-            remote_addr,
-            user_agent,
-        ));
-        with_request_context(request_context, async {
+        with_context(ctx.clone(), async {
             let mut lifecycle: Lifecycle = Lifecycle::Continue(request.is_enable_keep_alive());
             let route_handler: OptionArcFnPinBoxSendSync = self
                 .route_matcher
@@ -448,21 +425,9 @@ impl Server {
         let route: String = first_request.get_path().to_string();
         let stream: &ArcRwLockStream = state.stream;
         let ctx: Context = Context::create_context(stream, first_request);
-        let request_id: String = generate_request_id();
-        let method: String = first_request.get_method().to_string();
-        let path: String = first_request.get_path().to_string();
-        let remote_addr: Option<String> = ctx.get_socket_addr_string().await;
-        let user_agent: Option<String> = ctx.get_request_header_back("User-Agent").await;
-        let request_context: RequestContextRef = Arc::new(RequestContext::new(
-            request_id,
-            method,
-            path,
-            remote_addr,
-            user_agent,
-        ));
         let route_clone: String = route.clone();
         let self_ref = self;
-        with_request_context(request_context, async move {
+        with_context(ctx.clone(), async move {
             let mut lifecycle: Lifecycle = Lifecycle::Continue(true);
             self_ref
                 .route_matcher

@@ -13,7 +13,7 @@ async fn test_server() {
             .await
             .send()
             .await;
-        let _ = std::io::Write::flush(&mut std::io::stderr());
+        let _ = Write::flush(&mut io::stderr());
     }
 
     async fn on_ws_connected(ctx: Context) {
@@ -105,5 +105,5 @@ async fn test_server() {
         server.run().await.unwrap();
     }
 
-    let _ = tokio::time::timeout(std::time::Duration::from_secs(60), main()).await;
+    let _ = tokio::time::timeout(Duration::from_secs(60), main()).await;
 }

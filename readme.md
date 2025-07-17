@@ -42,7 +42,7 @@ use hyperlane::*;
 
 async fn error_handler(error: PanicInfo) {
     eprintln!("{}", error.to_owned());
-    let _ = std::io::Write::flush(&mut std::io::stderr());
+    let _ = Write::flush(&mut io::stderr());
 }
 
 async fn on_ws_connected(ctx: Context) {

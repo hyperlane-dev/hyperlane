@@ -1,0 +1,97 @@
+use crate::*;
+
+unsafe impl Send for PanicHook {}
+unsafe impl Sync for PanicHook {}
+
+impl PanicHook {
+    const UNINITIALIZED: usize = 0;
+    const INITIALIZING: usize = 1;
+    const INITIALIZED: usize = 2;
+
+    pub(crate) const fn new() -> Self {
+        Self {
+            error_handler: AtomicPtr::new(ptr::null_mut()),
+            is_initialized: AtomicUsize::new(Self::UNINITIALIZED),
+        }
+    }
+
+    pub(crate) fn set_error_handler(&self, handler: ArcErrorHandlerSendSync) {
+        let boxed_handler: Box<ArcErrorHandlerSendSync> = Box::new(handler);
+        let handler_ptr: *mut ArcErrorHandlerSendSync = Box::into_raw(boxed_handler);
+        let old_ptr: *mut ArcErrorHandlerSendSync =
+            self.get_error_handler().swap(handler_ptr, Ordering::AcqRel);
+        if !old_ptr.is_null() {
+            unsafe {
+                let _: Box<ArcErrorHandlerSendSync> = Box::from_raw(old_ptr);
+            }
+        }
+    }
+
+    pub(crate) fn initialize_once(&self) {
+        let is_ok: bool = self
+            .get_is_initialized()
+            .compare_exchange(
+                Self::UNINITIALIZED,
+                Self::INITIALIZING,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            )
+            .is_ok();
+        if is_ok {
+            let hook_ref: &'static Self = unsafe { mem::transmute(self) };
+            set_hook(Box::new(move |panic_info: &PanicHookInfo<'_>| {
+                hook_ref.handle_panic(panic_info);
+            }));
+            self.get_is_initialized()
+                .store(Self::INITIALIZED, Ordering::Release);
+            return;
+        }
+        while self.get_is_initialized().load(Ordering::Acquire) != Self::INITIALIZED {
+            hint::spin_loop();
+        }
+    }
+
+    fn handle_panic(&self, panic_info: &PanicHookInfo<'_>) {
+        let handler_ptr: *mut ArcErrorHandlerSendSync =
+            self.get_error_handler().load(Ordering::Acquire);
+        if handler_ptr.is_null() {
+            self.default_panic_handler(panic_info);
+            return;
+        }
+        let handler: &ArcErrorHandlerSendSync = unsafe { &*handler_ptr };
+        let panic_info_struct: PanicInfo = PanicInfo::from_panic_hook_info(panic_info);
+        let default_ctx: Context = Context::default();
+        tokio::spawn(async move {
+            let handler_clone: ArcErrorHandlerSendSync = handler.clone();
+            handler_clone(default_ctx, panic_info_struct).await;
+        });
+    }
+
+    fn default_panic_handler(&self, panic_info: &PanicHookInfo<'_>) {
+        let message: String = if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
+            s.to_string()
+        } else if let Some(s) = panic_info.payload().downcast_ref::<String>() {
+            s.clone()
+        } else {
+            EMPTY_STR.to_string()
+        };
+        let location: String = panic_info
+            .location()
+            .map(|loc| format!("{}:{}:{}", loc.file(), loc.line(), loc.column()))
+            .unwrap_or_else(|| EMPTY_STR.to_string());
+        eprintln!("Panic occurred: {} at {}", message, location);
+        let _ = Write::flush(&mut io::stderr());
+    }
+}
+
+impl Drop for PanicHook {
+    fn drop(&mut self) {
+        let handler_ptr: *mut ArcErrorHandlerSendSync =
+            self.get_error_handler().load(Ordering::Acquire);
+        if !handler_ptr.is_null() {
+            unsafe {
+                let _: Box<ArcErrorHandlerSendSync> = Box::from_raw(handler_ptr);
+            }
+        }
+    }
+}

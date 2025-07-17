@@ -5,7 +5,7 @@ use crate::*;
 pub(crate) async fn assert_panic_message_contains<F, Fut>(future_factory: F, expected_msg: &str)
 where
     F: FnOnce() -> Fut + Send + 'static,
-    Fut: std::future::Future<Output = ()> + Send + 'static,
+    Fut: Future<Output = ()> + Send + 'static,
 {
     let handle: JoinHandle<()> = tokio::spawn(future_factory());
     let result: Result<_, _> = handle.await;
