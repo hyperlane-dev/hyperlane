@@ -1,3 +1,4 @@
+mod attribute;
 mod config;
 mod context;
 mod error;
@@ -21,6 +22,7 @@ pub use http_type::*;
 
 pub use std::io::{self, Write};
 
+pub(crate) use attribute::*;
 pub(crate) use config::*;
 pub(crate) use lifecycle::*;
 pub(crate) use panic::*;
