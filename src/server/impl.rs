@@ -69,12 +69,11 @@ impl Server {
         F: ErrorHandler<Fut>,
         Fut: FutureSendStatic,
     {
-        self.get_config()
-            .write()
-            .await
-            .set_error_handler(Arc::new(move |error: PanicInfo| {
-                Box::pin(func(error)) as PinBoxFutureSendStatic
-            }));
+        self.get_config().write().await.set_error_handler(Arc::new(
+            move |ctx: Context, error: PanicInfo| {
+                Box::pin(func(ctx, error)) as PinBoxFutureSendStatic
+            },
+        ));
         self
     }
 
@@ -230,8 +229,41 @@ impl Server {
         let error_handler: ArcErrorHandlerSendSync = config.get_error_handler().clone();
         set_hook(Box::new(move |err: &'_ PanicHookInfo<'_>| {
             let panic_info: PanicInfo = PanicInfo::from_panic_hook_info(err);
-            tokio::spawn(error_handler(panic_info));
+            let default_ctx: Context = Context::default();
+            tokio::spawn(error_handler(default_ctx, panic_info));
         }));
+    }
+
+    async fn handle_panic_with_context(&self, panic_info: PanicInfo, ctx: Context) {
+        let error_handler: ArcErrorHandlerSendSync =
+            self.get_config().read().await.get_error_handler().clone();
+        tokio::spawn(async move {
+            let handler_func = error_handler.as_ref();
+            handler_func(ctx, panic_info).await;
+        });
+    }
+
+    async fn handle_task_panic(&self, join_error: tokio::task::JoinError, ctx: Context) {
+        let panic_payload = join_error.into_panic();
+        let message: String = if let Some(s) = panic_payload.downcast_ref::<&str>() {
+            s.to_string()
+        } else if let Some(s) = panic_payload.downcast_ref::<String>() {
+            s.clone()
+        } else {
+            EMPTY_STR.to_string()
+        };
+        let panic_info: PanicInfo = PanicInfo::new(
+            message,
+            None,
+            EMPTY_STR.to_string(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+        self.handle_panic_with_context(panic_info, ctx).await;
     }
 
     async fn init(&self) {
@@ -309,7 +341,15 @@ impl Server {
         let middleware_guard: RwLockReadGuardVecArcFnPinBoxSendSync =
             self.request_middleware.read().await;
         for middleware in middleware_guard.iter() {
-            middleware(ctx.clone()).await;
+            let ctx_clone: Context = ctx.clone();
+            let middleware_future = middleware(ctx_clone);
+            let result = tokio::task::spawn(middleware_future).await;
+            if let Err(join_error) = result {
+                if join_error.is_panic() {
+                    self.handle_task_panic(join_error, ctx.clone()).await;
+                    return;
+                }
+            }
             ctx.should_abort(lifecycle).await;
             if lifecycle.is_abort() {
                 return;
@@ -318,12 +358,21 @@ impl Server {
     }
 
     async fn run_route_handler(
+        &self,
         ctx: &Context,
         handler: &OptionArcFnPinBoxSendSync,
         lifecycle: &mut Lifecycle,
     ) {
         if let Some(func) = handler {
-            func(ctx.clone()).await;
+            let ctx_clone: Context = ctx.clone();
+            let handler_future = func(ctx_clone);
+            let result = tokio::task::spawn(handler_future).await;
+            if let Err(join_error) = result {
+                if join_error.is_panic() {
+                    self.handle_task_panic(join_error, ctx.clone()).await;
+                    return;
+                }
+            }
             ctx.should_abort(lifecycle).await;
             if lifecycle.is_abort() {
                 return;
@@ -335,7 +384,15 @@ impl Server {
         let middleware_guard: RwLockReadGuardVecArcFnPinBoxSendSync =
             self.response_middleware.read().await;
         for middleware in middleware_guard.iter() {
-            middleware(ctx.clone()).await;
+            let ctx_clone: Context = ctx.clone();
+            let middleware_future = middleware(ctx_clone);
+            let result = tokio::task::spawn(middleware_future).await;
+            if let Err(join_error) = result {
+                if join_error.is_panic() {
+                    self.handle_task_panic(join_error, ctx.clone()).await;
+                    return;
+                }
+            }
             ctx.should_abort(lifecycle).await;
             if lifecycle.is_abort() {
                 return;
@@ -347,62 +404,99 @@ impl Server {
         let stream: &ArcRwLockStream = state.stream;
         let route: &str = request.get_path();
         let ctx: Context = Context::create_context(stream, request);
-        let mut lifecycle: Lifecycle = Lifecycle::Continue(request.is_enable_keep_alive());
-        let route_handler: OptionArcFnPinBoxSendSync = self
-            .route_matcher
-            .read()
-            .await
-            .resolve_route(&ctx, route)
-            .await;
-        self.run_request_middleware(&ctx, &mut lifecycle).await;
-        if let Lifecycle::Abort(request_keepalive) = lifecycle {
-            return request_keepalive;
-        }
-        Self::run_route_handler(&ctx, &route_handler, &mut lifecycle).await;
-        if let Lifecycle::Abort(request_keepalive) = lifecycle {
-            return request_keepalive;
-        }
-        self.run_response_middleware(&ctx, &mut lifecycle).await;
-        if let Lifecycle::Abort(request_keepalive) = lifecycle {
-            return request_keepalive;
-        }
-        match lifecycle {
-            Lifecycle::Continue(res) | Lifecycle::Abort(res) => res,
-        }
+        let request_id: String = generate_request_id();
+        let method: String = request.get_method().to_string();
+        let path: String = request.get_path().to_string();
+        let remote_addr: Option<String> = ctx.get_socket_addr_string().await;
+        let user_agent: Option<String> = ctx.get_request_header_back("User-Agent").await;
+        let request_context: RequestContextRef = Arc::new(RequestContext::new(
+            request_id,
+            method,
+            path,
+            remote_addr,
+            user_agent,
+        ));
+        with_request_context(request_context, async {
+            let mut lifecycle: Lifecycle = Lifecycle::Continue(request.is_enable_keep_alive());
+            let route_handler: OptionArcFnPinBoxSendSync = self
+                .route_matcher
+                .read()
+                .await
+                .resolve_route(&ctx, route)
+                .await;
+            self.run_request_middleware(&ctx, &mut lifecycle).await;
+            if let Lifecycle::Abort(request_keepalive) = lifecycle {
+                return request_keepalive;
+            }
+            self.run_route_handler(&ctx, &route_handler, &mut lifecycle)
+                .await;
+            if let Lifecycle::Abort(request_keepalive) = lifecycle {
+                return request_keepalive;
+            }
+            self.run_response_middleware(&ctx, &mut lifecycle).await;
+            if let Lifecycle::Abort(request_keepalive) = lifecycle {
+                return request_keepalive;
+            }
+            match lifecycle {
+                Lifecycle::Continue(res) | Lifecycle::Abort(res) => res,
+            }
+        })
+        .await
     }
 
     async fn ws_handler<'a>(&self, state: &HandlerState<'a>, first_request: &mut Request) {
-        let route: &String = first_request.get_path();
+        let route: String = first_request.get_path().to_string();
         let stream: &ArcRwLockStream = state.stream;
         let ctx: Context = Context::create_context(stream, first_request);
-        let mut lifecycle: Lifecycle = Lifecycle::Continue(true);
-        self.route_matcher
-            .read()
-            .await
-            .resolve_route(&ctx, route)
-            .await;
-        self.run_pre_ws_upgrade(&ctx, &mut lifecycle).await;
-        if lifecycle.is_abort() {
-            return;
-        }
-        if ctx.upgrade_to_ws().await.is_err() {
-            return;
-        }
-        self.run_on_ws_connected(&ctx, &mut lifecycle).await;
-        if lifecycle.is_abort() {
-            return;
-        }
-        let route: &String = first_request.get_path();
-        let config: RwLockReadGuardServerConfig<'_> = self.get_config().read().await;
-        let buffer_size: usize = *config.get_ws_buffer_size();
-        let contains_disable_ws_handler: bool = config.contains_disable_ws_handler(route).await;
-        if contains_disable_ws_handler {
-            while self.request_handler(state, first_request).await {}
-            return;
-        }
-        while let Ok(request) = Request::ws_from_stream(stream, buffer_size, first_request).await {
-            let _ = self.request_handler(state, &request).await;
-        }
+        let request_id: String = generate_request_id();
+        let method: String = first_request.get_method().to_string();
+        let path: String = first_request.get_path().to_string();
+        let remote_addr: Option<String> = ctx.get_socket_addr_string().await;
+        let user_agent: Option<String> = ctx.get_request_header_back("User-Agent").await;
+        let request_context: RequestContextRef = Arc::new(RequestContext::new(
+            request_id,
+            method,
+            path,
+            remote_addr,
+            user_agent,
+        ));
+        let route_clone: String = route.clone();
+        let self_ref = self;
+        with_request_context(request_context, async move {
+            let mut lifecycle: Lifecycle = Lifecycle::Continue(true);
+            self_ref
+                .route_matcher
+                .read()
+                .await
+                .resolve_route(&ctx, &route_clone)
+                .await;
+            self_ref.run_pre_ws_upgrade(&ctx, &mut lifecycle).await;
+            if lifecycle.is_abort() {
+                return;
+            }
+            if ctx.upgrade_to_ws().await.is_err() {
+                return;
+            }
+            self_ref.run_on_ws_connected(&ctx, &mut lifecycle).await;
+            if lifecycle.is_abort() {
+                return;
+            }
+            let config: RwLockReadGuardServerConfig<'_> = self_ref.get_config().read().await;
+            let buffer_size: usize = *config.get_ws_buffer_size();
+            let contains_disable_ws_handler: bool =
+                config.contains_disable_ws_handler(&route_clone).await;
+            drop(config);
+            if contains_disable_ws_handler {
+                while self_ref.request_handler(state, first_request).await {}
+                return;
+            }
+            while let Ok(request) =
+                Request::ws_from_stream(stream, buffer_size, first_request).await
+            {
+                let _ = self_ref.request_handler(state, &request).await;
+            }
+        })
+        .await
     }
 
     async fn http_handler<'a>(&self, state: &HandlerState<'a>, first_request: &Request) {

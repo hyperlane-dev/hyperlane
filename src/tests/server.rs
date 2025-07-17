@@ -2,8 +2,17 @@ use crate::*;
 
 #[tokio::test]
 async fn test_server() {
-    async fn error_handler(error: PanicInfo) {
-        eprintln!("{}", error.to_owned());
+    async fn error_handler(ctx: Context, error: PanicInfo) {
+        eprintln!("{:?}", ctx);
+        let _ = ctx
+            .set_response_body(format!(
+                "{}\n{}",
+                error.to_string(),
+                ctx.get_request_string().await
+            ))
+            .await
+            .send()
+            .await;
         let _ = std::io::Write::flush(&mut std::io::stderr());
     }
 

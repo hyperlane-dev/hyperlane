@@ -3,6 +3,7 @@ mod context;
 mod error;
 mod handler;
 mod lifecycle;
+mod request_tracker;
 mod route;
 mod server;
 mod tests;
@@ -11,6 +12,7 @@ mod utils;
 pub use context::*;
 pub use error::*;
 pub use handler::*;
+pub use request_tracker::*;
 pub use route::*;
 pub use server::*;
 
