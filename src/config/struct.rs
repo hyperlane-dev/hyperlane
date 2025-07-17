@@ -13,11 +13,11 @@ pub(crate) struct ServerConfig {
     #[get(pub(crate))]
     #[get_mut(pub(crate))]
     #[set(pub(crate))]
-    pub(super) ws_buffer_size: usize,
+    pub(super) ws_buffer: usize,
     #[get(pub(crate))]
     #[get_mut(pub(crate))]
     #[set(pub(crate))]
-    pub(super) http_buffer_size: usize,
+    pub(super) http_buffer: usize,
     #[get(pub(crate))]
     #[get_mut(pub(crate))]
     #[set(pub(crate))]

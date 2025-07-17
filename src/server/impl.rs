@@ -7,8 +7,8 @@ impl Default for Server {
             route_matcher: arc_rwlock(RouteMatcher::new()),
             request_middleware: arc_rwlock(vec![]),
             response_middleware: arc_rwlock(vec![]),
-            pre_ws_upgrade: arc_rwlock(vec![]),
-            on_ws_connected: arc_rwlock(vec![]),
+            pre_upgrade_hook: arc_rwlock(vec![]),
+            ws_connected_hook: arc_rwlock(vec![]),
         }
     }
 }
@@ -38,29 +38,23 @@ impl Server {
         self
     }
 
-    pub async fn http_buffer_size(&self, buffer_size: usize) -> &Self {
-        let buffer_size: usize = if buffer_size == 0 {
+    pub async fn http_buffer(&self, buffer: usize) -> &Self {
+        let buffer: usize = if buffer == 0 {
             DEFAULT_BUFFER_SIZE
         } else {
-            buffer_size
+            buffer
         };
-        self.get_config()
-            .write()
-            .await
-            .set_http_buffer_size(buffer_size);
+        self.get_config().write().await.set_http_buffer(buffer);
         self
     }
 
-    pub async fn ws_buffer_size(&self, buffer_size: usize) -> &Self {
-        let buffer_size: usize = if buffer_size == 0 {
+    pub async fn ws_buffer(&self, buffer: usize) -> &Self {
+        let buffer: usize = if buffer == 0 {
             DEFAULT_BUFFER_SIZE
         } else {
-            buffer_size
+            buffer
         };
-        self.get_config()
-            .write()
-            .await
-            .set_ws_buffer_size(buffer_size);
+        self.get_config().write().await.set_ws_buffer(buffer);
         self
     }
 
@@ -161,24 +155,24 @@ impl Server {
         self
     }
 
-    pub async fn pre_ws_upgrade<F, Fut>(&self, func: F) -> &Self
+    pub async fn pre_upgrade_hook<F, Fut>(&self, func: F) -> &Self
     where
         F: FnSendSyncStatic<Fut>,
         Fut: FutureSendStatic,
     {
-        self.get_pre_ws_upgrade()
+        self.get_pre_upgrade_hook()
             .write()
             .await
             .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
         self
     }
 
-    pub async fn on_ws_connected<F, Fut>(&self, func: F) -> &Self
+    pub async fn ws_connected_hook<F, Fut>(&self, func: F) -> &Self
     where
         F: FnSendSyncStatic<Fut>,
         Fut: FutureSendStatic,
     {
-        self.get_on_ws_connected()
+        self.get_ws_connected_hook()
             .write()
             .await
             .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
@@ -269,7 +263,7 @@ impl Server {
         let nodelay: bool = *config.get_nodelay();
         let linger: OptionDuration = *config.get_linger();
         let ttl_opt: OptionU32 = *config.get_ttl();
-        let http_buffer_size: usize = *config.get_http_buffer_size();
+        let http_buffer: usize = *config.get_http_buffer();
         let addr: String = Self::format_host_port(&host, &port);
         let tcp_listener: TcpListener = TcpListener::bind(&addr)
             .await
@@ -284,7 +278,7 @@ impl Server {
             let server: Server = self.clone();
             tokio::spawn(async move {
                 let request_result: RequestReaderHandleResult =
-                    Request::http_from_stream(&stream, http_buffer_size).await;
+                    Request::http_from_stream(&stream, http_buffer).await;
                 if request_result.is_err() {
                     return;
                 }
@@ -304,11 +298,11 @@ impl Server {
         Ok(())
     }
 
-    async fn run_pre_ws_upgrade(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
+    async fn run_pre_upgrade_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
         let middleware_guard: RwLockReadGuardVecArcFnPinBoxSendSync =
-            self.pre_ws_upgrade.read().await;
-        for pre_ws_upgrade in middleware_guard.iter() {
-            pre_ws_upgrade(ctx.clone()).await;
+            self.pre_upgrade_hook.read().await;
+        for pre_upgrade_hook in middleware_guard.iter() {
+            pre_upgrade_hook(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
             if lifecycle.is_abort() {
                 return;
@@ -316,11 +310,11 @@ impl Server {
         }
     }
 
-    async fn run_on_ws_connected(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
+    async fn run_ws_connected_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
         let middleware_guard: RwLockReadGuardVecArcFnPinBoxSendSync =
-            self.on_ws_connected.read().await;
-        for on_ws_connected in middleware_guard.iter() {
-            on_ws_connected(ctx.clone()).await;
+            self.ws_connected_hook.read().await;
+        for ws_connected_hook in middleware_guard.iter() {
+            ws_connected_hook(ctx.clone()).await;
             ctx.should_abort(lifecycle).await;
             if lifecycle.is_abort() {
                 return;
@@ -427,28 +421,28 @@ impl Server {
         let stream: &ArcRwLockStream = state.stream;
         let ctx: Context = Context::create_context(stream, first_request);
         let route_clone: String = route.clone();
-        let self_ref = self;
+        let self_ref: &Server = self;
+        let mut lifecycle: Lifecycle = Lifecycle::Continue(true);
+        self_ref
+            .route_matcher
+            .read()
+            .await
+            .resolve_route(&ctx, &route_clone)
+            .await;
         with_context(ctx.clone(), async move {
-            let mut lifecycle: Lifecycle = Lifecycle::Continue(true);
-            self_ref
-                .route_matcher
-                .read()
-                .await
-                .resolve_route(&ctx, &route_clone)
-                .await;
-            self_ref.run_pre_ws_upgrade(&ctx, &mut lifecycle).await;
+            self_ref.run_pre_upgrade_hook(&ctx, &mut lifecycle).await;
             if lifecycle.is_abort() {
                 return;
             }
             if ctx.upgrade_to_ws().await.is_err() {
                 return;
             }
-            self_ref.run_on_ws_connected(&ctx, &mut lifecycle).await;
+            self_ref.run_ws_connected_hook(&ctx, &mut lifecycle).await;
             if lifecycle.is_abort() {
                 return;
             }
             let config: RwLockReadGuardServerConfig<'_> = self_ref.get_config().read().await;
-            let buffer_size: usize = *config.get_ws_buffer_size();
+            let buffer: usize = *config.get_ws_buffer();
             let contains_disable_ws_hook: bool =
                 config.contains_disable_ws_hook(&route_clone).await;
             drop(config);
@@ -456,9 +450,7 @@ impl Server {
                 while self_ref.request_hook(state, first_request).await {}
                 return;
             }
-            while let Ok(request) =
-                Request::ws_from_stream(stream, buffer_size, first_request).await
-            {
+            while let Ok(request) = Request::ws_from_stream(stream, buffer, first_request).await {
                 let _ = self_ref.request_hook(state, &request).await;
             }
         })
@@ -474,12 +466,12 @@ impl Server {
         let route: &String = first_request.get_path();
         let config: RwLockReadGuardServerConfig<'_> = self.get_config().read().await;
         let contains_disable_http_hook: bool = config.contains_disable_http_hook(route).await;
-        let buffer_size: usize = *config.get_http_buffer_size();
+        let buffer: usize = *config.get_http_buffer();
         if contains_disable_http_hook {
             while self.request_hook(state, first_request).await {}
             return;
         }
-        while let Ok(request) = Request::http_from_stream(stream, buffer_size).await {
+        while let Ok(request) = Request::http_from_stream(stream, buffer).await {
             let handle_result: bool = self.request_hook(state, &request).await;
             if !handle_result {
                 return;

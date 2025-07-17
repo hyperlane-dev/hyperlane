@@ -16,10 +16,10 @@ pub struct Server {
     pub(super) response_middleware: ArcRwLockVecArcFnPinBoxSendSync,
     #[get(pub(super))]
     #[set(pub(super))]
-    pub(super) pre_ws_upgrade: ArcRwLockVecArcFnPinBoxSendSync,
+    pub(super) pre_upgrade_hook: ArcRwLockVecArcFnPinBoxSendSync,
     #[get(pub(super))]
     #[set(pub(super))]
-    pub(super) on_ws_connected: ArcRwLockVecArcFnPinBoxSendSync,
+    pub(super) ws_connected_hook: ArcRwLockVecArcFnPinBoxSendSync,
 }
 
 #[derive(Clone)]

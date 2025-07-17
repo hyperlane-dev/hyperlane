@@ -40,7 +40,7 @@ git clone https://github.com/eastspire/hyperlane-quick-start.git
 ```rust
 use hyperlane::*;
 
-async fn on_ws_connected(ctx: Context) {
+async fn ws_connected_hook(ctx: Context) {
     let _ = ctx.set_response_body("connected").await.send_body().await;
 }
 
@@ -113,11 +113,11 @@ async fn main() {
     server.port(60000).await;
     server.enable_nodelay().await;
     server.disable_linger().await;
-    server.http_buffer_size(4096).await;
-    server.ws_buffer_size(4096).await;
+    server.http_buffer(4096).await;
+    server.ws_buffer(4096).await;
     server.error_hook(error_hook).await;
-    server.on_ws_connected(on_ws_connected).await;
-    server.pre_ws_upgrade(request_middleware).await;
+    server.ws_connected_hook(ws_connected_hook).await;
+    server.pre_upgrade_hook(request_middleware).await;
     server.request_middleware(request_middleware).await;
     server.response_middleware(response_middleware).await;
     server.route("/", root_route).await;
