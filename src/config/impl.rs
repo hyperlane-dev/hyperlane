@@ -13,8 +13,8 @@ impl Default for ServerConfig {
             disable_http_handler: hash_set_xx_hash3_64(),
             disable_ws_handler: hash_set_xx_hash3_64(),
             route_matcher: RouteMatcher::new(),
-            error_handler: Arc::new(|ctx: Context, error: PanicInfo| {
-                Box::pin(error_handler(ctx, error))
+            error_hook: Arc::new(|ctx: Context, error: PanicInfo| {
+                Box::pin(default_error_hook(ctx, error))
             }),
         }
     }

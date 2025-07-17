@@ -10,16 +10,16 @@ impl PanicHook {
 
     pub(crate) const fn new() -> Self {
         Self {
-            error_handler: AtomicPtr::new(ptr::null_mut()),
+            error_hook: AtomicPtr::new(ptr::null_mut()),
             is_initialized: AtomicUsize::new(Self::UNINITIALIZED),
         }
     }
 
-    pub(crate) fn set_error_handler(&self, handler: ArcErrorHandlerSendSync) {
+    pub(crate) fn set_error_hook(&self, handler: ArcErrorHandlerSendSync) {
         let boxed_handler: Box<ArcErrorHandlerSendSync> = Box::new(handler);
         let handler_ptr: *mut ArcErrorHandlerSendSync = Box::into_raw(boxed_handler);
         let old_ptr: *mut ArcErrorHandlerSendSync =
-            self.get_error_handler().swap(handler_ptr, Ordering::AcqRel);
+            self.get_error_hook().swap(handler_ptr, Ordering::AcqRel);
         if !old_ptr.is_null() {
             unsafe {
                 let _: Box<ArcErrorHandlerSendSync> = Box::from_raw(old_ptr);
@@ -53,7 +53,7 @@ impl PanicHook {
 
     fn handle_panic(&self, panic_info: &PanicHookInfo<'_>) {
         let handler_ptr: *mut ArcErrorHandlerSendSync =
-            self.get_error_handler().load(Ordering::Acquire);
+            self.get_error_hook().load(Ordering::Acquire);
         if handler_ptr.is_null() {
             self.default_panic_handler(panic_info);
             return;
@@ -87,7 +87,7 @@ impl PanicHook {
 impl Drop for PanicHook {
     fn drop(&mut self) {
         let handler_ptr: *mut ArcErrorHandlerSendSync =
-            self.get_error_handler().load(Ordering::Acquire);
+            self.get_error_hook().load(Ordering::Acquire);
         if !handler_ptr.is_null() {
             unsafe {
                 let _: Box<ArcErrorHandlerSendSync> = Box::from_raw(handler_ptr);

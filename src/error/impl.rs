@@ -66,36 +66,36 @@ impl Display for PanicInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let payload: &str = self.get_payload();
         let message: &str = self.get_message();
-        let formatted_payload: String = payload
-            .lines()
-            .map(|line| format!("Panic payload: {}", line))
-            .collect::<Vec<_>>()
-            .join(BR);
-        let formatted_message: String = message
-            .lines()
-            .map(|line| format!("Panic message: {}", line))
-            .collect::<Vec<_>>()
-            .join(BR);
-        let formatted_location: String = match self.get_location() {
-            Some(location) => {
-                let mut result: String = String::new();
-                result.push_str(BR);
-                for line in location.to_string().lines() {
-                    result.push_str("Panic location: ");
-                    result.push_str(line);
-                    result.push_str(BR);
+        let mut parts: Vec<String> = Vec::new();
+        if !payload.is_empty() {
+            let formatted_payload: String = payload
+                .lines()
+                .map(|line| format!("Panic payload: {}", line))
+                .collect::<Vec<_>>()
+                .join(BR);
+            parts.push(formatted_payload);
+        }
+        if !message.is_empty() {
+            let formatted_message: String = message
+                .lines()
+                .map(|line| format!("Panic message: {}", line))
+                .collect::<Vec<_>>()
+                .join(BR);
+            parts.push(formatted_message);
+        }
+        if let Some(location) = self.get_location() {
+            let mut formatted_location: String = String::new();
+            for line in location.to_string().lines() {
+                if !formatted_location.is_empty() {
+                    formatted_location.push_str(BR);
                 }
-                if result.ends_with(BR) {
-                    result.truncate(result.len() - BR.len());
-                }
-                result
+                formatted_location.push_str("Panic location: ");
+                formatted_location.push_str(line);
             }
-            None => String::new(),
-        };
-        write!(
-            f,
-            "{}{}{}{}",
-            formatted_payload, BR, formatted_message, formatted_location
-        )
+            if !formatted_location.is_empty() {
+                parts.push(formatted_location);
+            }
+        }
+        write!(f, "{}", parts.join(BR))
     }
 }

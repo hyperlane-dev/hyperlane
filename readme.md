@@ -40,7 +40,7 @@ git clone https://github.com/eastspire/hyperlane-quick-start.git
 ```rust
 use hyperlane::*;
 
-async fn error_handler(error: PanicInfo) {
+async fn error_hook(error: PanicInfo) {
     eprintln!("{}", error.to_owned());
     let _ = Write::flush(&mut io::stderr());
 }
@@ -120,7 +120,7 @@ async fn main() {
     server.disable_linger().await;
     server.http_buffer_size(4096).await;
     server.ws_buffer_size(4096).await;
-    server.error_handler(error_handler).await;
+    server.error_hook(error_hook).await;
     server.on_ws_connected(on_ws_connected).await;
     server.pre_ws_upgrade(request_middleware).await;
     server.request_middleware(request_middleware).await;

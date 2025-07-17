@@ -64,12 +64,12 @@ impl Server {
         self
     }
 
-    pub async fn error_handler<F, Fut>(&self, func: F) -> &Self
+    pub async fn error_hook<F, Fut>(&self, func: F) -> &Self
     where
         F: ErrorHandler<Fut>,
         Fut: FutureSendStatic,
     {
-        self.get_config().write().await.set_error_handler(Arc::new(
+        self.get_config().write().await.set_error_hook(Arc::new(
             move |ctx: Context, error: PanicInfo| {
                 Box::pin(func(ctx, error)) as PinBoxFutureSendStatic
             },
@@ -226,18 +226,18 @@ impl Server {
 
     async fn init_panic_hook(&self) {
         let config: RwLockReadGuardServerConfig<'_> = self.get_config().read().await;
-        let error_handler: ArcErrorHandlerSendSync = config.get_error_handler().clone();
+        let error_hook: ArcErrorHandlerSendSync = config.get_error_hook().clone();
 
         let panic_hook: &'static PanicHook = panic_hook();
-        panic_hook.set_error_handler(error_handler);
+        panic_hook.set_error_hook(error_hook);
         panic_hook.initialize_once();
     }
 
     async fn handle_panic_with_context(&self, panic_info: PanicInfo, ctx: Context) {
-        let error_handler: ArcErrorHandlerSendSync =
-            self.get_config().read().await.get_error_handler().clone();
+        let error_hook: ArcErrorHandlerSendSync =
+            self.get_config().read().await.get_error_hook().clone();
         tokio::spawn(async move {
-            let handler_func = error_handler.as_ref();
+            let handler_func = error_hook.as_ref();
             handler_func(ctx, panic_info).await;
         });
     }

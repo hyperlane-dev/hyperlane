@@ -2,20 +2,6 @@ use crate::*;
 
 #[tokio::test]
 async fn test_server() {
-    async fn error_handler(ctx: Context, error: PanicInfo) {
-        eprintln!("{:?}", ctx);
-        let _ = ctx
-            .set_response_body(format!(
-                "{}\n{}",
-                error.to_string(),
-                ctx.get_request_string().await
-            ))
-            .await
-            .send()
-            .await;
-        let _ = Write::flush(&mut io::stderr());
-    }
-
     async fn on_ws_connected(ctx: Context) {
         let _ = ctx.set_response_body("connected").await.send_body().await;
     }
@@ -90,7 +76,7 @@ async fn test_server() {
         server.disable_linger().await;
         server.http_buffer_size(4096).await;
         server.ws_buffer_size(4096).await;
-        server.error_handler(error_handler).await;
+        server.error_hook(default_error_hook).await;
         server.on_ws_connected(on_ws_connected).await;
         server.pre_ws_upgrade(request_middleware).await;
         server.request_middleware(request_middleware).await;
