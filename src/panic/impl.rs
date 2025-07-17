@@ -16,8 +16,8 @@ impl PanicHook {
     }
 
     pub(crate) fn set_error_hook(&self, handler: ArcErrorHandlerSendSync) {
-        let boxed_handler: Box<ArcErrorHandlerSendSync> = Box::new(handler);
-        let handler_ptr: *mut ArcErrorHandlerSendSync = Box::into_raw(boxed_handler);
+        let boxed_hook: Box<ArcErrorHandlerSendSync> = Box::new(handler);
+        let handler_ptr: *mut ArcErrorHandlerSendSync = Box::into_raw(boxed_hook);
         let old_ptr: *mut ArcErrorHandlerSendSync =
             self.get_error_hook().swap(handler_ptr, Ordering::AcqRel);
         if !old_ptr.is_null() {
@@ -55,7 +55,7 @@ impl PanicHook {
         let handler_ptr: *mut ArcErrorHandlerSendSync =
             self.get_error_hook().load(Ordering::Acquire);
         if handler_ptr.is_null() {
-            self.default_panic_handler(panic_info);
+            self.default_panic_hook(panic_info);
             return;
         }
         let handler: &ArcErrorHandlerSendSync = unsafe { &*handler_ptr };
@@ -67,7 +67,7 @@ impl PanicHook {
         });
     }
 
-    fn default_panic_handler(&self, panic_info: &PanicHookInfo<'_>) {
+    fn default_panic_hook(&self, panic_info: &PanicHookInfo<'_>) {
         let message: String = if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
             s.to_string()
         } else if let Some(s) = panic_info.payload().downcast_ref::<String>() {

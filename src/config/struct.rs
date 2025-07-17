@@ -33,11 +33,11 @@ pub(crate) struct ServerConfig {
     #[set(skip)]
     #[get(pub(crate))]
     #[get_mut(pub(crate))]
-    pub(super) disable_http_handler: HashSetXxHash3_64<String>,
+    pub(super) disable_http_hook: HashSetXxHash3_64<String>,
     #[get(pub(crate))]
     #[get_mut(pub(crate))]
     #[set(skip)]
-    pub(super) disable_ws_handler: HashSetXxHash3_64<String>,
+    pub(super) disable_ws_hook: HashSetXxHash3_64<String>,
     #[get(pub(crate))]
     #[get_mut(pub(crate))]
     #[set(skip)]

@@ -1,21 +1,20 @@
 mod config;
 mod context;
 mod error;
-mod handler;
+mod hook;
 mod lifecycle;
-mod panic_hook;
-mod request_tracker;
+mod panic;
 mod route;
 mod server;
-mod tests;
+mod tracker;
 mod utils;
 
 pub use context::*;
 pub use error::*;
-pub use handler::*;
-pub use request_tracker::*;
+pub use hook::*;
 pub use route::*;
 pub use server::*;
+pub use tracker::*;
 
 pub use http_type::*;
 
@@ -23,7 +22,7 @@ pub use std::io::{self, Write};
 
 pub(crate) use config::*;
 pub(crate) use lifecycle::*;
-pub(crate) use panic_hook::*;
+pub(crate) use panic::*;
 
 pub(crate) use core::hash::BuildHasherDefault;
 pub(crate) use std::{

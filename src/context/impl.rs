@@ -99,7 +99,7 @@ impl Context {
             .map(|socket_addr: SocketAddr| socket_addr.port())
     }
 
-    async fn internal_send_handler(&self, upgrade_ws: bool) -> ResponseResult {
+    async fn internal_send_hook(&self, upgrade_ws: bool) -> ResponseResult {
         if self.get_closed().await {
             return Err(ResponseError::ConnectionClosed);
         }
@@ -117,7 +117,7 @@ impl Context {
     }
 
     pub async fn send(&self) -> ResponseResult {
-        self.internal_send_handler(false).await
+        self.internal_send_hook(false).await
     }
 
     pub async fn send_once(&self) -> ResponseResult {
@@ -466,7 +466,7 @@ impl Context {
                 .await
                 .set_response_header(SEC_WEBSOCKET_ACCEPT, accept_key)
                 .await
-                .internal_send_handler(true)
+                .internal_send_hook(true)
                 .await;
         }
         Err(ResponseError::WebSocketHandShake(format!(

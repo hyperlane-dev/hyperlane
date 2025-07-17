@@ -26,11 +26,11 @@ async fn test_duplicate_route() {
 }
 
 #[tokio::test]
-async fn test_disable_http_handler_empty_route() {
+async fn test_disable_http_hook_empty_route() {
     assert_panic_message_contains(
         || async {
             let server: Server = Server::new();
-            server.disable_http_handler("").await;
+            server.disable_http_hook("").await;
         },
         "Route pattern cannot be empty",
     )
@@ -38,12 +38,12 @@ async fn test_disable_http_handler_empty_route() {
 }
 
 #[tokio::test]
-async fn test_disable_http_handler_duplicate_route() {
+async fn test_disable_http_hook_duplicate_route() {
     assert_panic_message_contains(
         || async {
             let server: Server = Server::new();
-            server.disable_http_handler("/").await;
-            server.disable_http_handler("/").await;
+            server.disable_http_hook("/").await;
+            server.disable_http_hook("/").await;
         },
         "Route pattern already exists: /",
     )
@@ -51,11 +51,11 @@ async fn test_disable_http_handler_duplicate_route() {
 }
 
 #[tokio::test]
-async fn test_disable_ws_handler_empty_route() {
+async fn test_disable_ws_hook_empty_route() {
     assert_panic_message_contains(
         || async {
             let server: Server = Server::new();
-            server.disable_ws_handler("").await;
+            server.disable_ws_hook("").await;
         },
         "Route pattern cannot be empty",
     )
@@ -63,12 +63,12 @@ async fn test_disable_ws_handler_empty_route() {
 }
 
 #[tokio::test]
-async fn test_disable_ws_handler_duplicate_route() {
+async fn test_disable_ws_hook_duplicate_route() {
     assert_panic_message_contains(
         || async {
             let server: Server = Server::new();
-            server.disable_ws_handler("/").await;
-            server.disable_ws_handler("/").await;
+            server.disable_ws_hook("/").await;
+            server.disable_ws_hook("/").await;
         },
         "Route pattern already exists: /",
     )

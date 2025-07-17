@@ -82,50 +82,50 @@ impl Server {
         self
     }
 
-    pub async fn enable_http_handler<'a, R>(&self, route: R) -> &Self
+    pub async fn enable_http_hook<'a, R>(&self, route: R) -> &Self
     where
         R: ToString,
     {
         self.get_config()
             .write()
             .await
-            .enable_http_handler(route.to_string())
+            .enable_http_hook(route.to_string())
             .await;
         self
     }
 
-    pub async fn disable_http_handler<'a, R>(&self, route: R) -> &Self
+    pub async fn disable_http_hook<'a, R>(&self, route: R) -> &Self
     where
         R: ToString,
     {
         self.get_config()
             .write()
             .await
-            .disable_http_handler(route.to_string())
+            .disable_http_hook(route.to_string())
             .await;
         self
     }
 
-    pub async fn enable_ws_handler<'a, R>(&self, route: R) -> &Self
+    pub async fn enable_ws_hook<'a, R>(&self, route: R) -> &Self
     where
         R: ToString,
     {
         self.get_config()
             .write()
             .await
-            .enable_ws_handler(route.to_string())
+            .enable_ws_hook(route.to_string())
             .await;
         self
     }
 
-    pub async fn disable_ws_handler<'a, R>(&self, route: R) -> &Self
+    pub async fn disable_ws_hook<'a, R>(&self, route: R) -> &Self
     where
         R: ToString,
     {
         self.get_config()
             .write()
             .await
-            .disable_ws_handler(route.to_string())
+            .disable_ws_hook(route.to_string())
             .await;
         self
     }
@@ -291,10 +291,10 @@ impl Server {
                 let handler: HandlerState = HandlerState::new(&stream);
                 match is_ws {
                     true => {
-                        server.ws_handler(&handler, &mut request).await;
+                        server.ws_hook(&handler, &mut request).await;
                     }
                     false => {
-                        server.http_handler(&handler, &request).await;
+                        server.http_hook(&handler, &request).await;
                     }
                 };
             });
@@ -346,7 +346,7 @@ impl Server {
         }
     }
 
-    async fn run_route_handler(
+    async fn run_route_hook(
         &self,
         ctx: &Context,
         handler: &OptionArcFnPinBoxSendSync,
@@ -389,13 +389,13 @@ impl Server {
         }
     }
 
-    async fn request_handler<'a>(&self, state: &HandlerState<'a>, request: &Request) -> bool {
+    async fn request_hook<'a>(&self, state: &HandlerState<'a>, request: &Request) -> bool {
         let stream: &ArcRwLockStream = state.stream;
         let route: &str = request.get_path();
         let ctx: Context = Context::create_context(stream, request);
         with_context(ctx.clone(), async {
             let mut lifecycle: Lifecycle = Lifecycle::Continue(request.is_enable_keep_alive());
-            let route_handler: OptionArcFnPinBoxSendSync = self
+            let route_hook: OptionArcFnPinBoxSendSync = self
                 .route_matcher
                 .read()
                 .await
@@ -405,8 +405,7 @@ impl Server {
             if let Lifecycle::Abort(request_keepalive) = lifecycle {
                 return request_keepalive;
             }
-            self.run_route_handler(&ctx, &route_handler, &mut lifecycle)
-                .await;
+            self.run_route_hook(&ctx, &route_hook, &mut lifecycle).await;
             if let Lifecycle::Abort(request_keepalive) = lifecycle {
                 return request_keepalive;
             }
@@ -421,7 +420,7 @@ impl Server {
         .await
     }
 
-    async fn ws_handler<'a>(&self, state: &HandlerState<'a>, first_request: &mut Request) {
+    async fn ws_hook<'a>(&self, state: &HandlerState<'a>, first_request: &mut Request) {
         let route: String = first_request.get_path().to_string();
         let stream: &ArcRwLockStream = state.stream;
         let ctx: Context = Context::create_context(stream, first_request);
@@ -448,38 +447,38 @@ impl Server {
             }
             let config: RwLockReadGuardServerConfig<'_> = self_ref.get_config().read().await;
             let buffer_size: usize = *config.get_ws_buffer_size();
-            let contains_disable_ws_handler: bool =
-                config.contains_disable_ws_handler(&route_clone).await;
+            let contains_disable_ws_hook: bool =
+                config.contains_disable_ws_hook(&route_clone).await;
             drop(config);
-            if contains_disable_ws_handler {
-                while self_ref.request_handler(state, first_request).await {}
+            if contains_disable_ws_hook {
+                while self_ref.request_hook(state, first_request).await {}
                 return;
             }
             while let Ok(request) =
                 Request::ws_from_stream(stream, buffer_size, first_request).await
             {
-                let _ = self_ref.request_handler(state, &request).await;
+                let _ = self_ref.request_hook(state, &request).await;
             }
         })
         .await
     }
 
-    async fn http_handler<'a>(&self, state: &HandlerState<'a>, first_request: &Request) {
-        let handle_result: bool = self.request_handler(state, first_request).await;
+    async fn http_hook<'a>(&self, state: &HandlerState<'a>, first_request: &Request) {
+        let handle_result: bool = self.request_hook(state, first_request).await;
         if !handle_result {
             return;
         }
         let stream: &ArcRwLockStream = state.stream;
         let route: &String = first_request.get_path();
         let config: RwLockReadGuardServerConfig<'_> = self.get_config().read().await;
-        let contains_disable_http_handler: bool = config.contains_disable_http_handler(route).await;
+        let contains_disable_http_hook: bool = config.contains_disable_http_hook(route).await;
         let buffer_size: usize = *config.get_http_buffer_size();
-        if contains_disable_http_handler {
-            while self.request_handler(state, first_request).await {}
+        if contains_disable_http_hook {
+            while self.request_hook(state, first_request).await {}
             return;
         }
         while let Ok(request) = Request::http_from_stream(stream, buffer_size).await {
-            let handle_result: bool = self.request_handler(state, &request).await;
+            let handle_result: bool = self.request_hook(state, &request).await;
             if !handle_result {
                 return;
             }

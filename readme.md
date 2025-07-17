@@ -40,11 +40,6 @@ git clone https://github.com/eastspire/hyperlane-quick-start.git
 ```rust
 use hyperlane::*;
 
-async fn error_hook(error: PanicInfo) {
-    eprintln!("{}", error.to_owned());
-    let _ = Write::flush(&mut io::stderr());
-}
-
 async fn on_ws_connected(ctx: Context) {
     let _ = ctx.set_response_body("connected").await.send_body().await;
 }
