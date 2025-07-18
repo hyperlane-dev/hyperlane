@@ -284,14 +284,17 @@ impl Server {
                 let is_ws: bool = request.is_ws();
                 let ctx: Context = Context::create_context(&stream, &request);
                 let handler: HandlerState = HandlerState::new(&stream, &ctx);
-                match is_ws {
-                    true => {
-                        server.ws_hook(&handler, &mut request).await;
-                    }
-                    false => {
-                        server.http_hook(&handler, &request).await;
-                    }
-                };
+                with_context(ctx.clone(), async move {
+                    match is_ws {
+                        true => {
+                            server.ws_hook(&handler, &mut request).await;
+                        }
+                        false => {
+                            server.http_hook(&handler, &request).await;
+                        }
+                    };
+                })
+                .await;
             });
         }
         Ok(())
@@ -413,66 +416,60 @@ impl Server {
             .await
             .resolve_route(ctx, &route)
             .await;
-        with_context(ctx.clone(), async move {
-            server.run_pre_upgrade_hook(ctx, &mut lifecycle).await;
-            if lifecycle.is_abort() {
-                return;
-            }
-            if ctx.upgrade_to_ws().await.is_err() {
-                return;
-            }
-            server.run_connected_hook(ctx, &mut lifecycle).await;
-            if lifecycle.is_abort() {
-                return;
-            }
-            let config: RwLockReadGuardServerConfig<'_> = server.get_config().read().await;
-            let buffer: usize = *config.get_ws_buffer();
-            let contains_disable_ws_hook: bool = config.contains_disable_ws_hook(&route).await;
-            drop(config);
-            if contains_disable_ws_hook {
-                while server.request_hook(state, first_request).await {}
-                return;
-            }
-            while let Ok(request) = Request::ws_from_stream(stream, buffer, first_request)
-                .await
-                .as_ref()
-            {
-                let _ = server.request_hook(state, request).await;
-            }
-        })
-        .await
+        server.run_pre_upgrade_hook(ctx, &mut lifecycle).await;
+        if lifecycle.is_abort() {
+            return;
+        }
+        if ctx.upgrade_to_ws().await.is_err() {
+            return;
+        }
+        server.run_connected_hook(ctx, &mut lifecycle).await;
+        if lifecycle.is_abort() {
+            return;
+        }
+        let config: RwLockReadGuardServerConfig<'_> = server.get_config().read().await;
+        let buffer: usize = *config.get_ws_buffer();
+        let contains_disable_ws_hook: bool = config.contains_disable_ws_hook(&route).await;
+        drop(config);
+        if contains_disable_ws_hook {
+            while server.request_hook(state, first_request).await {}
+            return;
+        }
+        while let Ok(request) = Request::ws_from_stream(stream, buffer, first_request)
+            .await
+            .as_ref()
+        {
+            let _ = server.request_hook(state, request).await;
+        }
     }
 
     async fn http_hook<'a>(&self, state: &HandlerState<'a>, first_request: &Request) {
         let stream: &ArcRwLockStream = state.stream;
         let ctx: &Context = &state.ctx;
         let server: &Server = self;
-        with_context(ctx.clone(), async move {
-            let mut lifecycle: Lifecycle = Lifecycle::Continue(true);
-            server.run_connected_hook(ctx, &mut lifecycle).await;
-            if lifecycle.is_abort() {
-                return;
-            }
-            let handle_result: bool = server.request_hook(state, first_request).await;
+        let mut lifecycle: Lifecycle = Lifecycle::Continue(true);
+        server.run_connected_hook(ctx, &mut lifecycle).await;
+        if lifecycle.is_abort() {
+            return;
+        }
+        let handle_result: bool = server.request_hook(state, first_request).await;
+        if !handle_result {
+            return;
+        }
+        let route: &String = first_request.get_path();
+        let config: RwLockReadGuardServerConfig<'_> = server.get_config().read().await;
+        let contains_disable_http_hook: bool = config.contains_disable_http_hook(route).await;
+        let buffer: usize = *config.get_http_buffer();
+        drop(config);
+        if contains_disable_http_hook {
+            while server.request_hook(state, first_request).await {}
+            return;
+        }
+        while let Ok(request) = Request::http_from_stream(stream, buffer).await.as_ref() {
+            let handle_result: bool = server.request_hook(state, request).await;
             if !handle_result {
                 return;
             }
-            let route: &String = first_request.get_path();
-            let config: RwLockReadGuardServerConfig<'_> = server.get_config().read().await;
-            let contains_disable_http_hook: bool = config.contains_disable_http_hook(route).await;
-            let buffer: usize = *config.get_http_buffer();
-            drop(config);
-            if contains_disable_http_hook {
-                while server.request_hook(state, first_request).await {}
-                return;
-            }
-            while let Ok(request) = Request::http_from_stream(stream, buffer).await.as_ref() {
-                let handle_result: bool = server.request_hook(state, request).await;
-                if !handle_result {
-                    return;
-                }
-            }
-        })
-        .await
+        }
     }
 }
