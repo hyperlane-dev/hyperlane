@@ -230,7 +230,7 @@ impl Server {
     async fn handle_panic_with_context(&self, panic_info: PanicInfo, ctx: Context) {
         let error_hook: ArcErrorHandlerSendSync =
             self.get_config().read().await.get_error_hook().clone();
-        tokio::task::spawn(async move {
+        tokio::spawn(async move {
             let _ = ctx.set_panic_info(panic_info).await;
             error_hook(ctx).await;
         });
@@ -257,7 +257,7 @@ impl Server {
     ) where
         F: Fn(Context) -> PinBoxFutureSendStatic,
     {
-        let result: Result<(), JoinError> = task::spawn(hook_func(ctx.clone())).await;
+        let result: Result<(), JoinError> = tokio::spawn(hook_func(ctx.clone())).await;
         ctx.should_abort(lifecycle).await;
         if let Err(join_error) = result {
             if join_error.is_panic() {
@@ -291,7 +291,7 @@ impl Server {
             }
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
             let server: Server = self.clone();
-            tokio::task::spawn(async move {
+            tokio::spawn(async move {
                 let request_result: RequestReaderHandleResult =
                     Request::http_from_stream(&stream, http_buffer).await;
                 if request_result.is_err() {

@@ -51,7 +51,7 @@ pub(crate) use serde::de::DeserializeOwned;
 pub(crate) use tokio::{
     net::TcpListener,
     sync::{RwLockReadGuard, RwLockWriteGuard},
-    task::{self, JoinError},
+    task::JoinError,
 };
 
 #[cfg(test)]
