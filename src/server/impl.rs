@@ -249,6 +249,23 @@ impl Server {
         self.handle_panic_with_context(panic_info, ctx).await;
     }
 
+    async fn run_hook_with_lifecycle<F>(
+        &self,
+        ctx: &Context,
+        lifecycle: &mut Lifecycle,
+        hook_func: F,
+    ) where
+        F: Fn(Context) -> PinBoxFutureSendStatic,
+    {
+        let result: Result<(), JoinError> = task::spawn(hook_func(ctx.clone())).await;
+        ctx.should_abort(lifecycle).await;
+        if let Err(join_error) = result {
+            if join_error.is_panic() {
+                self.handle_task_panic(join_error, ctx.clone()).await;
+            }
+        }
+    }
+
     async fn init(&self) {
         self.init_panic_hook().await;
     }
@@ -304,13 +321,9 @@ impl Server {
         let middleware_guard: RwLockReadGuardVecArcFnPinBoxSendSync =
             self.pre_upgrade_hook.read().await;
         for pre_upgrade_hook in middleware_guard.iter() {
-            let result: Result<(), JoinError> = task::spawn(pre_upgrade_hook(ctx.clone())).await;
-            ctx.should_abort(lifecycle).await;
-            if let Err(join_error) = result {
-                if join_error.is_panic() {
-                    self.handle_task_panic(join_error, ctx.clone()).await;
-                }
-            }
+            let hook_clone: ArcFnPinBoxSendSync = pre_upgrade_hook.clone();
+            self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| hook_clone(ctx))
+                .await;
         }
     }
 
@@ -318,13 +331,9 @@ impl Server {
         let middleware_guard: RwLockReadGuardVecArcFnPinBoxSendSync =
             self.connected_hook.read().await;
         for connected_hook in middleware_guard.iter() {
-            let result: Result<(), JoinError> = task::spawn(connected_hook(ctx.clone())).await;
-            ctx.should_abort(lifecycle).await;
-            if let Err(join_error) = result {
-                if join_error.is_panic() {
-                    self.handle_task_panic(join_error, ctx.clone()).await;
-                }
-            }
+            let hook_clone: ArcFnPinBoxSendSync = connected_hook.clone();
+            self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| hook_clone(ctx))
+                .await;
         }
     }
 
@@ -332,14 +341,9 @@ impl Server {
         let middleware_guard: RwLockReadGuardVecArcFnPinBoxSendSync =
             self.request_middleware.read().await;
         for middleware in middleware_guard.iter() {
-            let ctx_clone: Context = ctx.clone();
-            let result: Result<(), JoinError> = task::spawn(middleware(ctx_clone)).await;
-            ctx.should_abort(lifecycle).await;
-            if let Err(join_error) = result {
-                if join_error.is_panic() {
-                    self.handle_task_panic(join_error, ctx.clone()).await;
-                }
-            }
+            let middleware_clone: ArcFnPinBoxSendSync = middleware.clone();
+            self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| middleware_clone(ctx))
+                .await;
         }
     }
 
@@ -350,14 +354,9 @@ impl Server {
         lifecycle: &mut Lifecycle,
     ) {
         if let Some(func) = handler {
-            let ctx_clone: Context = ctx.clone();
-            let result: Result<(), JoinError> = task::spawn(func(ctx_clone)).await;
-            ctx.should_abort(lifecycle).await;
-            if let Err(join_error) = result {
-                if join_error.is_panic() {
-                    self.handle_task_panic(join_error, ctx.clone()).await;
-                }
-            }
+            let func_clone: ArcFnPinBoxSendSync = func.clone();
+            self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| func_clone(ctx))
+                .await;
         }
     }
 
@@ -365,14 +364,9 @@ impl Server {
         let middleware_guard: RwLockReadGuardVecArcFnPinBoxSendSync =
             self.response_middleware.read().await;
         for middleware in middleware_guard.iter() {
-            let ctx_clone: Context = ctx.clone();
-            let result: Result<(), JoinError> = task::spawn(middleware(ctx_clone)).await;
-            ctx.should_abort(lifecycle).await;
-            if let Err(join_error) = result {
-                if join_error.is_panic() {
-                    self.handle_task_panic(join_error, ctx.clone()).await;
-                }
-            }
+            let middleware_clone: ArcFnPinBoxSendSync = middleware.clone();
+            self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| middleware_clone(ctx))
+                .await;
         }
     }
 
