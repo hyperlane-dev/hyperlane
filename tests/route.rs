@@ -1,10 +1,13 @@
-#[cfg(test)]
-use crate::*;
+use hyperlane::{
+    tokio::task::{JoinError, JoinHandle},
+    *,
+};
+use std::any::Any;
 
 #[cfg(test)]
-pub(crate) async fn assert_panic_message_contains<F, Fut>(future_factory: F, expected_msg: &str)
+async fn assert_panic_message_contains<F, Fut>(future_factory: F, expected_msg: &str)
 where
-    F: FnOnce() -> Fut + Send + 'static,
+    F: Fn() -> Fut + Send + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
     let handle: JoinHandle<()> = tokio::spawn(future_factory());
@@ -31,4 +34,28 @@ where
         expected_msg,
         panic_msg
     );
+}
+
+#[tokio::test]
+async fn test_empty_route() {
+    assert_panic_message_contains(
+        || async {
+            let _server: ServerBuilder = ServerBuilder::new().route(EMPTY_STR, |_| async move {});
+        },
+        &RouteError::EmptyPattern.to_string(),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn test_duplicate_route() {
+    assert_panic_message_contains(
+        || async {
+            let _server: ServerBuilder = ServerBuilder::new()
+                .route(ROOT_PATH, |_| async move {})
+                .route(ROOT_PATH, |_| async move {});
+        },
+        &RouteError::DuplicatePattern(ROOT_PATH.to_string()).to_string(),
+    )
+    .await;
 }

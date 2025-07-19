@@ -7,8 +7,6 @@ mod lifecycle;
 mod panic;
 mod route;
 mod server;
-mod tests;
-mod utils;
 
 pub use context::*;
 pub use error::*;
@@ -50,12 +48,3 @@ pub(crate) use tokio::{
     sync::{RwLockReadGuard, RwLockWriteGuard},
     task::JoinError,
 };
-
-#[cfg(test)]
-pub(crate) use utils::*;
-
-#[cfg(test)]
-pub(crate) use std::any::Any;
-
-#[cfg(test)]
-pub(crate) use tokio::task::JoinHandle;

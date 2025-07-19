@@ -82,7 +82,7 @@ pub struct ServerInner {
 }
 
 #[derive(Clone, CustomDebug)]
-pub struct Server(pub(super) Arc<ServerInner>);
+pub struct Server(pub(super) ArcServerInner);
 
 #[derive(Clone, CustomDebug)]
 pub(crate) struct HandlerState<'a> {

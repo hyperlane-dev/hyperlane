@@ -9,7 +9,7 @@ pub enum ServerError {
 }
 
 #[derive(CustomDebug, DisplayDebug)]
-pub(crate) enum RouteError {
+pub enum RouteError {
     EmptyPattern,
     DuplicatePattern(String),
     InvalidRegexPattern(String),
