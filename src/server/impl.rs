@@ -311,8 +311,7 @@ impl Server {
 
     pub async fn run(&self) -> ServerResult {
         self.init();
-        let server_guard = self.get_read().await;
-        let config: &ServerConfig = server_guard.get_config();
+        let config: ServerConfig = self.get_read().await.get_config().clone();
         let host: &str = config.get_host();
         let port: usize = *config.get_port();
         let nodelay_opt: Option<bool> = *config.get_nodelay();
@@ -351,33 +350,21 @@ impl Server {
     }
 
     async fn run_pre_upgrade_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
-        let pre_upgrade_hooks = {
-            let server_guard = self.get_read().await;
-            server_guard.get_pre_upgrade_hook().clone()
-        };
-        for pre_upgrade in pre_upgrade_hooks.iter() {
+        for pre_upgrade in self.get_read().await.get_pre_upgrade_hook().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| pre_upgrade(ctx))
                 .await;
         }
     }
 
     async fn run_connected_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
-        let connected_hooks = {
-            let server_guard = self.get_read().await;
-            server_guard.get_connected_hook().clone()
-        };
-        for connected in connected_hooks.iter() {
+        for connected in self.get_read().await.get_connected_hook().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| connected(ctx))
                 .await;
         }
     }
 
     async fn run_request_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
-        let request_middleware = {
-            let server_guard = self.get_read().await;
-            server_guard.get_request_middleware().clone()
-        };
-        for middleware in request_middleware.iter() {
+        for middleware in self.get_read().await.get_request_middleware().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| middleware(ctx))
                 .await;
         }
@@ -396,11 +383,7 @@ impl Server {
     }
 
     async fn run_response_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
-        let response_middleware = {
-            let server_guard = self.get_read().await;
-            server_guard.get_response_middleware().clone()
-        };
-        for middleware in response_middleware.iter() {
+        for middleware in self.get_read().await.get_response_middleware().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| middleware(ctx))
                 .await;
         }
@@ -411,13 +394,12 @@ impl Server {
         let ctx: &Context = state.ctx;
         ctx.set_request(request).await;
         let mut lifecycle: Lifecycle = Lifecycle::Continue(request.is_enable_keep_alive());
-        let route_hook: OptionArcFnPinBoxSendSync = {
-            let server_guard = self.get_read().await;
-            server_guard
-                .get_route_matcher()
-                .resolve_route(&ctx, route)
-                .await
-        };
+        let route_hook: OptionArcFnPinBoxSendSync = self
+            .get_read()
+            .await
+            .get_route_matcher()
+            .resolve_route(&ctx, route)
+            .await;
         self.run_request_middleware(&ctx, &mut lifecycle).await;
         if let Lifecycle::Abort(request_keepalive) = lifecycle {
             return request_keepalive;
@@ -439,13 +421,11 @@ impl Server {
         let route: &String = first_request.get_path();
         let ctx: &Context = state.ctx;
         let mut lifecycle: Lifecycle = Lifecycle::Continue(true);
-        {
-            let server_guard = self.get_read().await;
-            server_guard
-                .get_route_matcher()
-                .resolve_route(ctx, &route)
-                .await;
-        }
+        self.get_read()
+            .await
+            .get_route_matcher()
+            .resolve_route(ctx, &route)
+            .await;
         self.run_pre_upgrade_hook(ctx, &mut lifecycle).await;
         if lifecycle.is_abort() {
             return;
@@ -458,7 +438,7 @@ impl Server {
             return;
         }
         let (disable_ws_hook_contains, buffer) = {
-            let server_guard = self.get_read().await;
+            let server_guard: RwLockReadGuardServerInner = self.get_read().await;
             (
                 server_guard.get_disable_ws_hook().contains(route),
                 *server_guard.get_config().get_ws_buffer(),
@@ -489,7 +469,7 @@ impl Server {
         }
         let route: &String = first_request.get_path();
         let (contains_disable_http_hook, buffer) = {
-            let server_guard = self.get_read().await;
+            let server_guard: RwLockReadGuardServerInner = self.get_read().await;
             (
                 server_guard.get_disable_http_hook().contains(route),
                 *server_guard.get_config().get_http_buffer(),
