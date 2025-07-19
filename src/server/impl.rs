@@ -44,7 +44,7 @@ impl ServerBuilder {
     }
 
     pub fn build(self) -> Server {
-        let inner: ServerInner = ServerInner::default()
+        let server: ServerInner = ServerInner::default()
             .set_config(self.get_config().clone())
             .set_route_matcher(self.get_route_matcher().clone())
             .set_request_middleware(self.get_request_middleware().clone())
@@ -55,7 +55,7 @@ impl ServerBuilder {
             .set_disable_ws_hook(self.get_disable_ws_hook().clone())
             .set_error_hook(self.get_error_hook().clone())
             .clone();
-        super::Server(Arc::new(inner))
+        super::Server(Arc::new(server))
     }
 
     pub fn host<T: ToString>(mut self, host: T) -> Self {
@@ -214,7 +214,7 @@ impl ServerBuilder {
 }
 
 impl Server {
-    fn format_host_port(host: &str, port: &usize) -> String {
+    pub fn format_host_port(host: &str, port: &usize) -> String {
         format!("{}{}{}", host, COLON_SPACE_SYMBOL, port)
     }
 

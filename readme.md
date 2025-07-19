@@ -40,8 +40,12 @@ git clone https://github.com/eastspire/hyperlane-quick-start.git
 ```rust
 use hyperlane::*;
 
-async fn ws_connected_hook(ctx: Context) {
-    let _ = ctx.set_response_body("connected").await.send_body().await;
+async fn connected_hook(ctx: Context) {
+    if !ctx.get_request().await.is_ws() {
+        return;
+    }
+    let socket_addr: String = ctx.get_socket_addr_or_default_string().await;
+    let _ = ctx.set_response_body(socket_addr).await.send_body().await;
 }
 
 async fn request_middleware(ctx: Context) {
@@ -106,28 +110,52 @@ async fn dynamic_route(ctx: Context) {
     panic!("Test panic {:?}", param);
 }
 
+async fn error_hook(ctx: Context) {
+    let error: PanicInfo = ctx.get_panic_info().await.unwrap_or_default();
+    let response_body: String = format!(
+        "{}{}{}",
+        error.to_string(),
+        BR,
+        ctx.get_request_string().await
+    );
+    let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+    eprintln!("{}", response_body);
+    let _ = std::io::Write::flush(&mut std::io::stderr());
+    let _ = ctx
+        .set_response_status_code(500)
+        .await
+        .clear_response_headers()
+        .await
+        .set_response_header(CONTENT_TYPE, content_type)
+        .await
+        .set_response_body(response_body)
+        .await
+        .send()
+        .await;
+}
+
 #[tokio::main]
 async fn main() {
-    let server: Server = Server::new();
-    server.host("0.0.0.0").await;
-    server.port(60000).await;
-    server.enable_nodelay().await;
-    server.disable_linger().await;
-    server.http_buffer(4096).await;
-    server.ws_buffer(4096).await;
-    server.error_hook(error_hook).await;
-    server.ws_connected_hook(ws_connected_hook).await;
-    server.pre_upgrade_hook(request_middleware).await;
-    server.request_middleware(request_middleware).await;
-    server.response_middleware(response_middleware).await;
-    server.route("/", root_route).await;
-    server.route("/ws", ws_route).await;
-    server.route("/sse", sse_route).await;
-    server.route("/dynamic/{routing}", dynamic_route).await;
-    server
+    ServerBuilder::new()
+        .host("0.0.0.0")
+        .port(60000)
+        .enable_nodelay()
+        .disable_linger()
+        .http_buffer(4096)
+        .ws_buffer(4096)
+        .error_hook(error_hook)
+        .connected_hook(connected_hook)
+        .pre_upgrade_hook(request_middleware)
+        .request_middleware(request_middleware)
+        .response_middleware(response_middleware)
+        .route("/", root_route)
+        .route("/ws", ws_route)
+        .route("/sse", sse_route)
+        .route("/dynamic/{routing}", dynamic_route)
         .route("/dynamic/routing/{file:^.*$}", dynamic_route)
-        .await;
-    server.run().await.unwrap();
+        .run()
+        .await
+        .unwrap();
 }
 ```
 
