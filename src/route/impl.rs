@@ -37,8 +37,7 @@ impl PartialEq for RoutePattern {
 
 impl RoutePattern {
     pub(crate) fn new(route: &str) -> ResultRoutePatternRouteError {
-        let segments: VecRouteSegment = Self::parse_route(route)?;
-        Ok(Self(segments))
+        Ok(Self(Self::parse_route(route)?))
     }
 
     fn parse_route(route: &str) -> ResultVecRouteSegmentRouteError {

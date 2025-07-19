@@ -6,12 +6,13 @@ impl Context {
     }
 
     pub(crate) fn create_context(stream: &ArcRwLockStream, request: &Request) -> Context {
-        let mut internal_ctx: InnerContext = InnerContext::default();
-        internal_ctx
-            .set_stream(Some(stream.clone()))
-            .set_request(request.clone());
-        let ctx: Context = Context::from_internal_context(internal_ctx);
-        ctx
+        Context::from_internal_context({
+            let mut internal_ctx: InnerContext = InnerContext::default();
+            internal_ctx
+                .set_stream(Some(stream.clone()))
+                .set_request(request.clone());
+            internal_ctx
+        })
     }
 
     async fn read(&self) -> RwLockReadInnerContext {
@@ -63,9 +64,7 @@ impl Context {
         if stream_result.is_none() {
             return None;
         }
-        let socket_addr_opt: OptionSocketAddr =
-            stream_result.unwrap().read().await.peer_addr().ok();
-        socket_addr_opt
+        stream_result.unwrap().read().await.peer_addr().ok()
     }
 
     pub async fn get_socket_addr_or_default(&self) -> SocketAddr {
@@ -73,13 +72,12 @@ impl Context {
         if stream_result.is_none() {
             return DEFAULT_SOCKET_ADDR;
         }
-        let socket_addr: SocketAddr = stream_result
+        stream_result
             .unwrap()
             .read()
             .await
             .peer_addr()
-            .unwrap_or(DEFAULT_SOCKET_ADDR);
-        socket_addr
+            .unwrap_or(DEFAULT_SOCKET_ADDR)
     }
 
     pub async fn get_socket_addr_string(&self) -> OptionString {
@@ -495,11 +493,10 @@ impl Context {
     where
         T: AnySendSyncClone,
     {
-        let attribute_key: AttributeKey = AttributeKey::External(key.to_string());
-        self.write()
-            .await
-            .get_mut_attributes()
-            .insert(attribute_key.to_string(), Arc::new(value));
+        self.write().await.get_mut_attributes().insert(
+            AttributeKey::External(key.to_string()).to_string(),
+            Arc::new(value),
+        );
         self
     }
 
@@ -511,21 +508,19 @@ impl Context {
     where
         T: AnySendSyncClone,
     {
-        let attribute_key: AttributeKey = AttributeKey::External(key.to_string());
         self.read()
             .await
             .get_attributes()
-            .get(&attribute_key.to_string())
+            .get(&AttributeKey::External(key.to_string()).to_string())
             .and_then(|arc| arc.downcast_ref::<T>())
             .cloned()
     }
 
     pub async fn remove_attribute(&self, key: &str) -> &Self {
-        let attribute_key: AttributeKey = AttributeKey::External(key.to_string());
         self.write()
             .await
             .get_mut_attributes()
-            .remove(&attribute_key.to_string());
+            .remove(&AttributeKey::External(key.to_string()).to_string());
         self
     }
 
@@ -533,11 +528,10 @@ impl Context {
     where
         T: AnySendSyncClone,
     {
-        let attribute_key: AttributeKey = AttributeKey::Internal(key);
         self.write()
             .await
             .get_mut_attributes()
-            .insert(attribute_key.to_string(), Arc::new(value));
+            .insert(AttributeKey::Internal(key).to_string(), Arc::new(value));
         self
     }
 
@@ -545,11 +539,10 @@ impl Context {
     where
         T: AnySendSyncClone,
     {
-        let attribute_key: AttributeKey = AttributeKey::Internal(key);
         self.read()
             .await
             .get_attributes()
-            .get(&attribute_key.to_string())
+            .get(&AttributeKey::Internal(key).to_string())
             .and_then(|arc| arc.downcast_ref::<T>())
             .cloned()
     }

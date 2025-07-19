@@ -311,42 +311,42 @@ impl Server {
 
     pub async fn run(&self) -> ServerResult {
         self.init();
-        let config: ServerConfig = self.get_read().await.get_config().clone();
-        let host: &str = config.get_host();
-        let port: usize = *config.get_port();
-        let nodelay_opt: Option<bool> = *config.get_nodelay();
-        let linger_opt: OptionDuration = *config.get_linger();
-        let ttl_opt: OptionU32 = *config.get_ttl();
-        let http_buffer: usize = *config.get_http_buffer();
-        let addr: String = Self::format_host_port(host, &port);
-        let tcp_listener: TcpListener = TcpListener::bind(&addr)
-            .await
-            .map_err(|err| ServerError::TcpBind(err.to_string()))?;
-        while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
-            let _ = stream.set_linger(linger_opt);
-            if let Some(nodelay) = nodelay_opt {
-                let _ = stream.set_nodelay(nodelay);
-            }
-            if let Some(ttl) = ttl_opt {
-                let _ = stream.set_ttl(ttl);
-            }
-            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
-            let server: Server = self.clone();
-            tokio::spawn(async move {
-                let request_result: RequestReaderHandleResult =
-                    Request::http_from_stream(&stream, http_buffer).await;
-                if let Ok(mut request) = request_result {
-                    let ctx: Context = Context::create_context(&stream, &request);
-                    let handler: HandlerState = HandlerState::new(&stream, &ctx);
-                    if request.is_ws() {
-                        server.ws_hook(&handler, &mut request).await;
-                    } else {
-                        server.http_hook(&handler, &request).await;
-                    }
+        sync_block_on(async {
+            let config: ServerConfig = self.get_read().await.get_config().clone();
+            let host: &str = config.get_host();
+            let port: usize = *config.get_port();
+            let nodelay_opt: Option<bool> = *config.get_nodelay();
+            let linger_opt: OptionDuration = *config.get_linger();
+            let ttl_opt: OptionU32 = *config.get_ttl();
+            let http_buffer: usize = *config.get_http_buffer();
+            let addr: String = Self::format_host_port(host, &port);
+            let tcp_listener: TcpListener = TcpListener::bind(&addr)
+                .await
+                .map_err(|err| ServerError::TcpBind(err.to_string()))?;
+            while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
+                let _ = stream.set_linger(linger_opt);
+                if let Some(nodelay) = nodelay_opt {
+                    let _ = stream.set_nodelay(nodelay);
                 }
-            });
-        }
-        Ok(())
+                if let Some(ttl) = ttl_opt {
+                    let _ = stream.set_ttl(ttl);
+                }
+                let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
+                let server: Server = self.clone();
+                tokio::spawn(async move {
+                    if let Ok(mut request) = Request::http_from_stream(&stream, http_buffer).await {
+                        let ctx: Context = Context::create_context(&stream, &request);
+                        let handler: HandlerState = HandlerState::new(&stream, &ctx);
+                        if request.is_ws() {
+                            server.ws_hook(&handler, &mut request).await;
+                        } else {
+                            server.http_hook(&handler, &request).await;
+                        }
+                    }
+                });
+            }
+            Ok(())
+        })
     }
 
     async fn run_pre_upgrade_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
