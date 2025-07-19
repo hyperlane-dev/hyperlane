@@ -244,7 +244,8 @@ impl Server {
         } else {
             EMPTY_STR.to_string()
         };
-        let panic_info: PanicInfo = PanicInfo::new(message, None, EMPTY_STR.to_string());
+        let payload: String = format!("{:?}", panic_payload);
+        let panic_info: PanicInfo = PanicInfo::new(message, None, payload);
         self.handle_panic_with_context(&panic_info, &ctx).await;
     }
 
