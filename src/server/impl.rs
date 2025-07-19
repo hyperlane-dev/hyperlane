@@ -1,6 +1,6 @@
 use crate::*;
 
-impl Default for ServerBuilder {
+impl Default for ServerInner {
     fn default() -> Self {
         Self {
             config: ServerConfig::default(),
@@ -16,92 +16,68 @@ impl Default for ServerBuilder {
     }
 }
 
-impl Default for ServerInner {
-    fn default() -> Self {
-        Self {
-            config: ServerConfig::default(),
-            route_matcher: RouteMatcher::new(),
-            request_middleware: vec![],
-            response_middleware: vec![],
-            pre_upgrade_hook: vec![],
-            connected_hook: vec![],
-            disable_http_hook: hash_set_xx_hash3_64(),
-            disable_ws_hook: hash_set_xx_hash3_64(),
-            error_hook: Arc::new(|_ctx: Context| Box::pin(async {})),
-        }
-    }
-}
-
 impl<'a> HandlerState<'a> {
     fn new(stream: &'a ArcRwLockStream, ctx: &'a Context) -> Self {
         Self { stream, ctx }
     }
 }
 
-impl ServerBuilder {
+impl Server {
     pub fn new() -> Self {
-        Self::default()
+        let server: ServerInner = ServerInner::default();
+        Self(Arc::new(server))
     }
 
-    pub fn build(self) -> Server {
-        let server: ServerInner = ServerInner::default()
-            .set_config(self.get_config().clone())
-            .set_route_matcher(self.get_route_matcher().clone())
-            .set_request_middleware(self.get_request_middleware().clone())
-            .set_response_middleware(self.get_response_middleware().clone())
-            .set_pre_upgrade_hook(self.get_pre_upgrade_hook().clone())
-            .set_connected_hook(self.get_connected_hook().clone())
-            .set_disable_http_hook(self.get_disable_http_hook().clone())
-            .set_disable_ws_hook(self.get_disable_ws_hook().clone())
-            .set_error_hook(self.get_error_hook().clone())
-            .clone();
-        super::Server(Arc::new(server))
+    pub fn host<T: ToString>(self, host: T) -> Self {
+        let mut server: ServerInner = self.get_clone();
+        server.get_mut_config().set_host(host.to_string());
+        Self(Arc::new(server))
     }
 
-    pub fn host<T: ToString>(mut self, host: T) -> Self {
-        self.get_mut_config().set_host(host.to_string());
-        self
+    pub fn port(self, port: usize) -> Self {
+        let mut server: ServerInner = self.get_clone();
+        server.get_mut_config().set_port(port);
+        Self(Arc::new(server))
     }
 
-    pub fn port(mut self, port: usize) -> Self {
-        self.get_mut_config().set_port(port);
-        self
-    }
-
-    pub fn http_buffer(mut self, buffer: usize) -> Self {
+    pub fn http_buffer(self, buffer: usize) -> Self {
         let buffer: usize = if buffer == 0 {
             DEFAULT_BUFFER_SIZE
         } else {
             buffer
         };
-        self.get_mut_config().set_http_buffer(buffer);
-        self
+        let mut server: ServerInner = self.get_clone();
+        server.get_mut_config().set_http_buffer(buffer);
+        Self(Arc::new(server))
     }
 
-    pub fn ws_buffer(mut self, buffer: usize) -> Self {
+    pub fn ws_buffer(self, buffer: usize) -> Self {
         let buffer: usize = if buffer == 0 {
             DEFAULT_BUFFER_SIZE
         } else {
             buffer
         };
-        self.get_mut_config().set_ws_buffer(buffer);
-        self
+        let mut server: ServerInner = self.get_clone();
+        server.get_mut_config().set_ws_buffer(buffer);
+        Self(Arc::new(server))
     }
 
-    pub fn error_hook<F, Fut>(mut self, func: F) -> Self
+    pub fn error_hook<F, Fut>(self, func: F) -> Self
     where
         F: ErrorHandler<Fut>,
         Fut: FutureSendStatic<()>,
     {
-        self.set_error_hook(Arc::new(move |ctx: Context| {
+        let mut server: ServerInner = self.get_clone();
+        server.set_error_hook(Arc::new(move |ctx: Context| {
             Box::pin(func(ctx)) as PinBoxFutureSendStatic
         }));
-        self
+        Self(Arc::new(server))
     }
 
-    pub fn set_nodelay(mut self, nodelay: bool) -> Self {
-        self.get_mut_config().set_nodelay(nodelay);
-        self
+    pub fn set_nodelay(self, nodelay: bool) -> Self {
+        let mut server: ServerInner = self.get_clone();
+        server.get_mut_config().set_nodelay(nodelay);
+        Self(Arc::new(server))
     }
 
     pub fn enable_nodelay(self) -> Self {
@@ -112,9 +88,10 @@ impl ServerBuilder {
         self.set_nodelay(false)
     }
 
-    pub fn set_linger(mut self, linger: OptionDuration) -> Self {
-        self.get_mut_config().set_linger(linger);
-        self
+    pub fn set_linger(self, linger: OptionDuration) -> Self {
+        let mut server: ServerInner = self.get_clone();
+        server.get_mut_config().set_linger(linger);
+        Self(Arc::new(server))
     }
 
     pub fn enable_linger(self, linger: Duration) -> Self {
@@ -125,12 +102,13 @@ impl ServerBuilder {
         self.set_linger(None)
     }
 
-    pub fn set_ttl(mut self, ttl: u32) -> Self {
-        self.get_mut_config().set_ttl(Some(ttl));
-        self
+    pub fn set_ttl(self, ttl: u32) -> Self {
+        let mut server: ServerInner = self.get_clone();
+        server.get_mut_config().set_ttl(Some(ttl));
+        Self(Arc::new(server))
     }
 
-    pub fn route<R, F, Fut>(mut self, route: R, func: F) -> Self
+    pub fn route<R, F, Fut>(self, route: R, func: F) -> Self
     where
         R: ToString,
         F: FnSendSyncStatic<Fut>,
@@ -138,88 +116,100 @@ impl ServerBuilder {
     {
         let route_str: String = route.to_string();
         let arc_func = Arc::new(move |ctx: Context| Box::pin(func(ctx)) as PinBoxFutureSendStatic);
-        self.get_mut_route_matcher()
+        let mut server: ServerInner = self.get_clone();
+        server
+            .get_mut_route_matcher()
             .add(&route_str, arc_func)
             .unwrap_or_else(|err| panic!("{}", err));
-        self
+        Self(Arc::new(server))
     }
 
-    pub fn request_middleware<F, Fut>(mut self, func: F) -> Self
+    pub fn request_middleware<F, Fut>(self, func: F) -> Self
     where
         F: FnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
     {
-        self.get_mut_request_middleware()
+        let mut server: ServerInner = self.get_clone();
+        server
+            .get_mut_request_middleware()
             .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
-        self
+        Self(Arc::new(server))
     }
 
-    pub fn response_middleware<F, Fut>(mut self, func: F) -> Self
+    pub fn response_middleware<F, Fut>(self, func: F) -> Self
     where
         F: FnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
     {
-        self.get_mut_response_middleware()
+        let mut server: ServerInner = self.get_clone();
+        server
+            .get_mut_response_middleware()
             .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
-        self
+        Self(Arc::new(server))
     }
 
-    pub fn pre_upgrade_hook<F, Fut>(mut self, func: F) -> Self
+    pub fn pre_upgrade_hook<F, Fut>(self, func: F) -> Self
     where
         F: FnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
     {
-        self.get_mut_pre_upgrade_hook()
+        let mut server: ServerInner = self.get_clone();
+        server
+            .get_mut_pre_upgrade_hook()
             .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
-        self
+        Self(Arc::new(server))
     }
 
-    pub fn connected_hook<F, Fut>(mut self, func: F) -> Self
+    pub fn connected_hook<F, Fut>(self, func: F) -> Self
     where
         F: FnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
     {
-        self.get_mut_connected_hook()
+        let mut server: ServerInner = self.get_clone();
+        server
+            .get_mut_connected_hook()
             .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
-        self
+        Self(Arc::new(server))
     }
 
-    pub fn enable_http_hook<R: ToString>(mut self, route: R) -> Self {
+    pub fn enable_http_hook<R: ToString>(self, route: R) -> Self {
         let route_string: String = route.to_string();
-        self.get_mut_disable_http_hook().remove(&route_string);
-        self
+        let mut server: ServerInner = self.get_clone();
+        server.get_mut_disable_http_hook().remove(&route_string);
+        Self(Arc::new(server))
     }
 
-    pub fn disable_http_hook<R: ToString>(mut self, route: R) -> Self {
+    pub fn disable_http_hook<R: ToString>(self, route: R) -> Self {
         let route_string: String = route.to_string();
-        self.get_mut_disable_http_hook().insert(route_string);
-        self
+        let mut server: ServerInner = self.get_clone();
+        server.get_mut_disable_http_hook().insert(route_string);
+        Self(Arc::new(server))
     }
 
-    pub fn enable_ws_hook<R: ToString>(mut self, route: R) -> Self {
+    pub fn enable_ws_hook<R: ToString>(self, route: R) -> Self {
         let route_string: String = route.to_string();
-        self.get_mut_disable_ws_hook().remove(&route_string);
-        self
+        let mut server: ServerInner = self.get_clone();
+        server.get_mut_disable_ws_hook().remove(&route_string);
+        Self(Arc::new(server))
     }
 
-    pub fn disable_ws_hook<R: ToString>(mut self, route: R) -> Self {
+    pub fn disable_ws_hook<R: ToString>(self, route: R) -> Self {
         let route_string: String = route.to_string();
-        self.get_mut_disable_ws_hook().insert(route_string);
-        self
+        let mut server: ServerInner = self.get_clone();
+        server.get_mut_disable_ws_hook().insert(route_string);
+        Self(Arc::new(server))
     }
 
-    pub async fn run(self) -> ServerResult {
-        self.build().run().await
-    }
-}
-
-impl Server {
     pub fn format_host_port(host: &str, port: &usize) -> String {
         format!("{}{}{}", host, COLON_SPACE_SYMBOL, port)
     }
 
     fn get(&self) -> &ServerInner {
         &self.0
+    }
+
+    fn get_clone(&self) -> ServerInner {
+        (*self.0).clone()
     }
 
     fn init_panic_hook(&self) {

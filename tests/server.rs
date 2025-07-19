@@ -97,7 +97,7 @@ async fn test_server() {
     }
 
     async fn main() {
-        ServerBuilder::new()
+        Server::new()
             .host("0.0.0.0")
             .port(60000)
             .enable_nodelay()
