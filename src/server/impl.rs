@@ -226,13 +226,10 @@ impl Server {
     }
 
     async fn handle_panic_with_context(&self, ctx: &Context, panic: &Panic) {
-        let error_hook: ArcErrorHandlerSendSync = self.get().get_error_hook().clone();
         let ctx_clone: Context = ctx.clone();
         let panic_clone: Panic = panic.clone();
-        tokio::spawn(async move {
-            let _ = ctx_clone.set_panic(panic_clone).await;
-            error_hook(ctx_clone).await;
-        });
+        let _ = ctx_clone.set_panic(panic_clone).await;
+        self.get().get_error_hook()(ctx_clone).await;
     }
 
     async fn handle_task_panic(&self, ctx: &Context, join_error: JoinError) {
