@@ -177,16 +177,17 @@ impl RouteMatcher {
     pub(crate) fn add(&mut self, pattern: &str, handler: ArcFnPinBoxSendSync) -> ResultAddRoute {
         let route_pattern: RoutePattern = RoutePattern::new(pattern)?;
         if route_pattern.is_static() {
-            if self.static_routes.contains_key(pattern) {
+            if self.get_static_routes().contains_key(pattern) {
                 return Err(RouteError::DuplicatePattern(pattern.to_owned()));
             }
-            self.static_routes.insert(pattern.to_string(), handler);
+            self.get_mut_static_routes()
+                .insert(pattern.to_string(), handler);
             return Ok(());
         }
         let target_vec: &mut VecRoutePatternArcFnPinBoxSendSync = if route_pattern.is_dynamic() {
-            &mut self.dynamic_routes
+            self.get_mut_dynamic_routes()
         } else {
-            &mut self.regex_routes
+            self.get_mut_regex_routes()
         };
         let has_same_pattern: bool = target_vec
             .iter()
@@ -203,17 +204,17 @@ impl RouteMatcher {
         ctx: &Context,
         path: &str,
     ) -> OptionArcFnPinBoxSendSync {
-        if let Some(handler) = self.static_routes.get(path) {
+        if let Some(handler) = self.get_static_routes().get(path) {
             ctx.set_route_params(RouteParams::default()).await;
             return Some(handler.clone());
         }
-        for (pattern, handler) in self.dynamic_routes.iter() {
+        for (pattern, handler) in self.get_dynamic_routes().iter() {
             if let Some(params) = pattern.match_path(path) {
                 ctx.set_route_params(params).await;
                 return Some(handler.clone());
             }
         }
-        for (pattern, handler) in self.regex_routes.iter() {
+        for (pattern, handler) in self.get_regex_routes().iter() {
             if let Some(params) = pattern.match_path(path) {
                 ctx.set_route_params(params).await;
                 return Some(handler.clone());

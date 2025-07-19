@@ -46,7 +46,7 @@ pub struct ServerInner {
 }
 
 #[derive(Clone, Getter, CustomDebug, DisplayDebug)]
-pub struct Server(pub(super) ArcRwLockServerInner);
+pub struct Server(#[get(pub(super))] pub(super) ArcRwLockServerInner);
 
 #[derive(Clone, CustomDebug, DisplayDebug)]
 pub(crate) struct HandlerState<'a> {
