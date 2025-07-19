@@ -36,7 +36,7 @@ impl Server {
         self.get_0().write().await
     }
 
-    pub fn host<T: ToString>(self, host: T) -> Self {
+    pub fn host<T: ToString>(&self, host: T) -> &Self {
         sync_block_on(async {
             self.get_write()
                 .await
@@ -46,14 +46,14 @@ impl Server {
         self
     }
 
-    pub fn port(self, port: usize) -> Self {
+    pub fn port(&self, port: usize) -> &Self {
         sync_block_on(async {
             self.get_write().await.get_mut_config().set_port(port);
         });
         self
     }
 
-    pub fn http_buffer(self, buffer: usize) -> Self {
+    pub fn http_buffer(&self, buffer: usize) -> &Self {
         let buffer: usize = if buffer == 0 {
             DEFAULT_BUFFER_SIZE
         } else {
@@ -68,7 +68,7 @@ impl Server {
         self
     }
 
-    pub fn ws_buffer(self, buffer: usize) -> Self {
+    pub fn ws_buffer(&self, buffer: usize) -> &Self {
         let buffer: usize = if buffer == 0 {
             DEFAULT_BUFFER_SIZE
         } else {
@@ -83,7 +83,7 @@ impl Server {
         self
     }
 
-    pub fn error_hook<F, Fut>(self, func: F) -> Self
+    pub fn error_hook<F, Fut>(&self, func: F) -> &Self
     where
         F: ErrorHandler<Fut>,
         Fut: FutureSendStatic<()>,
@@ -98,7 +98,7 @@ impl Server {
         self
     }
 
-    pub fn set_nodelay(self, nodelay: bool) -> Self {
+    pub fn set_nodelay(&self, nodelay: bool) -> &Self {
         sync_block_on(async {
             self.get_write()
                 .await
@@ -108,37 +108,37 @@ impl Server {
         self
     }
 
-    pub fn enable_nodelay(self) -> Self {
+    pub fn enable_nodelay(&self) -> &Self {
         self.set_nodelay(true)
     }
 
-    pub fn disable_nodelay(self) -> Self {
+    pub fn disable_nodelay(&self) -> &Self {
         self.set_nodelay(false)
     }
 
-    pub fn set_linger(self, linger: OptionDuration) -> Self {
+    pub fn set_linger(&self, linger: OptionDuration) -> &Self {
         sync_block_on(async {
             self.get_write().await.get_mut_config().set_linger(linger);
         });
         self
     }
 
-    pub fn enable_linger(self, linger: Duration) -> Self {
+    pub fn enable_linger(&self, linger: Duration) -> &Self {
         self.set_linger(Some(linger))
     }
 
-    pub fn disable_linger(self) -> Self {
+    pub fn disable_linger(&self) -> &Self {
         self.set_linger(None)
     }
 
-    pub fn set_ttl(self, ttl: u32) -> Self {
+    pub fn set_ttl(&self, ttl: u32) -> &Self {
         sync_block_on(async {
             self.get_write().await.get_mut_config().set_ttl(Some(ttl));
         });
         self
     }
 
-    pub fn route<R, F, Fut>(self, route: R, func: F) -> Self
+    pub fn route<R, F, Fut>(&self, route: R, func: F) -> &Self
     where
         R: ToString,
         F: FnSendSyncStatic<Fut>,
@@ -156,7 +156,7 @@ impl Server {
         self
     }
 
-    pub fn request_middleware<F, Fut>(self, func: F) -> Self
+    pub fn request_middleware<F, Fut>(&self, func: F) -> &Self
     where
         F: FnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
@@ -170,7 +170,7 @@ impl Server {
         self
     }
 
-    pub fn response_middleware<F, Fut>(self, func: F) -> Self
+    pub fn response_middleware<F, Fut>(&self, func: F) -> &Self
     where
         F: FnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
@@ -184,7 +184,7 @@ impl Server {
         self
     }
 
-    pub fn pre_upgrade_hook<F, Fut>(self, func: F) -> Self
+    pub fn pre_upgrade_hook<F, Fut>(&self, func: F) -> &Self
     where
         F: FnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
@@ -198,7 +198,7 @@ impl Server {
         self
     }
 
-    pub fn connected_hook<F, Fut>(self, func: F) -> Self
+    pub fn connected_hook<F, Fut>(&self, func: F) -> &Self
     where
         F: FnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
@@ -212,7 +212,7 @@ impl Server {
         self
     }
 
-    pub fn enable_http_hook<R: ToString>(self, route: R) -> Self {
+    pub fn enable_http_hook<R: ToString>(&self, route: R) -> &Self {
         let route_string: String = route.to_string();
         sync_block_on(async {
             self.get_write()
@@ -223,7 +223,7 @@ impl Server {
         self
     }
 
-    pub fn disable_http_hook<R: ToString>(self, route: R) -> Self {
+    pub fn disable_http_hook<R: ToString>(&self, route: R) -> &Self {
         let route_string: String = route.to_string();
         sync_block_on(async {
             self.get_write()
@@ -234,7 +234,7 @@ impl Server {
         self
     }
 
-    pub fn enable_ws_hook<R: ToString>(self, route: R) -> Self {
+    pub fn enable_ws_hook<R: ToString>(&self, route: R) -> &Self {
         let route_string: String = route.to_string();
         sync_block_on(async {
             self.get_write()
@@ -245,7 +245,7 @@ impl Server {
         self
     }
 
-    pub fn disable_ws_hook<R: ToString>(self, route: R) -> Self {
+    pub fn disable_ws_hook<R: ToString>(&self, route: R) -> &Self {
         let route_string: String = route.to_string();
         sync_block_on(async {
             self.get_write()
