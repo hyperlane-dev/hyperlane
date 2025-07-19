@@ -19,4 +19,4 @@ where
 {
 }
 
-impl<T> FutureSendStatic for T where T: Future<Output = ()> + Send + 'static {}
+impl<T, R> FutureSendStatic<R> for T where T: Future<Output = R> + Send + 'static {}

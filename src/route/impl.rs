@@ -45,11 +45,12 @@ impl RoutePattern {
         if route.is_empty() {
             return Err(RouteError::EmptyPattern);
         }
-        let mut segments: VecRouteSegment = Vec::new();
         let route: &str = route.trim_start_matches(DEFAULT_HTTP_PATH);
         if route.is_empty() {
-            return Ok(segments);
+            return Ok(Vec::new());
         }
+        let estimated_segments: usize = route.matches(DEFAULT_HTTP_PATH).count() + 1;
+        let mut segments: VecRouteSegment = Vec::with_capacity(estimated_segments);
         for segment in route.split(DEFAULT_HTTP_PATH) {
             if segment.starts_with(DYNAMIC_ROUTE_LEFT_BRACKET)
                 && segment.ends_with(DYNAMIC_ROUTE_RIGHT_BRACKET)
@@ -79,14 +80,30 @@ impl RoutePattern {
 
     pub(crate) fn match_path(&self, path: &str) -> OptionRouteParams {
         let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
-        let path_segments: VecStrRef = if path.is_empty() {
-            Vec::new()
-        } else {
-            path.split(DEFAULT_HTTP_PATH).collect()
-        };
         let route_segments_len: usize = self.0.len();
-        let path_segments_len: usize = path_segments.len();
         let is_tail_regex: bool = matches!(self.0.last(), Some(RouteSegment::Regex(_, _)));
+        if path.is_empty() {
+            if route_segments_len == 0 {
+                return Some(hash_map_xx_hash3_64());
+            }
+            return None;
+        }
+        let mut path_segments: VecStrRef = Vec::with_capacity(route_segments_len);
+        let mut segment_start: usize = 0;
+        let path_bytes: &[u8] = path.as_bytes();
+        let path_separator_byte: u8 = b'/';
+        for i in 0..path_bytes.len() {
+            if path_bytes[i] == path_separator_byte {
+                if segment_start < i {
+                    path_segments.push(&path[segment_start..i]);
+                }
+                segment_start = i + 1;
+            }
+        }
+        if segment_start < path.len() {
+            path_segments.push(&path[segment_start..]);
+        }
+        let path_segments_len: usize = path_segments.len();
         if (!is_tail_regex && path_segments_len != route_segments_len)
             || (is_tail_regex && path_segments_len < route_segments_len - 1)
         {
@@ -191,13 +208,13 @@ impl RouteMatcher {
             ctx.set_route_params(RouteParams::default()).await;
             return Some(handler.clone());
         }
-        for (pattern, handler) in &self.dynamic_routes {
+        for (pattern, handler) in self.dynamic_routes.iter() {
             if let Some(params) = pattern.match_path(path) {
                 ctx.set_route_params(params).await;
                 return Some(handler.clone());
             }
         }
-        for (pattern, handler) in &self.regex_routes {
+        for (pattern, handler) in self.regex_routes.iter() {
             if let Some(params) = pattern.match_path(path) {
                 ctx.set_route_params(params).await;
                 return Some(handler.clone());

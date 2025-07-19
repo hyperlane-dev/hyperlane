@@ -91,7 +91,7 @@ impl ServerBuilder {
     pub fn error_hook<F, Fut>(mut self, func: F) -> Self
     where
         F: ErrorHandler<Fut>,
-        Fut: FutureSendStatic,
+        Fut: FutureSendStatic<()>,
     {
         self.set_error_hook(Arc::new(move |ctx: Context| {
             Box::pin(func(ctx)) as PinBoxFutureSendStatic
@@ -134,7 +134,7 @@ impl ServerBuilder {
     where
         R: ToString,
         F: FnSendSyncStatic<Fut>,
-        Fut: FutureSendStatic,
+        Fut: FutureSendStatic<()>,
     {
         let route_str: String = route.to_string();
         let arc_func = Arc::new(move |ctx: Context| Box::pin(func(ctx)) as PinBoxFutureSendStatic);
@@ -147,7 +147,7 @@ impl ServerBuilder {
     pub fn request_middleware<F, Fut>(mut self, func: F) -> Self
     where
         F: FnSendSyncStatic<Fut>,
-        Fut: FutureSendStatic,
+        Fut: FutureSendStatic<()>,
     {
         self.get_mut_request_middleware()
             .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
@@ -157,7 +157,7 @@ impl ServerBuilder {
     pub fn response_middleware<F, Fut>(mut self, func: F) -> Self
     where
         F: FnSendSyncStatic<Fut>,
-        Fut: FutureSendStatic,
+        Fut: FutureSendStatic<()>,
     {
         self.get_mut_response_middleware()
             .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
@@ -167,7 +167,7 @@ impl ServerBuilder {
     pub fn pre_upgrade_hook<F, Fut>(mut self, func: F) -> Self
     where
         F: FnSendSyncStatic<Fut>,
-        Fut: FutureSendStatic,
+        Fut: FutureSendStatic<()>,
     {
         self.get_mut_pre_upgrade_hook()
             .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
@@ -177,7 +177,7 @@ impl ServerBuilder {
     pub fn connected_hook<F, Fut>(mut self, func: F) -> Self
     where
         F: FnSendSyncStatic<Fut>,
-        Fut: FutureSendStatic,
+        Fut: FutureSendStatic<()>,
     {
         self.get_mut_connected_hook()
             .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
@@ -273,13 +273,14 @@ impl Server {
 
     pub async fn run(&self) -> ServerResult {
         self.init();
-        let host: String = self.get().get_config().get_host().clone();
-        let port: usize = *self.get().get_config().get_port();
-        let nodelay: bool = *self.get().get_config().get_nodelay();
-        let linger: OptionDuration = *self.get().get_config().get_linger();
-        let ttl_opt: OptionU32 = *self.get().get_config().get_ttl();
-        let http_buffer: usize = *self.get().get_config().get_http_buffer();
-        let addr: String = Self::format_host_port(&host, &port);
+        let config: &ServerConfig = self.get().get_config();
+        let host: &str = config.get_host();
+        let port: usize = *config.get_port();
+        let nodelay: bool = *config.get_nodelay();
+        let linger: OptionDuration = *config.get_linger();
+        let ttl_opt: OptionU32 = *config.get_ttl();
+        let http_buffer: usize = *config.get_http_buffer();
+        let addr: String = Self::format_host_port(host, &port);
         let tcp_listener: TcpListener = TcpListener::bind(&addr)
             .await
             .map_err(|err| ServerError::TcpBind(err.to_string()))?;
@@ -294,21 +295,15 @@ impl Server {
             tokio::spawn(async move {
                 let request_result: RequestReaderHandleResult =
                     Request::http_from_stream(&stream, http_buffer).await;
-                if request_result.is_err() {
-                    return;
-                }
-                let mut request: Request = request_result.unwrap_or_default();
-                let is_ws: bool = request.is_ws();
-                let ctx: Context = Context::create_context(&stream, &request);
-                let handler: HandlerState = HandlerState::new(&stream, &ctx);
-                match is_ws {
-                    true => {
+                if let Ok(mut request) = request_result {
+                    let ctx: Context = Context::create_context(&stream, &request);
+                    let handler: HandlerState = HandlerState::new(&stream, &ctx);
+                    if request.is_ws() {
                         server.ws_hook(&handler, &mut request).await;
-                    }
-                    false => {
+                    } else {
                         server.http_hook(&handler, &request).await;
                     }
-                };
+                }
             });
         }
         Ok(())

@@ -34,20 +34,20 @@ impl Context {
         self.read().await.get_response().clone()
     }
 
-    pub async fn with_request<F, R>(&self, f: F) -> R
+    pub async fn with_request<F, Fut, R>(&self, func: F) -> R
     where
-        F: FnOnce(&Request) -> R,
+        F: Fn(Request) -> Fut,
+        Fut: FutureSendStatic<R>,
     {
-        let guard = self.0.blocking_read();
-        f(guard.get_request())
+        func(self.read().await.get_request().clone()).await
     }
 
-    pub async fn with_response<F, R>(&self, f: F) -> R
+    pub async fn with_response<F, Fut, R>(&self, func: F) -> R
     where
-        F: FnOnce(&Response) -> R,
+        F: Fn(Response) -> Fut,
+        Fut: FutureSendStatic<R>,
     {
-        let guard = self.0.blocking_read();
-        f(guard.get_response())
+        func(self.read().await.get_response().clone()).await
     }
 
     pub async fn get_request_string(&self) -> String {
@@ -169,19 +169,19 @@ impl Context {
     }
 
     pub async fn get_request_method(&self) -> RequestMethod {
-        self.with_request(|req| req.get_method().clone()).await
+        self.read().await.get_request().get_method().clone()
     }
 
     pub async fn get_request_host(&self) -> RequestHost {
-        self.with_request(|req| req.get_host().clone()).await
+        self.read().await.get_request().get_host().clone()
     }
 
     pub async fn get_request_path(&self) -> RequestPath {
-        self.with_request(|req| req.get_path().clone()).await
+        self.read().await.get_request().get_path().clone()
     }
 
     pub async fn get_request_querys(&self) -> RequestQuerys {
-        self.with_request(|req| req.get_querys().clone()).await
+        self.read().await.get_request().get_querys().clone()
     }
 
     pub async fn get_request_query<T>(&self, key: T) -> OptionRequestQuerysValue

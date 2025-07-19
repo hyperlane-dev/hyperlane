@@ -17,4 +17,4 @@ where
 {
 }
 
-pub trait FutureSendStatic: Future<Output = ()> + Send + 'static {}
+pub trait FutureSendStatic<T>: Future<Output = T> + Send + 'static {}
