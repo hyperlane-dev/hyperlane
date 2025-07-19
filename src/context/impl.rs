@@ -557,7 +557,7 @@ impl Context {
             .await
     }
 
-    pub(crate) async fn get_panic(&self) -> Option<Panic> {
+    pub async fn get_panic(&self) -> OptionPanic {
         self.get_internal_attribute(InternalAttributeKey::Panic)
             .await
     }

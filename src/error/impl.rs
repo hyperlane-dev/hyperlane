@@ -23,7 +23,7 @@ impl Panic {
         }
     }
 
-    fn format_panic_location(location: Option<&Location<'_>>) -> String {
+    fn format_panic_location(location: OptionLocationRef<'_, '_>) -> String {
         location
             .map(|data| {
                 format!(

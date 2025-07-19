@@ -1,7 +1,4 @@
-use hyperlane::{
-    tokio::task::{JoinError, JoinHandle},
-    *,
-};
+use hyperlane::{tokio::task::JoinError, *};
 use std::any::Any;
 
 #[cfg(test)]
@@ -10,8 +7,7 @@ where
     F: Fn() -> Fut + Send + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
-    let handle: JoinHandle<()> = tokio::spawn(future_factory());
-    let result: Result<_, _> = handle.await;
+    let result: ResultJoinError<_> = tokio::spawn(future_factory()).await;
     assert!(
         result.is_err(),
         "Expected panic, but task completed successfully"

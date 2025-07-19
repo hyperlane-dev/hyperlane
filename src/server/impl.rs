@@ -296,7 +296,7 @@ impl Server {
     ) where
         F: Fn(Context) -> PinBoxFutureSendStatic,
     {
-        let result: Result<(), JoinError> = tokio::spawn(hook_func(ctx.clone())).await;
+        let result: ResultJoinError<()> = tokio::spawn(hook_func(ctx.clone())).await;
         ctx.should_abort(lifecycle).await;
         if let Err(join_error) = result {
             if join_error.is_panic() {
@@ -309,7 +309,7 @@ impl Server {
         self.init_panic_hook();
     }
 
-    pub fn run(&self) -> ServerResult {
+    pub fn run(&self) -> ServerResult<()> {
         self.init();
         sync_block_on(async {
             let tcp_listener: TcpListener = self.create_tcp_listener().await?;
@@ -317,7 +317,7 @@ impl Server {
         })
     }
 
-    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {
+    async fn create_tcp_listener(&self) -> ServerResult<TcpListener> {
         let config: ServerConfig = self.get_read().await.get_config().clone();
         let host: &str = config.get_host();
         let port: usize = *config.get_port();
@@ -327,7 +327,7 @@ impl Server {
             .map_err(|err| ServerError::TcpBind(err.to_string()))
     }
 
-    async fn accept_connections(&self, tcp_listener: &TcpListener) -> ServerResult {
+    async fn accept_connections(&self, tcp_listener: &TcpListener) -> ServerResult<()> {
         while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
             self.configure_stream(&stream).await;
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
@@ -338,7 +338,7 @@ impl Server {
 
     async fn configure_stream(&self, stream: &TcpStream) {
         let config: ServerConfig = self.get_read().await.get_config().clone();
-        let nodelay_opt: Option<bool> = *config.get_nodelay();
+        let nodelay_opt: OptionBool = *config.get_nodelay();
         let linger_opt: OptionDuration = *config.get_linger();
         let ttl_opt: OptionU32 = *config.get_ttl();
         let _ = stream.set_linger(linger_opt);
