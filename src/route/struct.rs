@@ -6,9 +6,9 @@ pub(crate) struct RoutePattern(pub(super) VecRouteSegment);
 #[derive(Clone, CustomDebug)]
 pub(crate) struct RouteMatcher {
     #[debug(skip)]
-    pub(super) static_routes: HashMapXxHash3_64<String, ArcFnPinBoxSendSync>,
+    pub(super) static_routes: HashMapStringArcFnPinBoxSendSyncXxHash3_64,
     #[debug(skip)]
-    pub(super) dynamic_routes: Vec<(RoutePattern, ArcFnPinBoxSendSync)>,
+    pub(super) dynamic_routes: VecRoutePatternArcFnPinBoxSendSync,
     #[debug(skip)]
-    pub(super) regex_routes: Vec<(RoutePattern, ArcFnPinBoxSendSync)>,
+    pub(super) regex_routes: VecRoutePatternArcFnPinBoxSendSync,
 }

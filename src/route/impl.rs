@@ -79,7 +79,7 @@ impl RoutePattern {
 
     pub(crate) fn match_path(&self, path: &str) -> OptionRouteParams {
         let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
-        let path_segments: Vec<&str> = if path.is_empty() {
+        let path_segments: VecStrRef = if path.is_empty() {
             Vec::new()
         } else {
             path.split(DEFAULT_HTTP_PATH).collect()
@@ -152,7 +152,7 @@ impl RoutePattern {
 impl RouteMatcher {
     pub(crate) fn new() -> Self {
         Self {
-            static_routes: HashMap::with_hasher(BuildHasherDefault::<XxHash3_64>::default()),
+            static_routes: hash_map_xx_hash3_64(),
             dynamic_routes: Vec::new(),
             regex_routes: Vec::new(),
         }
@@ -167,12 +167,11 @@ impl RouteMatcher {
             self.static_routes.insert(pattern.to_string(), handler);
             return Ok(());
         }
-        let target_vec: &mut Vec<(RoutePattern, ArcFnPinBoxSendSync)> =
-            if route_pattern.is_dynamic() {
-                &mut self.dynamic_routes
-            } else {
-                &mut self.regex_routes
-            };
+        let target_vec: &mut VecRoutePatternArcFnPinBoxSendSync = if route_pattern.is_dynamic() {
+            &mut self.dynamic_routes
+        } else {
+            &mut self.regex_routes
+        };
         let has_same_pattern: bool = target_vec
             .iter()
             .any(|(tmp_pattern, _)| tmp_pattern == &route_pattern);

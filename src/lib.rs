@@ -21,7 +21,6 @@ pub(crate) use config::*;
 pub(crate) use lifecycle::*;
 pub(crate) use panic::*;
 
-pub(crate) use core::hash::BuildHasherDefault;
 pub(crate) use std::{
     collections::HashMap,
     error::Error as StdError,
