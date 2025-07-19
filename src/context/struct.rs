@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(Clone, Data, Default, CustomDebug)]
+#[derive(Clone, Data, Default, CustomDebug, DisplayDebug)]
 pub struct InnerContext {
     aborted: bool,
     closed: bool,
@@ -11,5 +11,5 @@ pub struct InnerContext {
     route_params: RouteParams,
 }
 
-#[derive(Clone, Default, CustomDebug)]
+#[derive(Clone, Default, CustomDebug, DisplayDebug)]
 pub struct Context(pub(super) ArcRwLock<InnerContext>);

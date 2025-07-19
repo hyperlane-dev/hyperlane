@@ -214,20 +214,28 @@ impl Server {
 
     fn init_panic_hook(&self) {
         let error_hook: ArcErrorHandlerSendSync = self.get().get_error_hook().clone();
-        let panic_hook: &'static PanicHook = panic_hook();
-        panic_hook.set_error_hook(error_hook);
-        panic_hook.initialize_once();
+        set_hook(Box::new(move |panic_info: &PanicHookInfo<'_>| {
+            let panic_info_struct: PanicInfo = PanicInfo::from_panic_hook_info(panic_info);
+            let default_ctx: Context = Context::default();
+            let error_hook_clone: ArcErrorHandlerSendSync = error_hook.clone();
+            tokio::spawn(async move {
+                let _ = default_ctx.set_panic_info(panic_info_struct).await;
+                error_hook_clone(default_ctx).await;
+            });
+        }));
     }
 
-    async fn handle_panic_with_context(&self, panic_info: PanicInfo, ctx: Context) {
+    async fn handle_panic_with_context(&self, panic_info: &PanicInfo, ctx: &Context) {
         let error_hook: ArcErrorHandlerSendSync = self.get().get_error_hook().clone();
+        let ctx_clone: Context = ctx.clone();
+        let panic_info_clone: PanicInfo = panic_info.clone();
         tokio::spawn(async move {
-            let _ = ctx.set_panic_info(panic_info).await;
-            error_hook(ctx).await;
+            let _ = ctx_clone.set_panic_info(panic_info_clone).await;
+            error_hook(ctx_clone).await;
         });
     }
 
-    async fn handle_task_panic(&self, join_error: JoinError, ctx: Context) {
+    async fn handle_task_panic(&self, join_error: JoinError, ctx: &Context) {
         let panic_payload: BoxAnySend = join_error.into_panic();
         let message: String = if let Some(msg) = panic_payload.downcast_ref::<&str>() {
             msg.to_string()
@@ -237,7 +245,7 @@ impl Server {
             EMPTY_STR.to_string()
         };
         let panic_info: PanicInfo = PanicInfo::new(message, None, EMPTY_STR.to_string());
-        self.handle_panic_with_context(panic_info, ctx).await;
+        self.handle_panic_with_context(&panic_info, &ctx).await;
     }
 
     async fn run_hook_with_lifecycle<F>(
@@ -252,7 +260,7 @@ impl Server {
         ctx.should_abort(lifecycle).await;
         if let Err(join_error) = result {
             if join_error.is_panic() {
-                self.handle_task_panic(join_error, ctx.clone()).await;
+                self.handle_task_panic(join_error, &ctx).await;
             }
         }
     }

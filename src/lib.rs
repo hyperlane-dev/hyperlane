@@ -4,7 +4,6 @@ mod context;
 mod error;
 mod hook;
 mod lifecycle;
-mod panic;
 mod route;
 mod server;
 
@@ -19,23 +18,16 @@ pub use http_type::*;
 pub(crate) use attribute::*;
 pub(crate) use config::*;
 pub(crate) use lifecycle::*;
-pub(crate) use panic::*;
 
 pub(crate) use std::{
     collections::HashMap,
     error::Error as StdError,
     future::Future,
-    hint,
     io::{self, Write},
-    mem,
     net::SocketAddr,
     panic::{PanicHookInfo, set_hook},
     pin::Pin,
-    ptr,
-    sync::{
-        Arc,
-        atomic::{AtomicPtr, AtomicUsize, Ordering},
-    },
+    sync::Arc,
     time::Duration,
 };
 

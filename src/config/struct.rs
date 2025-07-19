@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(Clone, Data, CustomDebug)]
+#[derive(Clone, Data, CustomDebug, DisplayDebug)]
 pub(crate) struct ServerConfig {
     #[get(pub(crate))]
     #[get_mut(pub(crate))]

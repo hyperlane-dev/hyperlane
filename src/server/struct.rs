@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(Data, Clone, CustomDebug)]
+#[derive(Data, Clone, CustomDebug, DisplayDebug)]
 pub struct ServerInner {
     #[get(pub(super))]
     #[get_mut(pub(super))]
@@ -45,10 +45,10 @@ pub struct ServerInner {
     pub(super) error_hook: ArcErrorHandlerSendSync,
 }
 
-#[derive(Clone, CustomDebug)]
+#[derive(Clone, CustomDebug, DisplayDebug)]
 pub struct Server(pub(super) ArcServerInner);
 
-#[derive(Clone, CustomDebug)]
+#[derive(Clone, CustomDebug, DisplayDebug)]
 pub(crate) struct HandlerState<'a> {
     pub(super) stream: &'a ArcRwLockStream,
     pub(super) ctx: &'a Context,
