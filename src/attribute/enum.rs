@@ -8,5 +8,5 @@ pub(crate) enum AttributeKey {
 
 #[derive(CustomDebug, Clone, PartialEq, Eq, Hash, DisplayDebug)]
 pub(crate) enum InternalAttributeKey {
-    PanicInfo,
+    Panic,
 }

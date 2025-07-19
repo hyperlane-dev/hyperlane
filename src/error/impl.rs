@@ -4,8 +4,8 @@ impl StdError for ServerError {}
 
 impl StdError for RouteError {}
 
-impl PanicInfo {
-    pub(crate) fn new(message: String, location: Option<String>, payload: String) -> Self {
+impl Panic {
+    pub(crate) fn new(message: String, location: String, payload: String) -> Self {
         Self {
             message,
             location,
@@ -13,22 +13,46 @@ impl PanicInfo {
         }
     }
 
-    pub(crate) fn from_panic_hook_info(info: &PanicHookInfo<'_>) -> Self {
-        let message: String = if let Some(s) = info.payload().downcast_ref::<&str>() {
+    fn extract_panic_message_from_any(panic_payload: &dyn Any) -> String {
+        if let Some(s) = panic_payload.downcast_ref::<&str>() {
             s.to_string()
-        } else if let Some(s) = info.payload().downcast_ref::<String>() {
+        } else if let Some(s) = panic_payload.downcast_ref::<String>() {
             s.clone()
         } else {
-            "Unknown panic".to_string()
-        };
-        let location: Option<String> = info
-            .location()
-            .map(|loc| format!("{}:{}:{}", loc.file(), loc.line(), loc.column()));
+            EMPTY_STR.to_string()
+        }
+    }
+
+    fn format_panic_location(location: Option<&Location<'_>>) -> String {
+        location
+            .map(|data| {
+                format!(
+                    "{}{}{}{}{}",
+                    data.file(),
+                    COLON_SPACE_SYMBOL,
+                    data.line(),
+                    COLON_SPACE_SYMBOL,
+                    data.column()
+                )
+            })
+            .unwrap_or_default()
+    }
+
+    pub(crate) fn from_panic_hook(info: &PanicHookInfo<'_>) -> Self {
+        let message: String = Self::extract_panic_message_from_any(info.payload());
+        let location: String = Self::format_panic_location(info.location());
         let payload: String = info.to_string();
         Self {
             message,
             location,
             payload,
         }
+    }
+
+    pub(crate) fn from_join_error(join_error: JoinError) -> Self {
+        let panic_join_error: BoxAnySend = join_error.into_panic();
+        let message: String = Self::extract_panic_message_from_any(&panic_join_error);
+        let panic: Panic = Panic::new(message, String::new(), String::new());
+        panic
     }
 }

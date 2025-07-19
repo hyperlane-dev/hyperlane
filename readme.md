@@ -111,7 +111,7 @@ async fn dynamic_route(ctx: Context) {
 }
 
 async fn error_hook(ctx: Context) {
-    let error: PanicInfo = ctx.get_panic_info().await.unwrap_or_default();
+    let error: Panic = ctx.get_panic().await.unwrap_or_default();
     let response_body: String = format!(
         "{}{}{}",
         error.to_string(),

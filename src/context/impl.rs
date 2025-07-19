@@ -559,13 +559,13 @@ impl Context {
         self
     }
 
-    pub async fn set_panic_info(&self, panic_info: PanicInfo) -> &Self {
-        self.set_internal_attribute(InternalAttributeKey::PanicInfo, panic_info)
+    pub(crate) async fn set_panic(&self, panic: Panic) -> &Self {
+        self.set_internal_attribute(InternalAttributeKey::Panic, panic)
             .await
     }
 
-    pub async fn get_panic_info(&self) -> Option<PanicInfo> {
-        self.get_internal_attribute(InternalAttributeKey::PanicInfo)
+    pub(crate) async fn get_panic(&self) -> Option<Panic> {
+        self.get_internal_attribute(InternalAttributeKey::Panic)
             .await
     }
 

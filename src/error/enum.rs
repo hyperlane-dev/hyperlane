@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(CustomDebug, DisplayDebug)]
+#[derive(CustomDebug, DisplayDebug, PartialEq, Eq)]
 pub enum ServerError {
     TcpBind(String),
     Unknown(String),
@@ -8,7 +8,7 @@ pub enum ServerError {
     InvalidHttpRequest(Request),
 }
 
-#[derive(CustomDebug, DisplayDebug)]
+#[derive(CustomDebug, DisplayDebug, PartialEq, Eq)]
 pub enum RouteError {
     EmptyPattern,
     DuplicatePattern(String),

@@ -28,6 +28,14 @@ impl Server {
         Self(Arc::new(server))
     }
 
+    fn get(&self) -> &ServerInner {
+        &self.0
+    }
+
+    fn get_clone(&self) -> ServerInner {
+        self.get().clone()
+    }
+
     pub fn host<T: ToString>(self, host: T) -> Self {
         let mut server: ServerInner = self.get_clone();
         server.get_mut_config().set_host(host.to_string());
@@ -204,49 +212,32 @@ impl Server {
         format!("{}{}{}", host, COLON_SPACE_SYMBOL, port)
     }
 
-    fn get(&self) -> &ServerInner {
-        &self.0
-    }
-
-    fn get_clone(&self) -> ServerInner {
-        (*self.0).clone()
-    }
-
     fn init_panic_hook(&self) {
         let error_hook: ArcErrorHandlerSendSync = self.get().get_error_hook().clone();
-        set_hook(Box::new(move |panic_info: &PanicHookInfo<'_>| {
-            let panic_info_struct: PanicInfo = PanicInfo::from_panic_hook_info(panic_info);
-            let default_ctx: Context = Context::default();
+        set_hook(Box::new(move |panic: &PanicHookInfo<'_>| {
+            let panic_struct: Panic = Panic::from_panic_hook(panic);
+            let ctx: Context = Context::default();
             let error_hook_clone: ArcErrorHandlerSendSync = error_hook.clone();
             tokio::spawn(async move {
-                let _ = default_ctx.set_panic_info(panic_info_struct).await;
-                error_hook_clone(default_ctx).await;
+                let _ = ctx.set_panic(panic_struct).await;
+                error_hook_clone(ctx).await;
             });
         }));
     }
 
-    async fn handle_panic_with_context(&self, panic_info: &PanicInfo, ctx: &Context) {
+    async fn handle_panic_with_context(&self, ctx: &Context, panic: &Panic) {
         let error_hook: ArcErrorHandlerSendSync = self.get().get_error_hook().clone();
         let ctx_clone: Context = ctx.clone();
-        let panic_info_clone: PanicInfo = panic_info.clone();
+        let panic_clone: Panic = panic.clone();
         tokio::spawn(async move {
-            let _ = ctx_clone.set_panic_info(panic_info_clone).await;
+            let _ = ctx_clone.set_panic(panic_clone).await;
             error_hook(ctx_clone).await;
         });
     }
 
-    async fn handle_task_panic(&self, join_error: JoinError, ctx: &Context) {
-        let panic_payload: BoxAnySend = join_error.into_panic();
-        let message: String = if let Some(msg) = panic_payload.downcast_ref::<&str>() {
-            msg.to_string()
-        } else if let Some(msg) = panic_payload.downcast_ref::<String>() {
-            msg.clone()
-        } else {
-            EMPTY_STR.to_string()
-        };
-        let payload: String = format!("{:?}", panic_payload);
-        let panic_info: PanicInfo = PanicInfo::new(message, None, payload);
-        self.handle_panic_with_context(&panic_info, &ctx).await;
+    async fn handle_task_panic(&self, ctx: &Context, join_error: JoinError) {
+        let panic: Panic = Panic::from_join_error(join_error);
+        self.handle_panic_with_context(&ctx, &panic).await;
     }
 
     async fn run_hook_with_lifecycle<F>(
@@ -261,7 +252,7 @@ impl Server {
         ctx.should_abort(lifecycle).await;
         if let Err(join_error) = result {
             if join_error.is_panic() {
-                self.handle_task_panic(join_error, &ctx).await;
+                self.handle_task_panic(&ctx, join_error).await;
             }
         }
     }
