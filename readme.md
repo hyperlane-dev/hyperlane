@@ -131,7 +131,6 @@ async fn main() {
         .route("/dynamic/{routing}", dynamic_route)
         .route("/dynamic/routing/{file:^.*$}", dynamic_route)
         .run()
-        .await
         .unwrap();
 }
 ```

@@ -39,7 +39,7 @@ pub(crate) use lombok_macros::*;
 pub(crate) use regex::Regex;
 pub(crate) use serde::de::DeserializeOwned;
 pub(crate) use tokio::{
-    net::TcpListener,
+    net::{TcpListener, TcpStream},
     runtime::Handle,
     sync::{RwLockReadGuard, RwLockWriteGuard},
     task::{JoinError, block_in_place},

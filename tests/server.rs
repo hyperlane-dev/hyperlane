@@ -92,7 +92,6 @@ async fn test_server() {
             .route("/dynamic/{routing}", dynamic_route)
             .route("/dynamic/routing/{file:^.*$}", dynamic_route)
             .run()
-            .await
             .unwrap();
     }
 
