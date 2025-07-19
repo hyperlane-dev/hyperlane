@@ -8,6 +8,7 @@ mod route;
 mod server;
 mod util;
 
+pub use attribute::*;
 pub use context::*;
 pub use error::*;
 pub use hook::*;
@@ -17,7 +18,6 @@ pub use util::*;
 
 pub use http_type::*;
 
-pub(crate) use attribute::*;
 pub(crate) use config::*;
 pub(crate) use lifecycle::*;
 
