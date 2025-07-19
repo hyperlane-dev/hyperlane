@@ -25,27 +25,32 @@ impl<'a> HandlerState<'a> {
 impl Server {
     pub fn new() -> Self {
         let server: ServerInner = ServerInner::default();
-        Self(Arc::new(server))
+        Self(arc_rwlock(server))
     }
 
-    fn get(&self) -> &ServerInner {
-        &self.0
+    async fn get_read(&self) -> RwLockReadGuardServerInner {
+        self.get_0().read().await
     }
 
-    fn get_clone(&self) -> ServerInner {
-        self.get().clone()
+    async fn get_write(&self) -> RwLockWriteGuardServerInner {
+        self.get_0().write().await
     }
 
     pub fn host<T: ToString>(self, host: T) -> Self {
-        let mut server: ServerInner = self.get_clone();
-        server.get_mut_config().set_host(host.to_string());
-        Self(Arc::new(server))
+        sync_block_on(async {
+            self.get_write()
+                .await
+                .get_mut_config()
+                .set_host(host.to_string());
+        });
+        self
     }
 
     pub fn port(self, port: usize) -> Self {
-        let mut server: ServerInner = self.get_clone();
-        server.get_mut_config().set_port(port);
-        Self(Arc::new(server))
+        sync_block_on(async {
+            self.get_write().await.get_mut_config().set_port(port);
+        });
+        self
     }
 
     pub fn http_buffer(self, buffer: usize) -> Self {
@@ -54,9 +59,13 @@ impl Server {
         } else {
             buffer
         };
-        let mut server: ServerInner = self.get_clone();
-        server.get_mut_config().set_http_buffer(buffer);
-        Self(Arc::new(server))
+        sync_block_on(async {
+            self.get_write()
+                .await
+                .get_mut_config()
+                .set_http_buffer(buffer);
+        });
+        self
     }
 
     pub fn ws_buffer(self, buffer: usize) -> Self {
@@ -65,9 +74,13 @@ impl Server {
         } else {
             buffer
         };
-        let mut server: ServerInner = self.get_clone();
-        server.get_mut_config().set_ws_buffer(buffer);
-        Self(Arc::new(server))
+        sync_block_on(async {
+            self.get_write()
+                .await
+                .get_mut_config()
+                .set_ws_buffer(buffer);
+        });
+        self
     }
 
     pub fn error_hook<F, Fut>(self, func: F) -> Self
@@ -75,17 +88,24 @@ impl Server {
         F: ErrorHandler<Fut>,
         Fut: FutureSendStatic<()>,
     {
-        let mut server: ServerInner = self.get_clone();
-        server.set_error_hook(Arc::new(move |ctx: Context| {
-            Box::pin(func(ctx)) as PinBoxFutureSendStatic
-        }));
-        Self(Arc::new(server))
+        sync_block_on(async {
+            self.get_write()
+                .await
+                .set_error_hook(Arc::new(move |ctx: Context| {
+                    Box::pin(func(ctx)) as PinBoxFutureSendStatic
+                }));
+        });
+        self
     }
 
     pub fn set_nodelay(self, nodelay: bool) -> Self {
-        let mut server: ServerInner = self.get_clone();
-        server.get_mut_config().set_nodelay(Some(nodelay));
-        Self(Arc::new(server))
+        sync_block_on(async {
+            self.get_write()
+                .await
+                .get_mut_config()
+                .set_nodelay(Some(nodelay));
+        });
+        self
     }
 
     pub fn enable_nodelay(self) -> Self {
@@ -97,9 +117,10 @@ impl Server {
     }
 
     pub fn set_linger(self, linger: OptionDuration) -> Self {
-        let mut server: ServerInner = self.get_clone();
-        server.get_mut_config().set_linger(linger);
-        Self(Arc::new(server))
+        sync_block_on(async {
+            self.get_write().await.get_mut_config().set_linger(linger);
+        });
+        self
     }
 
     pub fn enable_linger(self, linger: Duration) -> Self {
@@ -111,9 +132,10 @@ impl Server {
     }
 
     pub fn set_ttl(self, ttl: u32) -> Self {
-        let mut server: ServerInner = self.get_clone();
-        server.get_mut_config().set_ttl(Some(ttl));
-        Self(Arc::new(server))
+        sync_block_on(async {
+            self.get_write().await.get_mut_config().set_ttl(Some(ttl));
+        });
+        self
     }
 
     pub fn route<R, F, Fut>(self, route: R, func: F) -> Self
@@ -124,12 +146,14 @@ impl Server {
     {
         let route_str: String = route.to_string();
         let arc_func = Arc::new(move |ctx: Context| Box::pin(func(ctx)) as PinBoxFutureSendStatic);
-        let mut server: ServerInner = self.get_clone();
-        server
-            .get_mut_route_matcher()
-            .add(&route_str, arc_func)
-            .unwrap_or_else(|err| panic!("{}", err));
-        Self(Arc::new(server))
+        sync_block_on(async {
+            self.get_write()
+                .await
+                .get_mut_route_matcher()
+                .add(&route_str, arc_func)
+                .unwrap_or_else(|err| panic!("{}", err));
+        });
+        self
     }
 
     pub fn request_middleware<F, Fut>(self, func: F) -> Self
@@ -137,11 +161,13 @@ impl Server {
         F: FnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
     {
-        let mut server: ServerInner = self.get_clone();
-        server
-            .get_mut_request_middleware()
-            .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
-        Self(Arc::new(server))
+        sync_block_on(async {
+            self.get_write()
+                .await
+                .get_mut_request_middleware()
+                .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
+        });
+        self
     }
 
     pub fn response_middleware<F, Fut>(self, func: F) -> Self
@@ -149,11 +175,13 @@ impl Server {
         F: FnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
     {
-        let mut server: ServerInner = self.get_clone();
-        server
-            .get_mut_response_middleware()
-            .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
-        Self(Arc::new(server))
+        sync_block_on(async {
+            self.get_write()
+                .await
+                .get_mut_response_middleware()
+                .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
+        });
+        self
     }
 
     pub fn pre_upgrade_hook<F, Fut>(self, func: F) -> Self
@@ -161,11 +189,13 @@ impl Server {
         F: FnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
     {
-        let mut server: ServerInner = self.get_clone();
-        server
-            .get_mut_pre_upgrade_hook()
-            .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
-        Self(Arc::new(server))
+        sync_block_on(async {
+            self.get_write()
+                .await
+                .get_mut_pre_upgrade_hook()
+                .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
+        });
+        self
     }
 
     pub fn connected_hook<F, Fut>(self, func: F) -> Self
@@ -173,39 +203,57 @@ impl Server {
         F: FnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
     {
-        let mut server: ServerInner = self.get_clone();
-        server
-            .get_mut_connected_hook()
-            .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
-        Self(Arc::new(server))
+        sync_block_on(async {
+            self.get_write()
+                .await
+                .get_mut_connected_hook()
+                .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
+        });
+        self
     }
 
     pub fn enable_http_hook<R: ToString>(self, route: R) -> Self {
         let route_string: String = route.to_string();
-        let mut server: ServerInner = self.get_clone();
-        server.get_mut_disable_http_hook().remove(&route_string);
-        Self(Arc::new(server))
+        sync_block_on(async {
+            self.get_write()
+                .await
+                .get_mut_disable_http_hook()
+                .remove(&route_string);
+        });
+        self
     }
 
     pub fn disable_http_hook<R: ToString>(self, route: R) -> Self {
         let route_string: String = route.to_string();
-        let mut server: ServerInner = self.get_clone();
-        server.get_mut_disable_http_hook().insert(route_string);
-        Self(Arc::new(server))
+        sync_block_on(async {
+            self.get_write()
+                .await
+                .get_mut_disable_http_hook()
+                .insert(route_string);
+        });
+        self
     }
 
     pub fn enable_ws_hook<R: ToString>(self, route: R) -> Self {
         let route_string: String = route.to_string();
-        let mut server: ServerInner = self.get_clone();
-        server.get_mut_disable_ws_hook().remove(&route_string);
-        Self(Arc::new(server))
+        sync_block_on(async {
+            self.get_write()
+                .await
+                .get_mut_disable_ws_hook()
+                .remove(&route_string);
+        });
+        self
     }
 
     pub fn disable_ws_hook<R: ToString>(self, route: R) -> Self {
         let route_string: String = route.to_string();
-        let mut server: ServerInner = self.get_clone();
-        server.get_mut_disable_ws_hook().insert(route_string);
-        Self(Arc::new(server))
+        sync_block_on(async {
+            self.get_write()
+                .await
+                .get_mut_disable_ws_hook()
+                .insert(route_string);
+        });
+        self
     }
 
     pub fn format_host_port(host: &str, port: &usize) -> String {
@@ -213,7 +261,9 @@ impl Server {
     }
 
     fn init_panic_hook(&self) {
-        let error_hook: ArcErrorHandlerSendSync = self.get().get_error_hook().clone();
+        let server_clone = self.clone();
+        let error_hook: ArcErrorHandlerSendSync =
+            sync_block_on(async { server_clone.get_read().await.get_error_hook().clone() });
         set_hook(Box::new(move |panic: &PanicHookInfo<'_>| {
             let panic_struct: Panic = Panic::from_panic_hook(panic);
             let ctx: Context = Context::default();
@@ -229,7 +279,8 @@ impl Server {
         let ctx_clone: Context = ctx.clone();
         let panic_clone: Panic = panic.clone();
         let _ = ctx_clone.set_panic(panic_clone).await;
-        self.get().get_error_hook()(ctx_clone).await;
+        let error_hook = self.get_read().await.get_error_hook().clone();
+        error_hook(ctx_clone).await;
     }
 
     async fn handle_task_panic(&self, ctx: &Context, join_error: JoinError) {
@@ -260,7 +311,8 @@ impl Server {
 
     pub async fn run(&self) -> ServerResult {
         self.init();
-        let config: &ServerConfig = self.get().get_config();
+        let server_guard = self.get_read().await;
+        let config: &ServerConfig = server_guard.get_config();
         let host: &str = config.get_host();
         let port: usize = *config.get_port();
         let nodelay_opt: Option<bool> = *config.get_nodelay();
@@ -299,21 +351,33 @@ impl Server {
     }
 
     async fn run_pre_upgrade_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
-        for pre_upgrade in self.get().get_pre_upgrade_hook().iter() {
+        let pre_upgrade_hooks = {
+            let server_guard = self.get_read().await;
+            server_guard.get_pre_upgrade_hook().clone()
+        };
+        for pre_upgrade in pre_upgrade_hooks.iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| pre_upgrade(ctx))
                 .await;
         }
     }
 
     async fn run_connected_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
-        for connected in self.get().get_connected_hook().iter() {
+        let connected_hooks = {
+            let server_guard = self.get_read().await;
+            server_guard.get_connected_hook().clone()
+        };
+        for connected in connected_hooks.iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| connected(ctx))
                 .await;
         }
     }
 
     async fn run_request_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
-        for middleware in self.get().get_request_middleware().iter() {
+        let request_middleware = {
+            let server_guard = self.get_read().await;
+            server_guard.get_request_middleware().clone()
+        };
+        for middleware in request_middleware.iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| middleware(ctx))
                 .await;
         }
@@ -332,7 +396,11 @@ impl Server {
     }
 
     async fn run_response_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
-        for middleware in self.get().get_response_middleware().iter() {
+        let response_middleware = {
+            let server_guard = self.get_read().await;
+            server_guard.get_response_middleware().clone()
+        };
+        for middleware in response_middleware.iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| middleware(ctx))
                 .await;
         }
@@ -343,11 +411,13 @@ impl Server {
         let ctx: &Context = state.ctx;
         ctx.set_request(request).await;
         let mut lifecycle: Lifecycle = Lifecycle::Continue(request.is_enable_keep_alive());
-        let route_hook: OptionArcFnPinBoxSendSync = self
-            .get()
-            .get_route_matcher()
-            .resolve_route(&ctx, route)
-            .await;
+        let route_hook: OptionArcFnPinBoxSendSync = {
+            let server_guard = self.get_read().await;
+            server_guard
+                .get_route_matcher()
+                .resolve_route(&ctx, route)
+                .await
+        };
         self.run_request_middleware(&ctx, &mut lifecycle).await;
         if let Lifecycle::Abort(request_keepalive) = lifecycle {
             return request_keepalive;
@@ -369,10 +439,13 @@ impl Server {
         let route: &String = first_request.get_path();
         let ctx: &Context = state.ctx;
         let mut lifecycle: Lifecycle = Lifecycle::Continue(true);
-        self.get()
-            .get_route_matcher()
-            .resolve_route(ctx, &route)
-            .await;
+        {
+            let server_guard = self.get_read().await;
+            server_guard
+                .get_route_matcher()
+                .resolve_route(ctx, &route)
+                .await;
+        }
         self.run_pre_upgrade_hook(ctx, &mut lifecycle).await;
         if lifecycle.is_abort() {
             return;
@@ -384,12 +457,18 @@ impl Server {
         if lifecycle.is_abort() {
             return;
         }
-        if self.get().get_disable_ws_hook().contains(route) {
+        let (disable_ws_hook_contains, buffer) = {
+            let server_guard = self.get_read().await;
+            (
+                server_guard.get_disable_ws_hook().contains(route),
+                *server_guard.get_config().get_ws_buffer(),
+            )
+        };
+        if disable_ws_hook_contains {
             while self.request_hook(state, first_request).await {}
             return;
         }
         let stream: &ArcRwLockStream = state.stream;
-        let buffer: usize = *self.get().get_config().get_ws_buffer();
         while let Ok(request) = Request::ws_from_stream(stream, buffer, first_request)
             .await
             .as_ref()
@@ -409,8 +488,13 @@ impl Server {
             return;
         }
         let route: &String = first_request.get_path();
-        let contains_disable_http_hook: bool = self.get().get_disable_http_hook().contains(route);
-        let buffer: usize = *self.get().get_config().get_http_buffer();
+        let (contains_disable_http_hook, buffer) = {
+            let server_guard = self.get_read().await;
+            (
+                server_guard.get_disable_http_hook().contains(route),
+                *server_guard.get_config().get_http_buffer(),
+            )
+        };
         if contains_disable_http_hook {
             while self.request_hook(state, first_request).await {}
             return;

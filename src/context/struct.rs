@@ -11,5 +11,5 @@ pub struct InnerContext {
     route_params: RouteParams,
 }
 
-#[derive(Clone, Default, CustomDebug, DisplayDebug)]
+#[derive(Clone, Default, Getter, CustomDebug, DisplayDebug)]
 pub struct Context(pub(super) ArcRwLock<InnerContext>);

@@ -25,12 +25,12 @@ impl PartialEq for RouteSegment {
 
 impl PartialEq for RoutePattern {
     fn eq(&self, other: &Self) -> bool {
-        if self.0.len() != other.0.len() {
+        if self.get_0().len() != other.get_0().len() {
             return false;
         }
-        self.0
+        self.get_0()
             .iter()
-            .zip(other.0.iter())
+            .zip(other.get_0().iter())
             .all(|(segment1, segment2)| segment1 == segment2)
     }
 }
@@ -80,8 +80,8 @@ impl RoutePattern {
 
     pub(crate) fn match_path(&self, path: &str) -> OptionRouteParams {
         let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
-        let route_segments_len: usize = self.0.len();
-        let is_tail_regex: bool = matches!(self.0.last(), Some(RouteSegment::Regex(_, _)));
+        let route_segments_len: usize = self.get_0().len();
+        let is_tail_regex: bool = matches!(self.get_0().last(), Some(RouteSegment::Regex(_, _)));
         if path.is_empty() {
             if route_segments_len == 0 {
                 return Some(hash_map_xx_hash3_64());
@@ -110,7 +110,7 @@ impl RoutePattern {
             return None;
         }
         let mut params: RouteParams = hash_map_xx_hash3_64();
-        for (idx, segment) in self.0.iter().enumerate() {
+        for (idx, segment) in self.get_0().iter().enumerate() {
             match segment {
                 RouteSegment::Static(expected_path) => {
                     if path_segments.get(idx).copied() != Some(expected_path.as_str()) {
@@ -150,17 +150,17 @@ impl RoutePattern {
     }
 
     pub(crate) fn is_static(&self) -> bool {
-        self.0
+        self.get_0()
             .iter()
             .all(|seg| matches!(seg, RouteSegment::Static(_)))
     }
 
     pub(crate) fn is_dynamic(&self) -> bool {
-        self.0
+        self.get_0()
             .iter()
             .any(|seg| matches!(seg, RouteSegment::Dynamic(_)))
             && self
-                .0
+                .get_0()
                 .iter()
                 .all(|seg| !matches!(seg, RouteSegment::Regex(_, _)))
     }

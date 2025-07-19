@@ -45,8 +45,8 @@ pub struct ServerInner {
     pub(super) error_hook: ArcErrorHandlerSendSync,
 }
 
-#[derive(Clone, CustomDebug, DisplayDebug)]
-pub struct Server(pub(super) ArcServerInner);
+#[derive(Clone, Getter, CustomDebug, DisplayDebug)]
+pub struct Server(pub(super) ArcRwLockServerInner);
 
 #[derive(Clone, CustomDebug, DisplayDebug)]
 pub(crate) struct HandlerState<'a> {

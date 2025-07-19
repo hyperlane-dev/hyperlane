@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(Debug, Clone, DisplayDebug)]
+#[derive(Debug, Clone, Getter, DisplayDebug)]
 pub(crate) struct RoutePattern(pub(super) VecRouteSegment);
 
 #[derive(Clone, CustomDebug, DisplayDebug)]

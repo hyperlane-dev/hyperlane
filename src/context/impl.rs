@@ -15,11 +15,11 @@ impl Context {
     }
 
     async fn read(&self) -> RwLockReadInnerContext {
-        self.0.read().await
+        self.get_0().read().await
     }
 
     async fn write(&self) -> RwLockWriteInnerContext {
-        self.0.write().await
+        self.get_0().write().await
     }
 
     pub async fn get_stream(&self) -> OptionArcRwLockStream {
