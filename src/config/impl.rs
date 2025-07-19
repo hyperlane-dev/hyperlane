@@ -10,52 +10,6 @@ impl Default for ServerConfig {
             nodelay: DEFAULT_NODELAY,
             linger: DEFAULT_LINGER,
             ttl: DEFAULT_TTI,
-            disable_http_hook: hash_set_xx_hash3_64(),
-            disable_ws_hook: hash_set_xx_hash3_64(),
-            route_matcher: RouteMatcher::new(),
-            error_hook: Arc::new(|ctx: Context| Box::pin(default_error_hook(ctx))),
         }
-    }
-}
-
-impl ServerConfig {
-    pub(crate) async fn contains_disable_http_hook<'a>(&self, route: &'a str) -> bool {
-        if self.get_disable_http_hook().contains(route) {
-            return true;
-        }
-        self.get_route_matcher().match_route(route)
-    }
-
-    pub(crate) async fn disable_http_hook(&mut self, route: String) -> bool {
-        ServerConfig::get_mut_route_matcher(self)
-            .add(&route, Arc::new(|_| Box::pin(async move {})))
-            .unwrap_or_else(|err| panic!("{}", err));
-        let result: bool = self.get_mut_disable_http_hook().insert(route.clone());
-        result
-    }
-
-    pub(crate) async fn enable_http_hook(&mut self, route: String) -> bool {
-        let result: bool = self.get_mut_disable_http_hook().remove(&route);
-        result
-    }
-
-    pub(crate) async fn contains_disable_ws_hook<'a>(&self, route: &'a str) -> bool {
-        if self.get_disable_ws_hook().contains(route) {
-            return true;
-        }
-        self.get_route_matcher().match_route(route)
-    }
-
-    pub(crate) async fn disable_ws_hook(&mut self, route: String) -> bool {
-        ServerConfig::get_mut_route_matcher(self)
-            .add(&route, Arc::new(|_| Box::pin(async move {})))
-            .unwrap_or_else(|err| panic!("{}", err));
-        let result: bool = self.get_mut_disable_ws_hook().insert(route.clone());
-        result
-    }
-
-    pub(crate) async fn enable_ws_hook(&mut self, route: String) -> bool {
-        let result: bool = self.get_mut_disable_ws_hook().remove(&route);
-        result
     }
 }

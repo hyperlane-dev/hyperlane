@@ -14,8 +14,8 @@ impl fmt::Display for RoutePattern {
                 RouteSegment::Regex(val, re) => format!(":{}:re({})", val, re),
             })
             .collect::<Vec<_>>()
-            .join("/");
-        write!(f, "/{}", s)
+            .join(ROOT_PATH);
+        write!(f, "{}{}", ROOT_PATH, s)
     }
 }
 

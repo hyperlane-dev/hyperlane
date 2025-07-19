@@ -8,7 +8,6 @@ mod panic;
 mod route;
 mod server;
 mod tests;
-mod tracker;
 mod utils;
 
 pub use context::*;
@@ -16,11 +15,8 @@ pub use error::*;
 pub use hook::*;
 pub use route::*;
 pub use server::*;
-pub use tracker::*;
 
 pub use http_type::*;
-
-pub use std::io::{self, Write};
 
 pub(crate) use attribute::*;
 pub(crate) use config::*;
@@ -33,7 +29,9 @@ pub(crate) use std::{
     error::Error as StdError,
     fmt::{self, Display},
     future::Future,
-    hint, mem,
+    hint,
+    io::{self, Write},
+    mem,
     net::SocketAddr,
     panic::{PanicHookInfo, set_hook},
     pin::Pin,

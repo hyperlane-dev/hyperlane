@@ -34,6 +34,22 @@ impl Context {
         self.read().await.get_response().clone()
     }
 
+    pub async fn with_request<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&Request) -> R,
+    {
+        let guard = self.0.blocking_read();
+        f(guard.get_request())
+    }
+
+    pub async fn with_response<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&Response) -> R,
+    {
+        let guard = self.0.blocking_read();
+        f(guard.get_response())
+    }
+
     pub async fn get_request_string(&self) -> String {
         self.read().await.get_request().get_string()
     }
@@ -153,19 +169,19 @@ impl Context {
     }
 
     pub async fn get_request_method(&self) -> RequestMethod {
-        self.read().await.get_request().get_method().clone()
+        self.with_request(|req| req.get_method().clone()).await
     }
 
     pub async fn get_request_host(&self) -> RequestHost {
-        self.read().await.get_request().get_host().clone()
+        self.with_request(|req| req.get_host().clone()).await
     }
 
     pub async fn get_request_path(&self) -> RequestPath {
-        self.read().await.get_request().get_path().clone()
+        self.with_request(|req| req.get_path().clone()).await
     }
 
     pub async fn get_request_querys(&self) -> RequestQuerys {
-        self.read().await.get_request().get_querys().clone()
+        self.with_request(|req| req.get_querys().clone()).await
     }
 
     pub async fn get_request_query<T>(&self, key: T) -> OptionRequestQuerysValue

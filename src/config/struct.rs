@@ -30,20 +30,4 @@ pub(crate) struct ServerConfig {
     #[get_mut(pub(crate))]
     #[set(pub(crate))]
     pub(super) ttl: OptionU32,
-    #[set(skip)]
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    pub(super) disable_http_hook: HashSetXxHash3_64<String>,
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(skip)]
-    pub(super) disable_ws_hook: HashSetXxHash3_64<String>,
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(skip)]
-    pub(super) route_matcher: RouteMatcher,
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
-    pub(super) error_hook: ArcErrorHandlerSendSync,
 }

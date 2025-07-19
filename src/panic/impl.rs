@@ -69,19 +69,12 @@ impl PanicHook {
     }
 
     fn default_panic_hook(&self, panic_info: &PanicHookInfo<'_>) {
-        let message: String = if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
-            s.to_string()
-        } else if let Some(s) = panic_info.payload().downcast_ref::<String>() {
-            s.clone()
-        } else {
-            EMPTY_STR.to_string()
-        };
-        let location: String = panic_info
-            .location()
-            .map(|loc| format!("{}:{}:{}", loc.file(), loc.line(), loc.column()))
-            .unwrap_or_else(|| EMPTY_STR.to_string());
-        eprintln!("Panic occurred: {} at {}", message, location);
-        let _ = Write::flush(&mut io::stderr());
+        let panic_info_struct: PanicInfo = PanicInfo::from_panic_hook_info(panic_info);
+        let default_ctx: Context = Context::default();
+        tokio::spawn(async move {
+            let _ = default_ctx.set_panic_info(panic_info_struct).await;
+            default_error_hook(default_ctx).await;
+        });
     }
 }
 

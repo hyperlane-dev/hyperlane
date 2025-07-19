@@ -1,25 +1,58 @@
 use crate::*;
 
-#[derive(Clone, Getter, Setter)]
-pub struct Server {
-    #[get(pub(super))]
-    #[set(pub(super))]
-    pub(super) config: ArcRwLockServerConfig,
-    #[get(pub(super))]
-    #[set(pub(super))]
-    pub(super) route_matcher: ArcRwLockRouteMatcher,
-    #[get(pub(super))]
-    #[set(pub(super))]
-    pub(super) request_middleware: ArcRwLockVecArcFnPinBoxSendSync,
-    #[get(pub(super))]
-    #[set(pub(super))]
-    pub(super) response_middleware: ArcRwLockVecArcFnPinBoxSendSync,
-    #[get(pub(super))]
-    #[set(pub(super))]
-    pub(super) pre_upgrade_hook: ArcRwLockVecArcFnPinBoxSendSync,
-    #[get(pub(super))]
-    #[set(pub(super))]
-    pub(super) connected_hook: ArcRwLockVecArcFnPinBoxSendSync,
+#[derive(Data)]
+pub struct ServerBuilder {
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
+    pub(super) config: ServerConfig,
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
+    pub(super) route_matcher: RouteMatcher,
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
+    pub(super) request_middleware: VecArcFnPinBoxSendSync,
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
+    pub(super) response_middleware: VecArcFnPinBoxSendSync,
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
+    pub(super) pre_upgrade_hook: VecArcFnPinBoxSendSync,
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
+    pub(super) connected_hook: VecArcFnPinBoxSendSync,
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
+    pub(super) disable_http_hook: HashSetXxHash3_64<String>,
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
+    pub(super) disable_ws_hook: HashSetXxHash3_64<String>,
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
+    pub(super) error_hook: ArcErrorHandlerSendSync,
+}
+
+#[derive(Clone)]
+pub struct Server(pub(super) Arc<ServerInner>);
+
+pub struct ServerInner {
+    pub(super) config: ServerConfig,
+    pub(super) route_matcher: RouteMatcher,
+    pub(super) request_middleware: VecArcFnPinBoxSendSync,
+    pub(super) response_middleware: VecArcFnPinBoxSendSync,
+    pub(super) pre_upgrade_hook: VecArcFnPinBoxSendSync,
+    pub(super) connected_hook: VecArcFnPinBoxSendSync,
+    pub(super) disable_http_hook: HashSetXxHash3_64<String>,
+    pub(super) disable_ws_hook: HashSetXxHash3_64<String>,
+    pub(super) error_hook: ArcErrorHandlerSendSync,
 }
 
 #[derive(Clone)]

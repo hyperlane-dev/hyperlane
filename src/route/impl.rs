@@ -173,23 +173,6 @@ impl RouteMatcher {
         Ok(())
     }
 
-    pub(crate) fn match_route(&self, path: &str) -> bool {
-        if self.static_routes.contains_key(path) {
-            return true;
-        }
-        for (pattern, _) in &self.dynamic_routes {
-            if pattern.match_path(path).is_some() {
-                return true;
-            }
-        }
-        for (pattern, _) in &self.regex_routes {
-            if pattern.match_path(path).is_some() {
-                return true;
-            }
-        }
-        false
-    }
-
     pub(crate) async fn resolve_route(
         &self,
         ctx: &Context,

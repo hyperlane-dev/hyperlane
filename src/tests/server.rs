@@ -72,26 +72,27 @@ async fn test_server() {
     }
 
     async fn main() {
-        let server: Server = Server::new();
-        server.host("0.0.0.0").await;
-        server.port(60000).await;
-        server.enable_nodelay().await;
-        server.disable_linger().await;
-        server.http_buffer(4096).await;
-        server.ws_buffer(4096).await;
-        server.error_hook(default_error_hook).await;
-        server.connected_hook(connected_hook).await;
-        server.pre_upgrade_hook(request_middleware).await;
-        server.request_middleware(request_middleware).await;
-        server.response_middleware(response_middleware).await;
-        server.route("/", root_route).await;
-        server.route("/ws", ws_route).await;
-        server.route("/sse", sse_route).await;
-        server.route("/dynamic/{routing}", dynamic_route).await;
-        server
+        let res: Result<(), ServerError> = ServerBuilder::new()
+            .host("0.0.0.0")
+            .port(60000)
+            .enable_nodelay()
+            .disable_linger()
+            .http_buffer(4096)
+            .ws_buffer(4096)
+            .error_hook(default_error_hook)
+            .connected_hook(connected_hook)
+            .pre_upgrade_hook(request_middleware)
+            .request_middleware(request_middleware)
+            .response_middleware(response_middleware)
+            .route("/", root_route)
+            .route("/ws", ws_route)
+            .route("/sse", sse_route)
+            .route("/dynamic/{routing}", dynamic_route)
             .route("/dynamic/routing/{file:^.*$}", dynamic_route)
+            .run()
             .await;
-        server.run().await.unwrap();
+        println!("res: {:?}", res);
+        let _ = Write::flush(&mut io::stdout());
     }
 
     let _ = tokio::time::timeout(Duration::from_secs(60), main()).await;
