@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(Debug, Clone)]
+#[derive(CustomDebug, Clone)]
 pub(crate) enum RouteSegment {
     Static(String),
     Dynamic(String),

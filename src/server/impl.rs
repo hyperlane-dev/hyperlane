@@ -16,6 +16,22 @@ impl Default for ServerBuilder {
     }
 }
 
+impl Default for ServerInner {
+    fn default() -> Self {
+        Self {
+            config: ServerConfig::default(),
+            route_matcher: RouteMatcher::new(),
+            request_middleware: vec![],
+            response_middleware: vec![],
+            pre_upgrade_hook: vec![],
+            connected_hook: vec![],
+            disable_http_hook: hash_set_xx_hash3_64(),
+            disable_ws_hook: hash_set_xx_hash3_64(),
+            error_hook: Arc::new(|_ctx: Context| Box::pin(async {})),
+        }
+    }
+}
+
 impl<'a> HandlerState<'a> {
     fn new(stream: &'a ArcRwLockStream, ctx: &'a Context) -> Self {
         Self { stream, ctx }
@@ -28,18 +44,18 @@ impl ServerBuilder {
     }
 
     pub fn build(self) -> Server {
-        let inner: Arc<ServerInner> = Arc::new(ServerInner {
-            config: self.config,
-            route_matcher: self.route_matcher,
-            request_middleware: self.request_middleware,
-            response_middleware: self.response_middleware,
-            pre_upgrade_hook: self.pre_upgrade_hook,
-            connected_hook: self.connected_hook,
-            disable_http_hook: self.disable_http_hook,
-            disable_ws_hook: self.disable_ws_hook,
-            error_hook: self.error_hook,
-        });
-        super::Server(inner)
+        let inner: ServerInner = ServerInner::default()
+            .set_config(self.get_config().clone())
+            .set_route_matcher(self.get_route_matcher().clone())
+            .set_request_middleware(self.get_request_middleware().clone())
+            .set_response_middleware(self.get_response_middleware().clone())
+            .set_pre_upgrade_hook(self.get_pre_upgrade_hook().clone())
+            .set_connected_hook(self.get_connected_hook().clone())
+            .set_disable_http_hook(self.get_disable_http_hook().clone())
+            .set_disable_ws_hook(self.get_disable_ws_hook().clone())
+            .set_error_hook(self.get_error_hook().clone())
+            .clone();
+        super::Server(Arc::new(inner))
     }
 
     pub fn host<T: ToString>(mut self, host: T) -> Self {
@@ -206,51 +222,15 @@ impl Server {
         &self.0
     }
 
-    fn get_config(&self) -> &ServerConfig {
-        &self.get().config
-    }
-
-    fn get_route_matcher(&self) -> &RouteMatcher {
-        &self.get().route_matcher
-    }
-
-    fn get_request_middleware(&self) -> &VecArcFnPinBoxSendSync {
-        &self.get().request_middleware
-    }
-
-    fn get_response_middleware(&self) -> &VecArcFnPinBoxSendSync {
-        &self.get().response_middleware
-    }
-
-    fn get_pre_upgrade_hook(&self) -> &VecArcFnPinBoxSendSync {
-        &self.get().pre_upgrade_hook
-    }
-
-    fn get_connected_hook(&self) -> &VecArcFnPinBoxSendSync {
-        &self.get().connected_hook
-    }
-
-    fn get_disable_http_hook(&self) -> &HashSetXxHash3_64<String> {
-        &self.get().disable_http_hook
-    }
-
-    fn get_disable_ws_hook(&self) -> &HashSetXxHash3_64<String> {
-        &self.get().disable_ws_hook
-    }
-
-    fn get_error_hook(&self) -> &ArcErrorHandlerSendSync {
-        &self.get().error_hook
-    }
-
     fn init_panic_hook(&self) {
-        let error_hook: ArcErrorHandlerSendSync = self.get_error_hook().clone();
+        let error_hook: ArcErrorHandlerSendSync = self.get().get_error_hook().clone();
         let panic_hook: &'static PanicHook = panic_hook();
         panic_hook.set_error_hook(error_hook);
         panic_hook.initialize_once();
     }
 
     async fn handle_panic_with_context(&self, panic_info: PanicInfo, ctx: Context) {
-        let error_hook: ArcErrorHandlerSendSync = self.get_error_hook().clone();
+        let error_hook: ArcErrorHandlerSendSync = self.get().get_error_hook().clone();
         tokio::spawn(async move {
             let _ = ctx.set_panic_info(panic_info).await;
             error_hook(ctx).await;
@@ -293,12 +273,12 @@ impl Server {
 
     pub async fn run(&self) -> ServerResult {
         self.init();
-        let host: String = self.get_config().get_host().clone();
-        let port: usize = *self.get_config().get_port();
-        let nodelay: bool = *self.get_config().get_nodelay();
-        let linger: OptionDuration = *self.get_config().get_linger();
-        let ttl_opt: OptionU32 = *self.get_config().get_ttl();
-        let http_buffer: usize = *self.get_config().get_http_buffer();
+        let host: String = self.get().get_config().get_host().clone();
+        let port: usize = *self.get().get_config().get_port();
+        let nodelay: bool = *self.get().get_config().get_nodelay();
+        let linger: OptionDuration = *self.get().get_config().get_linger();
+        let ttl_opt: OptionU32 = *self.get().get_config().get_ttl();
+        let http_buffer: usize = *self.get().get_config().get_http_buffer();
         let addr: String = Self::format_host_port(&host, &port);
         let tcp_listener: TcpListener = TcpListener::bind(&addr)
             .await
@@ -335,21 +315,21 @@ impl Server {
     }
 
     async fn run_pre_upgrade_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
-        for pre_upgrade in self.get_pre_upgrade_hook().iter() {
+        for pre_upgrade in self.get().get_pre_upgrade_hook().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| pre_upgrade(ctx))
                 .await;
         }
     }
 
     async fn run_connected_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
-        for connected in self.get_connected_hook().iter() {
+        for connected in self.get().get_connected_hook().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| connected(ctx))
                 .await;
         }
     }
 
     async fn run_request_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
-        for middleware in self.get_request_middleware().iter() {
+        for middleware in self.get().get_request_middleware().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| middleware(ctx))
                 .await;
         }
@@ -368,7 +348,7 @@ impl Server {
     }
 
     async fn run_response_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
-        for middleware in self.get_response_middleware().iter() {
+        for middleware in self.get().get_response_middleware().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| middleware(ctx))
                 .await;
         }
@@ -379,8 +359,11 @@ impl Server {
         let ctx: &Context = state.ctx;
         ctx.set_request(request).await;
         let mut lifecycle: Lifecycle = Lifecycle::Continue(request.is_enable_keep_alive());
-        let route_hook: OptionArcFnPinBoxSendSync =
-            self.get_route_matcher().resolve_route(&ctx, route).await;
+        let route_hook: OptionArcFnPinBoxSendSync = self
+            .get()
+            .get_route_matcher()
+            .resolve_route(&ctx, route)
+            .await;
         self.run_request_middleware(&ctx, &mut lifecycle).await;
         if let Lifecycle::Abort(request_keepalive) = lifecycle {
             return request_keepalive;
@@ -402,7 +385,10 @@ impl Server {
         let route: &String = first_request.get_path();
         let ctx: &Context = state.ctx;
         let mut lifecycle: Lifecycle = Lifecycle::Continue(true);
-        self.get_route_matcher().resolve_route(ctx, &route).await;
+        self.get()
+            .get_route_matcher()
+            .resolve_route(ctx, &route)
+            .await;
         self.run_pre_upgrade_hook(ctx, &mut lifecycle).await;
         if lifecycle.is_abort() {
             return;
@@ -414,12 +400,12 @@ impl Server {
         if lifecycle.is_abort() {
             return;
         }
-        if self.get_disable_ws_hook().contains(route) {
+        if self.get().get_disable_ws_hook().contains(route) {
             while self.request_hook(state, first_request).await {}
             return;
         }
         let stream: &ArcRwLockStream = state.stream;
-        let buffer: usize = *self.get_config().get_ws_buffer();
+        let buffer: usize = *self.get().get_config().get_ws_buffer();
         while let Ok(request) = Request::ws_from_stream(stream, buffer, first_request)
             .await
             .as_ref()
@@ -439,8 +425,8 @@ impl Server {
             return;
         }
         let route: &String = first_request.get_path();
-        let contains_disable_http_hook: bool = self.get_disable_http_hook().contains(route);
-        let buffer: usize = *self.get_config().get_http_buffer();
+        let contains_disable_http_hook: bool = self.get().get_disable_http_hook().contains(route);
+        let buffer: usize = *self.get().get_config().get_http_buffer();
         if contains_disable_http_hook {
             while self.request_hook(state, first_request).await {}
             return;

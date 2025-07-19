@@ -1,5 +1,15 @@
 use crate::*;
 
+impl Default for RouteMatcher {
+    fn default() -> Self {
+        Self {
+            static_routes: hash_map_xx_hash3_64(),
+            dynamic_routes: Vec::new(),
+            regex_routes: Vec::new(),
+        }
+    }
+}
+
 impl PartialEq for RouteSegment {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {

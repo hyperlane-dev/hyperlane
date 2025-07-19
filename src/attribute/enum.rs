@@ -1,10 +1,12 @@
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+use crate::*;
+
+#[derive(CustomDebug, Clone, PartialEq, Eq, Hash, DisplayDebug)]
 pub(crate) enum AttributeKey {
     External(String),
     Internal(InternalAttributeKey),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(CustomDebug, Clone, PartialEq, Eq, Hash, DisplayDebug)]
 pub(crate) enum InternalAttributeKey {
     PanicInfo,
 }

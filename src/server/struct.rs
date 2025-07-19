@@ -1,61 +1,90 @@
 use crate::*;
 
-#[derive(Data)]
+#[derive(Data, CustomDebug)]
 pub struct ServerBuilder {
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
     pub(super) config: ServerConfig,
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
     pub(super) route_matcher: RouteMatcher,
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
+    #[debug(skip)]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
     pub(super) request_middleware: VecArcFnPinBoxSendSync,
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
+    #[debug(skip)]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
     pub(super) response_middleware: VecArcFnPinBoxSendSync,
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
+    #[debug(skip)]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
     pub(super) pre_upgrade_hook: VecArcFnPinBoxSendSync,
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
+    #[debug(skip)]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
     pub(super) connected_hook: VecArcFnPinBoxSendSync,
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
     pub(super) disable_http_hook: HashSetXxHash3_64<String>,
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
     pub(super) disable_ws_hook: HashSetXxHash3_64<String>,
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
+    #[debug(skip)]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
     pub(super) error_hook: ArcErrorHandlerSendSync,
 }
 
-#[derive(Clone)]
+#[derive(Getter, Setter, Clone, CustomDebug)]
+pub struct ServerInner {
+    #[get(pub(super))]
+    #[set(pub(super))]
+    pub(super) config: ServerConfig,
+    #[get(pub(super))]
+    #[set(pub(super))]
+    pub(super) route_matcher: RouteMatcher,
+    #[debug(skip)]
+    #[get(pub(super))]
+    #[set(pub(super))]
+    pub(super) request_middleware: VecArcFnPinBoxSendSync,
+    #[debug(skip)]
+    #[get(pub(super))]
+    #[set(pub(super))]
+    pub(super) response_middleware: VecArcFnPinBoxSendSync,
+    #[debug(skip)]
+    #[get(pub(super))]
+    #[set(pub(super))]
+    pub(super) pre_upgrade_hook: VecArcFnPinBoxSendSync,
+    #[debug(skip)]
+    #[get(pub(super))]
+    #[set(pub(super))]
+    pub(super) connected_hook: VecArcFnPinBoxSendSync,
+    #[get(pub(super))]
+    #[set(pub(super))]
+    pub(super) disable_http_hook: HashSetXxHash3_64<String>,
+    #[get(pub(super))]
+    #[set(pub(super))]
+    pub(super) disable_ws_hook: HashSetXxHash3_64<String>,
+    #[debug(skip)]
+    #[get(pub(super))]
+    #[set(pub(super))]
+    pub(super) error_hook: ArcErrorHandlerSendSync,
+}
+
+#[derive(Clone, CustomDebug)]
 pub struct Server(pub(super) Arc<ServerInner>);
 
-pub struct ServerInner {
-    pub(super) config: ServerConfig,
-    pub(super) route_matcher: RouteMatcher,
-    pub(super) request_middleware: VecArcFnPinBoxSendSync,
-    pub(super) response_middleware: VecArcFnPinBoxSendSync,
-    pub(super) pre_upgrade_hook: VecArcFnPinBoxSendSync,
-    pub(super) connected_hook: VecArcFnPinBoxSendSync,
-    pub(super) disable_http_hook: HashSetXxHash3_64<String>,
-    pub(super) disable_ws_hook: HashSetXxHash3_64<String>,
-    pub(super) error_hook: ArcErrorHandlerSendSync,
-}
-
-#[derive(Clone)]
+#[derive(Clone, CustomDebug)]
 pub(crate) struct HandlerState<'a> {
     pub(super) stream: &'a ArcRwLockStream,
     pub(super) ctx: &'a Context,

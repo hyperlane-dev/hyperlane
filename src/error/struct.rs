@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(Debug, Default, Clone, Getter)]
+#[derive(CustomDebug, Default, Clone, Getter, DisplayDebug)]
 pub struct PanicInfo {
     pub(super) message: String,
     pub(super) location: Option<String>,

@@ -27,7 +27,6 @@ pub(crate) use core::hash::BuildHasherDefault;
 pub(crate) use std::{
     collections::HashMap,
     error::Error as StdError,
-    fmt::{self, Display},
     future::Future,
     hint,
     io::{self, Write},

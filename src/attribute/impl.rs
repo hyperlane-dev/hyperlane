@@ -17,14 +17,3 @@ impl From<InternalAttributeKey> for AttributeKey {
         AttributeKey::Internal(key)
     }
 }
-
-impl ToString for AttributeKey {
-    fn to_string(&self) -> String {
-        match self {
-            AttributeKey::External(key) => key.clone(),
-            AttributeKey::Internal(internal_key) => match internal_key {
-                InternalAttributeKey::PanicInfo => "__internal_panic_info".to_string(),
-            },
-        }
-    }
-}
