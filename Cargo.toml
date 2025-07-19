@@ -19,7 +19,7 @@ exclude = [
 ]
 
 [dependencies]
-http-type = "4.42.1"
+http-type = "4.44.0"
 lombok-macros = "1.13.1"
 serde = "1.0.219"
 regex = "1.11.1"

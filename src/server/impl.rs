@@ -84,7 +84,7 @@ impl Server {
 
     pub fn set_nodelay(self, nodelay: bool) -> Self {
         let mut server: ServerInner = self.get_clone();
-        server.get_mut_config().set_nodelay(nodelay);
+        server.get_mut_config().set_nodelay(Some(nodelay));
         Self(Arc::new(server))
     }
 
@@ -266,8 +266,8 @@ impl Server {
         let config: &ServerConfig = self.get().get_config();
         let host: &str = config.get_host();
         let port: usize = *config.get_port();
-        let nodelay: bool = *config.get_nodelay();
-        let linger: OptionDuration = *config.get_linger();
+        let nodelay_opt: Option<bool> = *config.get_nodelay();
+        let linger_opt: OptionDuration = *config.get_linger();
         let ttl_opt: OptionU32 = *config.get_ttl();
         let http_buffer: usize = *config.get_http_buffer();
         let addr: String = Self::format_host_port(host, &port);
@@ -275,8 +275,10 @@ impl Server {
             .await
             .map_err(|err| ServerError::TcpBind(err.to_string()))?;
         while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
-            let _ = stream.set_nodelay(nodelay);
-            let _ = stream.set_linger(linger);
+            let _ = stream.set_linger(linger_opt);
+            if let Some(nodelay) = nodelay_opt {
+                let _ = stream.set_nodelay(nodelay);
+            }
             if let Some(ttl) = ttl_opt {
                 let _ = stream.set_ttl(ttl);
             }
