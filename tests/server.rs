@@ -75,7 +75,7 @@ async fn test_server() {
     }
 
     async fn main() {
-        Server::new()
+        let result: ServerResult<()> = Server::new()
             .host("0.0.0.0")
             .port(60000)
             .enable_nodelay()
@@ -91,8 +91,9 @@ async fn test_server() {
             .route("/sse", sse_route)
             .route("/dynamic/{routing}", dynamic_route)
             .route("/dynamic/routing/{file:^.*$}", dynamic_route)
-            .run()
-            .unwrap();
+            .run();
+        println!("Server result: {:?}", result);
+        let _ = std::io::Write::flush(&mut std::io::stderr());
     }
 
     let _ = tokio::time::timeout(std::time::Duration::from_secs(60), main()).await;

@@ -114,7 +114,7 @@ async fn dynamic_route(ctx: Context) {
 
 #[tokio::main]
 async fn main() {
-    Server::new()
+    let result: ServerResult<()> = Server::new()
         .host("0.0.0.0")
         .port(60000)
         .enable_nodelay()
@@ -130,8 +130,9 @@ async fn main() {
         .route("/sse", sse_route)
         .route("/dynamic/{routing}", dynamic_route)
         .route("/dynamic/routing/{file:^.*$}", dynamic_route)
-        .run()
-        .unwrap();
+        .run();
+    println!("Server result: {:?}", result);
+    let _ = std::io::Write::flush(&mut std::io::stderr());
 }
 ```
 

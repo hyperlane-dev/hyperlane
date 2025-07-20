@@ -32,6 +32,8 @@ pub(crate) use std::{
     panic::{PanicHookInfo, set_hook},
     pin::Pin,
     sync::Arc,
+    task::{Context as TaskContext, Poll, Wake, Waker},
+    thread::yield_now,
     time::Duration,
 };
 
@@ -40,7 +42,6 @@ pub(crate) use regex::Regex;
 pub(crate) use serde::de::DeserializeOwned;
 pub(crate) use tokio::{
     net::{TcpListener, TcpStream},
-    runtime::Handle,
     sync::{RwLockReadGuard, RwLockWriteGuard},
-    task::{JoinError, block_in_place},
+    task::JoinError,
 };
