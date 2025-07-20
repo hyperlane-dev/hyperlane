@@ -1,4 +1,4 @@
 use crate::*;
 
-pub(crate) type RwLockWriteInnerContext<'a> = RwLockWriteGuard<'a, InnerContext>;
-pub(crate) type RwLockReadInnerContext<'a> = RwLockReadGuard<'a, InnerContext>;
+pub(crate) type RwLockWriteContextInner<'a> = RwLockWriteGuard<'a, ContextInner>;
+pub(crate) type RwLockReadContextInner<'a> = RwLockReadGuard<'a, ContextInner>;

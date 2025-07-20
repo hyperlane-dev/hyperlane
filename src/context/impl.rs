@@ -1,13 +1,13 @@
 use crate::*;
 
 impl Context {
-    pub(crate) fn from_internal_context(ctx: InnerContext) -> Self {
+    pub(crate) fn from_internal_context(ctx: ContextInner) -> Self {
         Self(arc_rwlock(ctx))
     }
 
     pub(crate) fn create_context(stream: &ArcRwLockStream, request: &Request) -> Context {
         Context::from_internal_context({
-            let mut internal_ctx: InnerContext = InnerContext::default();
+            let mut internal_ctx: ContextInner = ContextInner::default();
             internal_ctx
                 .set_stream(Some(stream.clone()))
                 .set_request(request.clone());
@@ -15,11 +15,11 @@ impl Context {
         })
     }
 
-    async fn read(&self) -> RwLockReadInnerContext {
+    async fn read(&self) -> RwLockReadContextInner {
         self.get_0().read().await
     }
 
-    async fn write(&self) -> RwLockWriteInnerContext {
+    async fn write(&self) -> RwLockWriteContextInner {
         self.get_0().write().await
     }
 

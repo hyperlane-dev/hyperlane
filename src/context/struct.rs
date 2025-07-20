@@ -1,7 +1,7 @@
 use crate::*;
 
 #[derive(Clone, Data, Default, CustomDebug, DisplayDebug)]
-pub struct InnerContext {
+pub struct ContextInner {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
@@ -33,4 +33,4 @@ pub struct InnerContext {
 }
 
 #[derive(Clone, Default, Getter, CustomDebug, DisplayDebug)]
-pub struct Context(#[get(pub(super))] pub(super) ArcRwLock<InnerContext>);
+pub struct Context(#[get(pub(super))] pub(super) ArcRwLock<ContextInner>);
