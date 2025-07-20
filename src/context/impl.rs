@@ -94,6 +94,10 @@ impl Context {
             .map(|socket_addr: SocketAddr| socket_addr.ip())
     }
 
+    pub async fn get_request_version(&self) -> RequestVersion {
+        self.read().await.get_request().get_version().clone()
+    }
+
     pub async fn get_route_params(&self) -> RouteParams {
         self.read().await.get_route_params().clone()
     }
@@ -111,59 +115,6 @@ impl Context {
         self.get_socket_addr()
             .await
             .map(|socket_addr: SocketAddr| socket_addr.port())
-    }
-
-    async fn internal_send_hook(&self, upgrade_ws: bool) -> ResponseResult {
-        if self.get_closed().await {
-            return Err(ResponseError::ConnectionClosed);
-        }
-        if let Some(stream) = self.get_stream().await {
-            let is_ws: bool = self.get_request_upgrade_type().await.is_ws();
-            if !upgrade_ws && is_ws {
-                return Err(ResponseError::MethodNotSupported(
-                    "websocket does not support calling this method".to_owned(),
-                ));
-            }
-            let response_res: ResponseData = self.write().await.get_mut_response().build();
-            return stream.send(&response_res).await;
-        }
-        Err(ResponseError::NotFoundStream)
-    }
-
-    pub async fn send(&self) -> ResponseResult {
-        self.internal_send_hook(false).await
-    }
-
-    pub async fn send_once(&self) -> ResponseResult {
-        let res: ResponseResult = self.send().await;
-        self.closed().await;
-        res
-    }
-
-    pub async fn send_body(&self) -> ResponseResult {
-        if self.get_closed().await {
-            return Err(ResponseError::ConnectionClosed);
-        }
-        if let Some(stream) = self.get_stream().await {
-            let is_ws: bool = self.get_request_upgrade_type().await.is_ws();
-            let response_body: ResponseBody = self.get_response_body().await;
-            return stream.send_body_conditional(&response_body, is_ws).await;
-        }
-        Err(ResponseError::NotFoundStream)
-    }
-
-    pub async fn send_once_body(&self) -> ResponseResult {
-        let res: ResponseResult = self.send_body().await;
-        self.closed().await;
-        res
-    }
-
-    pub async fn flush(&self) -> ResponseResult {
-        if let Some(stream) = self.get_stream().await {
-            stream.flush().await;
-            return Ok(());
-        }
-        Err(ResponseError::NotFoundStream)
     }
 
     pub async fn get_request_method(&self) -> RequestMethod {
@@ -659,5 +610,58 @@ impl Context {
         } else {
             Lifecycle::Continue(keep_alive)
         };
+    }
+
+    async fn internal_send_hook(&self, upgrade_ws: bool) -> ResponseResult {
+        if self.get_closed().await {
+            return Err(ResponseError::ConnectionClosed);
+        }
+        if let Some(stream) = self.get_stream().await {
+            let is_ws: bool = self.get_request_upgrade_type().await.is_ws();
+            if !upgrade_ws && is_ws {
+                return Err(ResponseError::MethodNotSupported(
+                    "websocket does not support calling this method".to_owned(),
+                ));
+            }
+            let response_res: ResponseData = self.write().await.get_mut_response().build();
+            return stream.send(&response_res).await;
+        }
+        Err(ResponseError::NotFoundStream)
+    }
+
+    pub async fn send(&self) -> ResponseResult {
+        self.internal_send_hook(false).await
+    }
+
+    pub async fn send_once(&self) -> ResponseResult {
+        let res: ResponseResult = self.send().await;
+        self.closed().await;
+        res
+    }
+
+    pub async fn send_body(&self) -> ResponseResult {
+        if self.get_closed().await {
+            return Err(ResponseError::ConnectionClosed);
+        }
+        if let Some(stream) = self.get_stream().await {
+            let is_ws: bool = self.get_request_upgrade_type().await.is_ws();
+            let response_body: ResponseBody = self.get_response_body().await;
+            return stream.send_body_conditional(&response_body, is_ws).await;
+        }
+        Err(ResponseError::NotFoundStream)
+    }
+
+    pub async fn send_once_body(&self) -> ResponseResult {
+        let res: ResponseResult = self.send_body().await;
+        self.closed().await;
+        res
+    }
+
+    pub async fn flush(&self) -> ResponseResult {
+        if let Some(stream) = self.get_stream().await {
+            stream.flush().await;
+            return Ok(());
+        }
+        Err(ResponseError::NotFoundStream)
     }
 }
