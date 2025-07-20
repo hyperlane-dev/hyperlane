@@ -1,6 +1,6 @@
 use hyperlane::*;
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_server() {
     async fn connected_hook(ctx: Context) {
         if !ctx.get_request().await.is_ws() {
