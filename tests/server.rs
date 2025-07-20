@@ -1,6 +1,6 @@
 use hyperlane::*;
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_server() {
     async fn connected_hook(ctx: Context) {
         if !ctx.get_request().await.is_ws() {
@@ -75,23 +75,25 @@ async fn test_server() {
     }
 
     async fn main() {
-        let result: ServerResult<()> = Server::new()
-            .host("0.0.0.0")
-            .port(60000)
-            .enable_nodelay()
-            .disable_linger()
-            .http_buffer(4096)
-            .ws_buffer(4096)
-            .connected_hook(connected_hook)
-            .pre_upgrade_hook(request_middleware)
-            .request_middleware(request_middleware)
-            .response_middleware(response_middleware)
-            .route("/", root_route)
-            .route("/ws", ws_route)
-            .route("/sse", sse_route)
-            .route("/dynamic/{routing}", dynamic_route)
+        let server: Server = Server::new();
+        server.host("0.0.0.0").await;
+        server.port(60000).await;
+        server.enable_nodelay().await;
+        server.disable_linger().await;
+        server.http_buffer(4096).await;
+        server.ws_buffer(4096).await;
+        server.connected_hook(connected_hook).await;
+        server.pre_upgrade_hook(request_middleware).await;
+        server.request_middleware(request_middleware).await;
+        server.response_middleware(response_middleware).await;
+        server.route("/", root_route).await;
+        server.route("/ws", ws_route).await;
+        server.route("/sse", sse_route).await;
+        server.route("/dynamic/{routing}", dynamic_route).await;
+        server
             .route("/dynamic/routing/{file:^.*$}", dynamic_route)
-            .run();
+            .await;
+        let result: ServerResult<()> = server.run().await;
         println!("Server result: {:?}", result);
         let _ = std::io::Write::flush(&mut std::io::stderr());
     }

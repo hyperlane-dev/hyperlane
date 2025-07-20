@@ -6,7 +6,6 @@ mod hook;
 mod lifecycle;
 mod route;
 mod server;
-mod util;
 
 pub use attribute::*;
 pub use context::*;
@@ -14,7 +13,6 @@ pub use error::*;
 pub use hook::*;
 pub use route::*;
 pub use server::*;
-pub use util::*;
 
 pub use http_type::*;
 
@@ -40,7 +38,6 @@ pub(crate) use regex::Regex;
 pub(crate) use serde::de::DeserializeOwned;
 pub(crate) use tokio::{
     net::{TcpListener, TcpStream},
-    runtime::Handle,
     sync::{RwLockReadGuard, RwLockWriteGuard},
-    task::{JoinError, block_in_place},
+    task::JoinError,
 };

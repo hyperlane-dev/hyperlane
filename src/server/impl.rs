@@ -36,223 +36,189 @@ impl Server {
         self.get_0().write().await
     }
 
-    pub fn host<T: ToString>(&self, host: T) -> &Self {
-        sync_block_on(async {
-            self.get_write()
-                .await
-                .get_mut_config()
-                .set_host(host.to_string());
-        });
+    pub async fn host<T: ToString>(&self, host: T) -> &Self {
+        self.get_write()
+            .await
+            .get_mut_config()
+            .set_host(host.to_string());
         self
     }
 
-    pub fn port(&self, port: usize) -> &Self {
-        sync_block_on(async {
-            self.get_write().await.get_mut_config().set_port(port);
-        });
+    pub async fn port(&self, port: usize) -> &Self {
+        self.get_write().await.get_mut_config().set_port(port);
         self
     }
 
-    pub fn http_buffer(&self, buffer: usize) -> &Self {
+    pub async fn http_buffer(&self, buffer: usize) -> &Self {
         let buffer: usize = if buffer == 0 {
             DEFAULT_BUFFER_SIZE
         } else {
             buffer
         };
-        sync_block_on(async {
-            self.get_write()
-                .await
-                .get_mut_config()
-                .set_http_buffer(buffer);
-        });
+        self.get_write()
+            .await
+            .get_mut_config()
+            .set_http_buffer(buffer);
         self
     }
 
-    pub fn ws_buffer(&self, buffer: usize) -> &Self {
+    pub async fn ws_buffer(&self, buffer: usize) -> &Self {
         let buffer: usize = if buffer == 0 {
             DEFAULT_BUFFER_SIZE
         } else {
             buffer
         };
-        sync_block_on(async {
-            self.get_write()
-                .await
-                .get_mut_config()
-                .set_ws_buffer(buffer);
-        });
+        self.get_write()
+            .await
+            .get_mut_config()
+            .set_ws_buffer(buffer);
         self
     }
 
-    pub fn error_hook<F, Fut>(&self, func: F) -> &Self
+    pub async fn error_hook<F, Fut>(&self, func: F) -> &Self
     where
         F: ErrorHandler<Fut>,
         Fut: FutureSendStatic<()>,
     {
-        sync_block_on(async {
-            self.get_write()
-                .await
-                .set_error_hook(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
-        });
+        self.get_write()
+            .await
+            .set_error_hook(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
         self
     }
 
-    pub fn set_nodelay(&self, nodelay: bool) -> &Self {
-        sync_block_on(async {
-            self.get_write()
-                .await
-                .get_mut_config()
-                .set_nodelay(Some(nodelay));
-        });
+    pub async fn set_nodelay(&self, nodelay: bool) -> &Self {
+        self.get_write()
+            .await
+            .get_mut_config()
+            .set_nodelay(Some(nodelay));
         self
     }
 
-    pub fn enable_nodelay(&self) -> &Self {
-        self.set_nodelay(true)
+    pub async fn enable_nodelay(&self) -> &Self {
+        self.set_nodelay(true).await
     }
 
-    pub fn disable_nodelay(&self) -> &Self {
-        self.set_nodelay(false)
+    pub async fn disable_nodelay(&self) -> &Self {
+        self.set_nodelay(false).await
     }
 
-    pub fn set_linger(&self, linger: OptionDuration) -> &Self {
-        sync_block_on(async {
-            self.get_write().await.get_mut_config().set_linger(linger);
-        });
+    pub async fn set_linger(&self, linger: OptionDuration) -> &Self {
+        self.get_write().await.get_mut_config().set_linger(linger);
         self
     }
 
-    pub fn enable_linger(&self, linger: Duration) -> &Self {
-        self.set_linger(Some(linger))
+    pub async fn enable_linger(&self, linger: Duration) -> &Self {
+        self.set_linger(Some(linger)).await
     }
 
-    pub fn disable_linger(&self) -> &Self {
-        self.set_linger(None)
+    pub async fn disable_linger(&self) -> &Self {
+        self.set_linger(None).await
     }
 
-    pub fn set_ttl(&self, ttl: u32) -> &Self {
-        sync_block_on(async {
-            self.get_write().await.get_mut_config().set_ttl(Some(ttl));
-        });
+    pub async fn set_ttl(&self, ttl: u32) -> &Self {
+        self.get_write().await.get_mut_config().set_ttl(Some(ttl));
         self
     }
 
-    pub fn route<R, F, Fut>(&self, route: R, func: F) -> &Self
+    pub async fn route<R, F, Fut>(&self, route: R, func: F) -> &Self
     where
         R: ToString,
         F: FnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
     {
         let route_str: String = route.to_string();
-        sync_block_on(async {
-            self.get_write()
-                .await
-                .get_mut_route_matcher()
-                .add(
-                    &route_str,
-                    Arc::new(move |ctx: Context| Box::pin(func(ctx))),
-                )
-                .unwrap_or_else(|err| panic!("{}", err));
-        });
+        self.get_write()
+            .await
+            .get_mut_route_matcher()
+            .add(
+                &route_str,
+                Arc::new(move |ctx: Context| Box::pin(func(ctx))),
+            )
+            .unwrap_or_else(|err| panic!("{}", err));
         self
     }
 
-    pub fn request_middleware<F, Fut>(&self, func: F) -> &Self
+    pub async fn request_middleware<F, Fut>(&self, func: F) -> &Self
     where
         F: FnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
     {
-        sync_block_on(async {
-            self.get_write()
-                .await
-                .get_mut_request_middleware()
-                .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
-        });
+        self.get_write()
+            .await
+            .get_mut_request_middleware()
+            .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
         self
     }
 
-    pub fn response_middleware<F, Fut>(&self, func: F) -> &Self
+    pub async fn response_middleware<F, Fut>(&self, func: F) -> &Self
     where
         F: FnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
     {
-        sync_block_on(async {
-            self.get_write()
-                .await
-                .get_mut_response_middleware()
-                .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
-        });
+        self.get_write()
+            .await
+            .get_mut_response_middleware()
+            .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
         self
     }
 
-    pub fn pre_upgrade_hook<F, Fut>(&self, func: F) -> &Self
+    pub async fn pre_upgrade_hook<F, Fut>(&self, func: F) -> &Self
     where
         F: FnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
     {
-        sync_block_on(async {
-            self.get_write()
-                .await
-                .get_mut_pre_upgrade_hook()
-                .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
-        });
+        self.get_write()
+            .await
+            .get_mut_pre_upgrade_hook()
+            .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
         self
     }
 
-    pub fn connected_hook<F, Fut>(&self, func: F) -> &Self
+    pub async fn connected_hook<F, Fut>(&self, func: F) -> &Self
     where
         F: FnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
     {
-        sync_block_on(async {
-            self.get_write()
-                .await
-                .get_mut_connected_hook()
-                .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
-        });
+        self.get_write()
+            .await
+            .get_mut_connected_hook()
+            .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
         self
     }
 
-    pub fn enable_http_hook<R: ToString>(&self, route: R) -> &Self {
+    pub async fn enable_http_hook<R: ToString>(&self, route: R) -> &Self {
         let route_string: String = route.to_string();
-        sync_block_on(async {
-            self.get_write()
-                .await
-                .get_mut_disable_http_hook()
-                .remove(&route_string);
-        });
+        self.get_write()
+            .await
+            .get_mut_disable_http_hook()
+            .remove(&route_string);
         self
     }
 
-    pub fn disable_http_hook<R: ToString>(&self, route: R) -> &Self {
+    pub async fn disable_http_hook<R: ToString>(&self, route: R) -> &Self {
         let route_string: String = route.to_string();
-        sync_block_on(async {
-            self.get_write()
-                .await
-                .get_mut_disable_http_hook()
-                .insert(route_string);
-        });
+        self.get_write()
+            .await
+            .get_mut_disable_http_hook()
+            .insert(route_string);
         self
     }
 
-    pub fn enable_ws_hook<R: ToString>(&self, route: R) -> &Self {
+    pub async fn enable_ws_hook<R: ToString>(&self, route: R) -> &Self {
         let route_string: String = route.to_string();
-        sync_block_on(async {
-            self.get_write()
-                .await
-                .get_mut_disable_ws_hook()
-                .remove(&route_string);
-        });
+        self.get_write()
+            .await
+            .get_mut_disable_ws_hook()
+            .remove(&route_string);
         self
     }
 
-    pub fn disable_ws_hook<R: ToString>(&self, route: R) -> &Self {
+    pub async fn disable_ws_hook<R: ToString>(&self, route: R) -> &Self {
         let route_string: String = route.to_string();
-        sync_block_on(async {
-            self.get_write()
-                .await
-                .get_mut_disable_ws_hook()
-                .insert(route_string);
-        });
+        self.get_write()
+            .await
+            .get_mut_disable_ws_hook()
+            .insert(route_string);
         self
     }
 
@@ -260,10 +226,10 @@ impl Server {
         format!("{}{}{}", host, COLON_SPACE_SYMBOL, port)
     }
 
-    fn init_panic_hook(&self) {
-        let server_clone = self.clone();
+    async fn init_panic_hook(&self) {
+        let server_clone: Server = self.clone();
         let error_hook: ArcErrorHandlerSendSync =
-            sync_block_on(async { server_clone.get_read().await.get_error_hook().clone() });
+            server_clone.get_read().await.get_error_hook().clone();
         set_hook(Box::new(move |panic: &PanicHookInfo<'_>| {
             let panic_struct: Panic = Panic::from_panic_hook(panic);
             let ctx: Context = Context::default();
@@ -504,11 +470,9 @@ impl Server {
         self.handle_ws_requests(state, first_request, &route).await;
     }
 
-    pub fn run(&self) -> ServerResult<()> {
-        self.init_panic_hook();
-        sync_block_on(async {
-            let tcp_listener: TcpListener = self.create_tcp_listener().await?;
-            self.accept_connections(&tcp_listener).await
-        })
+    pub async fn run(&self) -> ServerResult<()> {
+        self.init_panic_hook().await;
+        let tcp_listener: TcpListener = self.create_tcp_listener().await?;
+        self.accept_connections(&tcp_listener).await
     }
 }
