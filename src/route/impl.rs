@@ -199,6 +199,45 @@ impl RouteMatcher {
         Ok(())
     }
 
+    pub(crate) fn remove(&mut self, pattern: &str) -> bool {
+        if let Ok(route_pattern) = RoutePattern::new(pattern) {
+            if route_pattern.is_static() {
+                return self.get_mut_static_routes().remove(pattern).is_some();
+            }
+            let target_vec: &mut VecRoutePatternArcFnPinBoxSendSync = if route_pattern.is_dynamic()
+            {
+                self.get_mut_dynamic_routes()
+            } else {
+                self.get_mut_regex_routes()
+            };
+            if let Some(pos) = target_vec
+                .iter()
+                .position(|(tmp_pattern, _)| tmp_pattern == &route_pattern)
+            {
+                target_vec.remove(pos);
+                return true;
+            }
+        }
+        false
+    }
+
+    pub(crate) fn match_route(&self, path: &str) -> bool {
+        if self.get_static_routes().contains_key(path) {
+            return true;
+        }
+        for (pattern, _) in self.get_dynamic_routes().iter() {
+            if pattern.match_path(path).is_some() {
+                return true;
+            }
+        }
+        for (pattern, _) in self.get_regex_routes().iter() {
+            if pattern.match_path(path).is_some() {
+                return true;
+            }
+        }
+        false
+    }
+
     pub(crate) async fn resolve_route(
         &self,
         ctx: &Context,

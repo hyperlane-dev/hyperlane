@@ -12,15 +12,17 @@ async fn test_server() {
 
     async fn request_middleware(ctx: Context) {
         let socket_addr: String = ctx.get_socket_addr_or_default_string().await;
-        ctx.set_response_header(SERVER, HYPERLANE)
+        ctx.set_response_version(HttpVersion::HTTP1_1)
+            .await
+            .set_response_status_code(200)
+            .await
+            .set_response_header(SERVER, HYPERLANE)
             .await
             .set_response_header(CONNECTION, KEEP_ALIVE)
             .await
             .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
             .await
             .set_response_header("SocketAddr", socket_addr)
-            .await
-            .set_response_version(HttpVersion::HTTP1_1)
             .await;
     }
 
@@ -29,6 +31,8 @@ async fn test_server() {
     }
 
     async fn root_route(ctx: Context) {
+        let path: RequestPath = ctx.get_request_path().await;
+        let response_body: String = format!("Hello hyperlane => {}", path);
         let cookie1: String = CookieBuilder::new("key1", "key2").http_only().build();
         let cookie2: String = CookieBuilder::new("key2", "key2").http_only().build();
         ctx.set_response_status_code(200)
@@ -37,7 +41,7 @@ async fn test_server() {
             .await
             .set_response_header(SET_COOKIE, cookie2)
             .await
-            .set_response_body("Hello hyperlane => /")
+            .set_response_body(response_body)
             .await;
     }
 
@@ -45,7 +49,7 @@ async fn test_server() {
         let key: RequestHeadersValueItem = ctx
             .get_request_header_back(SEC_WEBSOCKET_KEY)
             .await
-            .unwrap();
+            .unwrap_or_default();
         let request_body: Vec<u8> = ctx.get_request_body().await;
         let _ = ctx.set_response_body(key).await.send_body().await;
         let _ = ctx.set_response_body(request_body).await.send_body().await;
@@ -53,9 +57,7 @@ async fn test_server() {
 
     async fn sse_route(ctx: Context) {
         let _ = ctx
-            .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
-            .await
-            .set_response_status_code(200)
+            .replace_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
             .await
             .send()
             .await;

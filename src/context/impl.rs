@@ -422,21 +422,19 @@ impl Context {
     pub async fn upgrade_to_ws(&self) -> ResponseResult {
         if let Some(key) = &self.get_request_header_back(SEC_WEBSOCKET_KEY).await {
             let accept_key: String = WebSocketFrame::generate_accept_key(key);
-            let version: HttpVersion = self.get_response_version().await;
             let result: ResponseResult = self
                 .set_response_version(HttpVersion::HTTP1_1)
                 .await
                 .set_response_status_code(101)
                 .await
-                .set_response_header(UPGRADE, WEBSOCKET)
+                .replace_response_header(UPGRADE, WEBSOCKET)
                 .await
-                .set_response_header(CONNECTION, UPGRADE)
+                .replace_response_header(CONNECTION, UPGRADE)
                 .await
-                .set_response_header(SEC_WEBSOCKET_ACCEPT, accept_key)
+                .replace_response_header(SEC_WEBSOCKET_ACCEPT, accept_key)
                 .await
                 .internal_send_hook(true)
                 .await;
-            self.set_response_version(version).await;
             return result;
         }
         Err(ResponseError::WebSocketHandShake(format!(

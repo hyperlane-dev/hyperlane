@@ -9,7 +9,7 @@ pub struct ServerInner {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) route_matcher: RouteMatcher,
+    pub(super) route: RouteMatcher,
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
@@ -33,11 +33,11 @@ pub struct ServerInner {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) disable_http_hook: HashSetXxHash3_64<String>,
+    pub(super) disable_http_hook: RouteMatcher,
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) disable_ws_hook: HashSetXxHash3_64<String>,
+    pub(super) disable_ws_hook: RouteMatcher,
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
