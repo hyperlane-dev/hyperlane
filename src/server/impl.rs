@@ -251,7 +251,7 @@ impl Server {
             let ctx: Context = Context::default();
             let error_hook_clone: ArcErrorHandlerSendSync = error_hook.clone();
             tokio::spawn(async move {
-                let _ = ctx.set_panic(panic_struct).await;
+                ctx.set_panic(panic_struct).await;
                 error_hook_clone(ctx).await;
             });
         }));
