@@ -448,7 +448,7 @@ impl Context {
         T: AnySendSyncClone,
     {
         self.write().await.get_mut_attributes().insert(
-            AttributeKey::External(key.to_string()).to_string(),
+            AttributeKey::External(key.to_owned()).to_string(),
             Arc::new(value),
         );
         self
@@ -465,7 +465,7 @@ impl Context {
         self.read()
             .await
             .get_attributes()
-            .get(&AttributeKey::External(key.to_string()).to_string())
+            .get(&AttributeKey::External(key.to_owned()).to_string())
             .and_then(|arc| arc.downcast_ref::<T>())
             .cloned()
     }
@@ -474,7 +474,7 @@ impl Context {
         self.write()
             .await
             .get_mut_attributes()
-            .remove(&AttributeKey::External(key.to_string()).to_string());
+            .remove(&AttributeKey::External(key.to_owned()).to_string());
         self
     }
 
