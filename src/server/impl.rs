@@ -224,14 +224,14 @@ impl Server {
         self
     }
 
-    pub(crate) async fn contains_disable_http_hook<'a>(&self, route: &'a str) -> bool {
+    async fn contains_disable_http_hook<'a>(&self, route: &'a str) -> bool {
         self.get_read()
             .await
             .get_disable_http_hook()
             .match_route(route)
     }
 
-    pub(crate) async fn contains_disable_ws_hook<'a>(&self, route: &'a str) -> bool {
+    async fn contains_disable_ws_hook<'a>(&self, route: &'a str) -> bool {
         self.get_read()
             .await
             .get_disable_ws_hook()
@@ -258,11 +258,9 @@ impl Server {
     }
 
     async fn handle_panic_with_context(&self, ctx: &Context, panic: &Panic) {
-        let ctx_clone: Context = ctx.clone();
         let panic_clone: Panic = panic.clone();
-        let _ = ctx_clone.set_panic(panic_clone).await;
-        let error_hook = self.get_read().await.get_error_hook().clone();
-        error_hook(ctx_clone).await;
+        let _ = ctx.set_panic(panic_clone).await;
+        self.get_read().await.get_error_hook()(ctx.clone()).await;
     }
 
     async fn handle_task_panic(&self, ctx: &Context, join_error: JoinError) {
