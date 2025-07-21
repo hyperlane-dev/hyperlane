@@ -1,7 +1,7 @@
 use crate::*;
 
 #[tokio::test]
-async fn panic() {
+async fn get_panic_from_context() {
     let ctx: Context = Context::default();
     let set_panic: Panic = Panic::new(
         Some("test".to_string()),
@@ -14,7 +14,7 @@ async fn panic() {
 }
 
 #[tokio::test]
-async fn panic_from_join_error() {
+async fn get_panic_from_join_error() {
     let message: &'static str = "Test panic message";
     let join_handle: JoinHandle<()> = tokio::spawn(async {
         panic!("{}", message.to_string());
@@ -29,4 +29,20 @@ async fn panic_from_join_error() {
             .unwrap_or_default()
             .contains(message)
     );
+}
+
+#[tokio::test]
+async fn run_set_func() {
+    let ctx: Context = Context::default();
+    const KEY: &str = "string";
+    const PARAM: &str = "test";
+    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| {
+        return msg.to_string();
+    };
+    ctx.set_attribute(KEY, func).await;
+    let get_key = ctx
+        .get_attribute::<&(dyn Fn(&str) -> String + Send + Sync)>(KEY)
+        .await
+        .unwrap();
+    assert_eq!(get_key(PARAM), func(PARAM));
 }
