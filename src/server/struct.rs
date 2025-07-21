@@ -42,7 +42,7 @@ pub struct ServerInner {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) error_hook: ArcErrorHandlerSendSync,
+    pub(super) panic_hook: ArcErrorHandlerSendSync,
 }
 
 #[derive(Clone, Getter, CustomDebug, DisplayDebug)]

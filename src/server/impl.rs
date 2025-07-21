@@ -11,7 +11,7 @@ impl Default for ServerInner {
             connected_hook: vec![],
             disable_http_hook: RouteMatcher::new(),
             disable_ws_hook: RouteMatcher::new(),
-            error_hook: Arc::new(|ctx: Context| Box::pin(default_error_hook(ctx))),
+            panic_hook: Arc::new(|ctx: Context| Box::pin(default_panic_hook(ctx))),
         }
     }
 }
@@ -75,14 +75,14 @@ impl Server {
         self
     }
 
-    pub async fn error_hook<F, Fut>(&self, func: F) -> &Self
+    pub async fn panic_hook<F, Fut>(&self, func: F) -> &Self
     where
         F: ErrorHandler<Fut>,
         Fut: FutureSendStatic<()>,
     {
         self.get_write()
             .await
-            .set_error_hook(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
+            .set_panic_hook(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
         self
     }
 
@@ -244,15 +244,15 @@ impl Server {
 
     async fn init_panic_hook(&self) {
         let server_clone: Server = self.clone();
-        let error_hook: ArcErrorHandlerSendSync =
-            server_clone.get_read().await.get_error_hook().clone();
+        let panic_hook: ArcErrorHandlerSendSync =
+            server_clone.get_read().await.get_panic_hook().clone();
         set_hook(Box::new(move |panic: &PanicHookInfo<'_>| {
             let panic_struct: Panic = Panic::from_panic_hook(panic);
             let ctx: Context = Context::default();
-            let error_hook_clone: ArcErrorHandlerSendSync = error_hook.clone();
+            let panic_hook_clone: ArcErrorHandlerSendSync = panic_hook.clone();
             tokio::spawn(async move {
                 ctx.set_panic(panic_struct).await;
-                error_hook_clone(ctx).await;
+                panic_hook_clone(ctx).await;
             });
         }));
     }
@@ -260,7 +260,7 @@ impl Server {
     async fn handle_panic_with_context(&self, ctx: &Context, panic: &Panic) {
         let panic_clone: Panic = panic.clone();
         let _ = ctx.set_panic(panic_clone).await;
-        self.get_read().await.get_error_hook()(ctx.clone()).await;
+        self.get_read().await.get_panic_hook()(ctx.clone()).await;
     }
 
     async fn handle_task_panic(&self, ctx: &Context, join_error: JoinError) {

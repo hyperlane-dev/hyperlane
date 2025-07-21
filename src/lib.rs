@@ -4,6 +4,7 @@ mod context;
 mod error;
 mod hook;
 mod lifecycle;
+mod panic;
 mod route;
 mod server;
 mod tests;
@@ -12,6 +13,7 @@ pub use attribute::*;
 pub use context::*;
 pub use error::*;
 pub use hook::*;
+pub use panic::*;
 pub use route::*;
 pub use server::*;
 
@@ -23,7 +25,6 @@ pub(crate) use lifecycle::*;
 pub(crate) use std::{
     any::Any,
     collections::HashMap,
-    error::Error as StdError,
     future::Future,
     io::{self, Write},
     net::SocketAddr,
