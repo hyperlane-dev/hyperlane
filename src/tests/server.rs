@@ -1,7 +1,7 @@
-use hyperlane::*;
+use crate::*;
 
 #[tokio::test]
-async fn test_server() {
+async fn server() {
     async fn connected_hook(ctx: Context) {
         if !ctx.get_request().await.is_ws() {
             return;

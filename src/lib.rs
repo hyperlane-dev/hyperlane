@@ -6,6 +6,7 @@ mod hook;
 mod lifecycle;
 mod route;
 mod server;
+mod tests;
 
 pub use attribute::*;
 pub use context::*;
@@ -41,3 +42,6 @@ pub(crate) use tokio::{
     sync::{RwLockReadGuard, RwLockWriteGuard},
     task::JoinError,
 };
+
+#[cfg(test)]
+pub(crate) use tokio::task::JoinHandle;

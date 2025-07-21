@@ -1,8 +1,7 @@
-use hyperlane::{tokio::task::JoinHandle, *};
-use std::sync::Arc;
+use crate::*;
 
 #[tokio::test]
-async fn test_server_send_sync() {
+async fn server_send_sync() {
     fn assert_send<T: Send>() {}
     fn assert_sync<T: Sync>() {}
     fn assert_send_sync<T: Send + Sync>() {}
@@ -12,7 +11,7 @@ async fn test_server_send_sync() {
 }
 
 #[tokio::test]
-async fn test_server_clone_across_threads() {
+async fn server_clone_across_threads() {
     let server: Server = Server::new()
         .route("/test", |_| async move {})
         .await
@@ -27,7 +26,7 @@ async fn test_server_clone_across_threads() {
 }
 
 #[tokio::test]
-async fn test_server_share_across_threads() {
+async fn server_share_across_threads() {
     let server: Arc<Server> = Arc::new(
         Server::new()
             .route("/test", |_| async move {})
