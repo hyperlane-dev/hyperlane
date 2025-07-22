@@ -133,9 +133,9 @@ impl Context {
         self.read().await.get_request().get_querys().clone()
     }
 
-    pub async fn get_request_query<T>(&self, key: T) -> OptionRequestQuerysValue
+    pub async fn get_request_query<K>(&self, key: K) -> OptionRequestQuerysValue
     where
-        T: Into<RequestHeadersKey>,
+        K: Into<RequestHeadersKey>,
     {
         self.read().await.get_request().get_query(key)
     }
@@ -148,9 +148,9 @@ impl Context {
         self.read().await.get_request().get_body_string()
     }
 
-    pub async fn get_request_body_json<T>(&self) -> ResultJsonError<T>
+    pub async fn get_request_body_json<J>(&self) -> ResultJsonError<J>
     where
-        T: DeserializeOwned,
+        J: DeserializeOwned,
     {
         self.read().await.get_request().get_body_json()
     }
@@ -312,9 +312,9 @@ impl Context {
         self.read().await.get_response().get_body_string()
     }
 
-    pub async fn get_response_body_json<T>(&self) -> ResultJsonError<T>
+    pub async fn get_response_body_json<J>(&self) -> ResultJsonError<J>
     where
-        T: DeserializeOwned,
+        J: DeserializeOwned,
     {
         self.read().await.get_response().get_body_json()
     }
@@ -388,17 +388,17 @@ impl Context {
         self
     }
 
-    pub async fn set_response_body<T>(&self, body: T) -> &Self
+    pub async fn set_response_body<B>(&self, body: B) -> &Self
     where
-        T: Into<ResponseBody>,
+        B: Into<ResponseBody>,
     {
         self.write().await.get_mut_response().set_body(body);
         self
     }
 
-    pub async fn set_response_reason_phrase<T>(&self, reason_phrase: T) -> &Self
+    pub async fn set_response_reason_phrase<P>(&self, reason_phrase: P) -> &Self
     where
-        T: Into<ResponseReasonPhrase>,
+        P: Into<ResponseReasonPhrase>,
     {
         self.write()
             .await
@@ -443,9 +443,9 @@ impl Context {
         )))
     }
 
-    pub async fn set_attribute<T>(&self, key: &str, value: T) -> &Self
+    pub async fn set_attribute<V>(&self, key: &str, value: V) -> &Self
     where
-        T: AnySendSyncClone,
+        V: AnySendSyncClone,
     {
         self.write().await.get_mut_attributes().insert(
             AttributeKey::External(key.to_owned()).to_string(),
@@ -458,15 +458,15 @@ impl Context {
         self.read().await.get_attributes().clone()
     }
 
-    pub async fn get_attribute<T>(&self, key: &str) -> Option<T>
+    pub async fn get_attribute<V>(&self, key: &str) -> Option<V>
     where
-        T: AnySendSyncClone,
+        V: AnySendSyncClone,
     {
         self.read()
             .await
             .get_attributes()
             .get(&AttributeKey::External(key.to_owned()).to_string())
-            .and_then(|arc| arc.downcast_ref::<T>())
+            .and_then(|arc| arc.downcast_ref::<V>())
             .cloned()
     }
 
@@ -478,9 +478,9 @@ impl Context {
         self
     }
 
-    async fn set_internal_attribute<T>(&self, key: InternalAttributeKey, value: T) -> &Self
+    async fn set_internal_attribute<V>(&self, key: InternalAttributeKey, value: V) -> &Self
     where
-        T: AnySendSyncClone,
+        V: AnySendSyncClone,
     {
         self.write()
             .await
@@ -489,15 +489,15 @@ impl Context {
         self
     }
 
-    async fn get_internal_attribute<T>(&self, key: InternalAttributeKey) -> Option<T>
+    async fn get_internal_attribute<V>(&self, key: InternalAttributeKey) -> Option<V>
     where
-        T: AnySendSyncClone,
+        V: AnySendSyncClone,
     {
         self.read()
             .await
             .get_attributes()
             .get(&AttributeKey::Internal(key).to_string())
-            .and_then(|arc| arc.downcast_ref::<T>())
+            .and_then(|arc| arc.downcast_ref::<V>())
             .cloned()
     }
 
