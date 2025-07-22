@@ -280,6 +280,7 @@ impl Server {
         ctx.should_abort(lifecycle).await;
         if let Err(join_error) = result {
             if join_error.is_panic() {
+                *lifecycle = Lifecycle::Abort(false);
                 self.handle_task_panic(&ctx, join_error).await;
             }
         }
