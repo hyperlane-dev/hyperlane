@@ -277,10 +277,9 @@ impl Server {
         F: Fn(Context) -> PinBoxFutureSendStatic,
     {
         let result: ResultJoinError<()> = tokio::spawn(hook_func(ctx.clone())).await;
-        ctx.should_abort(lifecycle).await;
+        ctx.update_lifecycle_status(lifecycle).await;
         if let Err(join_error) = result {
             if join_error.is_panic() {
-                *lifecycle = Lifecycle::Abort(false);
                 self.handle_task_panic(&ctx, join_error).await;
             }
         }
@@ -383,7 +382,7 @@ impl Server {
         let route: &str = request.get_path();
         let ctx: &Context = state.ctx;
         ctx.set_request(request).await;
-        let mut lifecycle: Lifecycle = Lifecycle::Continue(request.is_enable_keep_alive());
+        let mut lifecycle: Lifecycle = Lifecycle::new_continue(request.is_enable_keep_alive());
         let route_hook: OptionArcFnPinBoxSendSync = self
             .get_read()
             .await
@@ -391,21 +390,15 @@ impl Server {
             .resolve_route(ctx, route)
             .await;
         self.run_request_middleware(ctx, &mut lifecycle).await;
-        if matches!(lifecycle, Lifecycle::Abort(_)) {
-            return match lifecycle {
-                Lifecycle::Continue(res) | Lifecycle::Abort(res) => res,
-            };
+        if lifecycle.is_abort() {
+            return lifecycle.keep_alive();
         }
         self.run_route_hook(ctx, &route_hook, &mut lifecycle).await;
-        if matches!(lifecycle, Lifecycle::Abort(_)) {
-            return match lifecycle {
-                Lifecycle::Continue(res) | Lifecycle::Abort(res) => res,
-            };
+        if lifecycle.is_abort() {
+            return lifecycle.keep_alive();
         }
         self.run_response_middleware(ctx, &mut lifecycle).await;
-        match lifecycle {
-            Lifecycle::Continue(res) | Lifecycle::Abort(res) => res,
-        }
+        lifecycle.keep_alive()
     }
 
     async fn handle_http_requests<'a>(&self, state: &HandlerState<'a>, request: &Request) {
@@ -425,7 +418,7 @@ impl Server {
 
     async fn http_hook<'a>(&self, state: &HandlerState<'a>, request: &Request) {
         let ctx: &Context = state.ctx;
-        let mut lifecycle: Lifecycle = Lifecycle::Continue(true);
+        let mut lifecycle: Lifecycle = Lifecycle::new();
         self.run_connected_hook(ctx, &mut lifecycle).await;
         if lifecycle.is_abort() {
             return;
@@ -456,7 +449,7 @@ impl Server {
     async fn ws_hook<'a>(&self, state: &HandlerState<'a>, request: &mut Request) {
         let route: String = request.get_path().clone();
         let ctx: &Context = state.ctx;
-        let mut lifecycle: Lifecycle = Lifecycle::Continue(true);
+        let mut lifecycle: Lifecycle = Lifecycle::new();
         self.get_read()
             .await
             .get_route()

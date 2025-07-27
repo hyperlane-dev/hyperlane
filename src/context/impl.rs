@@ -597,17 +597,10 @@ impl Context {
         Err(RequestError::GetTcpStream)
     }
 
-    pub(crate) async fn should_abort(&self, lifecycle: &mut Lifecycle) {
-        let keep_alive: bool = !self.get_closed().await
-            && matches!(
-                lifecycle,
-                Lifecycle::Continue(true) | Lifecycle::Abort(true)
-            );
-        *lifecycle = if self.get_aborted().await {
-            Lifecycle::Abort(keep_alive)
-        } else {
-            Lifecycle::Continue(keep_alive)
-        };
+    pub(crate) async fn update_lifecycle_status(&self, lifecycle: &mut Lifecycle) {
+        let keep_alive: bool = !self.get_closed().await && lifecycle.is_keep_alive();
+        let aborted: bool = self.get_aborted().await;
+        lifecycle.update_status(aborted, keep_alive);
     }
 
     async fn internal_send_hook(&self, upgrade_ws: bool) -> ResponseResult {
