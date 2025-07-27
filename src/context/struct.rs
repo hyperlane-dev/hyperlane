@@ -25,11 +25,11 @@ pub struct ContextInner {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    attributes: HashMapArcAnySendSync,
+    route_params: RouteParams,
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    route_params: RouteParams,
+    attributes: HashMapArcAnySendSync,
 }
 
 #[derive(Clone, Default, Getter, CustomDebug, DisplayDebug)]

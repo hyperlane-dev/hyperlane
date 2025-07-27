@@ -23,40 +23,46 @@ impl Context {
         self.get_0().write().await
     }
 
+    pub async fn get_aborted(&self) -> bool {
+        *self.read().await.get_aborted()
+    }
+
+    pub async fn set_aborted(&self, aborted: bool) -> &Self {
+        self.write().await.set_aborted(aborted);
+        self
+    }
+
+    pub async fn aborted(&self) -> &Self {
+        self.set_aborted(true).await;
+        self
+    }
+
+    pub async fn cancel_aborted(&self) -> &Self {
+        self.set_aborted(false).await;
+        self
+    }
+
+    pub async fn get_closed(&self) -> bool {
+        *self.read().await.get_closed()
+    }
+
+    pub async fn set_closed(&self, closed: bool) -> &Self {
+        self.write().await.set_closed(closed);
+        self
+    }
+
+    pub async fn closed(&self) -> &Self {
+        self.set_closed(true).await;
+        self
+    }
+
+    pub async fn cancel_closed(&self) -> &Self {
+        self.set_closed(false).await;
+        self
+    }
+
     pub async fn get_stream(&self) -> OptionArcRwLockStream {
         self.read().await.get_stream().clone()
-    }
-
-    pub async fn get_request(&self) -> Request {
-        self.read().await.get_request().clone()
-    }
-
-    pub async fn get_response(&self) -> Response {
-        self.read().await.get_response().clone()
-    }
-
-    pub async fn with_request<F, Fut, R>(&self, func: F) -> R
-    where
-        F: Fn(Request) -> Fut,
-        Fut: FutureSendStatic<R>,
-    {
-        func(self.read().await.get_request().clone()).await
-    }
-
-    pub async fn with_response<F, Fut, R>(&self, func: F) -> R
-    where
-        F: Fn(Response) -> Fut,
-        Fut: FutureSendStatic<R>,
-    {
-        func(self.read().await.get_response().clone()).await
-    }
-
-    pub async fn get_request_string(&self) -> String {
-        self.read().await.get_request().get_string()
-    }
-
-    pub async fn get_response_string(&self) -> String {
-        self.read().await.get_response().get_string()
     }
 
     pub async fn get_socket_addr(&self) -> OptionSocketAddr {
@@ -94,22 +100,35 @@ impl Context {
             .map(|socket_addr: SocketAddr| socket_addr.ip())
     }
 
-    pub async fn get_request_version(&self) -> RequestVersion {
-        self.read().await.get_request().get_version().clone()
-    }
-
-    pub async fn get_route_params(&self) -> RouteParams {
-        self.read().await.get_route_params().clone()
-    }
-
-    pub async fn get_route_param(&self, name: &str) -> OptionString {
-        self.read().await.get_route_params().get(name).cloned()
-    }
-
     pub async fn get_socket_port(&self) -> OptionSocketPort {
         self.get_socket_addr()
             .await
             .map(|socket_addr: SocketAddr| socket_addr.port())
+    }
+
+    pub async fn get_request(&self) -> Request {
+        self.read().await.get_request().clone()
+    }
+
+    pub(crate) async fn set_request(&self, request_data: &Request) -> &Self {
+        self.write().await.set_request(request_data.clone());
+        self
+    }
+
+    pub async fn with_request<F, Fut, R>(&self, func: F) -> R
+    where
+        F: Fn(Request) -> Fut,
+        Fut: FutureSendStatic<R>,
+    {
+        func(self.read().await.get_request().clone()).await
+    }
+
+    pub async fn get_request_string(&self) -> String {
+        self.read().await.get_request().get_string()
+    }
+
+    pub async fn get_request_version(&self) -> RequestVersion {
+        self.read().await.get_request().get_version().clone()
     }
 
     pub async fn get_request_method(&self) -> RequestMethod {
@@ -179,15 +198,15 @@ impl Context {
     where
         K: Into<RequestHeadersKey>,
     {
-        self.read().await.get_request().get_header_len(key)
+        self.read().await.get_request().get_header_length(key)
     }
 
-    pub async fn get_request_headers_values_len(&self) -> usize {
-        self.read().await.get_request().get_headers_values_len()
+    pub async fn get_request_headers_values_length(&self) -> usize {
+        self.read().await.get_request().get_headers_values_length()
     }
 
-    pub async fn get_request_headers_len(&self) -> usize {
-        self.read().await.get_request().get_headers_len()
+    pub async fn get_request_headers_length(&self) -> usize {
+        self.read().await.get_request().get_headers_length()
     }
 
     pub async fn has_request_header<K>(&self, key: K) -> bool
@@ -223,8 +242,34 @@ impl Context {
         self.read().await.get_request().get_upgrade_type()
     }
 
+    pub async fn get_response(&self) -> Response {
+        self.read().await.get_response().clone()
+    }
+
+    pub async fn set_response(&self, response: Response) -> &Self {
+        self.write().await.set_response(response);
+        self
+    }
+
+    pub async fn with_response<F, Fut, R>(&self, func: F) -> R
+    where
+        F: Fn(Response) -> Fut,
+        Fut: FutureSendStatic<R>,
+    {
+        func(self.read().await.get_response().clone()).await
+    }
+
+    pub async fn get_response_string(&self) -> String {
+        self.read().await.get_response().get_string()
+    }
+
     pub async fn get_response_version(&self) -> ResponseVersion {
         self.read().await.get_response().get_version().clone()
+    }
+
+    pub async fn set_response_version(&self, version: ResponseVersion) -> &Self {
+        self.write().await.get_mut_response().set_version(version);
+        self
     }
 
     pub async fn get_response_headers(&self) -> ResponseHeaders {
@@ -236,6 +281,15 @@ impl Context {
         K: Into<ResponseHeadersKey>,
     {
         self.read().await.get_response().get_header(key)
+    }
+
+    pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self
+    where
+        K: Into<String>,
+        V: Into<String>,
+    {
+        self.write().await.get_mut_response().set_header(key, value);
+        self
     }
 
     pub async fn get_response_header_front<K>(&self, key: K) -> OptionResponseHeadersValueItem
@@ -270,96 +324,19 @@ impl Context {
             .has_header_value(key, value)
     }
 
-    pub async fn get_response_headers_len(&self) -> usize {
-        self.read().await.get_response().get_headers_len()
+    pub async fn get_response_headers_length(&self) -> usize {
+        self.read().await.get_response().get_headers_length()
     }
 
     pub async fn get_response_header_len<K>(&self, key: K) -> usize
     where
         K: Into<ResponseHeadersKey>,
     {
-        self.read().await.get_response().get_header_len(key)
+        self.read().await.get_response().get_header_length(key)
     }
 
-    pub async fn get_response_headers_values_len(&self) -> usize {
-        self.read().await.get_response().get_headers_values_len()
-    }
-
-    pub async fn get_response_cookies(&self) -> Cookies {
-        self.get_response_header_back(COOKIE)
-            .await
-            .map(|data| Cookie::parse(&data))
-            .unwrap_or_default()
-    }
-
-    pub async fn get_response_cookie<K>(&self, key: K) -> OptionCookiesValue
-    where
-        K: Into<CookieKey>,
-    {
-        self.get_response_cookies().await.get(&key.into()).cloned()
-    }
-
-    pub async fn get_response_body(&self) -> ResponseBody {
-        self.read().await.get_response().get_body().clone()
-    }
-
-    pub async fn get_response_body_string(&self) -> String {
-        self.read().await.get_response().get_body_string()
-    }
-
-    pub async fn get_response_body_json<J>(&self) -> ResultJsonError<J>
-    where
-        J: DeserializeOwned,
-    {
-        self.read().await.get_response().get_body_json()
-    }
-
-    pub async fn get_response_reason_phrase(&self) -> ResponseReasonPhrase {
-        self.read().await.get_response().get_reason_phrase().clone()
-    }
-
-    pub async fn get_response_status_code(&self) -> ResponseStatusCode {
-        self.read().await.get_response().get_status_code().clone()
-    }
-
-    pub(crate) async fn set_request(&self, request_data: &Request) -> &Self {
-        self.write().await.set_request(request_data.clone());
-        self
-    }
-
-    pub(crate) async fn set_route_params(&self, params: RouteParams) -> &Self {
-        self.write().await.set_route_params(params);
-        self
-    }
-
-    pub async fn set_attribute<V>(&self, key: &str, value: V) -> &Self
-    where
-        V: AnySendSyncClone,
-    {
-        self.write().await.get_mut_attributes().insert(
-            AttributeKey::External(key.to_owned()).to_string(),
-            Arc::new(value),
-        );
-        self
-    }
-
-    pub async fn set_response(&self, response: Response) -> &Self {
-        self.write().await.set_response(response);
-        self
-    }
-
-    pub async fn set_response_version(&self, version: ResponseVersion) -> &Self {
-        self.write().await.get_mut_response().set_version(version);
-        self
-    }
-
-    pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self
-    where
-        K: Into<String>,
-        V: Into<String>,
-    {
-        self.write().await.get_mut_response().set_header(key, value);
-        self
+    pub async fn get_response_headers_values_length(&self) -> usize {
+        self.read().await.get_response().get_headers_values_length()
     }
 
     pub async fn replace_response_header<K, V>(&self, key: K, value: V) -> &Self
@@ -399,12 +376,45 @@ impl Context {
         self
     }
 
+    pub async fn get_response_cookies(&self) -> Cookies {
+        self.get_response_header_back(COOKIE)
+            .await
+            .map(|data| Cookie::parse(&data))
+            .unwrap_or_default()
+    }
+
+    pub async fn get_response_cookie<K>(&self, key: K) -> OptionCookiesValue
+    where
+        K: Into<CookieKey>,
+    {
+        self.get_response_cookies().await.get(&key.into()).cloned()
+    }
+
+    pub async fn get_response_body(&self) -> ResponseBody {
+        self.read().await.get_response().get_body().clone()
+    }
+
     pub async fn set_response_body<B>(&self, body: B) -> &Self
     where
         B: Into<ResponseBody>,
     {
         self.write().await.get_mut_response().set_body(body);
         self
+    }
+
+    pub async fn get_response_body_string(&self) -> String {
+        self.read().await.get_response().get_body_string()
+    }
+
+    pub async fn get_response_body_json<J>(&self) -> ResultJsonError<J>
+    where
+        J: DeserializeOwned,
+    {
+        self.read().await.get_response().get_body_json()
+    }
+
+    pub async fn get_response_reason_phrase(&self) -> ResponseReasonPhrase {
+        self.read().await.get_response().get_reason_phrase().clone()
     }
 
     pub async fn set_response_reason_phrase<P>(&self, reason_phrase: P) -> &Self
@@ -418,12 +428,111 @@ impl Context {
         self
     }
 
+    pub async fn get_response_status_code(&self) -> ResponseStatusCode {
+        self.read().await.get_response().get_status_code().clone()
+    }
+
     pub async fn set_response_status_code(&self, status_code: ResponseStatusCode) -> &Self {
         self.write()
             .await
             .get_mut_response()
             .set_status_code(status_code);
         self
+    }
+
+    pub async fn reset_response_body(&self) -> &Self {
+        self.set_response_body(ResponseBody::default()).await;
+        self
+    }
+
+    pub async fn get_route_params(&self) -> RouteParams {
+        self.read().await.get_route_params().clone()
+    }
+
+    pub(crate) async fn set_route_params(&self, params: RouteParams) -> &Self {
+        self.write().await.set_route_params(params);
+        self
+    }
+
+    pub async fn get_route_param(&self, name: &str) -> OptionString {
+        self.read().await.get_route_params().get(name).cloned()
+    }
+
+    pub async fn get_attributes(&self) -> HashMapArcAnySendSync {
+        self.read().await.get_attributes().clone()
+    }
+
+    pub async fn get_attribute<V>(&self, key: &str) -> Option<V>
+    where
+        V: AnySendSyncClone,
+    {
+        self.read()
+            .await
+            .get_attributes()
+            .get(&AttributeKey::External(key.to_owned()).to_string())
+            .and_then(|arc| arc.downcast_ref::<V>())
+            .cloned()
+    }
+
+    pub async fn set_attribute<V>(&self, key: &str, value: V) -> &Self
+    where
+        V: AnySendSyncClone,
+    {
+        self.write().await.get_mut_attributes().insert(
+            AttributeKey::External(key.to_owned()).to_string(),
+            Arc::new(value),
+        );
+        self
+    }
+
+    pub async fn remove_attribute(&self, key: &str) -> &Self {
+        self.write()
+            .await
+            .get_mut_attributes()
+            .remove(&AttributeKey::External(key.to_owned()).to_string());
+        self
+    }
+
+    pub async fn clear_attribute(&self) -> &Self {
+        self.write().await.get_mut_attributes().clear();
+        self
+    }
+
+    async fn get_internal_attribute<V>(&self, key: InternalAttributeKey) -> Option<V>
+    where
+        V: AnySendSyncClone,
+    {
+        self.read()
+            .await
+            .get_attributes()
+            .get(&AttributeKey::Internal(key).to_string())
+            .and_then(|arc| arc.downcast_ref::<V>())
+            .cloned()
+    }
+
+    async fn set_internal_attribute<V>(&self, key: InternalAttributeKey, value: V) -> &Self
+    where
+        V: AnySendSyncClone,
+    {
+        self.write()
+            .await
+            .get_mut_attributes()
+            .insert(AttributeKey::Internal(key).to_string(), Arc::new(value));
+        self
+    }
+
+    pub async fn get_panic(&self) -> OptionPanic {
+        self.get_internal_attribute(InternalAttributeKey::Panic)
+            .await
+    }
+
+    pub(crate) async fn set_panic(&self, panic: Panic) -> &Self {
+        self.set_internal_attribute(InternalAttributeKey::Panic, panic)
+            .await
+    }
+
+    pub async fn is_terminated(&self) -> bool {
+        self.get_aborted().await && self.get_closed().await
     }
 
     pub async fn is_enable_keep_alive(&self) -> bool {
@@ -452,115 +561,6 @@ impl Context {
             "missing {} header",
             SEC_WEBSOCKET_KEY
         )))
-    }
-
-    pub async fn get_attributes(&self) -> HashMapArcAnySendSync {
-        self.read().await.get_attributes().clone()
-    }
-
-    pub async fn get_attribute<V>(&self, key: &str) -> Option<V>
-    where
-        V: AnySendSyncClone,
-    {
-        self.read()
-            .await
-            .get_attributes()
-            .get(&AttributeKey::External(key.to_owned()).to_string())
-            .and_then(|arc| arc.downcast_ref::<V>())
-            .cloned()
-    }
-
-    pub async fn remove_attribute(&self, key: &str) -> &Self {
-        self.write()
-            .await
-            .get_mut_attributes()
-            .remove(&AttributeKey::External(key.to_owned()).to_string());
-        self
-    }
-
-    async fn set_internal_attribute<V>(&self, key: InternalAttributeKey, value: V) -> &Self
-    where
-        V: AnySendSyncClone,
-    {
-        self.write()
-            .await
-            .get_mut_attributes()
-            .insert(AttributeKey::Internal(key).to_string(), Arc::new(value));
-        self
-    }
-
-    async fn get_internal_attribute<V>(&self, key: InternalAttributeKey) -> Option<V>
-    where
-        V: AnySendSyncClone,
-    {
-        self.read()
-            .await
-            .get_attributes()
-            .get(&AttributeKey::Internal(key).to_string())
-            .and_then(|arc| arc.downcast_ref::<V>())
-            .cloned()
-    }
-
-    pub async fn clear_attribute(&self) -> &Self {
-        self.write().await.get_mut_attributes().clear();
-        self
-    }
-
-    pub(crate) async fn set_panic(&self, panic: Panic) -> &Self {
-        self.set_internal_attribute(InternalAttributeKey::Panic, panic)
-            .await
-    }
-
-    pub async fn get_panic(&self) -> OptionPanic {
-        self.get_internal_attribute(InternalAttributeKey::Panic)
-            .await
-    }
-
-    pub async fn get_aborted(&self) -> bool {
-        *self.read().await.get_aborted()
-    }
-
-    pub async fn set_aborted(&self, aborted: bool) -> &Self {
-        self.write().await.set_aborted(aborted);
-        self
-    }
-
-    pub async fn aborted(&self) -> &Self {
-        self.set_aborted(true).await;
-        self
-    }
-
-    pub async fn cancel_aborted(&self) -> &Self {
-        self.set_aborted(false).await;
-        self
-    }
-
-    pub async fn get_closed(&self) -> bool {
-        *self.read().await.get_closed()
-    }
-
-    pub async fn set_closed(&self, closed: bool) -> &Self {
-        self.write().await.set_closed(closed);
-        self
-    }
-
-    pub async fn closed(&self) -> &Self {
-        self.set_closed(true).await;
-        self
-    }
-
-    pub async fn cancel_closed(&self) -> &Self {
-        self.set_closed(false).await;
-        self
-    }
-
-    pub async fn is_terminated(&self) -> bool {
-        self.get_aborted().await && self.get_closed().await
-    }
-
-    pub async fn reset_response_body(&self) -> &Self {
-        self.set_response_body(ResponseBody::default()).await;
-        self
     }
 
     pub async fn http_from_stream(&self, buffer: usize) -> RequestReaderHandleResult {
