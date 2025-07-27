@@ -1,5 +1,15 @@
 use crate::*;
 
+/// The default panic handler provided by the server.
+///
+/// This function is invoked when a panic occurs during request processing and no custom
+/// panic hook has been configured. It logs the panic information to standard error
+/// and sends a `500 Internal Server Error` response to the client.
+///
+/// # Arguments
+///
+/// - `ctx` - The `Context` of the request during which the panic occurred.
+/// This is used to access panic details and to send the error response.
 pub(crate) async fn default_panic_hook(ctx: Context) {
     let request_string: String = ctx.get_request_string().await;
     let error: Panic = ctx.get_panic().await.unwrap_or_default();
