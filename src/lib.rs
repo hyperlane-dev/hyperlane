@@ -1,14 +1,14 @@
-//! # Hyperlane
+//! hyperlane
 //!
-//! Hyperlane is a lightweight and high-performance Rust HTTP server library
-//! designed to simplify network service development.
-//! It supports HTTP request parsing, response building, and TCP communication,
-//! making it ideal for building modern web services. Additionally,
-//! it provides support for request and response middleware, WebSocket, and Server-Sent Events (SSE),
-//! enabling flexible and efficient real-time communication. Built with pure Rust and standard library,
+//! hyperlane is a lightweight and high-performance Rust HTTP server library
+//! designed to simplify network service development. It supports HTTP request parsing,
+//! response building, and TCP communication, making it ideal for building modern
+//! web services. Additionally, it provides support for request and response middleware,
+//! WebSocket, and Server-Sent Events (SSE), enabling flexible and efficient
+//! real-time communication. Built with pure Rust and standard library,
 //! Hyperlane offers true cross-platform compatibility across Windows, Linux and macOS,
-//! with the same API experience on all platforms,
-//! powered by Tokio's async runtime for seamless networking without platform-specific dependencies.
+//! with the same API experience on all platforms, powered by Tokio's async runtime for
+//! seamless networking without platform-specific dependencies.
 
 // The `attribute` module provides custom attributes for route handling.
 mod attribute;
