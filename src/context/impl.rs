@@ -106,11 +106,6 @@ impl Context {
         self.read().await.get_route_params().get(name).cloned()
     }
 
-    pub(crate) async fn set_route_params(&self, params: RouteParams) -> &Self {
-        self.write().await.set_route_params(params);
-        self
-    }
-
     pub async fn get_socket_port(&self) -> OptionSocketPort {
         self.get_socket_addr()
             .await
@@ -332,6 +327,22 @@ impl Context {
         self
     }
 
+    pub(crate) async fn set_route_params(&self, params: RouteParams) -> &Self {
+        self.write().await.set_route_params(params);
+        self
+    }
+
+    pub async fn set_attribute<V>(&self, key: &str, value: V) -> &Self
+    where
+        V: AnySendSyncClone,
+    {
+        self.write().await.get_mut_attributes().insert(
+            AttributeKey::External(key.to_owned()).to_string(),
+            Arc::new(value),
+        );
+        self
+    }
+
     pub async fn set_response(&self, response: Response) -> &Self {
         self.write().await.set_response(response);
         self
@@ -443,17 +454,6 @@ impl Context {
         )))
     }
 
-    pub async fn set_attribute<V>(&self, key: &str, value: V) -> &Self
-    where
-        V: AnySendSyncClone,
-    {
-        self.write().await.get_mut_attributes().insert(
-            AttributeKey::External(key.to_owned()).to_string(),
-            Arc::new(value),
-        );
-        self
-    }
-
     pub async fn get_attributes(&self) -> HashMapArcAnySendSync {
         self.read().await.get_attributes().clone()
     }
@@ -517,7 +517,7 @@ impl Context {
     }
 
     pub async fn get_aborted(&self) -> bool {
-        *self.write().await.get_aborted()
+        *self.read().await.get_aborted()
     }
 
     pub async fn set_aborted(&self, aborted: bool) -> &Self {
@@ -536,7 +536,7 @@ impl Context {
     }
 
     pub async fn get_closed(&self) -> bool {
-        *self.write().await.get_closed()
+        *self.read().await.get_closed()
     }
 
     pub async fn set_closed(&self, closed: bool) -> &Self {
@@ -552,6 +552,10 @@ impl Context {
     pub async fn cancel_closed(&self) -> &Self {
         self.set_closed(false).await;
         self
+    }
+
+    pub async fn is_terminated(&self) -> bool {
+        self.get_aborted().await && self.get_closed().await
     }
 
     pub async fn reset_response_body(&self) -> &Self {
@@ -604,8 +608,8 @@ impl Context {
     }
 
     async fn internal_send_hook(&self, upgrade_ws: bool) -> ResponseResult {
-        if self.get_closed().await {
-            return Err(ResponseError::ConnectionClosed);
+        if self.is_terminated().await {
+            return Err(ResponseError::Terminated);
         }
         if let Some(stream) = self.get_stream().await {
             let is_ws: bool = self.get_request_upgrade_type().await.is_ws();
@@ -631,8 +635,8 @@ impl Context {
     }
 
     pub async fn send_body(&self) -> ResponseResult {
-        if self.get_closed().await {
-            return Err(ResponseError::ConnectionClosed);
+        if self.is_terminated().await {
+            return Err(ResponseError::Terminated);
         }
         if let Some(stream) = self.get_stream().await {
             let is_ws: bool = self.get_request_upgrade_type().await.is_ws();
