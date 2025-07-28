@@ -1,48 +1,48 @@
 use crate::*;
 
-/// Converts a string slice into an `AttributeKey`.
+/// Implementation of `From` trait for `AttributeKey`.
 impl From<&str> for AttributeKey {
-    /// This implementation creates an `External` attribute key from a string slice.
+    /// Converts a string slice into an `AttributeKey`.
     ///
     /// # Arguments
     ///
-    /// - `key` - A string slice that represents the attribute key.
+    /// - `&str` - The string slice to convert.
     ///
     /// # Returns
     ///
-    /// An `AttributeKey::External` variant containing the provided key.
+    /// - `AttributeKey` - The converted attribute key.
     fn from(key: &str) -> Self {
         AttributeKey::External(key.to_string())
     }
 }
 
-/// Converts a `String` into an `AttributeKey`.
+/// Implementation of `From` trait for `AttributeKey`.
 impl From<String> for AttributeKey {
-    /// This implementation creates an `External` attribute key from a `String`.
+    /// Converts a `String` into an `AttributeKey`.
     ///
     /// # Arguments
     ///
-    /// - `key` - A `String` that represents the attribute key.
+    /// - `String` - The string to convert.
     ///
     /// # Returns
     ///
-    /// An `AttributeKey::External` variant containing the provided key.
+    /// - `AttributeKey` - The converted attribute key.
     fn from(key: String) -> Self {
         AttributeKey::External(key)
     }
 }
 
-/// Converts an `InternalAttributeKey` into an `AttributeKey`.
+/// Implementation of `From` trait for `AttributeKey`.
 impl From<InternalAttributeKey> for AttributeKey {
-    /// This implementation wraps an `InternalAttributeKey` in the `Internal` variant of `AttributeKey`.
+    /// Converts an `InternalAttributeKey` into an `AttributeKey`.
     ///
     /// # Arguments
     ///
-    /// - `key` - An `InternalAttributeKey` to be converted.
+    /// - `InternalAttributeKey` - The internal attribute key to convert.
     ///
     /// # Returns
     ///
-    /// An `AttributeKey::Internal` variant containing the provided key.
+    /// - `AttributeKey` - The converted attribute key.
     fn from(key: InternalAttributeKey) -> Self {
         AttributeKey::Internal(key)
     }

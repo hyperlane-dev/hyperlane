@@ -1,13 +1,12 @@
 use crate::*;
 
-/// Provides a default implementation for `ServerInner`.
+/// Provides a default implementation for ServerInner.
 impl Default for ServerInner {
-    /// Creates a new `ServerInner` instance with default values.
+    /// Creates a new ServerInner instance with default values.
     ///
     /// # Returns
     ///
-    /// Returns a `ServerInner` with an empty configuration, new route matchers,
-    /// empty middleware and hook vectors, and the default panic hook.
+    /// - `ServerInner` - A new instance with default configuration.
     fn default() -> Self {
         Self {
             config: ServerConfig::default(),
@@ -24,27 +23,27 @@ impl Default for ServerInner {
 }
 
 impl<'a> HandlerState<'a> {
-    /// Creates a new `HandlerState` with the given stream and context.
+    /// Creates a new HandlerState instance.
     ///
     /// # Arguments
     ///
-    /// - `stream` - A reference to the underlying network stream for the connection.
-    /// - `ctx` - A reference to the request context.
+    /// - `&'a ArcRwLockStream` - The network stream.
+    /// - `&'a Context` - The request context.
     ///
     /// # Returns
     ///
-    /// A new `HandlerState` instance.
+    /// - `HandlerState` - The newly created handler state.
     pub(super) fn new(stream: &'a ArcRwLockStream, ctx: &'a Context) -> Self {
         Self { stream, ctx }
     }
 }
 
 impl Server {
-    /// Creates a new `Server` instance with default settings.
+    /// Creates a new Server instance with default settings.
     ///
     /// # Returns
     ///
-    /// Returns a new `Server` instance wrapped in a thread-safe `Arc<RwLock>`.
+    /// - `Server` - A new Server instance.
     pub fn new() -> Self {
         let server: ServerInner = ServerInner::default();
         Self(arc_rwlock(server))
@@ -52,35 +51,31 @@ impl Server {
 
     /// Acquires a read lock on the inner server data.
     ///
-    /// This method provides safe, shared, read-only access to the server's internal state.
-    ///
     /// # Returns
     ///
-    /// Returns a `RwLockReadGuardServerInner` that allows reading the `ServerInner` data.
+    /// - `RwLockReadGuardServerInner` - The read guard for ServerInner.
     async fn get_read(&self) -> RwLockReadGuardServerInner {
         self.get_0().read().await
     }
 
     /// Acquires a write lock on the inner server data.
     ///
-    /// This method provides safe, exclusive, mutable access to the server's internal state.
-    ///
     /// # Returns
     ///
-    /// Returns a `RwLockWriteGuardServerInner` that allows modifying the `ServerInner` data.
+    /// - `RwLockWriteGuardServerInner` - The write guard for ServerInner.
     async fn get_write(&self) -> RwLockWriteGuardServerInner {
         self.get_0().write().await
     }
 
-    /// Sets the host address for the server to bind to.
+    /// Sets the host address for the server.
     ///
     /// # Arguments
     ///
-    /// - `host` - The host address, e.g., "127.0.0.1" or "localhost".
+    /// - `T` - The host address implementing ToString.
     ///
     /// # Returns
     ///
-    /// A reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn host<T: ToString>(&self, host: T) -> &Self {
         self.get_write()
             .await
@@ -89,15 +84,15 @@ impl Server {
         self
     }
 
-    /// Sets the port for the server to listen on.
+    /// Sets the port number for the server.
     ///
     /// # Arguments
     ///
-    /// - `port` - The port number, e.g., 8080.
+    /// - `usize` - The port number.
     ///
     /// # Returns
     ///
-    /// A reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn port(&self, port: usize) -> &Self {
         self.get_write().await.get_mut_config().set_port(port);
         self
@@ -105,15 +100,13 @@ impl Server {
 
     /// Sets the read buffer size for HTTP connections.
     ///
-    /// If the provided buffer size is 0, it defaults to `DEFAULT_BUFFER_SIZE`.
-    ///
     /// # Arguments
     ///
-    /// - `buffer` - The buffer size in bytes.
+    /// - `usize` - The buffer size in bytes.
     ///
     /// # Returns
     ///
-    /// A reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn http_buffer(&self, buffer: usize) -> &Self {
         let buffer: usize = if buffer == 0 {
             DEFAULT_BUFFER_SIZE
@@ -129,15 +122,13 @@ impl Server {
 
     /// Sets the read buffer size for WebSocket connections.
     ///
-    /// If the provided buffer size is 0, it defaults to `DEFAULT_BUFFER_SIZE`.
-    ///
     /// # Arguments
     ///
-    /// - `buffer` - The buffer size in bytes.
+    /// - `usize` - The buffer size in bytes.
     ///
     /// # Returns
     ///
-    /// A reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn ws_buffer(&self, buffer: usize) -> &Self {
         let buffer: usize = if buffer == 0 {
             DEFAULT_BUFFER_SIZE
@@ -151,15 +142,16 @@ impl Server {
         self
     }
 
-    /// Sets a custom panic hook to handle panics that occur during request processing.
+    /// Sets a custom panic hook for request processing.
     ///
     /// # Arguments
     ///
-    /// - `func` - An error handler function that takes a `Context` and returns a future.
+    /// - `F` - The panic handler function implementing ErrorHandler<Fut>.
+    /// - `Fut` - The future type implementing FutureSendStatic<()>.
     ///
     /// # Returns
     ///
-    /// A reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn panic_hook<F, Fut>(&self, func: F) -> &Self
     where
         F: ErrorHandler<Fut>,
@@ -171,15 +163,15 @@ impl Server {
         self
     }
 
-    /// Sets the `TCP_NODELAY` option for the server's underlying TCP sockets.
+    /// Sets the TCP_NODELAY socket option.
     ///
     /// # Arguments
     ///
-    /// - `nodelay` - A boolean value to enable or disable the `TCP_NODELAY` option.
+    /// - `bool` - Whether to enable TCP_NODELAY.
     ///
     /// # Returns
     ///
-    /// A reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn set_nodelay(&self, nodelay: bool) -> &Self {
         self.get_write()
             .await
@@ -188,90 +180,84 @@ impl Server {
         self
     }
 
-    /// Enables the `TCP_NODELAY` option for the server's sockets.
-    ///
-    /// This is a convenience method that calls `set_nodelay(true)`.
+    /// Enables the TCP_NODELAY socket option.
     ///
     /// # Returns
     ///
-    /// Returns a reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn enable_nodelay(&self) -> &Self {
         self.set_nodelay(true).await
     }
 
-    /// Disables the `TCP_NODELAY` option for the server's sockets.
-    ///
-    /// This is a convenience method that calls `set_nodelay(false)`.
+    /// Disables the TCP_NODELAY socket option.
     ///
     /// # Returns
     ///
-    /// Returns a reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn disable_nodelay(&self) -> &Self {
         self.set_nodelay(false).await
     }
 
-    /// Sets the `SO_LINGER` option for the server's underlying TCP sockets.
+    /// Sets the SO_LINGER socket option.
     ///
     /// # Arguments
     ///
-    /// - `linger` - An `Option<Duration>` to configure the linger behavior.
+    /// - `OptionDuration` - The linger duration.
     ///
     /// # Returns
     ///
-    /// A reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn set_linger(&self, linger: OptionDuration) -> &Self {
         self.get_write().await.get_mut_config().set_linger(linger);
         self
     }
 
-    /// Enables the `SO_LINGER` option with a specified duration.
+    /// Enables the SO_LINGER socket option.
     ///
     /// # Arguments
     ///
-    /// - `linger` - The `Duration` to set for the linger option.
+    /// - `Duration` - The linger duration.
     ///
     /// # Returns
     ///
-    /// A reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn enable_linger(&self, linger: Duration) -> &Self {
         self.set_linger(Some(linger)).await
     }
 
-    /// Disables the `SO_LINGER` option.
-    ///
-    /// This is a convenience method that calls `set_linger(None)`.
+    /// Disables the SO_LINGER socket option.
     ///
     /// # Returns
     ///
-    /// Returns a reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn disable_linger(&self) -> &Self {
         self.set_linger(None).await
     }
 
-    /// Sets the `IP_TTL` (Time To Live) option for the server's underlying TCP sockets.
+    /// Sets the IP_TTL socket option.
     ///
     /// # Arguments
     ///
-    /// - `ttl` - The TTL value to set.
+    /// - `u32` - The TTL value.
     ///
     /// # Returns
     ///
-    /// A reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn set_ttl(&self, ttl: u32) -> &Self {
         self.get_write().await.get_mut_config().set_ttl(Some(ttl));
         self
     }
 
-    /// Adds a new route handler for a specific path.
+    /// Adds a route handler for a specific path.
     ///
     /// # Arguments
     ///
-    /// - `route` - The path pattern for the route (e.g., "/hello").
-    /// - `func` - The handler function to execute when the route is matched.
+    /// - `R` - The route path pattern implementing ToString.
+    /// - `F` - The handler function implementing FnSendSyncStatic<Fut>.
     ///
     /// # Returns
     ///
-    /// A reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn route<R, F, Fut>(&self, route: R, func: F) -> &Self
     where
         R: ToString,
@@ -290,17 +276,15 @@ impl Server {
         self
     }
 
-    /// Adds a request middleware to the server's processing pipeline.
-    ///
-    /// Request middleware is executed for every incoming request before the route handler.
+    /// Adds request middleware to the processing pipeline.
     ///
     /// # Arguments
     ///
-    /// - `func` - The middleware function to add.
+    /// - `F` - The middleware function implementing FnSendSyncStatic<Fut>.
     ///
     /// # Returns
     ///
-    /// A reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn request_middleware<F, Fut>(&self, func: F) -> &Self
     where
         F: FnSendSyncStatic<Fut>,
@@ -313,17 +297,15 @@ impl Server {
         self
     }
 
-    /// Adds a response middleware to the server's processing pipeline.
-    ///
-    /// Response middleware is executed for every outgoing response after the route handler.
+    /// Adds response middleware to the processing pipeline.
     ///
     /// # Arguments
     ///
-    /// - `func` - The middleware function to add.
+    /// - `F: FnSendSyncStatic<Fut>` - The middleware function.
     ///
     /// # Returns
     ///
-    /// A reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn response_middleware<F, Fut>(&self, func: F) -> &Self
     where
         F: FnSendSyncStatic<Fut>,
@@ -336,17 +318,15 @@ impl Server {
         self
     }
 
-    /// Adds a hook that is executed before a connection is upgraded to WebSocket.
-    ///
-    /// This is useful for tasks like authentication or validation before establishing the WebSocket connection.
+    /// Adds a hook executed before WebSocket connection upgrade.
     ///
     /// # Arguments
     ///
-    /// - `func` - The hook function to add.
+    /// - `F: FnSendSyncStatic<Fut>` - The hook function.
     ///
     /// # Returns
     ///
-    /// A reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn pre_upgrade_hook<F, Fut>(&self, func: F) -> &Self
     where
         F: FnSendSyncStatic<Fut>,
@@ -359,15 +339,15 @@ impl Server {
         self
     }
 
-    /// Adds a hook that is executed immediately after a new client connection is established.
+    /// Adds a hook executed after new client connection is established.
     ///
     /// # Arguments
     ///
-    /// - `func` - The hook function to add.
+    /// - `F: FnSendSyncStatic<Fut>` - The hook function.
     ///
     /// # Returns
     ///
-    /// A reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn connected_hook<F, Fut>(&self, func: F) -> &Self
     where
         F: FnSendSyncStatic<Fut>,
@@ -380,15 +360,15 @@ impl Server {
         self
     }
 
-    /// Re-enables the default HTTP handling for a specific route that was previously disabled.
+    /// Re-enables default HTTP handling for a route.
     ///
     /// # Arguments
     ///
-    /// - `route` - The route for which to enable the default HTTP hook.
+    /// - `R: ToString` - The route path.
     ///
     /// # Returns
     ///
-    /// A reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn enable_http_hook<R: ToString>(&self, route: R) -> &Self {
         let route_string: String = route.to_string();
         self.get_write()
@@ -398,17 +378,15 @@ impl Server {
         self
     }
 
-    /// Disables the default HTTP handling for a specific route.
-    ///
-    /// This can be used to implement custom, low-level handling for certain paths.
+    /// Disables default HTTP handling for a route.
     ///
     /// # Arguments
     ///
-    /// - `route` - The route for which to disable the default HTTP hook.
+    /// - `R: ToString` - The route path.
     ///
     /// # Returns
     ///
-    /// A reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn disable_http_hook<R: ToString>(&self, route: R) -> &Self {
         let route_string: String = route.to_string();
         let _ = self
@@ -419,15 +397,15 @@ impl Server {
         self
     }
 
-    /// Re-enables the default WebSocket handling for a specific route that was previously disabled.
+    /// Re-enables default WebSocket handling for a route.
     ///
     /// # Arguments
     ///
-    /// - `route` - The route for which to enable the default WebSocket hook.
+    /// - `R: ToString` - The route path.
     ///
     /// # Returns
     ///
-    /// A reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn enable_ws_hook<R: ToString>(&self, route: R) -> &Self {
         let route_string: String = route.to_string();
         self.get_write()
@@ -437,17 +415,15 @@ impl Server {
         self
     }
 
-    /// Disables the default WebSocket handling for a specific route.
-    ///
-    /// This allows for custom WebSocket frame processing or alternative upgrade logic.
+    /// Disables default WebSocket handling for a route.
     ///
     /// # Arguments
     ///
-    /// - `route` - The route for which to disable the default WebSocket hook.
+    /// - `R: ToString` - The route path.
     ///
     /// # Returns
     ///
-    /// A reference to `self` to allow for method chaining.
+    /// - `&Self` - Reference to self for method chaining.
     pub async fn disable_ws_hook<R: ToString>(&self, route: R) -> &Self {
         let route_string: String = route.to_string();
         let _ = self
@@ -458,15 +434,15 @@ impl Server {
         self
     }
 
-    /// Checks if the default HTTP hook is disabled for a given route.
+    /// Checks if default HTTP handling is disabled for a route.
     ///
     /// # Arguments
     ///
-    /// - `route` - The route path to check.
+    /// - `&str` - The route path.
     ///
     /// # Returns
     ///
-    /// `true` if the HTTP hook is disabled for the route, `false` otherwise.
+    /// - `bool` - True if HTTP handling is disabled.
     async fn contains_disable_http_hook<'a>(&self, route: &'a str) -> bool {
         self.get_read()
             .await
@@ -474,15 +450,15 @@ impl Server {
             .match_route(route)
     }
 
-    /// Checks if the default WebSocket hook is disabled for a given route.
+    /// Checks if default WebSocket handling is disabled for a route.
     ///
     /// # Arguments
     ///
-    /// - `route` - The route path to check.
+    /// - `&str` - The route path.
     ///
     /// # Returns
     ///
-    /// `true` if the WebSocket hook is disabled for the route, `false` otherwise.
+    /// - `bool` - True if WebSocket handling is disabled.
     async fn contains_disable_ws_hook<'a>(&self, route: &'a str) -> bool {
         self.get_read()
             .await
@@ -492,14 +468,16 @@ impl Server {
 
     /// Formats the host and port into a bindable address string.
     ///
+    /// Formats host and port into address string.
+    ///
     /// # Arguments
     ///
-    /// - `host` - The host address string.
-    /// - `port` - The port number.
+    /// - `str` - The host address.
+    /// - `usize` - The port number.
     ///
     /// # Returns
     ///
-    /// A formatted string in the format "host:port".
+    /// - `String` - The formatted address string.
     pub fn format_host_port(host: &str, port: &usize) -> String {
         format!("{}{}{}", host, COLON_SPACE_SYMBOL, port)
     }

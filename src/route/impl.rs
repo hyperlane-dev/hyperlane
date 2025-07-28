@@ -1,12 +1,12 @@
 use crate::*;
 
-/// Provides a default implementation for `RouteMatcher`.
+/// Provides a default implementation for RouteMatcher.
 impl Default for RouteMatcher {
-    /// Creates a new, empty `RouteMatcher`.
+    /// Creates a new, empty RouteMatcher.
     ///
     /// # Returns
     ///
-    /// Returns a `RouteMatcher` with empty storage for static, dynamic, and regex routes.
+    /// - `RouteMatcher` - A new RouteMatcher with empty storage for static, dynamic, and regex routes.
     fn default() -> Self {
         Self {
             static_routes: hash_map_xx_hash3_64(),
@@ -16,23 +16,19 @@ impl Default for RouteMatcher {
     }
 }
 
-/// Implements equality comparison for `RouteSegment`.
+/// Implements equality comparison for RouteSegment.
 ///
 /// This allows for checking if two route segments are functionally equivalent.
 impl PartialEq for RouteSegment {
-    /// Compares two `RouteSegment`s for equality.
-    ///
-    /// - `Static` segments are equal if their string content is identical.
-    /// - `Dynamic` segments are considered equal to any other `Dynamic` segment.
-    /// - `Regex` segments are equal if their parameter names are the same. The regex pattern itself is not compared.
+    /// Compares two RouteSegments for equality.
     ///
     /// # Arguments
     ///
-    /// - `other` - The other `RouteSegment` to compare against.
+    /// - `&RouteSegment` - The other RouteSegment to compare against.
     ///
     /// # Returns
     ///
-    /// `true` if the segments are equal, `false` otherwise.
+    /// - `bool` - true if the segments are equal, false otherwise.
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (RouteSegment::Static(segment1), RouteSegment::Static(segment2)) => {
@@ -45,22 +41,19 @@ impl PartialEq for RouteSegment {
     }
 }
 
-/// Implements equality comparison for `RoutePattern`.
+/// Implements equality comparison for RoutePattern.
 ///
 /// This is used to detect duplicate route patterns.
 impl PartialEq for RoutePattern {
-    /// Compares two `RoutePattern`s for equality.
-    ///
-    /// Two patterns are considered equal if they have the same number of segments and
-    /// each corresponding segment is equal according to `RouteSegment::eq`.
+    /// Compares two RoutePatterns for equality.
     ///
     /// # Arguments
     ///
-    /// - `other` - The other `RoutePattern` to compare against.
+    /// - `&RoutePattern` - The other RoutePattern to compare against.
     ///
     /// # Returns
     ///
-    /// `true` if the patterns are equal, `false` otherwise.
+    /// - `bool` - true if the patterns are equal, false otherwise.
     fn eq(&self, other: &Self) -> bool {
         if self.get_0().len() != other.get_0().len() {
             return false;
@@ -73,30 +66,30 @@ impl PartialEq for RoutePattern {
 }
 
 impl RoutePattern {
-    /// Creates a new `RoutePattern` by parsing a route string.
+    /// Creates a new RoutePattern by parsing a route string.
     ///
     /// # Arguments
     ///
-    /// - `route` - The raw route string to parse (e.g., "/users/:id").
+    /// - `&str` - The raw route string to parse.
     ///
     /// # Returns
     ///
-    /// A `Result` containing the new `RoutePattern` on success, or a `RouteError` on failure.
+    /// - `Result<RoutePattern, RouteError>` - The parsed RoutePattern on success, or RouteError on failure.
     pub(crate) fn new(route: &str) -> ResultRoutePatternRouteError {
         Ok(Self(Self::parse_route(route)?))
     }
 
-    /// Parses a raw route string into a vector of `RouteSegment`s.
+    /// Parses a raw route string into RouteSegments.
     ///
     /// This is the core logic for interpreting the route syntax.
     ///
     /// # Arguments
     ///
-    /// - `route` - The raw route string.
+    /// - `&str` - The raw route string.
     ///
     /// # Returns
     ///
-    /// A `Result` containing a vector of `RouteSegment`s on success, or a `RouteError` if parsing fails.
+    /// - `Result<Vec<RouteSegment>, RouteError>` - Vector of RouteSegments on success, or RouteError on failure.
     fn parse_route(route: &str) -> ResultVecRouteSegmentRouteError {
         if route.is_empty() {
             return Err(RouteError::EmptyPattern);
@@ -134,18 +127,17 @@ impl RoutePattern {
         Ok(segments)
     }
 
-    /// Matches this route pattern against a given request path.
+    /// Matches this route pattern against a request path.
     ///
-    /// If the pattern matches, it extracts any dynamic or regex parameters from the path.
+    /// If the pattern matches, extracts any dynamic or regex parameters.
     ///
     /// # Arguments
     ///
-    /// - `path` - The request path to match against.
+    /// - `&str` - The request path to match against.
     ///
     /// # Returns
     ///
-    /// `Some(RouteParams)` if the path matches, containing any extracted parameters.
-    /// `None` if the path does not match.
+    /// - `Option<RouteParams>` - Some with parameters if matched, None otherwise.
     pub(crate) fn match_path(&self, path: &str) -> OptionRouteParams {
         let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
         let route_segments_len: usize = self.get_0().len();
@@ -219,11 +211,9 @@ impl RoutePattern {
 
     /// Checks if the route pattern is static.
     ///
-    /// A pattern is static if it contains only `RouteSegment::Static` segments.
-    ///
     /// # Returns
     ///
-    /// `true` if the pattern is static, `false` otherwise.
+    /// - `bool` - true if the pattern is static, false otherwise.
     pub(crate) fn is_static(&self) -> bool {
         self.get_0()
             .iter()
@@ -232,12 +222,9 @@ impl RoutePattern {
 
     /// Checks if the route pattern is dynamic.
     ///
-    /// A pattern is dynamic if it contains at least one `RouteSegment::Dynamic` and no
-    /// `RouteSegment::Regex` segments.
-    ///
     /// # Returns
     ///
-    /// `true` if the pattern is dynamic, `false` otherwise.
+    /// - `bool` - true if the pattern is dynamic, false otherwise.
     pub(crate) fn is_dynamic(&self) -> bool {
         self.get_0()
             .iter()
@@ -250,11 +237,11 @@ impl RoutePattern {
 }
 
 impl RouteMatcher {
-    /// Creates a new, empty `RouteMatcher`.
+    /// Creates a new, empty RouteMatcher.
     ///
     /// # Returns
     ///
-    /// Returns a new `RouteMatcher` instance with initialized, empty route stores.
+    /// - `RouteMatcher` - A new RouteMatcher instance with empty route stores.
     pub(crate) fn new() -> Self {
         Self {
             static_routes: hash_map_xx_hash3_64(),
@@ -269,12 +256,12 @@ impl RouteMatcher {
     ///
     /// # Arguments
     ///
-    /// - `pattern` - The route pattern string.
-    /// - `handler` - The handler function for this route.
+    /// - `&str` - The route pattern string.
+    /// - `ArcFnPinBoxSendSync` - The handler function for this route.
     ///
     /// # Returns
     ///
-    /// `Ok(())` on success, or a `RouteError` if the pattern is a duplicate.
+    /// - `Result<(), RouteError>` - Ok on success, or RouteError if pattern is duplicate.
     pub(crate) fn add(&mut self, pattern: &str, handler: ArcFnPinBoxSendSync) -> ResultAddRoute {
         let route_pattern: RoutePattern = RoutePattern::new(pattern)?;
         if route_pattern.is_static() {
@@ -304,11 +291,11 @@ impl RouteMatcher {
     ///
     /// # Arguments
     ///
-    /// - `pattern` - The pattern of the route to remove.
+    /// - `&str` - The pattern of the route to remove.
     ///
     /// # Returns
     ///
-    /// `true` if a route was successfully removed, `false` otherwise.
+    /// - `bool` - true if route was removed, false otherwise.
     pub(crate) fn remove(&mut self, pattern: &str) -> bool {
         if let Ok(route_pattern) = RoutePattern::new(pattern) {
             if route_pattern.is_static() {
@@ -331,17 +318,15 @@ impl RouteMatcher {
         false
     }
 
-    /// Checks if a given path matches any of the registered routes.
-    ///
-    /// This is useful for checking if a route exists without needing the handler.
+    /// Checks if a path matches any registered routes.
     ///
     /// # Arguments
     ///
-    /// - `path` - The request path to check.
+    /// - `&str` - The request path to check.
     ///
     /// # Returns
     ///
-    /// `true` if a matching route is found, `false` otherwise.
+    /// - `bool` - true if matching route found, false otherwise.
     pub(crate) fn match_route(&self, path: &str) -> bool {
         if self.get_static_routes().contains_key(path) {
             return true;
@@ -359,19 +344,16 @@ impl RouteMatcher {
         false
     }
 
-    /// Finds the handler for a given path by matching against all registered routes.
-    ///
-    /// It checks static, dynamic, and regex routes in order. If a match is found,
-    /// it populates the request context with any captured parameters.
+    /// Finds the handler for a path by matching against registered routes.
     ///
     /// # Arguments
     ///
-    /// - `ctx` - The request context, which will be updated with route parameters on a match.
-    /// - `path` - The request path to resolve.
+    /// - `&Context` - The request context.
+    /// - `&str` - The request path to resolve.
     ///
     /// # Returns
     ///
-    /// `Some(handler)` if a match is found, `None` otherwise.
+    /// - `Option<ArcFnPinBoxSendSync>` - Some handler if match found, None otherwise.
     pub(crate) async fn resolve_route(
         &self,
         ctx: &Context,

@@ -1,12 +1,12 @@
 use crate::*;
 
-/// Provides default values for `ServerConfig`.
+/// Implementation of `Default` trait for `ServerConfig`.
 impl Default for ServerConfig {
-    /// This implementation sets up the server with sensible defaults for common use cases.
+    /// Creates a default `ServerConfig` with predefined values.
     ///
     /// # Returns
     ///
-    /// A `ServerConfig` instance with default values.
+    /// - `ServerConfig` - The default server configuration.
     fn default() -> Self {
         Self {
             host: DEFAULT_HOST.to_owned(),

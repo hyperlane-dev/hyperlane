@@ -5,13 +5,13 @@ impl Panic {
     ///
     /// # Arguments
     ///
-    /// - `message` - The panic message.
-    /// - `location` - The source code location of the panic.
-    /// - `payload` - The panic payload.
+    /// - `OptionString` - The panic message.
+    /// - `OptionString` - The source code location of the panic.
+    /// - `OptionString` - The panic payload.
     ///
     /// # Returns
     ///
-    /// A new `Panic` instance.
+    /// - `Panic` - A new panic instance.
     pub(crate) fn new(
         message: OptionString,
         location: OptionString,
@@ -30,12 +30,11 @@ impl Panic {
     ///
     /// # Arguments
     ///
-    /// - `panic_payload` - The payload from a `PanicInfo` object.
+    /// - `&dyn Any` - The payload from a `PanicInfo` object.
     ///
     /// # Returns
     ///
-    /// An `Option<String>` containing the extracted message, or `None` if the payload
-    /// is not a string type.
+    /// - `OptionString` - The extracted message, or None if the payload is not a string type.
     fn extract_panic_message_from_any(panic_payload: &dyn Any) -> OptionString {
         if let Some(s) = panic_payload.downcast_ref::<&str>() {
             Some(s.to_string())
@@ -50,11 +49,11 @@ impl Panic {
     ///
     /// # Arguments
     ///
-    /// - `location` - An optional reference to the `Location` of the panic.
+    /// - `OptionLocationRef<'_, '_>` - The location of the panic.
     ///
     /// # Returns
     ///
-    /// An `Option<String>` with the formatted location, or `None` if the location is not available.
+    /// - `OptionString` - The formatted location, or None if not available.
     fn format_panic_location(location: OptionLocationRef<'_, '_>) -> OptionString {
         location.map(|data| {
             format!(
@@ -75,11 +74,11 @@ impl Panic {
     ///
     /// # Arguments
     ///
-    /// - `info` - The `PanicInfo` provided by the `std::panic::set_hook` callback.
+    /// - `&PanicHookInfo<'_>` - The panic info from the hook callback.
     ///
     /// # Returns
     ///
-    /// A new `Panic` instance populated with data from `info`.
+    /// - `Panic` - A new panic instance with data from info.
     pub(crate) fn from_panic_hook(info: &PanicHookInfo<'_>) -> Self {
         let message_string: String = info.to_string();
         let message: OptionString = if message_string.is_empty() {
@@ -103,11 +102,11 @@ impl Panic {
     ///
     /// # Arguments
     ///
-    /// - `join_error` - The error returned from a panicked task.
+    /// - `JoinError` - The error from a panicked task.
     ///
     /// # Returns
     ///
-    /// A new `Panic` instance with the message extracted from the `JoinError`.
+    /// - `Panic` - A new panic instance with message from error.
     pub(crate) fn from_join_error(join_error: JoinError) -> Self {
         let default_message: String = join_error.to_string();
         let mut message: OptionString = if let Ok(panic_join_error) = join_error.try_into_panic() {
