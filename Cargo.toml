@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "5.65.1"
+version = "5.66.0"
 edition = "2024"
 authors = ["root@ltpp.vip"]
 license = "MIT"

@@ -65,6 +65,9 @@ async fn request_middleware(ctx: Context) {
 }
 
 async fn response_middleware(ctx: Context) {
+    if ctx.get_request().await.is_ws() {
+        return;
+    }
     let _ = ctx.send().await;
 }
 

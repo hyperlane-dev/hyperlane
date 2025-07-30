@@ -1141,7 +1141,7 @@ impl Context {
     ///
     /// True if the connection is both aborted and closed, otherwise false.
     pub async fn is_terminated(&self) -> bool {
-        self.get_aborted().await && self.get_closed().await
+        self.get_aborted().await || self.get_closed().await
     }
 
     /// Checks if the connection should be kept alive based on request headers.
@@ -1175,7 +1175,7 @@ impl Context {
                 .await
                 .replace_response_header(SEC_WEBSOCKET_ACCEPT, accept_key)
                 .await
-                .internal_send_hook(true)
+                .send()
                 .await;
             return result;
         }
@@ -1252,39 +1252,20 @@ impl Context {
         lifecycle.update_status(aborted, keep_alive);
     }
 
-    /// Internal method to send the response, with a hook for WebSocket upgrades.
-    ///
-    /// # Arguments
-    ///
-    /// - `upgrade_ws` - Whether this send is part of a WebSocket upgrade.
-    ///
-    /// # Returns
-    ///
-    /// The outcome of sending the response.
-    async fn internal_send_hook(&self, upgrade_ws: bool) -> ResponseResult {
-        if self.is_terminated().await {
-            return Err(ResponseError::Terminated);
-        }
-        if let Some(stream) = self.get_stream().await {
-            let is_ws: bool = self.get_request_upgrade_type().await.is_ws();
-            if !upgrade_ws && is_ws {
-                return Err(ResponseError::MethodNotSupported(
-                    "websocket does not support calling this method".to_owned(),
-                ));
-            }
-            let response_res: ResponseData = self.write().await.get_mut_response().build();
-            return stream.send(&response_res).await;
-        }
-        Err(ResponseError::NotFoundStream)
-    }
-
     /// Sends the response headers and body to the client.
     ///
     /// # Returns
     ///
     /// The outcome of the send operation.
     pub async fn send(&self) -> ResponseResult {
-        self.internal_send_hook(false).await
+        if self.is_terminated().await {
+            return Err(ResponseError::Terminated);
+        }
+        if let Some(stream) = self.get_stream().await {
+            let response_res: ResponseData = self.write().await.get_mut_response().build();
+            return stream.send(&response_res).await;
+        }
+        Err(ResponseError::NotFoundStream)
     }
 
     /// Sends the response and then closes the connection.
