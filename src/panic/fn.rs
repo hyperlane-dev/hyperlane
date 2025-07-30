@@ -8,8 +8,7 @@ use crate::*;
 ///
 /// # Arguments
 ///
-/// - `ctx` - The `Context` of the request during which the panic occurred.
-/// This is used to access panic details and to send the error response.
+/// - `Context` - The context of the request during which the panic occurred.
 pub(crate) async fn default_panic_hook(ctx: Context) {
     let request_string: String = ctx.get_request_string().await;
     let error: Panic = ctx.get_panic().await.unwrap_or_default();

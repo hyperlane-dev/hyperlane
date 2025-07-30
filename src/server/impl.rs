@@ -22,6 +22,10 @@ impl Default for ServerInner {
     }
 }
 
+/// Manages the state for handling a single connection, including the stream and context.
+///
+/// This struct provides a convenient way to pass around the necessary components
+/// for processing a request or WebSocket frame.
 impl<'a> HandlerState<'a> {
     /// Creates a new HandlerState instance.
     ///
@@ -38,6 +42,10 @@ impl<'a> HandlerState<'a> {
     }
 }
 
+/// Represents the server, providing methods to configure and run it.
+///
+/// This struct wraps the `ServerInner` configuration and routing logic,
+/// offering a high-level API for setting up the HTTP and WebSocket server.
 impl Server {
     /// Creates a new Server instance with default settings.
     ///
@@ -467,8 +475,6 @@ impl Server {
     }
 
     /// Formats the host and port into a bindable address string.
-    ///
-    /// Formats host and port into address string.
     ///
     /// # Arguments
     ///

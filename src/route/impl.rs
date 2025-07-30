@@ -65,6 +65,10 @@ impl PartialEq for RoutePattern {
     }
 }
 
+/// Manages route patterns, including parsing and matching.
+///
+/// This struct is responsible for defining and validating route structures,
+/// supporting static, dynamic, and regex-based path matching.
 impl RoutePattern {
     /// Creates a new RoutePattern by parsing a route string.
     ///
@@ -236,6 +240,10 @@ impl RoutePattern {
     }
 }
 
+/// Manages a collection of routes, enabling efficient lookup and dispatch.
+///
+/// This struct stores routes categorized by type (static, dynamic, regex)
+/// to quickly find the appropriate handler for incoming requests.
 impl RouteMatcher {
     /// Creates a new, empty RouteMatcher.
     ///

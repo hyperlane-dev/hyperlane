@@ -4,8 +4,6 @@ use crate::*;
 impl Context {
     /// Creates a new `Context` from an internal context instance.
     ///
-    /// Creates a new context from internal context data.
-    ///
     /// # Arguments
     ///
     /// - `ContextInner` - The wrapped context data.
@@ -18,8 +16,6 @@ impl Context {
     }
 
     /// Creates a new `Context` for a given stream and request.
-    ///
-    /// Creates a new context for a network stream and request.
     ///
     /// # Arguments
     ///
@@ -67,8 +63,6 @@ impl Context {
     }
 
     /// Sets the aborted flag for the context.
-    ///
-    /// Sets the aborted state of the context.
     ///
     /// # Arguments
     ///
@@ -323,8 +317,6 @@ impl Context {
 
     /// Retrieves a specific query parameter by its key.
     ///
-    /// Gets a query parameter by key.
-    ///
     /// # Arguments
     ///
     /// - `RequestHeadersKey` - The query parameter key.
@@ -480,8 +472,6 @@ impl Context {
 
     /// Checks if a request header has a specific value.
     ///
-    /// Checks if a request header contains specific value.
-    ///
     /// # Arguments
     ///
     /// - `RequestHeadersKey` - The header key.
@@ -511,8 +501,6 @@ impl Context {
     }
 
     /// Retrieves a specific cookie by its name from the request.
-    ///
-    /// Gets a cookie by name.
     ///
     /// # Arguments
     ///
@@ -561,8 +549,6 @@ impl Context {
     }
 
     /// Executes an asynchronous closure with the current response.
-    ///
-    /// This method provides temporary access to the response data without cloning.
     ///
     /// # Arguments
     ///
@@ -637,8 +623,6 @@ impl Context {
     }
 
     /// Sets a response header, adding it if it doesn't exist or appending to it if it does.
-    ///
-    /// Sets a response header.
     ///
     /// # Arguments
     ///
@@ -800,8 +784,6 @@ impl Context {
     }
 
     /// Removes a specific value from a response header.
-    ///
-    /// Removes a specific value from response header.
     ///
     /// # Arguments
     ///
@@ -1205,8 +1187,6 @@ impl Context {
 
     /// Reads an HTTP request from the underlying stream.
     ///
-    /// Reads HTTP request from stream.
-    ///
     /// # Arguments
     ///
     /// - `usize` - The read buffer size.
@@ -1231,8 +1211,6 @@ impl Context {
     }
 
     /// Reads a WebSocket frame from the underlying stream.
-    ///
-    /// Reads WebSocket frame from stream.
     ///
     /// # Arguments
     ///
