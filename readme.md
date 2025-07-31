@@ -16,7 +16,7 @@
 
 [Api Docs](https://docs.rs/hyperlane/latest/hyperlane/)
 
-> hyperlane is a lightweight rust http server with middleware, websocket, sse, and tcp support, built on tokio for cross-platform async networking.
+> A lightweight rust http server with middleware, websocket, sse, and tcp support, built on tokio for cross-platform async networking, hyperlane simplifies modern web service development.
 
 ## Installation
 

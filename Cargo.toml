@@ -1,10 +1,10 @@
 [package]
 name = "hyperlane"
-version = "5.66.4"
+version = "5.66.5"
 edition = "2024"
 authors = ["root@ltpp.vip"]
 license = "MIT"
-description = """hyperlane is a lightweight rust http server with middleware, websocket, sse, and tcp support, built on tokio for cross-platform async networking."""
+description = """A lightweight rust http server with middleware, websocket, sse, and tcp support, built on tokio for cross-platform async networking, hyperlane simplifies modern web service development."""
 keywords = ["http", "request", "response", "tcp", "cross-platform"]
 repository = "https://github.com/hyperlane-dev/hyperlane.git"
 categories = ["network-programming", "web-programming"]
