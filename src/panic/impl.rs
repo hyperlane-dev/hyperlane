@@ -1,5 +1,6 @@
 use crate::*;
 
+/// Implementation of methods for the `Panic` struct.
 impl Panic {
     /// Creates a new `Panic` instance from its constituent parts.
     ///

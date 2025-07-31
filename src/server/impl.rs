@@ -79,7 +79,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `T` - The host address implementing ToString.
+    /// - `T` - The host address implementing `ToString`.
     ///
     /// # Returns
     ///
@@ -154,8 +154,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `F` - The panic handler function implementing ErrorHandler<Fut>.
-    /// - `Fut` - The future type implementing FutureSendStatic<()>.
+    /// - `F` - The panic handler function implementing `ErrorHandler<Fut>`.
+    /// - `Fut` - The future type implementing `FutureSendStatic<()>`.
     ///
     /// # Returns
     ///
@@ -260,8 +260,9 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `R` - The route path pattern implementing ToString.
-    /// - `F` - The handler function implementing FnSendSyncStatic<Fut>.
+    /// - `R` - The route path pattern implementing `ToString`.
+    /// - `F` - The handler function implementing `FnSendSyncStatic<Fut>`.
+    /// - `Fut` - The future type.
     ///
     /// # Returns
     ///
@@ -288,7 +289,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `F` - The middleware function implementing FnSendSyncStatic<Fut>.
+    /// - `F` - The middleware function implementing `FnSendSyncStatic<Fut>`.
+    /// - `Fut` - The future type.
     ///
     /// # Returns
     ///
@@ -309,7 +311,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `F: FnSendSyncStatic<Fut>` - The middleware function.
+    /// - `F` - The middleware function implementing `FnSendSyncStatic<Fut>`.
+    /// - `Fut` - The future type.
     ///
     /// # Returns
     ///
@@ -330,7 +333,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `F: FnSendSyncStatic<Fut>` - The hook function.
+    /// - `F` - The hook function implementing `FnSendSyncStatic<Fut>`.
+    /// - `Fut` - The future type.
     ///
     /// # Returns
     ///
@@ -351,7 +355,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `F: FnSendSyncStatic<Fut>` - The hook function.
+    /// - `F` - The hook function implementing `FnSendSyncStatic<Fut>`.
+    /// - `Fut` - The future type.
     ///
     /// # Returns
     ///
@@ -372,7 +377,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `R: ToString` - The route path.
+    /// - `R` - The route path implementing `ToString`.
     ///
     /// # Returns
     ///
@@ -390,7 +395,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `R: ToString` - The route path.
+    /// - `R` - The route path implementing `ToString`.
     ///
     /// # Returns
     ///
@@ -409,7 +414,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `R: ToString` - The route path.
+    /// - `R` - The route path implementing `ToString`.
     ///
     /// # Returns
     ///
@@ -427,7 +432,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `R: ToString` - The route path.
+    /// - `R` - The route path implementing `ToString`.
     ///
     /// # Returns
     ///
@@ -478,8 +483,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `str` - The host address.
-    /// - `usize` - The port number.
+    /// - `&str` - The host address.
+    /// - `&usize` - The port number.
     ///
     /// # Returns
     ///
@@ -514,8 +519,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `ctx` - The context of the request during which the panic occurred.
-    /// - `panic` - The captured panic information.
+    /// - `&Context` - The context of the request during which the panic occurred.
+    /// - `&Panic` - The captured panic information.
     async fn handle_panic_with_context(&self, ctx: &Context, panic: &Panic) {
         let panic_clone: Panic = panic.clone();
         let _ = ctx.set_panic(panic_clone).await;
@@ -528,8 +533,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `ctx` - The context associated with the task.
-    /// - `join_error` - The `JoinError` returned from the panicked task.
+    /// - `&Context` - The context associated with the task.
+    /// - `JoinError` - The `JoinError` returned from the panicked task.
     async fn handle_task_panic(&self, ctx: &Context, join_error: JoinError) {
         let panic: Panic = Panic::from_join_error(join_error);
         self.handle_panic_with_context(&ctx, &panic).await;
@@ -541,9 +546,9 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `ctx` - The request context.
-    /// - `lifecycle` - A mutable reference to the current `Lifecycle` state.
-    /// - `hook_func` - The hook function to execute.
+    /// - `&Context` - The request context.
+    /// - `&mut Lifecycle` - A mutable reference to the current `Lifecycle` state.
+    /// - `F` - The hook function to execute.
     async fn run_hook_with_lifecycle<F>(
         &self,
         ctx: &Context,
@@ -581,11 +586,11 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `tcp_listener` - A reference to the `TcpListener` to accept connections from.
+    /// - `&TcpListener` - A reference to the `TcpListener` to accept connections from.
     ///
     /// # Returns
     ///
-    /// A `ServerResult` which is typically `Ok(())` unless an unrecoverable
+    /// - `ServerResult<()>` - A `ServerResult` which is typically `Ok(())` unless an unrecoverable
     /// error occurs.
     async fn accept_connections(&self, tcp_listener: &TcpListener) -> ServerResult<()> {
         while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
@@ -602,7 +607,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `stream` - A reference to the `TcpStream` to configure.
+    /// - `&TcpStream` - A reference to the `TcpStream` to configure.
     async fn configure_stream(&self, stream: &TcpStream) {
         let config: ServerConfig = self.get_read().await.get_config().clone();
         let nodelay_opt: OptionBool = *config.get_nodelay();
@@ -621,7 +626,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `stream` - The thread-safe stream representing the client connection.
+    /// - `ArcRwLockStream` - The thread-safe stream representing the client connection.
     async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
         let server: Server = self.clone();
         let http_buffer: usize = *self.get_read().await.get_config().get_http_buffer();
@@ -636,8 +641,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `stream` - The stream for the client connection.
-    /// - `http_buffer` - The buffer size to use for reading the initial HTTP request.
+    /// - `ArcRwLockStream` - The stream for the client connection.
+    /// - `usize` - The buffer size to use for reading the initial HTTP request.
     async fn handle_connection(&self, stream: ArcRwLockStream, http_buffer: usize) {
         if let Ok(mut request) = Request::http_from_stream(&stream, http_buffer).await {
             let ctx: Context = Context::create_context(&stream, &request);
@@ -654,8 +659,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `ctx` - The request context.
-    /// - `lifecycle` - A mutable reference to the request lifecycle state.
+    /// - `&Context` - The request context.
+    /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
     async fn run_pre_upgrade_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
         for func in self.get_read().await.get_pre_upgrade_hook().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| func(ctx))
@@ -667,8 +672,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `ctx` - The request context.
-    /// - `lifecycle` - A mutable reference to the request lifecycle state.
+    /// - `&Context` - The request context.
+    /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
     async fn run_connected_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
         for func in self.get_read().await.get_connected_hook().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| func(ctx))
@@ -680,8 +685,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `ctx` - The request context.
-    /// - `lifecycle` - A mutable reference to the request lifecycle state.
+    /// - `&Context` - The request context.
+    /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
     async fn run_request_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
         for func in self.get_read().await.get_request_middleware().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| func(ctx))
@@ -693,9 +698,9 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `ctx` - The request context.
-    /// - `handler` - An `Option` containing the handler function if a route was matched.
-    /// - `lifecycle` - A mutable reference to the request lifecycle state.
+    /// - `&Context` - The request context.
+    /// - `&OptionArcFnPinBoxSendSync` - An `Option` containing the handler function if a route was matched.
+    /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
     async fn run_route_hook(
         &self,
         ctx: &Context,
@@ -712,8 +717,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `ctx` - The request context.
-    /// - `lifecycle` - A mutable reference to the request lifecycle state.
+    /// - `&Context` - The request context.
+    /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
     async fn run_response_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
         for func in self.get_read().await.get_response_middleware().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| func(ctx))
@@ -728,12 +733,12 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `state` - The `HandlerState` for the current connection.
-    /// - `request` - The incoming request to be processed.
+    /// - `&HandlerState<'a>` - The `HandlerState` for the current connection.
+    /// - `&Request` - The incoming request to be processed.
     ///
     /// # Returns
     ///
-    /// A boolean indicating whether the connection should be kept alive.
+    /// - `bool` - A boolean indicating whether the connection should be kept alive.
     async fn request_hook<'a>(&self, state: &HandlerState<'a>, request: &Request) -> bool {
         let route: &str = request.get_path();
         let ctx: &Context = state.ctx;
@@ -761,8 +766,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `state` - The `HandlerState` for the current connection.
-    /// - `request` - The initial request that established the keep-alive connection.
+    /// - `&HandlerState<'a>` - The `HandlerState` for the current connection.
+    /// - `&Request` - The initial request that established the keep-alive connection.
     async fn handle_http_requests<'a>(&self, state: &HandlerState<'a>, request: &Request) {
         let route: &String = request.get_path();
         let contains_disable_http_hook: bool = self.contains_disable_http_hook(route).await;
@@ -784,8 +789,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `state` - The `HandlerState` for the current connection.
-    /// - `request` - The initial HTTP request from the client.
+    /// - `&HandlerState<'a>` - The `HandlerState` for the current connection.
+    /// - `&Request` - The initial HTTP request from the client.
     async fn http_hook<'a>(&self, state: &HandlerState<'a>, request: &Request) {
         let ctx: &Context = state.ctx;
         let mut lifecycle: Lifecycle = Lifecycle::new();
@@ -803,9 +808,9 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `state` - The `HandlerState` for the current connection.
-    /// - `request` - The mutable request object, which will be updated with each new frame.
-    /// - `route` - The route path that the WebSocket connection was established on.
+    /// - `&HandlerState<'a>` - The `HandlerState` for the current connection.
+    /// - `&mut Request` - The mutable request object, which will be updated with each new frame.
+    /// - `&str` - The route path that the WebSocket connection was established on.
     async fn handle_ws_requests<'a>(
         &self,
         state: &HandlerState<'a>,
@@ -830,8 +835,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `state` - The `HandlerState` for the current connection.
-    /// - `request` - The mutable HTTP request that initiated the WebSocket upgrade.
+    /// - `&HandlerState<'a>` - The `HandlerState` for the current connection.
+    /// - `&mut Request` - The mutable HTTP request that initiated the WebSocket upgrade.
     async fn ws_hook<'a>(&self, state: &HandlerState<'a>, request: &mut Request) {
         let route: String = request.get_path().clone();
         let ctx: &Context = state.ctx;

@@ -19,8 +19,8 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `ArcRwLockStream` - The network stream.
-    /// - `Request` - The HTTP request.
+    /// - `&ArcRwLockStream` - The network stream.
+    /// - `&Request` - The HTTP request.
     ///
     /// # Returns
     ///
@@ -319,7 +319,7 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `RequestHeadersKey` - The query parameter key.
+    /// - `K` - The query parameter key.
     ///
     /// # Returns
     ///
@@ -367,7 +367,7 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `RequestHeadersKey` - The header key.
+    /// - `K` - The header key.
     ///
     /// # Returns
     ///
@@ -474,8 +474,8 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `RequestHeadersKey` - The header key.
-    /// - `RequestHeadersValueItem` - The value to check.
+    /// - `K` - The header key.
+    /// - `V` - The value to check.
     ///
     /// # Returns
     ///
@@ -504,7 +504,7 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `CookieKey` - The cookie name.
+    /// - `K` - The cookie name.
     ///
     /// # Returns
     ///
@@ -626,8 +626,8 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `String` - The header key.
-    /// - `String` - The header value.
+    /// - `K` - The header key.
+    /// - `V` - The header value.
     ///
     /// # Returns
     ///
@@ -787,8 +787,8 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `ResponseHeadersKey` - The header key.
-    /// - `String` - The value to remove.
+    /// - `K` - The header key.
+    /// - `V` - The value to remove.
     ///
     /// # Returns
     ///
@@ -932,11 +932,11 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `status_code` - The status code to set for the response.
+    /// - `ResponseStatusCode` - The status code to set for the response.
     ///
     /// # Returns
     ///
-    /// A reference to the modified context.
+    /// - `&Self` - A reference to the modified context.
     pub async fn set_response_status_code(&self, status_code: ResponseStatusCode) -> &Self {
         self.write()
             .await
@@ -949,7 +949,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// A reference to the modified context.
+    /// - `&Self` - A reference to the modified context.
     pub async fn reset_response_body(&self) -> &Self {
         self.set_response_body(ResponseBody::default()).await;
         self
@@ -959,7 +959,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// A map containing the route parameters.
+    /// - `RouteParams` - A map containing the route parameters.
     pub async fn get_route_params(&self) -> RouteParams {
         self.read().await.get_route_params().clone()
     }
@@ -968,11 +968,11 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `params` - The route parameters to set.
+    /// - `RouteParams` - The route parameters to set.
     ///
     /// # Returns
     ///
-    /// A reference to the modified `Context`.
+    /// - `&Self` - A reference to the modified `Context`.
     pub(crate) async fn set_route_params(&self, params: RouteParams) -> &Self {
         self.write().await.set_route_params(params);
         self
@@ -982,11 +982,11 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `name` - The name of the route parameter to retrieve.
+    /// - `&str` - The name of the route parameter to retrieve.
     ///
     /// # Returns
     ///
-    /// The value of the route parameter if it exists.
+    /// - `OptionString` - The value of the route parameter if it exists.
     pub async fn get_route_param(&self, name: &str) -> OptionString {
         self.read().await.get_route_params().get(name).cloned()
     }
@@ -995,7 +995,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// A map containing all attributes.
+    /// - `HashMapArcAnySendSync` - A map containing all attributes.
     pub async fn get_attributes(&self) -> HashMapArcAnySendSync {
         self.read().await.get_attributes().clone()
     }
@@ -1004,11 +1004,11 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `key` - The key of the attribute to retrieve.
+    /// - `&str` - The key of the attribute to retrieve.
     ///
     /// # Returns
     ///
-    /// The attribute's value if it exists and can be cast to the specified type.
+    /// - `Option<V>` - The attribute's value if it exists and can be cast to the specified type.
     pub async fn get_attribute<V>(&self, key: &str) -> Option<V>
     where
         V: AnySendSyncClone,
@@ -1025,12 +1025,12 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `key` - The key of the attribute to set.
-    /// - `value` - The value of the attribute.
+    /// - `&str` - The key of the attribute to set.
+    /// - `V` - The value of the attribute.
     ///
     /// # Returns
     ///
-    /// A reference to the modified context.
+    /// - `&Self` - A reference to the modified context.
     pub async fn set_attribute<V>(&self, key: &str, value: V) -> &Self
     where
         V: AnySendSyncClone,
@@ -1046,11 +1046,11 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `key` - The key of the attribute to remove.
+    /// - `&str` - The key of the attribute to remove.
     ///
     /// # Returns
     ///
-    /// A reference to the modified context.
+    /// - `&Self` - A reference to the modified context.
     pub async fn remove_attribute(&self, key: &str) -> &Self {
         self.write()
             .await
@@ -1063,7 +1063,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// A reference to the modified context.
+    /// - `&Self` - A reference to the modified context.
     pub async fn clear_attribute(&self) -> &Self {
         self.write().await.get_mut_attributes().clear();
         self
@@ -1073,11 +1073,11 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `key` - The internal attribute key to retrieve.
+    /// - `InternalAttributeKey` - The internal attribute key to retrieve.
     ///
     /// # Returns
     ///
-    /// The attribute's value if it exists and can be cast to the specified type.
+    /// - `Option<V>` - The attribute's value if it exists and can be cast to the specified type.
     async fn get_internal_attribute<V>(&self, key: InternalAttributeKey) -> Option<V>
     where
         V: AnySendSyncClone,
@@ -1094,12 +1094,12 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `key` - The internal attribute key to set.
-    /// - `value` - The value of the attribute.
+    /// - `InternalAttributeKey` - The internal attribute key to set.
+    /// - `V` - The value of the attribute.
     ///
     /// # Returns
     ///
-    /// A reference to the modified context.
+    /// - `&Self` - A reference to the modified context.
     async fn set_internal_attribute<V>(&self, key: InternalAttributeKey, value: V) -> &Self
     where
         V: AnySendSyncClone,
@@ -1115,7 +1115,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// The panic information if a panic was caught.
+    /// - `OptionPanic` - The panic information if a panic was caught.
     pub async fn get_panic(&self) -> OptionPanic {
         self.get_internal_attribute(InternalAttributeKey::Panic)
             .await
@@ -1125,11 +1125,11 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `panic` - The panic information to store.
+    /// - `Panic` - The panic information to store.
     ///
     /// # Returns
     ///
-    /// A reference to the modified context.
+    /// - `&Self` - A reference to the modified context.
     pub(crate) async fn set_panic(&self, panic: Panic) -> &Self {
         self.set_internal_attribute(InternalAttributeKey::Panic, panic)
             .await
@@ -1139,7 +1139,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// True if the connection is both aborted and closed, otherwise false.
+    /// - `bool` - True if the connection is both aborted and closed, otherwise false.
     pub async fn is_terminated(&self) -> bool {
         self.get_aborted().await || self.get_closed().await
     }
@@ -1148,7 +1148,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// True if the Connection header suggests keeping the connection alive, otherwise false.
+    /// - `bool` - True if the Connection header suggests keeping the connection alive, otherwise false.
     pub async fn is_enable_keep_alive(&self) -> bool {
         self.get_request().await.is_enable_keep_alive()
     }
@@ -1160,7 +1160,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// The outcome of the handshake operation.
+    /// - `ResponseResult` - The outcome of the handshake operation.
     pub async fn upgrade_to_ws(&self) -> ResponseResult {
         if let Some(key) = &self.get_request_header_back(SEC_WEBSOCKET_KEY).await {
             let accept_key: String = WebSocketFrame::generate_accept_key(key);
@@ -1245,7 +1245,7 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `lifecycle` - The lifecycle to update.
+    /// - `&mut Lifecycle` - The lifecycle to update.
     pub(crate) async fn update_lifecycle_status(&self, lifecycle: &mut Lifecycle) {
         let keep_alive: bool = !self.get_closed().await && lifecycle.is_keep_alive();
         let aborted: bool = self.get_aborted().await;
@@ -1256,7 +1256,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// The outcome of the send operation.
+    /// - `ResponseResult` - The outcome of the send operation.
     pub async fn send(&self) -> ResponseResult {
         if self.is_terminated().await {
             return Err(ResponseError::Terminated);
@@ -1274,7 +1274,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// The outcome of the send operation.
+    /// - `ResponseResult` - The outcome of the send operation.
     pub async fn send_once(&self) -> ResponseResult {
         let res: ResponseResult = self.send().await;
         self.closed().await;
@@ -1287,7 +1287,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// The outcome of the send operation.
+    /// - `ResponseResult` - The outcome of the send operation.
     pub async fn send_body(&self) -> ResponseResult {
         if self.is_terminated().await {
             return Err(ResponseError::Terminated);
@@ -1306,7 +1306,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// The outcome of the send operation.
+    /// - `ResponseResult` - The outcome of the send operation.
     pub async fn send_once_body(&self) -> ResponseResult {
         let res: ResponseResult = self.send_body().await;
         self.closed().await;
@@ -1317,7 +1317,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// The outcome of the flush operation.
+    /// - `ResponseResult` - The outcome of the flush operation.
     pub async fn flush(&self) -> ResponseResult {
         if let Some(stream) = self.get_stream().await {
             stream.flush().await;

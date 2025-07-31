@@ -1,5 +1,6 @@
 use super::*;
 
+/// Implementation of methods for the `Lifecycle` enum.
 impl Lifecycle {
     /// Creates a new Lifecycle instance with default continue and keep-alive state.
     ///
@@ -27,12 +28,9 @@ impl Lifecycle {
     ///
     /// # Arguments
     ///
+    /// - `&mut self` - A mutable reference to the `Lifecycle` instance.
     /// - `bool` - Whether the request processing has been aborted.
     /// - `bool` - Whether the connection should be kept alive.
-    ///
-    /// # Returns
-    ///
-    /// This method does not return a value.
     pub(crate) fn update_status(&mut self, aborted: bool, keep_alive: bool) {
         *self = if aborted {
             Lifecycle::Abort(keep_alive)
