@@ -1,13 +1,13 @@
 <center>
 
-## hyperlane
+## Hyperlane
 
 <img src="./img/logo.png" alt="" height="160">
 
 [![](https://img.shields.io/crates/v/hyperlane.svg)](https://crates.io/crates/hyperlane)
 [![](https://img.shields.io/crates/d/hyperlane.svg)](https://img.shields.io/crates/d/hyperlane.svg)
 [![](https://docs.rs/hyperlane/badge.svg)](https://docs.rs/hyperlane)
-[![](https://github.com/eastspire/hyperlane/workflows/Rust/badge.svg)](https://github.com/eastspire/hyperlane/actions?query=workflow:Rust)
+[![](https://github.com/hyperlane-dev/hyperlane/workflows/Rust/badge.svg)](https://github.com/hyperlane-dev/hyperlane/actions?query=workflow:Rust)
 [![](https://img.shields.io/crates/l/hyperlane.svg)](./LICENSE)
 
 </center>
@@ -16,7 +16,7 @@
 
 [Api Docs](https://docs.rs/hyperlane/latest/hyperlane/)
 
-> hyperlane is a lightweight and high-performance Rust HTTP server library designed to simplify network service development. It supports HTTP request parsing, response building, and TCP communication, making it ideal for building modern web services. Additionally, it provides support for request and response middleware, WebSocket, and Server-Sent Events (SSE), enabling flexible and efficient real-time communication. Built with pure Rust and standard library, Hyperlane offers true cross-platform compatibility across Windows, Linux and macOS, with the same API experience on all platforms, powered by Tokio's async runtime for seamless networking without platform-specific dependencies.
+> Hyperlane is a lightweight and high-performance Rust HTTP server library designed to simplify network service development. It supports HTTP request parsing, response building, and TCP communication, making it ideal for building modern web services. Additionally, it provides support for request and response middleware, WebSocket, and Server-Sent Events (SSE), enabling flexible and efficient real-time communication. Built with pure Rust and standard library, Hyperlane offers true cross-platform compatibility across Windows, Linux and macOS, with the same API experience on all platforms, powered by Tokio's async runtime for seamless networking without platform-specific dependencies.
 
 ## Installation
 
@@ -28,11 +28,11 @@ cargo add hyperlane
 
 ## Quick start
 
-- [hyperlane-quick-start git](https://github.com/eastspire/hyperlane-quick-start)
+- [hyperlane-quick-start git](https://github.com/hyperlane-dev/hyperlane-quick-start)
 - [hyperlane-quick-start docs](https://docs.ltpp.vip/hyperlane/quick-start/)
 
 ```sh
-git clone https://github.com/eastspire/hyperlane-quick-start.git
+git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
 ```
 
 ## Use
