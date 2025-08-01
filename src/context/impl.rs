@@ -945,16 +945,6 @@ impl Context {
         self
     }
 
-    /// Resets the response body to be empty.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - A reference to the modified context.
-    pub async fn reset_response_body(&self) -> &Self {
-        self.set_response_body(ResponseBody::default()).await;
-        self
-    }
-
     /// Retrieves the parameters extracted from the route path.
     ///
     /// # Returns
@@ -1195,7 +1185,6 @@ impl Context {
     ///
     /// - `RequestReaderHandleResult` - The parsed request or error.
     pub async fn http_from_stream(&self, buffer: usize) -> RequestReaderHandleResult {
-        self.reset_response_body().await;
         if self.get_aborted().await {
             return Err(RequestError::RequestAborted);
         }
@@ -1220,7 +1209,6 @@ impl Context {
     ///
     /// - `RequestReaderHandleResult` - The parsed frame or error.
     pub async fn ws_from_stream(&self, buffer: usize) -> RequestReaderHandleResult {
-        self.reset_response_body().await;
         if self.get_aborted().await {
             return Err(RequestError::RequestAborted);
         }
