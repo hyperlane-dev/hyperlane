@@ -22,6 +22,8 @@ pub(crate) async fn default_panic_hook(ctx: Context) {
     eprintln!("{}", response_body);
     let _ = Write::flush(&mut io::stderr());
     let _ = ctx
+        .set_response_version(HttpVersion::HTTP1_1)
+        .await
         .set_response_status_code(500)
         .await
         .clear_response_headers()
