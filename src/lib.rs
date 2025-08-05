@@ -38,7 +38,6 @@ pub(crate) use std::{
     any::Any,
     collections::HashMap,
     future::Future,
-    io::{self, Write},
     net::SocketAddr,
     panic::Location,
     panic::{PanicHookInfo, set_hook},

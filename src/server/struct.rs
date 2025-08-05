@@ -7,7 +7,7 @@ use crate::*;
 /// It is not intended to be used directly by end-users, but rather wrapped within the `Server` struct
 /// for thread-safe access.
 #[derive(Data, Clone, CustomDebug, DisplayDebug)]
-pub struct ServerInner {
+pub(crate) struct ServerInner {
     /// Stores the server's configuration settings, such as address, port, and timeouts.
     #[get(pub(super))]
     #[get_mut(pub(super))]
@@ -70,11 +70,7 @@ pub struct ServerInner {
 /// It allows multiple parts of the application to safely share and modify the server's
 /// configuration and state across different threads and asynchronous tasks.
 #[derive(Clone, Getter, CustomDebug, DisplayDebug)]
-pub struct Server(
-    /// The thread-safe, shared inner state of the server.
-    #[get(pub(super))]
-    pub(super) ArcRwLockServerInner,
-);
+pub struct Server(#[get(pub(super))] pub(super) ArcRwLockServerInner);
 
 /// Represents the state associated with a single connection handler.
 ///

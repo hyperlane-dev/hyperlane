@@ -15,7 +15,7 @@ pub enum ServerError {
 
 /// Represents errors related to route definitions and matching.
 #[derive(CustomDebug, DisplayDebug, PartialEq, Eq)]
-pub enum RouteError {
+pub(crate) enum RouteError {
     /// The route pattern cannot be empty.
     EmptyPattern,
     /// A route with the same pattern has already been defined.

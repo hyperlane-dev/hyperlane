@@ -5,7 +5,7 @@ use crate::*;
 /// This structure holds all the data associated with a single request-response cycle,
 /// including the stream, request, response, and any custom attributes.
 #[derive(Clone, Data, Default, CustomDebug, DisplayDebug)]
-pub struct ContextInner {
+pub(crate) struct ContextInner {
     /// A flag indicating whether the request handling has been aborted.
     #[get(pub(super))]
     #[get_mut(pub(super))]

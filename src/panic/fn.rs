@@ -20,7 +20,7 @@ pub(crate) async fn default_panic_hook(ctx: Context) {
         response_body.push_str(BR);
     }
     eprintln!("{}", response_body);
-    let _ = Write::flush(&mut io::stderr());
+    let _ = std::io::Write::flush(&mut std::io::stderr());
     let _ = ctx
         .set_response_version(HttpVersion::HTTP1_1)
         .await
