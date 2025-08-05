@@ -2,7 +2,7 @@
 
 ## hyperlane
 
-<img src="./img/logo.png" alt="" height="160">
+<img src="https://docs.ltpp.vip/img/hyperlane.png" alt="" height="160">
 
 [![](https://img.shields.io/crates/v/hyperlane.svg)](https://crates.io/crates/hyperlane)
 [![](https://img.shields.io/crates/d/hyperlane.svg)](https://img.shields.io/crates/d/hyperlane.svg)
