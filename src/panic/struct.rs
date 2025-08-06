@@ -11,7 +11,7 @@ pub struct Panic {
     /// This is `None` if the panic payload is not a string.
     #[get(pub)]
     pub(super) message: OptionString,
-    /// The source code location where the panic occurred (e.g., "src/main.rs:10:5").
+    /// The source code location where the panic occurred.
     #[get(pub)]
     pub(super) location: OptionString,
     /// The payload of the panic, often a string literal.

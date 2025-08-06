@@ -1,7 +1,7 @@
 use crate::*;
 
 /// A type alias for a hash map that stores captured route parameters.
-/// The key is the parameter name (e.g., "id"), and the value is the captured string.
+/// The key is the parameter name and the value is the captured string.
 pub type RouteParams = HashMapXxHash3_64<String, String>;
 
 /// A type alias for a vector of `RouteSegment`s, representing a parsed route.

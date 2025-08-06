@@ -12,7 +12,7 @@ pub(crate) enum RouteSegment {
     /// are both static segments.
     Static(String),
     /// A dynamic segment that captures a value from the path.
-    /// It is denoted by a colon prefix (e.g., `:id` in `/users/:id`). The captured value
+    /// It is denoted by a colon prefix. The captured value
     /// is stored as a parameter in the request context.
     Dynamic(String),
     /// A segment that is matched against a regular expression.

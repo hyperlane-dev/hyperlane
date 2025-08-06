@@ -516,7 +516,7 @@ impl Context {
         self.get_request_cookies().await.get(&key.into()).cloned()
     }
 
-    /// Retrieves the upgrade type of the request, e.g., for WebSockets.
+    /// Retrieves the upgrade type of the request.
     ///
     /// # Returns
     ///

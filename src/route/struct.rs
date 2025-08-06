@@ -16,7 +16,7 @@ pub(crate) struct RoutePattern(
 ///
 /// The matcher categorizes routes into three types for optimized performance:
 /// 1.  `static_routes`: For exact path matches, offering the fastest lookups.
-/// 2.  `dynamic_routes`: For paths with variable segments (e.g., "/users/:id").
+/// 2.  `dynamic_routes`: For paths with variable segments.
 /// 3.  `regex_routes`: For complex matching based on regular expressions.
 ///
 /// When a request comes in, the matcher checks these categories in order to find the
@@ -29,7 +29,7 @@ pub(crate) struct RouteMatcher {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     pub(super) static_routes: HashMapStringArcFnPinBoxSendSyncXxHash3_64,
-    /// A vector of routes that contain dynamic segments (e.g., path parameters).
+    /// A vector of routes that contain dynamic segments.
     /// These are evaluated sequentially if no static route matches.
     #[debug(skip)]
     #[get(pub(super))]
