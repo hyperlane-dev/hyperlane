@@ -137,8 +137,11 @@ async fn main() {
     server
         .route("/dynamic/routing/{file:^.*$}", dynamic_route)
         .await;
-    let result: ServerResult<()> = server.run().await;
-    println!("Server result: {:?}", result);
+    let result: ServerResult<ArcFnSendSync> = server.run().await;
+    println!("Server result: {:?}", result.is_ok());
+    tokio::time::sleep(Duration::from_secs(60)).await;
+    let shutdown: ArcFnSendSync = result.clone().unwrap();
+    shutdown();
     let _ = std::io::Write::flush(&mut std::io::stderr());
 }
 ```

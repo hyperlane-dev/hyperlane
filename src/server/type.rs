@@ -8,6 +8,10 @@ pub type ServerResult<T> = Result<T, ServerError>;
 /// This is used when waiting for asynchronous tasks to complete.
 pub type ResultJoinError<T> = Result<T, JoinError>;
 
+/// A type alias for a thread-safe, atomically-reference-counted closure.
+/// This is used for callbacks and other functions that need to be shared across threads.
+pub type ArcFnSendSync = Arc<dyn Fn() + Send + Sync>;
+
 /// A type alias for a thread-safe, reference-counted read-write lock over `ServerInner`.
 /// This is the core mechanism for sharing server state across threads.
 pub(crate) type ArcRwLockServerInner = ArcRwLock<ServerInner>;

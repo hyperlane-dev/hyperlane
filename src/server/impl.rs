@@ -863,14 +863,28 @@ impl Server {
     /// Starts the server, binds to the configured address, and begins listening for connections.
     ///
     /// This is the main entry point to launch the server. It will initialize the panic hook,
-    /// create a TCP listener, and then enter the connection acceptance loop.
+    /// create a TCP listener, and then enter the connection acceptance loop in a background task.
     ///
     /// # Returns
     ///
-    /// Returns a `ServerResult` which will be an error if the server fails to start.
-    pub async fn run(&self) -> ServerResult<()> {
+    /// Returns a `ServerResult` containing a shutdown function on success.
+    /// Calling this function will shut down the server by aborting its main task.
+    /// Returns an error if the server fails to start.
+    pub async fn run(&self) -> ServerResult<ArcFnSendSync> {
         self.init_panic_hook().await;
         let tcp_listener: TcpListener = self.create_tcp_listener().await?;
-        self.accept_connections(&tcp_listener).await
+        let server: Server = self.clone();
+        let (shutdown_sender, mut shutdown_receiver) = mpsc::channel(1);
+        let shutdown = move || {
+            let _ = shutdown_sender.send(());
+        };
+        let accept_connections: JoinHandle<ServerResult<()>> =
+            tokio::spawn(async move { server.accept_connections(&tcp_listener).await });
+        tokio::spawn(async move {
+            if shutdown_receiver.recv().await.is_some() {
+                accept_connections.abort();
+            }
+        });
+        Ok(Arc::new(shutdown))
     }
 }
