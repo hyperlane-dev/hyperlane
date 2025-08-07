@@ -1,11 +1,12 @@
 use crate::*;
 
-/// A trait for asynchronous functions that handle errors.
+/// A trait for handling errors that occur within a context.
 ///
-/// This trait defines the contract for error handlers, which are functions that
-/// take a `Context` and return a future. This allows for flexible and
-/// asynchronous error processing, such as logging or sending custom error responses.
-pub trait ErrorHandler<Fut>: Fn(Context) -> Fut + Send + Sync + 'static
+/// This hook is triggered when an error is encountered, allowing for custom logic
+/// such as logging, cleanup, or sending a response. The hook must be a function
+/// that takes a `Context` and returns a future, and it must be `Send`, `Sync`,
+/// and have a `'static` lifetime.
+pub trait ContextErrorHook<Fut>: Fn(Context) -> Fut + Send + Sync + 'static
 where
     Fut: Future<Output = ()> + Send,
 {
@@ -16,7 +17,7 @@ where
 /// This trait is essential for creating type-erased async function pointers,
 /// which is a common pattern for storing and dynamically dispatching different
 /// asynchronous handlers in a collection.
-pub trait FnPinBoxSendSync:
+pub trait ContextFnPinBoxSendSync:
     Fn(Context) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync
 {
 }
@@ -26,7 +27,7 @@ pub trait FnPinBoxSendSync:
 /// This trait ensures that a handler function is safe to be sent across threads
 /// and has a static lifetime, making it suitable for use in long-lived components
 /// of the application, such as the main router.
-pub trait FnSendSyncStatic<Fut>: Fn(Context) -> Fut + Send + Sync + 'static
+pub trait ContextFnSendSyncStatic<Fut>: Fn(Context) -> Fut + Send + Sync + 'static
 where
     Fut: Future<Output = ()> + Send,
 {

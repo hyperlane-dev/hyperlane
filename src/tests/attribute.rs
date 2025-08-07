@@ -16,7 +16,7 @@ async fn get_panic_from_context() {
 #[tokio::test]
 async fn get_panic_from_join_error() {
     let message: &'static str = "Test panic message";
-    let join_handle: JoinHandle<()> = tokio::spawn(async {
+    let join_handle: JoinHandle<()> = spawn(async {
         panic!("{}", message.to_string());
     });
     let join_error: JoinError = join_handle.await.unwrap_err();

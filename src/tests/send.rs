@@ -17,7 +17,7 @@ async fn server_clone_across_threads() {
         .await
         .clone();
     let server_clone: Server = server.clone();
-    let handle: JoinHandle<&'static str> = tokio::spawn(async move {
+    let handle: JoinHandle<&'static str> = spawn(async move {
         let _server_in_thread: Server = server_clone;
         "success"
     });
@@ -35,11 +35,11 @@ async fn server_share_across_threads() {
     );
     let server1: Arc<Server> = server.clone();
     let server2: Arc<Server> = server.clone();
-    let handle1: JoinHandle<&'static str> = tokio::spawn(async move {
+    let handle1: JoinHandle<&'static str> = spawn(async move {
         let _server_in_thread1: Arc<Server> = server1;
         "thread1"
     });
-    let handle2: JoinHandle<&'static str> = tokio::spawn(async move {
+    let handle2: JoinHandle<&'static str> = spawn(async move {
         let _server_in_thread2: Arc<Server> = server2;
         "thread2"
     });

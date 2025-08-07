@@ -154,7 +154,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `F` - The panic handler function implementing `ErrorHandler<Fut>`.
+    /// - `F` - The panic handler function implementing `ContextErrorHook<Fut>`.
     /// - `Fut` - The future type implementing `FutureSendStatic<()>`.
     ///
     /// # Returns
@@ -162,7 +162,7 @@ impl Server {
     /// - `&Self` - Reference to self for method chaining.
     pub async fn panic_hook<F, Fut>(&self, func: F) -> &Self
     where
-        F: ErrorHandler<Fut>,
+        F: ContextErrorHook<Fut>,
         Fut: FutureSendStatic<()>,
     {
         self.get_write()
@@ -261,7 +261,7 @@ impl Server {
     /// # Arguments
     ///
     /// - `R` - The route path pattern implementing `ToString`.
-    /// - `F` - The handler function implementing `FnSendSyncStatic<Fut>`.
+    /// - `F` - The handler function implementing `ContextFnSendSyncStatic<Fut>`.
     /// - `Fut` - The future type.
     ///
     /// # Returns
@@ -270,7 +270,7 @@ impl Server {
     pub async fn route<R, F, Fut>(&self, route: R, func: F) -> &Self
     where
         R: ToString,
-        F: FnSendSyncStatic<Fut>,
+        F: ContextFnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
     {
         let route_str: String = route.to_string();
@@ -289,7 +289,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `F` - The middleware function implementing `FnSendSyncStatic<Fut>`.
+    /// - `F` - The middleware function implementing `ContextFnSendSyncStatic<Fut>`.
     /// - `Fut` - The future type.
     ///
     /// # Returns
@@ -297,7 +297,7 @@ impl Server {
     /// - `&Self` - Reference to self for method chaining.
     pub async fn request_middleware<F, Fut>(&self, func: F) -> &Self
     where
-        F: FnSendSyncStatic<Fut>,
+        F: ContextFnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
     {
         self.get_write()
@@ -311,7 +311,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `F` - The middleware function implementing `FnSendSyncStatic<Fut>`.
+    /// - `F` - The middleware function implementing `ContextFnSendSyncStatic<Fut>`.
     /// - `Fut` - The future type.
     ///
     /// # Returns
@@ -319,7 +319,7 @@ impl Server {
     /// - `&Self` - Reference to self for method chaining.
     pub async fn response_middleware<F, Fut>(&self, func: F) -> &Self
     where
-        F: FnSendSyncStatic<Fut>,
+        F: ContextFnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
     {
         self.get_write()
@@ -333,7 +333,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `F` - The hook function implementing `FnSendSyncStatic<Fut>`.
+    /// - `F` - The hook function implementing `ContextFnSendSyncStatic<Fut>`.
     /// - `Fut` - The future type.
     ///
     /// # Returns
@@ -341,7 +341,7 @@ impl Server {
     /// - `&Self` - Reference to self for method chaining.
     pub async fn pre_upgrade_hook<F, Fut>(&self, func: F) -> &Self
     where
-        F: FnSendSyncStatic<Fut>,
+        F: ContextFnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
     {
         self.get_write()
@@ -355,7 +355,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `F` - The hook function implementing `FnSendSyncStatic<Fut>`.
+    /// - `F` - The hook function implementing `ContextFnSendSyncStatic<Fut>`.
     /// - `Fut` - The future type.
     ///
     /// # Returns
@@ -363,7 +363,7 @@ impl Server {
     /// - `&Self` - Reference to self for method chaining.
     pub async fn connected_hook<F, Fut>(&self, func: F) -> &Self
     where
-        F: FnSendSyncStatic<Fut>,
+        F: ContextFnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
     {
         self.get_write()
@@ -499,13 +499,13 @@ impl Server {
     /// to the server's configured panic handler.
     async fn init_panic_hook(&self) {
         let server_clone: Server = self.clone();
-        let panic_hook: ArcErrorHandlerSendSync =
+        let panic_hook: ArcContextErrorHookSendSync =
             server_clone.get_read().await.get_panic_hook().clone();
         set_hook(Box::new(move |panic: &PanicHookInfo<'_>| {
             let panic_struct: Panic = Panic::from_panic_hook(panic);
             let ctx: Context = Context::default();
-            let panic_hook_clone: ArcErrorHandlerSendSync = panic_hook.clone();
-            tokio::spawn(async move {
+            let panic_hook_clone: ArcContextErrorHookSendSync = panic_hook.clone();
+            spawn(async move {
                 ctx.set_panic(panic_struct).await;
                 panic_hook_clone(ctx).await;
             });
@@ -557,7 +557,7 @@ impl Server {
     ) where
         F: Fn(Context) -> PinBoxFutureSendStatic,
     {
-        let result: ResultJoinError<()> = tokio::spawn(hook_func(ctx.clone())).await;
+        let result: ResultJoinError<()> = spawn(hook_func(ctx.clone())).await;
         ctx.update_lifecycle_status(lifecycle).await;
         if let Err(join_error) = result {
             if join_error.is_panic() {
@@ -630,7 +630,7 @@ impl Server {
     async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
         let server: Server = self.clone();
         let http_buffer: usize = *self.get_read().await.get_config().get_http_buffer();
-        tokio::spawn(async move {
+        spawn(async move {
             server.handle_connection(stream, http_buffer).await;
         });
     }
@@ -699,12 +699,12 @@ impl Server {
     /// # Arguments
     ///
     /// - `&Context` - The request context.
-    /// - `&OptionArcFnPinBoxSendSync` - An `Option` containing the handler function if a route was matched.
+    /// - `&OptionArcContextFnPinBoxSendSync` - An `Option` containing the handler function if a route was matched.
     /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
     async fn run_route_hook(
         &self,
         ctx: &Context,
-        handler: &OptionArcFnPinBoxSendSync,
+        handler: &OptionArcContextFnPinBoxSendSync,
         lifecycle: &mut Lifecycle,
     ) {
         if let Some(func) = handler {
@@ -744,7 +744,7 @@ impl Server {
         let ctx: &Context = state.ctx;
         ctx.set_request(request).await;
         let mut lifecycle: Lifecycle = Lifecycle::new_continue(request.is_enable_keep_alive());
-        let route_hook: OptionArcFnPinBoxSendSync = self
+        let route_hook: OptionArcContextFnPinBoxSendSync = self
             .get_read()
             .await
             .get_route()
@@ -870,21 +870,36 @@ impl Server {
     /// Returns a `ServerResult` containing a shutdown function on success.
     /// Calling this function will shut down the server by aborting its main task.
     /// Returns an error if the server fails to start.
-    pub async fn run(&self) -> ServerResult<ArcFnSendSync> {
+    pub async fn run(&self) -> ServerResult<ServerRun> {
         self.init_panic_hook().await;
         let tcp_listener: TcpListener = self.create_tcp_listener().await?;
         let server: Server = self.clone();
-        let (shutdown_sender, mut shutdown_receiver) = mpsc::channel(1);
-        let shutdown = move || {
-            let _ = shutdown_sender.send(());
-        };
-        let accept_connections: JoinHandle<ServerResult<()>> =
-            tokio::spawn(async move { server.accept_connections(&tcp_listener).await });
-        tokio::spawn(async move {
-            if shutdown_receiver.recv().await.is_some() {
-                accept_connections.abort();
-            }
+        let (wait_sender, wait_receiver) = channel(());
+        let (shutdown_sender, mut shutdown_receiver) = channel(());
+        let accept_connections: JoinHandle<()> = spawn(async move {
+            let _ = server.accept_connections(&tcp_listener).await;
+            let _ = wait_sender.send(());
         });
-        Ok(Arc::new(shutdown))
+        let wait_hook: ArcPinBoxFutureSend = Arc::new(move || {
+            let mut wait_receiver_clone: Receiver<()> = wait_receiver.clone();
+            Box::pin(async move {
+                let _ = wait_receiver_clone.changed().await;
+            })
+        });
+        let shutdown_hook: ArcPinBoxFutureSend = Arc::new(move || {
+            let shutdown_sender_clone: Sender<()> = shutdown_sender.clone();
+            Box::pin(async move {
+                let _ = shutdown_sender_clone.send(());
+            })
+        });
+        spawn(async move {
+            let _ = shutdown_receiver.changed().await;
+            accept_connections.abort();
+        });
+        let server_run: ServerRun = ServerRun {
+            wait_hook,
+            shutdown_hook,
+        };
+        Ok(server_run)
     }
 }

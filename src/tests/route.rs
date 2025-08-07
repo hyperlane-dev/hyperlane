@@ -6,7 +6,7 @@ where
     F: Fn() -> Fut + Send + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
-    let result: ResultJoinError<_> = tokio::spawn(future_factory()).await;
+    let result: ResultJoinError<_> = spawn(future_factory()).await;
     assert!(
         result.is_err(),
         "Expected panic, but task completed successfully"

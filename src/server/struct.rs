@@ -24,27 +24,27 @@ pub(crate) struct ServerInner {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) request_middleware: VecArcFnPinBoxSendSync,
+    pub(super) request_middleware: VecArcContextFnPinBoxSendSync,
     /// A collection of middleware functions that are executed for every outgoing response
     /// before it is sent back to the client.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) response_middleware: VecArcFnPinBoxSendSync,
+    pub(super) response_middleware: VecArcContextFnPinBoxSendSync,
     /// A collection of hooks that are executed before a connection is upgraded to WebSocket.
     /// This allows for custom logic, such as authentication, to be performed.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) pre_upgrade_hook: VecArcFnPinBoxSendSync,
+    pub(super) pre_upgrade_hook: VecArcContextFnPinBoxSendSync,
     /// A collection of hooks that are executed immediately after a new client connection is established.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) connected_hook: VecArcFnPinBoxSendSync,
+    pub(super) connected_hook: VecArcContextFnPinBoxSendSync,
     /// A route matcher used to specify routes for which the default HTTP hook should be disabled.
     #[get(pub(super))]
     #[get_mut(pub(super))]
@@ -61,7 +61,7 @@ pub(crate) struct ServerInner {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) panic_hook: ArcErrorHandlerSendSync,
+    pub(super) panic_hook: ArcContextErrorHookSendSync,
 }
 
 /// The primary server structure that provides a thread-safe interface to the server's state.
@@ -71,6 +71,16 @@ pub(crate) struct ServerInner {
 /// configuration and state across different threads and asynchronous tasks.
 #[derive(Clone, Getter, CustomDebug, DisplayDebug)]
 pub struct Server(#[get(pub(super))] pub(super) ArcRwLockServerInner);
+
+#[derive(Clone, CustomDebug, DisplayDebug, Getter)]
+pub struct ServerRun {
+    #[debug(skip)]
+    #[get(pub)]
+    pub(super) wait_hook: ArcPinBoxFutureSend,
+    #[debug(skip)]
+    #[get(pub)]
+    pub(super) shutdown_hook: ArcPinBoxFutureSend,
+}
 
 /// Represents the state associated with a single connection handler.
 ///

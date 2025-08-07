@@ -265,12 +265,16 @@ impl RouteMatcher {
     /// # Arguments
     ///
     /// - `&str` - The route pattern string.
-    /// - `ArcFnPinBoxSendSync` - The handler function for this route.
+    /// - `ArcContextFnPinBoxSendSync` - The handler function for this route.
     ///
     /// # Returns
     ///
     /// - `Result<(), RouteError>` - Ok on success, or RouteError if pattern is duplicate.
-    pub(crate) fn add(&mut self, pattern: &str, handler: ArcFnPinBoxSendSync) -> ResultAddRoute {
+    pub(crate) fn add(
+        &mut self,
+        pattern: &str,
+        handler: ArcContextFnPinBoxSendSync,
+    ) -> ResultAddRoute {
         let route_pattern: RoutePattern = RoutePattern::new(pattern)?;
         if route_pattern.is_static() {
             if self.get_static_routes().contains_key(pattern) {
@@ -361,12 +365,12 @@ impl RouteMatcher {
     ///
     /// # Returns
     ///
-    /// - `Option<ArcFnPinBoxSendSync>` - Some handler if match found, None otherwise.
+    /// - `Option<ArcContextFnPinBoxSendSync>` - Some handler if match found, None otherwise.
     pub(crate) async fn resolve_route(
         &self,
         ctx: &Context,
         path: &str,
-    ) -> OptionArcFnPinBoxSendSync {
+    ) -> OptionArcContextFnPinBoxSendSync {
         if let Some(handler) = self.get_static_routes().get(path) {
             ctx.set_route_params(RouteParams::default()).await;
             return Some(handler.clone());
