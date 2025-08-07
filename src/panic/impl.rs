@@ -46,56 +46,6 @@ impl Panic {
         }
     }
 
-    /// Formats a `Location` struct into a "file:line:column" string.
-    ///
-    /// # Arguments
-    ///
-    /// - `OptionLocationRef<'_, '_>` - The location of the panic.
-    ///
-    /// # Returns
-    ///
-    /// - `OptionString` - The formatted location, or None if not available.
-    fn format_panic_location(location: OptionLocationRef<'_, '_>) -> OptionString {
-        location.map(|data| {
-            format!(
-                "{}{}{}{}{}",
-                data.file(),
-                COLON_SPACE_SYMBOL,
-                data.line(),
-                COLON_SPACE_SYMBOL,
-                data.column()
-            )
-        })
-    }
-
-    /// Creates a `Panic` instance from the standard library's `PanicInfo`.
-    ///
-    /// This is the primary constructor used by the global panic hook to capture
-    /// details about a panic.
-    ///
-    /// # Arguments
-    ///
-    /// - `&PanicHookInfo<'_>` - The panic info from the hook callback.
-    ///
-    /// # Returns
-    ///
-    /// - `Panic` - A new panic instance with data from info.
-    pub(crate) fn from_panic_hook(info: &PanicHookInfo<'_>) -> Self {
-        let message_string: String = info.to_string();
-        let message: OptionString = if message_string.is_empty() {
-            Some(message_string)
-        } else {
-            None
-        };
-        let payload: OptionString = Self::extract_panic_message_from_any(info.payload());
-        let location: OptionString = Self::format_panic_location(info.location());
-        Self {
-            message,
-            location,
-            payload,
-        }
-    }
-
     /// Creates a `Panic` instance from a `tokio::task::JoinError`.
     ///
     /// This is used to handle panics that occur within spawned asynchronous tasks,

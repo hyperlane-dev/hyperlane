@@ -1,14 +1,13 @@
 //! hyperlane
 //!
-//! hyperlane is a lightweight and high-performance Rust HTTP server library
-//! designed to simplify network service development. It supports HTTP request parsing,
-//! response building, and TCP communication, making it ideal for building modern
-//! web services. Additionally, it provides support for request and response middleware,
-//! WebSocket, and Server-Sent Events (SSE), enabling flexible and efficient
-//! real-time communication. Built with pure Rust and standard library,
-//! Hyperlane offers true cross-platform compatibility across Windows, Linux and macOS,
-//! with the same API experience on all platforms, powered by Tokio's async runtime for
-//! seamless networking without platform-specific dependencies.
+//! A lightweight, high-performance, and cross-platform
+//! Rust HTTP server library built on Tokio. It simplifies
+//! modern web service development by providing built-in
+//! support for middleware, WebSocket, Server-Sent Events (SSE),
+//! and raw TCP communication. With a unified and ergonomic API
+//! across Windows, Linux, and MacOS, it enables developers to
+//! build robust, scalable, and event-driven network
+//! applications with minimal overhead and maximum flexibility.
 
 mod attribute;
 mod config;
@@ -35,15 +34,8 @@ pub(crate) use config::*;
 pub(crate) use lifecycle::*;
 
 pub(crate) use std::{
-    any::Any,
-    collections::HashMap,
-    future::Future,
-    net::SocketAddr,
-    panic::Location,
-    panic::{PanicHookInfo, set_hook},
-    pin::Pin,
-    sync::Arc,
-    time::Duration,
+    any::Any, collections::HashMap, future::Future, net::SocketAddr, panic::Location, pin::Pin,
+    sync::Arc, time::Duration,
 };
 
 pub(crate) use lombok_macros::*;

@@ -18,13 +18,6 @@ pub type OptionArcContextFnPinBoxSendSync = Option<ArcContextFnPinBoxSendSync>;
 /// executed sequentially.
 pub type VecArcContextFnPinBoxSendSync = Vec<ArcContextFnPinBoxSendSync>;
 
-/// A type alias for a thread-safe, shareable error handler function.
-///
-/// This type allows for an error handler to be stored and shared across threads,
-/// making it suitable for global or application-level error handling.
-pub type ArcContextErrorHookSendSync =
-    Arc<dyn Fn(Context) -> PinBoxFutureSendStatic + Send + Sync + 'static>;
-
 /// A type alias for a pinned, boxed, sendable, static future.
 ///
 /// This is a common return type for asynchronous handlers, providing a type-erased

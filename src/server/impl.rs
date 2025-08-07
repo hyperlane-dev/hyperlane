@@ -6,7 +6,7 @@ impl Default for ServerInner {
     ///
     /// # Returns
     ///
-    /// - `ServerInner` - A new instance with default configuration.
+    /// - `Self` - A new instance with default configuration.
     fn default() -> Self {
         Self {
             config: ServerConfig::default(),
@@ -17,7 +17,25 @@ impl Default for ServerInner {
             connected_hook: vec![],
             disable_http_hook: RouteMatcher::new(),
             disable_ws_hook: RouteMatcher::new(),
-            panic_hook: Arc::new(|ctx: Context| Box::pin(default_panic_hook(ctx))),
+            panic_hook: vec![],
+        }
+    }
+}
+
+/// Provides a default implementation for `ServerRunHook`.
+impl Default for ServerRunHook {
+    /// Creates a new `ServerRunHook` instance with default no-op hooks.
+    ///
+    /// The default `wait_hook` and `shutdown_hook` do nothing, allowing the server
+    /// to run without specific shutdown or wait logic unless configured otherwise.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - A new `ServerRunHook` instance with default hooks.
+    fn default() -> Self {
+        Self {
+            wait_hook: Arc::new(|| Box::pin(async move {})),
+            shutdown_hook: Arc::new(|| Box::pin(async move {})),
         }
     }
 }
@@ -36,7 +54,7 @@ impl<'a> HandlerState<'a> {
     ///
     /// # Returns
     ///
-    /// - `HandlerState` - The newly created handler state.
+    /// - `Self` - The newly created handler state.
     pub(super) fn new(stream: &'a ArcRwLockStream, ctx: &'a Context) -> Self {
         Self { stream, ctx }
     }
@@ -51,7 +69,7 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// - `Server` - A new Server instance.
+    /// - `Self` - A new Server instance.
     pub fn new() -> Self {
         let server: ServerInner = ServerInner::default();
         Self(arc_rwlock(server))
@@ -162,12 +180,13 @@ impl Server {
     /// - `&Self` - Reference to self for method chaining.
     pub async fn panic_hook<F, Fut>(&self, func: F) -> &Self
     where
-        F: ContextErrorHook<Fut>,
+        F: ContextFnSendSyncStatic<Fut>,
         Fut: FutureSendStatic<()>,
     {
         self.get_write()
             .await
-            .set_panic_hook(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
+            .get_mut_panic_hook()
+            .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
         self
     }
 
@@ -493,29 +512,15 @@ impl Server {
         format!("{}{}{}", host, COLON_SPACE_SYMBOL, port)
     }
 
-    /// Initializes the global panic hook for the entire application.
+    /// Handles a panic that has been captured and associated with a specific request `Context`.
     ///
-    /// This sets a custom panic hook that captures panic information and forwards it
-    /// to the server's configured panic handler.
-    async fn init_panic_hook(&self) {
-        let server_clone: Server = self.clone();
-        let panic_hook: ArcContextErrorHookSendSync =
-            server_clone.get_read().await.get_panic_hook().clone();
-        set_hook(Box::new(move |panic: &PanicHookInfo<'_>| {
-            let panic_struct: Panic = Panic::from_panic_hook(panic);
-            let ctx: Context = Context::default();
-            let panic_hook_clone: ArcContextErrorHookSendSync = panic_hook.clone();
-            spawn(async move {
-                ctx.set_panic(panic_struct).await;
-                panic_hook_clone(ctx).await;
-            });
-        }));
-    }
-
-    /// Handles a panic that occurred within a request's context.
+    /// This function is invoked when a panic occurs within a task that has access to the request
+    /// context, such as a route handler or middleware. It ensures that the panic information is
+    /// recorded in the `Context` and then passed to the server's configured panic hook for
+    /// processing.
     ///
-    /// This function associates the panic information with the context and invokes the
-    /// server's configured panic hook.
+    /// By associating the panic with the context, the handler can access request-specific details
+    /// to provide more meaningful error logging and responses.
     ///
     /// # Arguments
     ///
@@ -524,7 +529,12 @@ impl Server {
     async fn handle_panic_with_context(&self, ctx: &Context, panic: &Panic) {
         let panic_clone: Panic = panic.clone();
         let _ = ctx.set_panic(panic_clone).await;
-        self.get_read().await.get_panic_hook()(ctx.clone()).await;
+        for func in self.get_read().await.get_panic_hook().iter() {
+            func(ctx.clone()).await;
+            if ctx.get_aborted().await {
+                return;
+            }
+        }
     }
 
     /// Handles a panic that occurred within a spawned Tokio task.
@@ -661,11 +671,19 @@ impl Server {
     ///
     /// - `&Context` - The request context.
     /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
-    async fn run_pre_upgrade_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
+    async fn run_pre_upgrade_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) -> bool {
         for func in self.get_read().await.get_pre_upgrade_hook().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| func(ctx))
                 .await;
+            if lifecycle.is_abort() {
+                return true;
+            }
         }
+        false
     }
 
     /// Executes all registered `connected` hooks.
@@ -674,11 +692,19 @@ impl Server {
     ///
     /// - `&Context` - The request context.
     /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
-    async fn run_connected_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
+    async fn run_connected_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) -> bool {
         for func in self.get_read().await.get_connected_hook().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| func(ctx))
                 .await;
+            if lifecycle.is_abort() {
+                return true;
+            }
         }
+        false
     }
 
     /// Executes all registered request middleware in sequence.
@@ -687,11 +713,19 @@ impl Server {
     ///
     /// - `&Context` - The request context.
     /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
-    async fn run_request_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
+    async fn run_request_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) -> bool {
         for func in self.get_read().await.get_request_middleware().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| func(ctx))
                 .await;
+            if lifecycle.is_abort() {
+                return true;
+            }
         }
+        false
     }
 
     /// Executes the matched route handler.
@@ -701,16 +735,21 @@ impl Server {
     /// - `&Context` - The request context.
     /// - `&OptionArcContextFnPinBoxSendSync` - An `Option` containing the handler function if a route was matched.
     /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
     async fn run_route_hook(
         &self,
         ctx: &Context,
         handler: &OptionArcContextFnPinBoxSendSync,
         lifecycle: &mut Lifecycle,
-    ) {
+    ) -> bool {
         if let Some(func) = handler {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| func(ctx))
                 .await;
         }
+        lifecycle.is_abort()
     }
 
     /// Executes all registered response middleware in sequence.
@@ -719,11 +758,19 @@ impl Server {
     ///
     /// - `&Context` - The request context.
     /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
-    async fn run_response_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) {
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
+    async fn run_response_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) -> bool {
         for func in self.get_read().await.get_response_middleware().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| func(ctx))
                 .await;
+            if lifecycle.is_abort() {
+                return true;
+            }
         }
+        false
     }
 
     /// The core request handling pipeline.
@@ -750,12 +797,10 @@ impl Server {
             .get_route()
             .resolve_route(ctx, route)
             .await;
-        self.run_request_middleware(ctx, &mut lifecycle).await;
-        if lifecycle.is_abort() {
+        if self.run_request_middleware(ctx, &mut lifecycle).await {
             return lifecycle.keep_alive();
         }
-        self.run_route_hook(ctx, &route_hook, &mut lifecycle).await;
-        if lifecycle.is_abort() {
+        if self.run_route_hook(ctx, &route_hook, &mut lifecycle).await {
             return lifecycle.keep_alive();
         }
         self.run_response_middleware(ctx, &mut lifecycle).await;
@@ -794,8 +839,7 @@ impl Server {
     async fn http_hook<'a>(&self, state: &HandlerState<'a>, request: &Request) {
         let ctx: &Context = state.ctx;
         let mut lifecycle: Lifecycle = Lifecycle::new();
-        self.run_connected_hook(ctx, &mut lifecycle).await;
-        if lifecycle.is_abort() {
+        if self.run_connected_hook(ctx, &mut lifecycle).await {
             return;
         }
         if !self.request_hook(state, request).await {
@@ -846,15 +890,13 @@ impl Server {
             .get_route()
             .resolve_route(ctx, &route)
             .await;
-        self.run_pre_upgrade_hook(ctx, &mut lifecycle).await;
-        if lifecycle.is_abort() {
+        if self.run_pre_upgrade_hook(ctx, &mut lifecycle).await {
             return;
         }
         if ctx.upgrade_to_ws().await.is_err() {
             return;
         }
-        self.run_connected_hook(ctx, &mut lifecycle).await;
-        if lifecycle.is_abort() {
+        if self.run_connected_hook(ctx, &mut lifecycle).await {
             return;
         }
         self.handle_ws_requests(state, request, &route).await;
@@ -870,8 +912,7 @@ impl Server {
     /// Returns a `ServerResult` containing a shutdown function on success.
     /// Calling this function will shut down the server by aborting its main task.
     /// Returns an error if the server fails to start.
-    pub async fn run(&self) -> ServerResult<ServerRun> {
-        self.init_panic_hook().await;
+    pub async fn run(&self) -> ServerResult<ServerRunHook> {
         let tcp_listener: TcpListener = self.create_tcp_listener().await?;
         let server: Server = self.clone();
         let (wait_sender, wait_receiver) = channel(());
@@ -896,10 +937,9 @@ impl Server {
             let _ = shutdown_receiver.changed().await;
             accept_connections.abort();
         });
-        let server_run: ServerRun = ServerRun {
-            wait_hook,
-            shutdown_hook,
-        };
+        let mut server_run: ServerRunHook = ServerRunHook::default();
+        server_run.set_shutdown_hook(shutdown_hook);
+        server_run.set_wait_hook(wait_hook);
         Ok(server_run)
     }
 }

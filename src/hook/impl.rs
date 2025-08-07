@@ -1,17 +1,5 @@
 use crate::*;
 
-/// A blanket implementation for any function that can act as an error handler.
-///
-/// This allows closures and functions with the appropriate signature to be used
-/// as error handlers without requiring explicit wrapping. This simplifies the
-/// process of defining custom error handling logic.
-impl<F, Fut> ContextErrorHook<Fut> for F
-where
-    F: Fn(Context) -> Fut + Send + Sync + 'static,
-    Fut: Future<Output = ()> + Send,
-{
-}
-
 /// A blanket implementation for functions that return a pinned, boxed, sendable future.
 ///
 /// This trait is a common pattern for asynchronous handlers in Rust, enabling type

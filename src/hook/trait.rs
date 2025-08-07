@@ -1,17 +1,5 @@
 use crate::*;
 
-/// A trait for handling errors that occur within a context.
-///
-/// This hook is triggered when an error is encountered, allowing for custom logic
-/// such as logging, cleanup, or sending a response. The hook must be a function
-/// that takes a `Context` and returns a future, and it must be `Send`, `Sync`,
-/// and have a `'static` lifetime.
-pub trait ContextErrorHook<Fut>: Fn(Context) -> Fut + Send + Sync + 'static
-where
-    Fut: Future<Output = ()> + Send,
-{
-}
-
 /// A trait for functions that return a pinned, boxed, sendable future.
 ///
 /// This trait is essential for creating type-erased async function pointers,

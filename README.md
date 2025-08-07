@@ -16,7 +16,7 @@
 
 [Api Docs](https://docs.rs/hyperlane/latest/hyperlane/)
 
-> A lightweight, high-performance, and cross-platform rust http server library built on tokio, it simplifies modern web service development by providing built-in support for middleware, websocket, server-sent events (sse), and raw tcp communication, while offering a unified and ergonomic api across windows, linux, and macos, enabling developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
+> A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
 
 ## Installation
 
@@ -117,6 +117,35 @@ async fn dynamic_route(ctx: Context) {
     panic!("Test panic {:?}", param);
 }
 
+async fn panic_hook(ctx: Context) {
+    let request_string: String = ctx.get_request_string().await;
+    let error: Panic = ctx.get_panic().await.unwrap_or_default();
+    let mut response_body: String = error.to_string();
+    let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+    if ctx.get_response().await != Response::default() {
+        response_body.push_str(BR);
+        response_body.push_str(&request_string);
+        response_body.push_str(BR);
+    }
+    eprintln!("{}", response_body);
+    let _ = std::io::Write::flush(&mut std::io::stderr());
+    let _ = ctx
+        .set_response_version(HttpVersion::HTTP1_1)
+        .await
+        .set_response_status_code(500)
+        .await
+        .clear_response_headers()
+        .await
+        .replace_response_header(SERVER, HYPERLANE)
+        .await
+        .replace_response_header(CONTENT_TYPE, content_type)
+        .await
+        .set_response_body(response_body)
+        .await
+        .send()
+        .await;
+}
+
 #[tokio::main]
 async fn main() {
     let server: Server = Server::new();
@@ -126,6 +155,7 @@ async fn main() {
     server.disable_linger().await;
     server.http_buffer(4096).await;
     server.ws_buffer(4096).await;
+    server.panic_hook(panic_hook).await;
     server.connected_hook(connected_hook).await;
     server.pre_upgrade_hook(request_middleware).await;
     server.request_middleware(request_middleware).await;
@@ -137,12 +167,9 @@ async fn main() {
     server
         .route("/dynamic/routing/{file:^.*$}", dynamic_route)
         .await;
-    let result: ServerResult<ArcFnSendSync> = server.run().await;
-    println!("Server result: {:?}", result.is_ok());
+    let server_run_hook: ServerRunHook = server.run().await.unwrap_or_default();
     tokio::time::sleep(Duration::from_secs(60)).await;
-    let shutdown: ArcFnSendSync = result.clone().unwrap();
-    shutdown();
-    let _ = std::io::Write::flush(&mut std::io::stderr());
+    server_run_hook.get_shutdown_hook()().await;
 }
 ```
 
