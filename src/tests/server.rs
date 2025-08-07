@@ -123,8 +123,13 @@ async fn server() {
             .route("/dynamic/routing/{file:^.*$}", dynamic_route)
             .await;
         let server_run_hook: ServerRunHook = server.run().await.unwrap_or_default();
-        tokio::time::sleep(Duration::from_secs(60)).await;
-        server_run_hook.get_shutdown_hook()().await;
+        let shutdown_hook: ArcPinBoxFutureSend = server_run_hook.get_shutdown_hook().clone();
+        let get_wait_hook: &ArcPinBoxFutureSend = server_run_hook.get_wait_hook();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(6)).await;
+            shutdown_hook().await;
+        });
+        get_wait_hook().await;
     }
 
     main().await;
