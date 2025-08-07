@@ -22,21 +22,42 @@ impl Default for ServerInner {
     }
 }
 
-/// Provides a default implementation for `ServerRunHook`.
-impl Default for ServerRunHook {
-    /// Creates a new `ServerRunHook` instance with default no-op hooks.
+/// Provides a default implementation for `ServerHook`.
+impl Default for ServerHook {
+    /// Creates a new `ServerHook` instance with default no-op hooks.
     ///
     /// The default `wait_hook` and `shutdown_hook` do nothing, allowing the server
     /// to run without specific shutdown or wait logic unless configured otherwise.
     ///
     /// # Returns
     ///
-    /// - `Self` - A new `ServerRunHook` instance with default hooks.
+    /// - `Self` - A new `ServerHook` instance with default hooks.
     fn default() -> Self {
         Self {
             wait_hook: Arc::new(|| Box::pin(async move {})),
             shutdown_hook: Arc::new(|| Box::pin(async move {})),
         }
+    }
+}
+
+/// Manages server lifecycle hooks, including waiting and shutdown procedures.
+///
+/// This struct holds closures that are executed during specific server lifecycle events.
+impl ServerHook {
+    /// Waits for the server's shutdown signal or completion.
+    ///
+    /// This method asynchronously waits until the server's `wait_hook` is triggered,
+    /// typically indicating that the server has finished its operations or is ready to shut down.
+    pub async fn wait(&self) {
+        self.get_wait_hook()().await;
+    }
+
+    /// Initiates the server shutdown process.
+    ///
+    /// This method asynchronously calls the `shutdown_hook`, which is responsible for
+    /// performing any necessary cleanup or graceful shutdown procedures.
+    pub async fn shutdown(&self) {
+        self.get_shutdown_hook()().await;
     }
 }
 
@@ -528,7 +549,7 @@ impl Server {
     /// - `&Panic` - The captured panic information.
     async fn handle_panic_with_context(&self, ctx: &Context, panic: &Panic) {
         let panic_clone: Panic = panic.clone();
-        let _ = ctx.set_panic(panic_clone).await;
+        ctx.cancel_aborted().await.set_panic(panic_clone).await;
         for func in self.get_read().await.get_panic_hook().iter() {
             func(ctx.clone()).await;
             if ctx.get_aborted().await {
@@ -912,7 +933,7 @@ impl Server {
     /// Returns a `ServerResult` containing a shutdown function on success.
     /// Calling this function will shut down the server by aborting its main task.
     /// Returns an error if the server fails to start.
-    pub async fn run(&self) -> ServerResult<ServerRunHook> {
+    pub async fn run(&self) -> ServerResult<ServerHook> {
         let tcp_listener: TcpListener = self.create_tcp_listener().await?;
         let server: Server = self.clone();
         let (wait_sender, wait_receiver) = channel(());
@@ -937,7 +958,7 @@ impl Server {
             let _ = shutdown_receiver.changed().await;
             accept_connections.abort();
         });
-        let mut server_run: ServerRunHook = ServerRunHook::default();
+        let mut server_run: ServerHook = ServerHook::default();
         server_run.set_shutdown_hook(shutdown_hook);
         server_run.set_wait_hook(wait_hook);
         Ok(server_run)

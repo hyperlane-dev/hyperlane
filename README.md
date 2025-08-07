@@ -161,9 +161,8 @@ async fn main() {
     server
         .route("/dynamic/routing/{file:^.*$}", dynamic_route)
         .await;
-    let server_run_hook: ServerRunHook = server.run().await.unwrap_or_default();
-    let get_wait_hook: &ArcPinBoxFutureSend = server_run_hook.get_wait_hook();
-    get_wait_hook().await;
+    let server_hook: ServerHook = server.run().await.unwrap_or_default();
+    server_hook.wait().await;
 }
 ```
 
