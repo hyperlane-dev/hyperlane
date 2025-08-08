@@ -119,9 +119,7 @@ async fn server() {
         server.route("/ws", ws_route).await;
         server.route("/sse", sse_route).await;
         server.route("/dynamic/{routing}", dynamic_route).await;
-        server
-            .route("/dynamic/routing/{file:^.*$}", dynamic_route)
-            .await;
+        server.route("/regex/{file:^.*$}", dynamic_route).await;
         let server_hook: ServerHook = server.run().await.unwrap_or_default();
         let server_hook_clone: ServerHook = server_hook.clone();
         tokio::spawn(async move {

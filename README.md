@@ -158,9 +158,7 @@ async fn main() {
     server.route("/ws", ws_route).await;
     server.route("/sse", sse_route).await;
     server.route("/dynamic/{routing}", dynamic_route).await;
-    server
-        .route("/dynamic/routing/{file:^.*$}", dynamic_route)
-        .await;
+    server.route("/regex/{file:^.*$}", dynamic_route).await;
     let server_hook: ServerHook = server.run().await.unwrap_or_default();
     server_hook.wait().await;
 }
