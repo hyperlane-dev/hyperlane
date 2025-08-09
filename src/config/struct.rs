@@ -4,8 +4,8 @@ use crate::*;
 ///
 /// This structure holds all the settings for the HTTP and WebSocket server,
 /// including network parameters and buffer sizes.
-#[derive(Clone, Data, CustomDebug, DisplayDebug, PartialEq, Eq)]
-pub(crate) struct ServerConfig {
+#[derive(Clone, Data, CustomDebug, DisplayDebug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct ServerConfig {
     /// The host address the server will bind to.
     #[get(pub(crate))]
     #[get_mut(pub(crate))]

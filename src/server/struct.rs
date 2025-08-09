@@ -83,14 +83,14 @@ pub struct ServerHook {
     /// This is typically used to wait for the server to stop accepting connections before
     /// the application exits.
     #[debug(skip)]
-    #[get(pub(super))]
+    #[get(pub)]
     #[set(pub(super))]
     pub(super) wait_hook: ArcPinBoxFutureSend,
     /// A hook that, when called, initiates a graceful shutdown of the server.
     /// This will stop the server from accepting new connections and allow existing ones
     /// to complete.
     #[debug(skip)]
-    #[get(pub(super))]
+    #[get(pub)]
     #[set(pub(super))]
     pub(super) shutdown_hook: ArcPinBoxFutureSend,
 }

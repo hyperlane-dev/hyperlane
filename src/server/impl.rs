@@ -145,6 +145,35 @@ impl Server {
         self
     }
 
+    /// Sets the server configuration from a string.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - The configuration string.
+    ///
+    /// # Returns
+    ///
+    /// - `&Self` - Reference to self for method chaining.
+    pub async fn config_str(&self, config: &str) -> &Self {
+        let server_config: ServerConfig = ServerConfig::from_str(config).unwrap();
+        self.config(server_config).await;
+        self
+    }
+
+    /// Sets the server configuration.
+    ///
+    /// # Arguments
+    ///
+    /// - `ServerConfig` - The server configuration.
+    ///
+    /// # Returns
+    ///
+    /// - `&Self` - Reference to self for method chaining.
+    pub async fn config(&self, config: ServerConfig) -> &Self {
+        self.get_write().await.set_config(config);
+        self
+    }
+
     /// Sets the read buffer size for HTTP connections.
     ///
     /// # Arguments

@@ -21,6 +21,7 @@ mod server;
 mod tests;
 
 pub use attribute::*;
+pub use config::*;
 pub use context::*;
 pub use error::*;
 pub use hook::*;
@@ -30,7 +31,6 @@ pub use server::*;
 
 pub use http_type::*;
 
-pub(crate) use config::*;
 pub(crate) use lifecycle::*;
 
 pub(crate) use std::{
@@ -40,7 +40,7 @@ pub(crate) use std::{
 
 pub(crate) use lombok_macros::*;
 pub(crate) use regex::Regex;
-pub(crate) use serde::de::DeserializeOwned;
+pub(crate) use serde::{Deserialize, Serialize, de::DeserializeOwned};
 pub(crate) use tokio::{
     net::{TcpListener, TcpStream},
     spawn,
