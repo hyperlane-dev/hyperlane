@@ -118,7 +118,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `T` - The host address implementing `ToString`.
+    /// - `T: ToString` - The host address.
     ///
     /// # Returns
     ///
@@ -149,13 +149,14 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `&str` - The configuration string.
+    /// - `C: ToString` - The configuration.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn config_str(&self, config: &str) -> &Self {
-        let server_config: ServerConfig = ServerConfig::from_str(config).unwrap();
+    pub async fn config_str<C: ToString>(&self, config_str: C) -> &Self {
+        let config_string: String = config_str.to_string();
+        let server_config: ServerConfig = ServerConfig::from_str(&config_string).unwrap();
         self.config(server_config).await;
         self
     }
@@ -222,8 +223,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `F` - The panic handler function implementing `ContextErrorHook<Fut>`.
-    /// - `Fut` - The future type implementing `FutureSendStatic<()>`.
+    /// - `F: FnContextSendSyncStatic<Fut, ()>` - The panic handler function.
+    /// - `Fut: FutureSendStatic<()>` - The future returned by the panic handler.
     ///
     /// # Returns
     ///
@@ -329,9 +330,9 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `R` - The route path pattern implementing `ToString`.
-    /// - `F` - The handler function implementing `FnContextSendSyncStatic<Fut>`.
-    /// - `Fut` - The future type.
+    /// - `R: ToString` - The route path pattern.
+    /// - `F: FnContextSendSyncStatic<Fut, ()>` - The handler function for the route.
+    /// - `Fut: FutureSendStatic<()>` - The future returned by the handler.
     ///
     /// # Returns
     ///
@@ -358,8 +359,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `F` - The middleware function implementing `FnContextSendSyncStatic<Fut>`.
-    /// - `Fut` - The future type.
+    /// - `F: FnContextSendSyncStatic<Fut, ()>` - The middleware function.
+    /// - `Fut: FutureSendStatic<()>` - The future returned by the middleware.
     ///
     /// # Returns
     ///
@@ -380,8 +381,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `F` - The middleware function implementing `FnContextSendSyncStatic<Fut>`.
-    /// - `Fut` - The future type.
+    /// - `F: FnContextSendSyncStatic<Fut, ()>` - The middleware function.
+    /// - `Fut: FutureSendStatic<()>` - The future returned by the middleware.
     ///
     /// # Returns
     ///
@@ -402,8 +403,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `F` - The hook function implementing `FnContextSendSyncStatic<Fut>`.
-    /// - `Fut` - The future type.
+    /// - `F: FnContextSendSyncStatic<Fut, ()>` - The hook function.
+    /// - `Fut: FutureSendStatic<()>` - The future returned by the hook.
     ///
     /// # Returns
     ///
@@ -424,8 +425,8 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `F` - The hook function implementing `FnContextSendSyncStatic<Fut>`.
-    /// - `Fut` - The future type.
+    /// - `F: FnContextSendSyncStatic<Fut, ()>` - The hook function.
+    /// - `Fut: FutureSendStatic<()>` - The future returned by the hook.
     ///
     /// # Returns
     ///
@@ -446,7 +447,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `R` - The route path implementing `ToString`.
+    /// - `R: ToString` - The route path.
     ///
     /// # Returns
     ///
@@ -464,7 +465,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `R` - The route path implementing `ToString`.
+    /// - `R: ToString` - The route path.
     ///
     /// # Returns
     ///
@@ -483,7 +484,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `R` - The route path implementing `ToString`.
+    /// - `R: ToString` - The route path.
     ///
     /// # Returns
     ///
@@ -501,7 +502,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `R` - The route path implementing `ToString`.
+    /// - `R: ToString` - The route path.
     ///
     /// # Returns
     ///
@@ -520,46 +521,48 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `&str` - The route path.
+    /// - `R: ToString` - The route path.
     ///
     /// # Returns
     ///
     /// - `bool` - True if HTTP handling is disabled.
-    async fn contains_disable_http_hook<'a>(&self, route: &'a str) -> bool {
+    async fn contains_disable_http_hook<'a, R: ToString>(&self, route: R) -> bool {
+        let route_string: String = route.to_string();
         self.get_read()
             .await
             .get_disable_http_hook()
-            .match_route(route)
+            .match_route(&route_string)
     }
 
     /// Checks if default WebSocket handling is disabled for a route.
     ///
     /// # Arguments
     ///
-    /// - `&str` - The route path.
+    /// - `R: ToString` - The route path.
     ///
     /// # Returns
     ///
     /// - `bool` - True if WebSocket handling is disabled.
-    async fn contains_disable_ws_hook<'a>(&self, route: &'a str) -> bool {
+    async fn contains_disable_ws_hook<'a, R: ToString>(&self, route: R) -> bool {
+        let route_string: String = route.to_string();
         self.get_read()
             .await
             .get_disable_ws_hook()
-            .match_route(route)
+            .match_route(&route_string)
     }
 
     /// Formats the host and port into a bindable address string.
     ///
     /// # Arguments
     ///
-    /// - `&str` - The host address.
-    /// - `&usize` - The port number.
+    /// - `H: ToString` - The host address.
+    /// - `P: Into<usize>` - The port number.
     ///
     /// # Returns
     ///
     /// - `String` - The formatted address string.
-    pub fn format_host_port(host: &str, port: &usize) -> String {
-        format!("{}{}{}", host, COLON_SPACE_SYMBOL, port)
+    pub fn format_host_port<H: ToString, P: Into<usize>>(host: H, port: P) -> String {
+        format!("{}{}{}", host.to_string(), COLON_SPACE_SYMBOL, port.into())
     }
 
     /// Handles a panic that has been captured and associated with a specific request `Context`.
@@ -606,9 +609,9 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `&Context` - The request context.
-    /// - `&mut Lifecycle` - A mutable reference to the current `Lifecycle` state.
-    /// - `F` - The hook function to execute.
+    /// - `ctx: &Context` - The request context.
+    /// - `lifecycle: &mut Lifecycle` - A mutable reference to the current `Lifecycle` state.
+    /// - `F: Fn(Context) -> PinBoxFutureSendStatic` - The hook function to execute.
     async fn run_hook_with_lifecycle<F>(
         &self,
         ctx: &Context,
@@ -636,7 +639,7 @@ impl Server {
         let config: ServerConfig = self.get_read().await.get_config().clone();
         let host: &str = config.get_host();
         let port: usize = *config.get_port();
-        let addr: String = Self::format_host_port(host, &port);
+        let addr: String = Self::format_host_port(host, port);
         TcpListener::bind(&addr)
             .await
             .map_err(|err| ServerError::TcpBind(err.to_string()))
