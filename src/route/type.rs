@@ -11,11 +11,11 @@ pub(crate) type VecStrRef<'a> = Vec<&'a str>;
 /// A type alias for a vector containing tuples of a `RoutePattern` and its associated handler function.
 /// This is used for storing dynamic and regex routes.
 pub(crate) type VecRoutePatternArcFnPinBoxSendSync =
-    Vec<(RoutePattern, ArcContextFnPinBoxSendSync)>;
+    Vec<(RoutePattern, ArcFnContextPinBoxSendSync)>;
 /// A type alias for a hash map that stores static routes and their handlers.
 /// The key is the exact path string.
 pub(crate) type HashMapStringArcFnPinBoxSendSyncXxHash3_64 =
-    HashMapXxHash3_64<String, ArcContextFnPinBoxSendSync>;
+    HashMapXxHash3_64<String, ArcFnContextPinBoxSendSync>;
 /// A type alias for a `Result` returned when adding a new route, indicating success or a `RouteError`.
 pub(crate) type ResultAddRoute = Result<(), RouteError>;
 /// A type alias for a `Result` from parsing a route string, yielding a vector of `RouteSegment`s or a `RouteError`.

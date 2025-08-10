@@ -5,7 +5,7 @@ use crate::*;
 /// This trait is essential for creating type-erased async function pointers,
 /// which is a common pattern for storing and dynamically dispatching different
 /// asynchronous handlers in a collection.
-pub trait ContextFnPinBoxSendSync:
+pub trait FnContextPinBoxSendSync:
     Fn(Context) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync
 {
 }
@@ -15,7 +15,7 @@ pub trait ContextFnPinBoxSendSync:
 /// This trait ensures that a handler function is safe to be sent across threads
 /// and has a static lifetime, making it suitable for use in long-lived components
 /// of the application, such as the main router.
-pub trait ContextFnSendSyncStatic<Fut>: Fn(Context) -> Fut + Send + Sync + 'static
+pub trait FnContextSendSyncStatic<Fut>: Fn(Context) -> Fut + Send + Sync + 'static
 where
     Fut: Future<Output = ()> + Send,
 {

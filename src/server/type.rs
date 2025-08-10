@@ -10,11 +10,11 @@ pub type ResultJoinError<T> = Result<T, JoinError>;
 
 /// A type alias for a pinned, boxed, `Send`-able future with no output.
 /// This is often used to represent an asynchronous task that can be sent across threads.
-pub type PinBoxFutureSend = Pin<Box<dyn Future<Output = ()> + Send>>;
+pub type PinBoxFutureSend = Pin<Box<dyn FutureSend>>;
 
-/// A type alias for a thread-safe, reference-counted closure that produces a `PinBoxFutureSend`.
+/// A type alias for a thread-safe, reference-counted closure that produces a `FnPinBoxFutureSendSync`.
 /// This is useful for creating and sharing asynchronous task factories.
-pub type ArcPinBoxFutureSend = Arc<dyn Fn() -> PinBoxFutureSend + Send + Sync>;
+pub type ArcFnPinBoxFutureSendSync = Arc<dyn FnPinBoxFutureSendSync>;
 
 /// A type alias for a thread-safe, reference-counted read-write lock over `ServerInner`.
 /// This is the core mechanism for sharing server state across threads.

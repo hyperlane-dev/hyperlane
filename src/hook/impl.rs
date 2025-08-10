@@ -5,7 +5,7 @@ use crate::*;
 /// This trait is a common pattern for asynchronous handlers in Rust, enabling type
 /// erasure and dynamic dispatch for futures. It is essential for storing different
 /// async functions in a collection.
-impl<F> ContextFnPinBoxSendSync for F where
+impl<F> FnContextPinBoxSendSync for F where
     F: Fn(Context) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync
 {
 }
@@ -15,7 +15,7 @@ impl<F> ContextFnPinBoxSendSync for F where
 /// This trait is used for handlers that are known at compile time, ensuring they
 /// are safe to be sent across threads and have a static lifetime. This is crucial
 /// for handlers that are part of the application's long-lived state.
-impl<F, Fut> ContextFnSendSyncStatic<Fut> for F
+impl<F, Fut> FnContextSendSyncStatic<Fut> for F
 where
     F: Fn(Context) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = ()> + Send,
