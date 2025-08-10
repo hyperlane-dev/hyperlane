@@ -1,11 +1,5 @@
 use crate::*;
 
-/// Blanket implementation of `FutureSend` for any type that satisfies the bounds.
-impl<T: Future<Output = ()> + Send> FutureSend for T {}
-
-/// Blanket implementation of `FnPinBoxFutureSendSync` for any type that satisfies the bounds.
-impl<T: Fn() -> PinBoxFutureSend + Send + Sync> FnPinBoxFutureSendSync for T {}
-
 /// Provides a default implementation for ServerInner.
 impl Default for ServerInner {
     /// Creates a new ServerInner instance with default values.
@@ -236,7 +230,7 @@ impl Server {
     /// - `&Self` - Reference to self for method chaining.
     pub async fn panic_hook<F, Fut>(&self, func: F) -> &Self
     where
-        F: FnContextSendSyncStatic<Fut>,
+        F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
         self.get_write()
@@ -345,7 +339,7 @@ impl Server {
     pub async fn route<R, F, Fut>(&self, route: R, func: F) -> &Self
     where
         R: ToString,
-        F: FnContextSendSyncStatic<Fut>,
+        F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
         let route_str: String = route.to_string();
@@ -372,7 +366,7 @@ impl Server {
     /// - `&Self` - Reference to self for method chaining.
     pub async fn request_middleware<F, Fut>(&self, func: F) -> &Self
     where
-        F: FnContextSendSyncStatic<Fut>,
+        F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
         self.get_write()
@@ -394,7 +388,7 @@ impl Server {
     /// - `&Self` - Reference to self for method chaining.
     pub async fn response_middleware<F, Fut>(&self, func: F) -> &Self
     where
-        F: FnContextSendSyncStatic<Fut>,
+        F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
         self.get_write()
@@ -416,7 +410,7 @@ impl Server {
     /// - `&Self` - Reference to self for method chaining.
     pub async fn pre_upgrade_hook<F, Fut>(&self, func: F) -> &Self
     where
-        F: FnContextSendSyncStatic<Fut>,
+        F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
         self.get_write()
@@ -438,7 +432,7 @@ impl Server {
     /// - `&Self` - Reference to self for method chaining.
     pub async fn connected_hook<F, Fut>(&self, func: F) -> &Self
     where
-        F: FnContextSendSyncStatic<Fut>,
+        F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
         self.get_write()
@@ -798,7 +792,7 @@ impl Server {
     async fn run_route_hook(
         &self,
         ctx: &Context,
-        handler: &OptionArcFnContextPinBoxSendSync,
+        handler: &OptionArcFnContextPinBoxSendSync<()>,
         lifecycle: &mut Lifecycle,
     ) -> bool {
         if let Some(func) = handler {
@@ -847,7 +841,7 @@ impl Server {
         let ctx: &Context = state.ctx;
         ctx.set_request(request).await;
         let mut lifecycle: Lifecycle = Lifecycle::new_continue(request.is_enable_keep_alive());
-        let route_hook: OptionArcFnContextPinBoxSendSync = self
+        let route_hook: OptionArcFnContextPinBoxSendSync<()> = self
             .get_read()
             .await
             .get_route()
@@ -977,13 +971,13 @@ impl Server {
             let _ = server.accept_connections(&tcp_listener).await;
             let _ = wait_sender.send(());
         });
-        let wait_hook: ArcFnPinBoxFutureSendSync = Arc::new(move || {
+        let wait_hook: ArcFnPinBoxFutureSend<()> = Arc::new(move || {
             let mut wait_receiver_clone: Receiver<()> = wait_receiver.clone();
             Box::pin(async move {
                 let _ = wait_receiver_clone.changed().await;
             })
         });
-        let shutdown_hook: ArcFnPinBoxFutureSendSync = Arc::new(move || {
+        let shutdown_hook: ArcFnPinBoxFutureSend<()> = Arc::new(move || {
             let shutdown_sender_clone: Sender<()> = shutdown_sender.clone();
             Box::pin(async move {
                 let _ = shutdown_sender_clone.send(());

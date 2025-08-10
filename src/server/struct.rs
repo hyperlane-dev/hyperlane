@@ -24,27 +24,27 @@ pub(crate) struct ServerInner {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) request_middleware: VecArcFnContextPinBoxSendSync,
+    pub(super) request_middleware: VecArcFnContextPinBoxSendSync<()>,
     /// A collection of middleware functions that are executed for every outgoing response
     /// before it is sent back to the client.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) response_middleware: VecArcFnContextPinBoxSendSync,
+    pub(super) response_middleware: VecArcFnContextPinBoxSendSync<()>,
     /// A collection of hooks that are executed before a connection is upgraded to WebSocket.
     /// This allows for custom logic, such as authentication, to be performed.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) pre_upgrade_hook: VecArcFnContextPinBoxSendSync,
+    pub(super) pre_upgrade_hook: VecArcFnContextPinBoxSendSync<()>,
     /// A collection of hooks that are executed immediately after a new client connection is established.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) connected_hook: VecArcFnContextPinBoxSendSync,
+    pub(super) connected_hook: VecArcFnContextPinBoxSendSync<()>,
     /// A route matcher used to specify routes for which the default HTTP hook should be disabled.
     #[get(pub(super))]
     #[get_mut(pub(super))]
@@ -61,7 +61,7 @@ pub(crate) struct ServerInner {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) panic_hook: VecArcFnContextPinBoxSendSync,
+    pub(super) panic_hook: VecArcFnContextPinBoxSendSync<()>,
 }
 
 /// The primary server structure that provides a thread-safe interface to the server's state.
@@ -85,14 +85,14 @@ pub struct ServerHook {
     #[debug(skip)]
     #[get(pub)]
     #[set(pub(super))]
-    pub(super) wait_hook: ArcFnPinBoxFutureSendSync,
+    pub(super) wait_hook: ArcFnPinBoxFutureSend<()>,
     /// A hook that, when called, initiates a graceful shutdown of the server.
     /// This will stop the server from accepting new connections and allow existing ones
     /// to complete.
     #[debug(skip)]
     #[get(pub)]
     #[set(pub(super))]
-    pub(super) shutdown_hook: ArcFnPinBoxFutureSendSync,
+    pub(super) shutdown_hook: ArcFnPinBoxFutureSend<()>,
 }
 
 /// Represents the state associated with a single connection handler.
