@@ -9,7 +9,7 @@ impl Default for ServerInner {
     /// - `Self` - A new instance with default configuration.
     fn default() -> Self {
         Self {
-            config: ServerConfig::default(),
+            config: ServerConfigInner::default(),
             route: RouteMatcher::new(),
             request_middleware: vec![],
             response_middleware: vec![],
@@ -101,7 +101,7 @@ impl Server {
     /// # Returns
     ///
     /// - `RwLockReadGuardServerInner` - The read guard for ServerInner.
-    async fn get_read(&self) -> RwLockReadGuardServerInner {
+    async fn read(&self) -> RwLockReadGuardServerInner {
         self.get_0().read().await
     }
 
@@ -110,39 +110,8 @@ impl Server {
     /// # Returns
     ///
     /// - `RwLockWriteGuardServerInner` - The write guard for ServerInner.
-    async fn get_write(&self) -> RwLockWriteGuardServerInner {
+    async fn write(&self) -> RwLockWriteGuardServerInner {
         self.get_0().write().await
-    }
-
-    /// Sets the host address for the server.
-    ///
-    /// # Arguments
-    ///
-    /// - `T: ToString` - The host address.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn host<T: ToString>(&self, host: T) -> &Self {
-        self.get_write()
-            .await
-            .get_mut_config()
-            .set_host(host.to_string());
-        self
-    }
-
-    /// Sets the port number for the server.
-    ///
-    /// # Arguments
-    ///
-    /// - `usize` - The port number.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn port(&self, port: usize) -> &Self {
-        self.get_write().await.get_mut_config().set_port(port);
-        self
     }
 
     /// Sets the server configuration from a string.
@@ -155,9 +124,8 @@ impl Server {
     ///
     /// - `&Self` - Reference to self for method chaining.
     pub async fn config_str<C: ToString>(&self, config_str: C) -> &Self {
-        let config_string: String = config_str.to_string();
-        let server_config: ServerConfig = ServerConfig::from_str(&config_string).unwrap();
-        self.config(server_config).await;
+        let config: ServerConfig = ServerConfig::from_str(&config_str.to_string()).unwrap();
+        self.write().await.set_config(config.get_inner().await);
         self
     }
 
@@ -171,51 +139,7 @@ impl Server {
     ///
     /// - `&Self` - Reference to self for method chaining.
     pub async fn config(&self, config: ServerConfig) -> &Self {
-        self.get_write().await.set_config(config);
-        self
-    }
-
-    /// Sets the read buffer size for HTTP connections.
-    ///
-    /// # Arguments
-    ///
-    /// - `usize` - The buffer size in bytes.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn http_buffer(&self, buffer: usize) -> &Self {
-        let buffer: usize = if buffer == 0 {
-            DEFAULT_BUFFER_SIZE
-        } else {
-            buffer
-        };
-        self.get_write()
-            .await
-            .get_mut_config()
-            .set_http_buffer(buffer);
-        self
-    }
-
-    /// Sets the read buffer size for WebSocket connections.
-    ///
-    /// # Arguments
-    ///
-    /// - `usize` - The buffer size in bytes.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn ws_buffer(&self, buffer: usize) -> &Self {
-        let buffer: usize = if buffer == 0 {
-            DEFAULT_BUFFER_SIZE
-        } else {
-            buffer
-        };
-        self.get_write()
-            .await
-            .get_mut_config()
-            .set_ws_buffer(buffer);
+        self.write().await.set_config(config.get_inner().await);
         self
     }
 
@@ -234,95 +158,10 @@ impl Server {
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
-        self.get_write()
+        self.write()
             .await
             .get_mut_panic_hook()
             .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
-        self
-    }
-
-    /// Sets the TCP_NODELAY socket option.
-    ///
-    /// # Arguments
-    ///
-    /// - `bool` - Whether to enable TCP_NODELAY.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn set_nodelay(&self, nodelay: bool) -> &Self {
-        self.get_write()
-            .await
-            .get_mut_config()
-            .set_nodelay(Some(nodelay));
-        self
-    }
-
-    /// Enables the TCP_NODELAY socket option.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn enable_nodelay(&self) -> &Self {
-        self.set_nodelay(true).await
-    }
-
-    /// Disables the TCP_NODELAY socket option.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn disable_nodelay(&self) -> &Self {
-        self.set_nodelay(false).await
-    }
-
-    /// Sets the SO_LINGER socket option.
-    ///
-    /// # Arguments
-    ///
-    /// - `OptionDuration` - The linger duration.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn set_linger(&self, linger: OptionDuration) -> &Self {
-        self.get_write().await.get_mut_config().set_linger(linger);
-        self
-    }
-
-    /// Enables the SO_LINGER socket option.
-    ///
-    /// # Arguments
-    ///
-    /// - `Duration` - The linger duration.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn enable_linger(&self, linger: Duration) -> &Self {
-        self.set_linger(Some(linger)).await
-    }
-
-    /// Disables the SO_LINGER socket option.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn disable_linger(&self) -> &Self {
-        self.set_linger(None).await
-    }
-
-    /// Sets the IP_TTL socket option.
-    ///
-    /// # Arguments
-    ///
-    /// - `u32` - The TTL value.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn set_ttl(&self, ttl: u32) -> &Self {
-        self.get_write().await.get_mut_config().set_ttl(Some(ttl));
         self
     }
 
@@ -344,7 +183,7 @@ impl Server {
         Fut: FutureSendStatic<()>,
     {
         let route_str: String = route.to_string();
-        self.get_write()
+        self.write()
             .await
             .get_mut_route()
             .add(
@@ -370,7 +209,7 @@ impl Server {
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
-        self.get_write()
+        self.write()
             .await
             .get_mut_request_middleware()
             .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
@@ -392,7 +231,7 @@ impl Server {
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
-        self.get_write()
+        self.write()
             .await
             .get_mut_response_middleware()
             .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
@@ -414,7 +253,7 @@ impl Server {
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
-        self.get_write()
+        self.write()
             .await
             .get_mut_pre_upgrade_hook()
             .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
@@ -436,7 +275,7 @@ impl Server {
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
-        self.get_write()
+        self.write()
             .await
             .get_mut_connected_hook()
             .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
@@ -454,7 +293,7 @@ impl Server {
     /// - `&Self` - Reference to self for method chaining.
     pub async fn enable_http_hook<R: ToString>(&self, route: R) -> &Self {
         let route_string: String = route.to_string();
-        self.get_write()
+        self.write()
             .await
             .get_mut_disable_http_hook()
             .remove(&route_string);
@@ -473,7 +312,7 @@ impl Server {
     pub async fn disable_http_hook<R: ToString>(&self, route: R) -> &Self {
         let route_string: String = route.to_string();
         let _ = self
-            .get_write()
+            .write()
             .await
             .get_mut_disable_http_hook()
             .add(&route_string, Arc::new(|_: Context| Box::pin(async {})));
@@ -491,7 +330,7 @@ impl Server {
     /// - `&Self` - Reference to self for method chaining.
     pub async fn enable_ws_hook<R: ToString>(&self, route: R) -> &Self {
         let route_string: String = route.to_string();
-        self.get_write()
+        self.write()
             .await
             .get_mut_disable_ws_hook()
             .remove(&route_string);
@@ -510,7 +349,7 @@ impl Server {
     pub async fn disable_ws_hook<R: ToString>(&self, route: R) -> &Self {
         let route_string: String = route.to_string();
         let _ = self
-            .get_write()
+            .write()
             .await
             .get_mut_disable_ws_hook()
             .add(&route_string, Arc::new(|_: Context| Box::pin(async {})));
@@ -528,7 +367,7 @@ impl Server {
     /// - `bool` - True if HTTP handling is disabled.
     async fn contains_disable_http_hook<'a, R: ToString>(&self, route: R) -> bool {
         let route_string: String = route.to_string();
-        self.get_read()
+        self.read()
             .await
             .get_disable_http_hook()
             .match_route(&route_string)
@@ -545,7 +384,7 @@ impl Server {
     /// - `bool` - True if WebSocket handling is disabled.
     async fn contains_disable_ws_hook<'a, R: ToString>(&self, route: R) -> bool {
         let route_string: String = route.to_string();
-        self.get_read()
+        self.read()
             .await
             .get_disable_ws_hook()
             .match_route(&route_string)
@@ -556,13 +395,13 @@ impl Server {
     /// # Arguments
     ///
     /// - `H: ToString` - The host address.
-    /// - `P: Into<usize>` - The port number.
+    /// - `usize` - The port number.
     ///
     /// # Returns
     ///
     /// - `String` - The formatted address string.
-    pub fn format_host_port<H: ToString, P: Into<usize>>(host: H, port: P) -> String {
-        format!("{}{}{}", host.to_string(), COLON_SPACE_SYMBOL, port.into())
+    pub fn format_host_port<H: ToString>(host: H, port: usize) -> String {
+        format!("{}{}{}", host.to_string(), COLON_SPACE_SYMBOL, port)
     }
 
     /// Handles a panic that has been captured and associated with a specific request `Context`.
@@ -582,7 +421,7 @@ impl Server {
     async fn handle_panic_with_context(&self, ctx: &Context, panic: &Panic) {
         let panic_clone: Panic = panic.clone();
         ctx.cancel_aborted().await.set_panic(panic_clone).await;
-        for func in self.get_read().await.get_panic_hook().iter() {
+        for func in self.read().await.get_panic_hook().iter() {
             func(ctx.clone()).await;
             if ctx.get_aborted().await {
                 return;
@@ -636,8 +475,8 @@ impl Server {
     /// Returns a `ServerResult` containing the bound `TcpListener` on success,
     /// or a `ServerError` on failure.
     async fn create_tcp_listener(&self) -> ServerResult<TcpListener> {
-        let config: ServerConfig = self.get_read().await.get_config().clone();
-        let host: &str = config.get_host();
+        let config: ServerConfigInner = self.read().await.get_config().clone();
+        let host: String = config.get_host().clone();
         let port: usize = *config.get_port();
         let addr: String = Self::format_host_port(host, port);
         TcpListener::bind(&addr)
@@ -672,7 +511,7 @@ impl Server {
     ///
     /// - `&TcpStream` - A reference to the `TcpStream` to configure.
     async fn configure_stream(&self, stream: &TcpStream) {
-        let config: ServerConfig = self.get_read().await.get_config().clone();
+        let config: ServerConfigInner = self.read().await.get_config().clone();
         let nodelay_opt: OptionBool = *config.get_nodelay();
         let linger_opt: OptionDuration = *config.get_linger();
         let ttl_opt: OptionU32 = *config.get_ttl();
@@ -692,7 +531,7 @@ impl Server {
     /// - `ArcRwLockStream` - The thread-safe stream representing the client connection.
     async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
         let server: Server = self.clone();
-        let http_buffer: usize = *self.get_read().await.get_config().get_http_buffer();
+        let http_buffer: usize = *self.read().await.get_config().get_http_buffer();
         spawn(async move {
             server.handle_connection(stream, http_buffer).await;
         });
@@ -729,7 +568,7 @@ impl Server {
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
     async fn run_pre_upgrade_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) -> bool {
-        for func in self.get_read().await.get_pre_upgrade_hook().iter() {
+        for func in self.read().await.get_pre_upgrade_hook().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| func(ctx))
                 .await;
             if lifecycle.is_abort() {
@@ -750,7 +589,7 @@ impl Server {
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
     async fn run_connected_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) -> bool {
-        for func in self.get_read().await.get_connected_hook().iter() {
+        for func in self.read().await.get_connected_hook().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| func(ctx))
                 .await;
             if lifecycle.is_abort() {
@@ -771,7 +610,7 @@ impl Server {
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
     async fn run_request_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) -> bool {
-        for func in self.get_read().await.get_request_middleware().iter() {
+        for func in self.read().await.get_request_middleware().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| func(ctx))
                 .await;
             if lifecycle.is_abort() {
@@ -816,7 +655,7 @@ impl Server {
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
     async fn run_response_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) -> bool {
-        for func in self.get_read().await.get_response_middleware().iter() {
+        for func in self.read().await.get_response_middleware().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| func(ctx))
                 .await;
             if lifecycle.is_abort() {
@@ -845,7 +684,7 @@ impl Server {
         ctx.set_request(request).await;
         let mut lifecycle: Lifecycle = Lifecycle::new_continue(request.is_enable_keep_alive());
         let route_hook: OptionArcFnContextPinBoxSendSync<()> = self
-            .get_read()
+            .read()
             .await
             .get_route()
             .resolve_route(ctx, route)
@@ -869,7 +708,7 @@ impl Server {
     async fn handle_http_requests<'a>(&self, state: &HandlerState<'a>, request: &Request) {
         let route: &String = request.get_path();
         let contains_disable_http_hook: bool = self.contains_disable_http_hook(route).await;
-        let buffer: usize = *self.get_read().await.get_config().get_http_buffer();
+        let buffer: usize = *self.read().await.get_config().get_http_buffer();
         if contains_disable_http_hook {
             while self.request_hook(state, request).await {}
             return;
@@ -915,7 +754,7 @@ impl Server {
         route: &str,
     ) {
         let disable_ws_hook_contains: bool = self.contains_disable_ws_hook(route).await;
-        let buffer: usize = *self.get_read().await.get_config().get_ws_buffer();
+        let buffer: usize = *self.read().await.get_config().get_ws_buffer();
         if disable_ws_hook_contains {
             while self.request_hook(state, request).await {}
             return;
@@ -938,7 +777,7 @@ impl Server {
         let route: String = request.get_path().clone();
         let ctx: &Context = state.ctx;
         let mut lifecycle: Lifecycle = Lifecycle::new();
-        self.get_read()
+        self.read()
             .await
             .get_route()
             .resolve_route(ctx, &route)

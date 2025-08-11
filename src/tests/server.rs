@@ -104,12 +104,14 @@ async fn server() {
 
     async fn main() {
         let server: Server = Server::new();
-        server.host("0.0.0.0").await;
-        server.port(60000).await;
-        server.enable_nodelay().await;
-        server.disable_linger().await;
-        server.http_buffer(4096).await;
-        server.ws_buffer(4096).await;
+        let config: ServerConfig = ServerConfig::new();
+        config.host("0.0.0.0").await;
+        config.port(60000).await;
+        config.enable_nodelay().await;
+        config.disable_linger().await;
+        config.http_buffer(4096).await;
+        config.ws_buffer(4096).await;
+        server.config(config).await;
         server.panic_hook(panic_hook).await;
         server.connected_hook(connected_hook).await;
         server.pre_upgrade_hook(request_middleware).await;

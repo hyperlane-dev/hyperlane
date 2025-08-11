@@ -15,6 +15,11 @@ pub type ResultJoinError<T> = Result<T, JoinError>;
 /// This is the core mechanism for sharing server state across threads.
 pub(crate) type ArcRwLockServerInner = ArcRwLock<ServerInner>;
 
+/// A type alias for a thread-safe, reference-counted read-write lock over `ServerConfigInner`.
+///
+/// This is the core mechanism for sharing server config state across threads.
+pub(crate) type ArcRwLockServerConfigInner = ArcRwLock<ServerConfigInner>;
+
 /// A type alias for a read guard on the `ServerInner`'s `RwLock`.
 ///
 /// This provides read-only access to the server's internal state.
