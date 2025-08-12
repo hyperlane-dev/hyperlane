@@ -446,17 +446,13 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `R: ToString` - The route path.
+    /// - `&str` - The route path.
     ///
     /// # Returns
     ///
     /// - `bool` - True if HTTP handling is disabled.
-    async fn contains_disable_http_hook<'a, R: ToString>(&self, route: R) -> bool {
-        let route_string: String = route.to_string();
-        self.read()
-            .await
-            .get_disable_http_hook()
-            .match_route(&route_string)
+    async fn contains_disable_http_hook(&self, route: &str) -> bool {
+        self.read().await.get_disable_http_hook().match_route(route)
     }
 
     /// Checks if default WebSocket handling is disabled for a route.
@@ -792,7 +788,7 @@ impl Server {
     /// - `&HandlerState<'a>` - The `HandlerState` for the current connection.
     /// - `&Request` - The initial request that established the keep-alive connection.
     async fn handle_http_requests<'a>(&self, state: &HandlerState<'a>, request: &Request) {
-        let route: &String = request.get_path();
+        let route: &str = request.get_path();
         let contains_disable_http_hook: bool = self.contains_disable_http_hook(route).await;
         let buffer: usize = *self.read().await.get_config().get_http_buffer();
         if contains_disable_http_hook {
