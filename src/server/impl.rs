@@ -22,6 +22,92 @@ impl Default for ServerInner {
     }
 }
 
+/// Implements the `PartialEq` trait for `ServerInner`.
+///
+/// This allows for comparing two `ServerInner` instances for equality.
+impl PartialEq for ServerInner {
+    /// Checks if two `ServerInner` instances are equal.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Self`: The other `ServerInner` instance to compare against.
+    ///
+    /// # Returns
+    ///
+    /// - `bool`: `true` if the instances are equal, `false` otherwise.
+    fn eq(&self, other: &Self) -> bool {
+        self.config == other.config
+            && self.route == other.route
+            && self.disable_http_hook == other.disable_http_hook
+            && self.disable_ws_hook == other.disable_ws_hook
+            && self.request_middleware.len() == other.request_middleware.len()
+            && self.response_middleware.len() == other.response_middleware.len()
+            && self.panic_hook.len() == other.panic_hook.len()
+            && self.connected_hook.len() == other.connected_hook.len()
+            && self.pre_upgrade_hook.len() == other.pre_upgrade_hook.len()
+            && self
+                .request_middleware
+                .iter()
+                .zip(other.request_middleware.iter())
+                .all(|(a, b)| Arc::ptr_eq(a, b))
+            && self
+                .response_middleware
+                .iter()
+                .zip(other.response_middleware.iter())
+                .all(|(a, b)| Arc::ptr_eq(a, b))
+            && self
+                .pre_upgrade_hook
+                .iter()
+                .zip(other.pre_upgrade_hook.iter())
+                .all(|(a, b)| Arc::ptr_eq(a, b))
+            && self
+                .connected_hook
+                .iter()
+                .zip(other.connected_hook.iter())
+                .all(|(a, b)| Arc::ptr_eq(a, b))
+            && self
+                .panic_hook
+                .iter()
+                .zip(other.panic_hook.iter())
+                .all(|(a, b)| Arc::ptr_eq(a, b))
+    }
+}
+
+/// Implements the `Eq` trait for `ServerInner`.
+///
+/// This indicates that `ServerInner` has a total equality relation.
+impl Eq for ServerInner {}
+
+/// Implements the `PartialEq` trait for `Server`.
+///
+/// This allows for comparing two `Server` instances for equality.
+impl PartialEq for Server {
+    /// Checks if two `Server` instances are equal.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Self`: The other `Server` instance to compare against.
+    ///
+    /// # Returns
+    ///
+    /// - `bool`: `true` if the instances are equal, `false` otherwise.
+    fn eq(&self, other: &Self) -> bool {
+        if Arc::ptr_eq(&self.get_0(), &other.get_0()) {
+            return true;
+        }
+        if let (Ok(s), Ok(o)) = (self.get_0().try_read(), other.get_0().try_read()) {
+            *s == *o
+        } else {
+            false
+        }
+    }
+}
+
+/// Implements the `Eq` trait for `Server`.
+///
+/// This indicates that `Server` has a total equality relation.
+impl Eq for Server {}
+
 /// Provides a default implementation for `ServerHook`.
 impl Default for ServerHook {
     /// Creates a new `ServerHook` instance with default no-op hooks.

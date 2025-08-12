@@ -36,9 +36,6 @@ impl Default for ServerConfig {
     }
 }
 
-/// Implements the `Eq` trait for `ServerConfig`.
-impl Eq for ServerConfig {}
-
 /// Implements the `PartialEq` trait for `ServerConfig`.
 ///
 /// This allows for comparing two `ServerConfig` instances for equality.
@@ -66,6 +63,11 @@ impl PartialEq for ServerConfig {
         }
     }
 }
+
+/// Implements the `Eq` trait for `ServerConfig`.
+///
+/// This indicates that `ServerConfig` has a total equality relation.
+impl Eq for ServerConfig {}
 
 /// Implementation block for `ServerConfig`.
 impl ServerConfig {
