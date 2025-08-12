@@ -124,7 +124,6 @@ async fn server() {
         config.host("0.0.0.0").await;
         config.port(60000).await;
         config.enable_nodelay().await;
-        config.disable_linger().await;
         config.http_buffer(4096).await;
         config.ws_buffer(4096).await;
         server.config(config).await;

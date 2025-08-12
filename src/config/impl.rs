@@ -170,13 +170,13 @@ impl ServerConfig {
     ///
     /// # Parameters
     ///
-    /// - `OptionBool`: The `Option<bool>` value for `TCP_NODELAY`.
+    /// - `bool`: The `bool` value for `TCP_NODELAY`.
     ///
     /// # Returns
     ///
     /// A reference to `Self` for method chaining.
-    pub async fn nodelay(&self, nodelay: OptionBool) -> &Self {
-        self.write().await.set_nodelay(nodelay);
+    pub async fn nodelay(&self, nodelay: bool) -> &Self {
+        self.write().await.set_nodelay(Some(nodelay));
         self
     }
 
@@ -186,7 +186,7 @@ impl ServerConfig {
     ///
     /// A reference to `Self` for method chaining.
     pub async fn enable_nodelay(&self) -> &Self {
-        self.nodelay(Some(true)).await
+        self.nodelay(true).await
     }
 
     /// Disables the `TCP_NODELAY` option.
@@ -195,79 +195,35 @@ impl ServerConfig {
     ///
     /// A reference to `Self` for method chaining.
     pub async fn disable_nodelay(&self) -> &Self {
-        self.nodelay(Some(false)).await
+        self.nodelay(false).await
     }
 
     /// Sets the `SO_LINGER` option.
     ///
     /// # Parameters
     ///
-    /// - `OptionDuration`: The `Option<Duration>` value for `SO_LINGER`.
+    /// - `Duration`: The `Duration` value for `SO_LINGER`.
     ///
     /// # Returns
     ///
     /// A reference to `Self` for method chaining.
-    pub async fn linger(&self, linger: OptionDuration) -> &Self {
-        self.write().await.set_linger(linger);
+    pub async fn linger(&self, linger: Duration) -> &Self {
+        self.write().await.set_linger(Some(linger));
         self
-    }
-
-    /// Enables the `SO_LINGER` option with a specified duration.
-    ///
-    /// # Parameters
-    ///
-    /// - `Duration`: The `Duration` for `SO_LINGER`.
-    ///
-    /// # Returns
-    ///
-    /// A reference to `Self` for method chaining.
-    pub async fn enable_linger(&self, linger: Duration) -> &Self {
-        self.linger(Some(linger)).await
-    }
-
-    /// Disables the `SO_LINGER` option.
-    ///
-    /// # Returns
-    ///
-    /// A reference to `Self` for method chaining.
-    pub async fn disable_linger(&self) -> &Self {
-        self.linger(None).await
     }
 
     /// Sets the `IP_TTL` option.
     ///
     /// # Parameters
     ///
-    /// - `OptionU32`: The `Option<u32>` value for `IP_TTL`.
+    /// - `u32`: The `u32` value for `IP_TTL`.
     ///
     /// # Returns
     ///
     /// A reference to `Self` for method chaining.
-    pub async fn ttl(&self, ttl: OptionU32) -> &Self {
-        self.write().await.set_ttl(ttl);
+    pub async fn ttl(&self, ttl: u32) -> &Self {
+        self.write().await.set_ttl(Some(ttl));
         self
-    }
-
-    /// Enables the `IP_TTL` option with a specified value.
-    ///
-    /// # Parameters
-    ///
-    /// - `u32`: The `u32` TTL value.
-    ///
-    /// # Returns
-    ///
-    /// A reference to `Self` for method chaining.
-    pub async fn enable_ttl(&self, ttl: u32) -> &Self {
-        self.ttl(Some(ttl)).await
-    }
-
-    /// Disables the `IP_TTL` option.
-    ///
-    /// # Returns
-    ///
-    /// A reference to `Self` for method chaining.
-    pub async fn disable_ttl(&self) -> &Self {
-        self.ttl(None).await
     }
 
     /// Creates a `ServerConfig` from a JSON string.
