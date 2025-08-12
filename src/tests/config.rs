@@ -14,14 +14,15 @@ async fn config_from_str() {
         }
     "#;
     let config: ServerConfig = ServerConfig::from_str(config_str).unwrap();
-    assert_eq!(config.get_host(), "0.0.0.0");
-    assert_eq!(*config.get_port(), 80);
-    assert_eq!(*config.get_ws_buffer(), 4096);
-    assert_eq!(*config.get_http_buffer(), 4096);
-    assert_eq!(*config.get_nodelay(), Some(true));
-    assert_eq!(
-        *config.get_linger(),
-        Some(std::time::Duration::from_secs(64))
-    );
-    assert_eq!(*config.get_ttl(), Some(64));
+    let new_config: ServerConfig = ServerConfig::new();
+    new_config.host("0.0.0.0").await;
+    new_config.port(80).await;
+    new_config.ws_buffer(4096).await;
+    new_config.http_buffer(4096).await;
+    new_config.enable_nodelay().await;
+    new_config
+        .enable_linger(std::time::Duration::from_secs(64))
+        .await;
+    new_config.enable_ttl(64).await;
+    assert_eq!(config, new_config);
 }

@@ -34,8 +34,15 @@ pub use http_type::*;
 pub(crate) use lifecycle::*;
 
 pub(crate) use std::{
-    any::Any, collections::HashMap, future::Future, net::SocketAddr, panic::Location, pin::Pin,
-    sync::Arc, time::Duration,
+    any::Any,
+    cmp::Ordering,
+    collections::{BTreeSet, HashMap},
+    future::Future,
+    net::SocketAddr,
+    panic::Location,
+    pin::Pin,
+    sync::Arc,
+    time::Duration,
 };
 
 pub(crate) use lombok_macros::*;

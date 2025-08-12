@@ -16,52 +16,176 @@ impl Default for RouteMatcher {
     }
 }
 
-/// Implements equality comparison for RouteSegment.
+/// Implements the `PartialEq` trait for `RoutePattern`.
 ///
-/// This allows for checking if two route segments are functionally equivalent.
-impl PartialEq for RouteSegment {
-    /// Compares two RouteSegments for equality.
+/// This allows for comparing two `RoutePattern` instances for equality.
+impl PartialEq for RoutePattern {
+    /// Checks if two `RoutePattern` instances are equal.
     ///
     /// # Arguments
     ///
-    /// - `&RouteSegment` - The other RouteSegment to compare against.
+    /// - `&Self`: The other `RoutePattern` instance to compare against.
     ///
     /// # Returns
     ///
-    /// - `bool` - true if the segments are equal, false otherwise.
+    /// - `bool`: `true` if the instances are equal, `false` otherwise.
     fn eq(&self, other: &Self) -> bool {
+        self.get_0() == other.get_0()
+    }
+}
+
+/// Implements the `Eq` trait for `RoutePattern`.
+///
+/// This indicates that `RoutePattern` has a total equality relation.
+impl Eq for RoutePattern {}
+
+/// Implements the `PartialOrd` trait for `RoutePattern`.
+///
+/// This allows for partial ordering of `RoutePattern` instances.
+impl PartialOrd for RoutePattern {
+    /// Partially compares two `RoutePattern` instances.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Self`: The other `RoutePattern` instance to compare against.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<std::cmp::Ordering>`: The ordering of the two instances.
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+/// Implements the `Ord` trait for `RoutePattern`.
+///
+/// This allows for total ordering of `RoutePattern` instances.
+impl Ord for RoutePattern {
+    /// Compares two `RoutePattern` instances.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Self`: The other `RoutePattern` instance to compare against.
+    ///
+    /// # Returns
+    ///
+    /// - `std::cmp::Ordering`: The ordering of the two instances.
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.get_0().cmp(&other.get_0())
+    }
+}
+
+/// Implements the `PartialEq` trait for `RouteMatcher`.
+///
+/// This allows for comparing two `RouteMatcher` instances for equality.
+impl PartialEq for RouteMatcher {
+    /// Checks if two `RouteMatcher` instances are equal.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Self`: The other `RouteMatcher` instance to compare against.
+    ///
+    /// # Returns
+    ///
+    /// - `bool`: `true` if the instances are equal, `false` otherwise.
+    fn eq(&self, other: &Self) -> bool {
+        let self_static_keys: BTreeSet<_> = self.static_routes.keys().collect();
+        let other_static_keys: BTreeSet<_> = other.static_routes.keys().collect();
+        if self_static_keys != other_static_keys {
+            return false;
+        }
+        let self_dynamic_patterns: BTreeSet<_> =
+            self.dynamic_routes.iter().map(|(p, _)| p).collect();
+        let other_dynamic_patterns: BTreeSet<_> =
+            other.dynamic_routes.iter().map(|(p, _)| p).collect();
+        if self_dynamic_patterns != other_dynamic_patterns {
+            return false;
+        }
+        let self_regex_patterns: BTreeSet<_> = self.regex_routes.iter().map(|(p, _)| p).collect();
+        let other_regex_patterns: BTreeSet<_> = other.regex_routes.iter().map(|(p, _)| p).collect();
+        if self_regex_patterns != other_regex_patterns {
+            return false;
+        }
+        true
+    }
+}
+
+/// Implements the `Eq` trait for `RouteMatcher`.
+///
+/// This indicates that `RouteMatcher` has a total equality relation.
+impl Eq for RouteMatcher {}
+
+/// Implements the `Eq` trait for `RouteSegment`.
+///
+/// This indicates that `RouteSegment` has a total equality relation.
+impl Eq for RouteSegment {}
+
+/// Implements the `PartialOrd` trait for `RouteSegment`.
+///
+/// This allows for partial ordering of `RouteSegment` instances.
+impl PartialOrd for RouteSegment {
+    /// Partially compares two `RouteSegment` instances.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Self`: The other `RouteSegment` instance to compare against.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<Ordering>`: The ordering of the two instances.
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+/// Implements the `Ord` trait for `RouteSegment`.
+///
+/// This allows for total ordering of `RouteSegment` instances.
+impl Ord for RouteSegment {
+    /// Compares two `RouteSegment` instances.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Self`: The other `RouteSegment` instance to compare against.
+    ///
+    /// # Returns
+    ///
+    /// - `Ordering`: The ordering of the two instances.
+    fn cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
-            (RouteSegment::Static(segment1), RouteSegment::Static(segment2)) => {
-                segment1 == segment2
+            (Self::Static(s1), Self::Static(s2)) => s1.cmp(s2),
+            (Self::Dynamic(d1), Self::Dynamic(d2)) => d1.cmp(d2),
+            (Self::Regex(n1, r1), Self::Regex(n2, r2)) => {
+                n1.cmp(n2).then_with(|| r1.as_str().cmp(r2.as_str()))
             }
-            (RouteSegment::Dynamic(_), RouteSegment::Dynamic(_)) => true,
-            (RouteSegment::Regex(name1, _), RouteSegment::Regex(name2, _)) => name1 == name2,
-            _ => false,
+            (Self::Static(_), _) => Ordering::Less,
+            (_, Self::Static(_)) => Ordering::Greater,
+            (Self::Dynamic(_), _) => Ordering::Less,
+            (_, Self::Dynamic(_)) => Ordering::Greater,
         }
     }
 }
 
-/// Implements equality comparison for RoutePattern.
+/// Implements the `PartialEq` trait for `RouteSegment`.
 ///
-/// This is used to detect duplicate route patterns.
-impl PartialEq for RoutePattern {
-    /// Compares two RoutePatterns for equality.
+/// This allows for comparing two `RouteSegment` instances for equality.
+impl PartialEq for RouteSegment {
+    /// Checks if two `RouteSegment` instances are equal.
     ///
     /// # Arguments
     ///
-    /// - `&RoutePattern` - The other RoutePattern to compare against.
+    /// - `&Self`: The other `RouteSegment` instance to compare against.
     ///
     /// # Returns
     ///
-    /// - `bool` - true if the patterns are equal, false otherwise.
+    /// - `bool`: `true` if the instances are equal, `false` otherwise.
     fn eq(&self, other: &Self) -> bool {
-        if self.get_0().len() != other.get_0().len() {
-            return false;
+        match (self, other) {
+            (Self::Static(l0), Self::Static(r0)) => l0 == r0,
+            (Self::Dynamic(l0), Self::Dynamic(r0)) => l0 == r0,
+            (Self::Regex(l0, l1), Self::Regex(r0, r1)) => l0 == r0 && l1.as_str() == r1.as_str(),
+            _ => false,
         }
-        self.get_0()
-            .iter()
-            .zip(other.get_0().iter())
-            .all(|(segment1, segment2)| segment1 == segment2)
     }
 }
 

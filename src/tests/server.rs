@@ -1,6 +1,22 @@
 use crate::*;
 
 #[tokio::test]
+async fn server_partial_eq() {
+    let server1: Server = Server::new();
+    let server2: Server = Server::new();
+    assert_eq!(server1, server2);
+    let server1_clone: Server = server1.clone();
+    assert_eq!(server1, server1_clone);
+}
+
+#[tokio::test]
+async fn server_inner_partial_eq() {
+    let inner1: ServerInner = ServerInner::default();
+    let inner2: ServerInner = ServerInner::default();
+    assert_eq!(inner1, inner2);
+}
+
+#[tokio::test]
 async fn server() {
     async fn connected_hook(ctx: Context) {
         if !ctx.get_request().await.is_ws() {
@@ -104,12 +120,14 @@ async fn server() {
 
     async fn main() {
         let server: Server = Server::new();
-        server.host("0.0.0.0").await;
-        server.port(60000).await;
-        server.enable_nodelay().await;
-        server.disable_linger().await;
-        server.http_buffer(4096).await;
-        server.ws_buffer(4096).await;
+        let config: ServerConfig = ServerConfig::new();
+        config.host("0.0.0.0").await;
+        config.port(60000).await;
+        config.enable_nodelay().await;
+        config.disable_linger().await;
+        config.http_buffer(4096).await;
+        config.ws_buffer(4096).await;
+        server.config(config).await;
         server.panic_hook(panic_hook).await;
         server.connected_hook(connected_hook).await;
         server.pre_upgrade_hook(request_middleware).await;

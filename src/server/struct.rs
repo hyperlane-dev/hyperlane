@@ -12,7 +12,7 @@ pub(crate) struct ServerInner {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) config: ServerConfig,
+    pub(super) config: ServerConfigInner,
     /// The routing component responsible for matching incoming requests to their registered handlers.
     #[get(pub(super))]
     #[get_mut(pub(super))]
