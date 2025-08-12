@@ -459,17 +459,13 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `R: ToString` - The route path.
+    /// - `&str` - The route path.
     ///
     /// # Returns
     ///
     /// - `bool` - True if WebSocket handling is disabled.
-    async fn contains_disable_ws_hook<'a, R: ToString>(&self, route: R) -> bool {
-        let route_string: String = route.to_string();
-        self.read()
-            .await
-            .get_disable_ws_hook()
-            .match_route(&route_string)
+    async fn contains_disable_ws_hook(&self, route: &str) -> bool {
+        self.read().await.get_disable_ws_hook().match_route(route)
     }
 
     /// Formats the host and port into a bindable address string.
