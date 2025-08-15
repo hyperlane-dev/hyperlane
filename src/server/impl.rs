@@ -177,9 +177,24 @@ impl Server {
     /// # Returns
     ///
     /// - `Self` - A new Server instance.
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         let server: ServerInner = ServerInner::default();
         Self(arc_rwlock(server))
+    }
+
+    /// Creates a new Server instance from a configuration.
+    ///
+    /// # Arguments
+    ///
+    /// - `ServerConfig` - The server configuration.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - A new Server instance.
+    pub async fn from(config: ServerConfig) -> Self {
+        let server: Self = Self::new().await;
+        server.config(config).await;
+        server
     }
 
     /// Acquires a read lock on the inner server data.

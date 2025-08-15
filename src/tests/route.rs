@@ -35,7 +35,10 @@ where
 async fn test_empty_route() {
     assert_panic_message_contains(
         || async {
-            let _server: &Server = Server::new().route(EMPTY_STR, |_| async move {}).await;
+            let _server: &Server = Server::new()
+                .await
+                .route(EMPTY_STR, |_| async move {})
+                .await;
         },
         &RouteError::EmptyPattern.to_string(),
     )
@@ -47,6 +50,7 @@ async fn test_duplicate_route() {
     assert_panic_message_contains(
         || async {
             let _server: &Server = Server::new()
+                .await
                 .route(ROOT_PATH, |_| async move {})
                 .await
                 .route(ROOT_PATH, |_| async move {})

@@ -142,14 +142,13 @@ async fn panic_hook(ctx: Context) {
 
 #[tokio::main]
 async fn main() {
-    let server: Server = Server::new();
     let config: ServerConfig = ServerConfig::new();
     config.host("0.0.0.0").await;
     config.port(60000).await;
     config.enable_nodelay().await;
     config.http_buffer(4096).await;
     config.ws_buffer(4096).await;
-    server.config(config).await;
+    let server: Server = Server::from(config).await;
     server.panic_hook(panic_hook).await;
     server.connected_hook(connected_hook).await;
     server.pre_upgrade_hook(request_middleware).await;

@@ -13,6 +13,7 @@ async fn server_send_sync() {
 #[tokio::test]
 async fn server_clone_across_threads() {
     let server: Server = Server::new()
+        .await
         .route("/test", |_| async move {})
         .await
         .clone();
@@ -29,6 +30,7 @@ async fn server_clone_across_threads() {
 async fn server_share_across_threads() {
     let server: Arc<Server> = Arc::new(
         Server::new()
+            .await
             .route("/test", |_| async move {})
             .await
             .clone(),

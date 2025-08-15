@@ -2,8 +2,8 @@ use crate::*;
 
 #[tokio::test]
 async fn server_partial_eq() {
-    let server1: Server = Server::new();
-    let server2: Server = Server::new();
+    let server1: Server = Server::new().await;
+    let server2: Server = Server::new().await;
     assert_eq!(server1, server2);
     let server1_clone: Server = server1.clone();
     assert_eq!(server1, server1_clone);
@@ -119,14 +119,13 @@ async fn server() {
     }
 
     async fn main() {
-        let server: Server = Server::new();
         let config: ServerConfig = ServerConfig::new();
         config.host("0.0.0.0").await;
         config.port(60000).await;
         config.enable_nodelay().await;
         config.http_buffer(4096).await;
         config.ws_buffer(4096).await;
-        server.config(config).await;
+        let server: Server = Server::from(config).await;
         server.panic_hook(panic_hook).await;
         server.connected_hook(connected_hook).await;
         server.pre_upgrade_hook(request_middleware).await;
