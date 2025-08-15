@@ -76,7 +76,7 @@ async fn server() {
 
     async fn sse_route(ctx: Context) {
         let _ = ctx
-            .replace_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+            .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
             .await
             .send()
             .await;
@@ -108,9 +108,9 @@ async fn server() {
             .await
             .clear_response_headers()
             .await
-            .replace_response_header(SERVER, HYPERLANE)
+            .set_response_header(SERVER, HYPERLANE)
             .await
-            .replace_response_header(CONTENT_TYPE, content_type)
+            .set_response_header(CONTENT_TYPE, content_type)
             .await
             .set_response_body(response_body)
             .await

@@ -622,19 +622,19 @@ impl Context {
         self.read().await.get_response().get_header(key)
     }
 
-    /// Sets a response header, adding it if it doesn't exist or appending to it if it does.
+    /// Sets a response header with a new value, removing any existing values.
     ///
     /// # Arguments
     ///
-    /// - `K` - The header key.
-    /// - `V` - The header value.
+    /// - `K` - The key of the header to set.
+    /// - `V` - The new value for the header.
     ///
     /// # Returns
     ///
-    /// - `&Self` - Reference to self for method chaining.
+    /// - `&Self` - Reference to the modified context.
     pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self
     where
-        K: Into<String>,
+        K: Into<ResponseHeadersKey>,
         V: Into<String>,
     {
         self.write().await.get_mut_response().set_header(key, value);
@@ -744,25 +744,22 @@ impl Context {
         self.read().await.get_response().get_headers_values_length()
     }
 
-    /// Replaces a response header with a new value, removing any existing values.
+    /// Adds a response header, adding it if it doesn't exist or appending to it if it does.
     ///
     /// # Arguments
     ///
-    /// - `K` - The key of the header to replace.
-    /// - `V` - The new value for the header.
+    /// - `K` - The header key.
+    /// - `V` - The header value.
     ///
     /// # Returns
     ///
-    /// - `&Self` - Reference to the modified context.
-    pub async fn replace_response_header<K, V>(&self, key: K, value: V) -> &Self
+    /// - `&Self` - Reference to self for method chaining.
+    pub async fn add_response_header<K, V>(&self, key: K, value: V) -> &Self
     where
-        K: Into<ResponseHeadersKey>,
+        K: Into<String>,
         V: Into<String>,
     {
-        self.write()
-            .await
-            .get_mut_response()
-            .replace_header(key, value);
+        self.write().await.get_mut_response().add_header(key, value);
         self
     }
 
@@ -1159,11 +1156,11 @@ impl Context {
                 .await
                 .set_response_status_code(101)
                 .await
-                .replace_response_header(UPGRADE, WEBSOCKET)
+                .set_response_header(UPGRADE, WEBSOCKET)
                 .await
-                .replace_response_header(CONNECTION, UPGRADE)
+                .set_response_header(CONNECTION, UPGRADE)
                 .await
-                .replace_response_header(SEC_WEBSOCKET_ACCEPT, accept_key)
+                .set_response_header(SEC_WEBSOCKET_ACCEPT, accept_key)
                 .await
                 .send()
                 .await;
