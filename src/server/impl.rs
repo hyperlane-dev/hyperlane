@@ -108,45 +108,6 @@ impl PartialEq for Server {
 /// This indicates that `Server` has a total equality relation.
 impl Eq for Server {}
 
-/// Provides a default implementation for `ServerHook`.
-impl Default for ServerHook {
-    /// Creates a new `ServerHook` instance with default no-op hooks.
-    ///
-    /// The default `wait_hook` and `shutdown_hook` do nothing, allowing the server
-    /// to run without specific shutdown or wait logic unless configured otherwise.
-    ///
-    /// # Returns
-    ///
-    /// - `Self` - A new `ServerHook` instance with default hooks.
-    fn default() -> Self {
-        Self {
-            wait_hook: Arc::new(|| Box::pin(async move {})),
-            shutdown_hook: Arc::new(|| Box::pin(async move {})),
-        }
-    }
-}
-
-/// Manages server lifecycle hooks, including waiting and shutdown procedures.
-///
-/// This struct holds closures that are executed during specific server lifecycle events.
-impl ServerHook {
-    /// Waits for the server's shutdown signal or completion.
-    ///
-    /// This method asynchronously waits until the server's `wait_hook` is triggered,
-    /// typically indicating that the server has finished its operations or is ready to shut down.
-    pub async fn wait(&self) {
-        self.get_wait_hook()().await;
-    }
-
-    /// Initiates the server shutdown process.
-    ///
-    /// This method asynchronously calls the `shutdown_hook`, which is responsible for
-    /// performing any necessary cleanup or graceful shutdown procedures.
-    pub async fn shutdown(&self) {
-        self.get_shutdown_hook()().await;
-    }
-}
-
 /// Manages the state for handling a single connection, including the stream and context.
 ///
 /// This struct provides a convenient way to pass around the necessary components
@@ -922,9 +883,9 @@ impl Server {
             let _ = shutdown_receiver.changed().await;
             accept_connections.abort();
         });
-        let mut server_run: ServerHook = ServerHook::default();
-        server_run.set_shutdown_hook(shutdown_hook);
-        server_run.set_wait_hook(wait_hook);
-        Ok(server_run)
+        let mut server_hook: ServerHook = ServerHook::default();
+        server_hook.set_shutdown_hook(shutdown_hook);
+        server_hook.set_wait_hook(wait_hook);
+        Ok(server_hook)
     }
 }

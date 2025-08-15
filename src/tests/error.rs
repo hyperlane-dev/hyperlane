@@ -12,6 +12,9 @@ async fn test_server_error() {
     let invalid_http_request_error: ServerError = ServerError::InvalidHttpRequest(request.clone());
     let new_invalid_http_request_error: ServerError = ServerError::InvalidHttpRequest(request);
     assert_eq!(invalid_http_request_error, new_invalid_http_request_error);
+    let other_error: ServerError = ServerError::Other("other error".to_string());
+    let new_other_error: ServerError = ServerError::Other("other error".to_string());
+    assert_eq!(other_error, new_other_error);
 }
 
 #[tokio::test]

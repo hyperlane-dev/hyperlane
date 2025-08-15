@@ -11,6 +11,8 @@ pub enum ServerError {
     HttpRead(String),
     /// The received HTTP request was invalid or malformed.
     InvalidHttpRequest(Request),
+    /// Other error.
+    Other(String),
 }
 
 /// Represents errors related to route definitions and matching.
