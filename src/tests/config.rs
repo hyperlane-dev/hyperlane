@@ -14,7 +14,7 @@ async fn config_from_str() {
         }
     "#;
     let config: ServerConfig = ServerConfig::from_str(config_str).unwrap();
-    let new_config: ServerConfig = ServerConfig::new();
+    let new_config: ServerConfig = ServerConfig::new().await;
     new_config.host("0.0.0.0").await;
     new_config.port(80).await;
     new_config.ws_buffer(4096).await;

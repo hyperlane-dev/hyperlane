@@ -76,7 +76,7 @@ impl ServerConfig {
     /// # Returns
     ///
     /// A new `ServerConfig` instance.
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         Self::default()
     }
 
