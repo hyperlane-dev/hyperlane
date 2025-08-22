@@ -1,5 +1,6 @@
 use crate::*;
 
+// Collects route macro definitions for the inventory system.
 collect!(RouteMacro);
 
 /// Provides a default implementation for RouteMatcher.
@@ -195,7 +196,7 @@ impl PartialEq for RouteSegment {
 impl Default for RouteMacro {
     /// Creates a new `RouteMacro` with default values.
     ///
-    /// The default route has an empty path, no associated server, and a handler
+    /// The default route has an empty path and a handler
     /// that does nothing. This is useful for creating a base `RouteMacro` instance
     /// that can be configured further.
     ///
@@ -204,7 +205,6 @@ impl Default for RouteMacro {
     /// - `Self` - A new `RouteMacro` instance with default fields.
     fn default() -> Self {
         Self {
-            server: None,
             path: EMPTY_STR,
             handler: |_: Context| Box::pin(async {}),
         }

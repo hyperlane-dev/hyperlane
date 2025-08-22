@@ -46,14 +46,8 @@ pub(crate) struct RouteMatcher {
 /// Represents a route definition created by a macro.
 ///
 /// This struct encapsulates the necessary information to register a new route.
-/// It holds the URL path, the asynchronous handler, and an optional server instance.
-/// This allows for flexible route definition, either associated with a specific server
-/// or defined globally.
 #[derive(Getter, Setter, Clone, Debug, PartialEq, Eq)]
 pub struct RouteMacro {
-    /// An optional server instance to which the route will be added.
-    /// If `None`, the route may be registered with a default or global server instance.
-    pub server: Option<Server>,
     /// The URL path pattern for the route.
     pub path: &'static str,
     /// The asynchronous handler function to be executed when the route is matched.

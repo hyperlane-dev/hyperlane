@@ -84,5 +84,5 @@ pub(crate) struct ServerInner {
 /// This struct acts as a public-facing wrapper around an `Arc<RwLock<ServerInner>>`.
 /// It allows multiple parts of the application to safely share and modify the server's
 /// configuration and state across different threads and asynchronous tasks.
-#[derive(Clone, Getter, CustomDebug, DisplayDebug)]
+#[derive(Clone, Getter, CustomDebug, DisplayDebug, Default)]
 pub struct Server(#[get(pub(super))] pub(super) ArcRwLockServerInner);
