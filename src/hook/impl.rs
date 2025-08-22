@@ -50,8 +50,8 @@ impl Default for ServerHook {
     /// - `Self` - A new `ServerHook` instance with default hooks.
     fn default() -> Self {
         Self {
-            wait_hook: Arc::new(|| Box::pin(async move {})),
-            shutdown_hook: Arc::new(|| Box::pin(async move {})),
+            wait_hook: Arc::new(|| Box::pin(async {})),
+            shutdown_hook: Arc::new(|| Box::pin(async {})),
         }
     }
 }

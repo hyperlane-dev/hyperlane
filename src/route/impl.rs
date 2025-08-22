@@ -1,5 +1,7 @@
 use crate::*;
 
+collect!(RouteMacro);
+
 /// Provides a default implementation for RouteMatcher.
 impl Default for RouteMatcher {
     /// Creates a new, empty RouteMatcher.
@@ -186,6 +188,37 @@ impl PartialEq for RouteSegment {
             (Self::Regex(l0, l1), Self::Regex(r0, r1)) => l0 == r0 && l1.as_str() == r1.as_str(),
             _ => false,
         }
+    }
+}
+
+/// Provides a default implementation for `RouteMacro`.
+impl Default for RouteMacro {
+    /// Creates a new `RouteMacro` with default values.
+    ///
+    /// The default route has an empty path, no associated server, and a handler
+    /// that does nothing. This is useful for creating a base `RouteMacro` instance
+    /// that can be configured further.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - A new `RouteMacro` instance with default fields.
+    fn default() -> Self {
+        Self {
+            server: None,
+            path: EMPTY_STR,
+            handler: |_: Context| Box::pin(async {}),
+        }
+    }
+}
+
+impl RouteMacro {
+    /// Creates a new `RouteMacro` instance.
+    ///
+    /// # Returns
+    ///
+    /// - `Self`: A new `RouteMacro` instance.
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 
