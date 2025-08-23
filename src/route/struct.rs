@@ -19,8 +19,7 @@ pub(crate) struct RoutePattern(
 /// 2.  `dynamic_routes`: For paths with variable segments.
 /// 3.  `regex_routes`: For complex matching based on regular expressions.
 ///
-/// When a request comes in, the matcher checks these categories in order to find the
-/// appropriate handler.
+/// When a request comes in, the matcher checks these categories in order to find the appropriate handler.
 #[derive(Clone, CustomDebug, Getter, GetterMut, DisplayDebug)]
 pub(crate) struct RouteMatcher {
     /// A hash map for storing and quickly retrieving handlers for static routes.
@@ -41,15 +40,4 @@ pub(crate) struct RouteMatcher {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     pub(super) regex_routes: VecRoutePatternArcFnPinBoxSendSync,
-}
-
-/// Represents a route definition created by a macro.
-///
-/// This struct encapsulates the necessary information to register a new route.
-#[derive(Getter, Setter, Clone, Debug, PartialEq, Eq)]
-pub struct RouteMacro {
-    /// The URL path pattern for the route.
-    pub path: &'static str,
-    /// The asynchronous handler function to be executed when the route is matched.
-    pub handler: fn(Context) -> PinBoxFutureSend<()>,
 }

@@ -22,3 +22,16 @@ pub struct ServerHook {
     #[set(pub(crate))]
     pub(super) shutdown_hook: ArcFnPinBoxFutureSend<()>,
 }
+
+/// Represents a route definition created by a macro.
+///
+/// This struct encapsulates the necessary information to register a new hook.
+#[derive(Getter, Setter, Clone, Debug, PartialEq, Eq)]
+pub struct HookMacro {
+    /// Represents the asynchronous handler function that is executed when
+    /// the associated hook is triggered.
+    pub handler: fn(Context) -> PinBoxFutureSend<()>,
+    /// Represents the type of the hook that determines when the handler
+    /// should be executed.
+    pub hook_type: HookType,
+}
