@@ -1,39 +1,43 @@
-/// Enum to identify different kinds of hooks in the server lifecycle.
+use crate::*;
+
+/// Represents different kinds of hooks in the server lifecycle.
 ///
-/// Each variant represents a specific type of hook that can be registered
+/// Each variant corresponds to a specific hook that can be registered
 /// and triggered at different stages of request handling or server events.
-#[derive(Clone, Debug, PartialEq, Eq, Copy)]
+/// Hooks with an `Option<isize>` allow specifying a priority order; `None` indicates
+/// the default order (0 or unspecified).
+#[derive(Clone, Debug, PartialEq, Eq, Copy, Hash, DisplayDebug)]
 pub enum HookType {
-    /// Hook triggered when a panic occurs in the server.
+    /// Triggered when a panic occurs in the server.
     ///
-    /// - `isize`: Priority of the panic hook.
-    PanicHook(isize),
-    /// Hook to disable the default HTTP handler for a specific route.
+    /// - `Option<isize>`: Optional priority of the panic hook. `None` means default.
+    PanicHook(Option<isize>),
+    /// Disables the default HTTP handler for a specific route.
     ///
-    /// - `&'static str`: The route path for which the default HTTP handler is disabled.
+    /// - `&'static str`: The route path for which the HTTP handler is disabled.
     DisableHttpHook(&'static str),
-    /// Hook to disable the default WebSocket handler for a specific route.
+    /// Disables the default WebSocket handler for a specific route.
     ///
-    /// - `&'static str`: The route path for which the default WebSocket handler is disabled.
+    /// - `&'static str`: The route path for which the WebSocket handler is disabled.
     DisableWsHook(&'static str),
-    /// Hook triggered when a client successfully establishes a connection.
+    /// Triggered when a client successfully establishes a connection.
     ///
-    /// - `isize`: Priority of the connected hook.
-    ConnectedHook(isize),
-    /// Hook triggered before a protocol upgrade (e.g., HTTP to WebSocket).
+    /// - `Option<isize>`: Optional priority of the connected hook.
+    ConnectedHook(Option<isize>),
+    /// Triggered before a protocol upgrade.
     ///
-    /// - `isize`: Priority of the pre-upgrade hook.
-    PreUpgradeHook(isize),
-    /// Hook executed before a request reaches its designated route handler.
+    /// - `Option<isize>`: Optional priority of the pre-upgrade hook.
+    PreUpgradeHook(Option<isize>),
+    /// Executed before a request reaches its designated route handler.
     ///
-    /// - `isize`: Priority of the request middleware.
-    RequestMiddleware(isize),
-    /// Hook representing a route handler for a specific path.
+    /// - `Option<isize>`: Optional priority of the request middleware.
+    RequestMiddleware(Option<isize>),
+    /// Represents a route handler for a specific path.
     ///
     /// - `&'static str`: The route path handled by this hook.
     Route(&'static str),
-    /// Hook executed after a route handler but before the response is sent.
+    /// Executed after a route handler but before the response is sent.
     ///
-    /// - `isize`: Priority of the response middleware.
-    ResponseMiddleware(isize),
+    /// - `Option<isize>`: Optional priority of the response middleware.
+    ResponseMiddleware(Option<isize>),
 }

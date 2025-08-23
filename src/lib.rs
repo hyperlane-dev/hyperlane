@@ -38,7 +38,6 @@ pub(crate) use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
     future::Future,
-    mem::{Discriminant, discriminant},
     net::SocketAddr,
     panic::Location,
     pin::Pin,
