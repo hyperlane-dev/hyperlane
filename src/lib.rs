@@ -36,8 +36,9 @@ pub(crate) use lifecycle::*;
 pub(crate) use std::{
     any::Any,
     cmp::Ordering,
-    collections::{BTreeSet, HashMap},
+    collections::{HashMap, HashSet},
     future::Future,
+    mem::{Discriminant, discriminant},
     net::SocketAddr,
     panic::Location,
     pin::Pin,

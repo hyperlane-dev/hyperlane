@@ -92,20 +92,34 @@ impl PartialEq for RouteMatcher {
     ///
     /// - `bool`: `true` if the instances are equal, `false` otherwise.
     fn eq(&self, other: &Self) -> bool {
-        let self_static_keys: BTreeSet<_> = self.static_routes.keys().collect();
-        let other_static_keys: BTreeSet<_> = other.static_routes.keys().collect();
+        let self_static_keys: HashSet<&String> = self.static_routes.keys().collect();
+        let other_static_keys: HashSet<&String> = other.static_routes.keys().collect();
         if self_static_keys != other_static_keys {
             return false;
         }
-        let self_dynamic_patterns: BTreeSet<_> =
-            self.dynamic_routes.iter().map(|(p, _)| p).collect();
-        let other_dynamic_patterns: BTreeSet<_> =
-            other.dynamic_routes.iter().map(|(p, _)| p).collect();
+        let self_dynamic_patterns: HashSet<Vec<&str>> = self
+            .dynamic_routes
+            .iter()
+            .map(|(p, _)| segment_key(p))
+            .collect();
+        let other_dynamic_patterns: HashSet<Vec<&str>> = other
+            .dynamic_routes
+            .iter()
+            .map(|(p, _)| segment_key(p))
+            .collect();
         if self_dynamic_patterns != other_dynamic_patterns {
             return false;
         }
-        let self_regex_patterns: BTreeSet<_> = self.regex_routes.iter().map(|(p, _)| p).collect();
-        let other_regex_patterns: BTreeSet<_> = other.regex_routes.iter().map(|(p, _)| p).collect();
+        let self_regex_patterns: HashSet<Vec<&str>> = self
+            .regex_routes
+            .iter()
+            .map(|(p, _)| segment_key(p))
+            .collect();
+        let other_regex_patterns: HashSet<Vec<&str>> = other
+            .regex_routes
+            .iter()
+            .map(|(p, _)| segment_key(p))
+            .collect();
         if self_regex_patterns != other_regex_patterns {
             return false;
         }
