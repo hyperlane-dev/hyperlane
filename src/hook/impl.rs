@@ -76,3 +76,28 @@ impl ServerHook {
         self.get_shutdown_hook()().await;
     }
 }
+
+/// Implementation block for `HookType`.
+///
+/// This block defines utility methods associated with the `HookType` enum.
+/// These methods provide additional functionality for working with hooks,
+/// such as extracting the execution order (priority) used in duplicate checks.
+impl HookType {
+    /// Returns the optional execution priority (`order`) of a hook.
+    ///
+    /// Hooks that carry an `order` indicate their execution priority.  
+    /// Hooks without an `order` are considered unordered and are ignored in duplicate checks.
+    ///
+    /// # Returns
+    /// - `Option<isize>` - `Some(order)` if the hook defines a priority, otherwise `None`.
+    pub fn get(&self) -> Option<isize> {
+        match *self {
+            HookType::RequestMiddleware(order)
+            | HookType::ResponseMiddleware(order)
+            | HookType::PanicHook(order)
+            | HookType::ConnectedHook(order)
+            | HookType::PreUpgradeHook(order) => order,
+            _ => None,
+        }
+    }
+}
