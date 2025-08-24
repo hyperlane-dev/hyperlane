@@ -8,15 +8,14 @@ use crate::*;
 ///
 /// # Arguments
 ///
-/// - `&[&HookMacro]`: A slice of references to `HookMacro` structs to be checked.
+/// - `Vec<HookMacro>`: A vector of `HookMacro` instances to be checked.
 ///
 /// # Panics
 ///
 /// - Panics if two or more `Hook` items of the same type define the same non-zero `order`.
-pub fn assert_hook_unique_order(slice: &[&HookMacro]) {
+pub fn assert_hook_unique_order(list: Vec<HookMacro>) {
     let mut seen: HashSet<(HookType, isize)> = HashSet::new();
-    slice
-        .iter()
+    list.iter()
         .filter_map(|hook| hook.hook_type.get().map(|order| (hook.hook_type, order)))
         .for_each(|(key, order)| {
             if !seen.insert((key, order)) {
