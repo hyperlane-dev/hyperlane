@@ -54,8 +54,8 @@ impl PartialOrd for RoutePattern {
     ///
     /// # Returns
     ///
-    /// - `Option<std::cmp::Ordering>`: The ordering of the two instances.
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    /// - `Option<Ordering>`: The ordering of the two instances.
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
@@ -72,8 +72,8 @@ impl Ord for RoutePattern {
     ///
     /// # Returns
     ///
-    /// - `std::cmp::Ordering`: The ordering of the two instances.
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    /// - `Ordering`: The ordering of the two instances.
+    fn cmp(&self, other: &Self) -> Ordering {
         self.get_0().cmp(&other.get_0())
     }
 }
@@ -283,7 +283,7 @@ impl RoutePattern {
     /// # Returns
     ///
     /// - `Option<RouteParams>` - Some with parameters if matched, None otherwise.
-    pub(crate) fn match_path(&self, path: &str) -> OptionRouteParams {
+    pub(crate) fn try_match_path(&self, path: &str) -> OptionRouteParams {
         let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
         let route_segments_len: usize = self.get_0().len();
         let is_tail_regex: bool = matches!(self.get_0().last(), Some(RouteSegment::Regex(_, _)));
@@ -485,12 +485,12 @@ impl RouteMatcher {
             return true;
         }
         for (pattern, _) in self.get_dynamic_routes().iter() {
-            if pattern.match_path(path).is_some() {
+            if pattern.try_match_path(path).is_some() {
                 return true;
             }
         }
         for (pattern, _) in self.get_regex_routes().iter() {
-            if pattern.match_path(path).is_some() {
+            if pattern.try_match_path(path).is_some() {
                 return true;
             }
         }
@@ -507,7 +507,7 @@ impl RouteMatcher {
     /// # Returns
     ///
     /// - `Option<ArcFnContextPinBoxSendSync>` - Some handler if match found, None otherwise.
-    pub(crate) async fn resolve_route(
+    pub(crate) async fn try_resolve_route(
         &self,
         ctx: &Context,
         path: &str,
@@ -517,13 +517,13 @@ impl RouteMatcher {
             return Some(handler.clone());
         }
         for (pattern, handler) in self.get_dynamic_routes().iter() {
-            if let Some(params) = pattern.match_path(path) {
+            if let Some(params) = pattern.try_match_path(path) {
                 ctx.set_route_params(params).await;
                 return Some(handler.clone());
             }
         }
         for (pattern, handler) in self.get_regex_routes().iter() {
-            if let Some(params) = pattern.match_path(path) {
+            if let Some(params) = pattern.try_match_path(path) {
                 ctx.set_route_params(params).await;
                 return Some(handler.clone());
             }

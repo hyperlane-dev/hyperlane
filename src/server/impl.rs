@@ -780,7 +780,7 @@ impl Server {
             .read()
             .await
             .get_route()
-            .resolve_route(ctx, route)
+            .try_resolve_route(ctx, route)
             .await;
         if self.run_request_middleware(ctx, &mut lifecycle).await {
             return lifecycle.keep_alive();
@@ -873,7 +873,7 @@ impl Server {
         self.read()
             .await
             .get_route()
-            .resolve_route(ctx, &route)
+            .try_resolve_route(ctx, &route)
             .await;
         if self.run_pre_upgrade_hook(ctx, &mut lifecycle).await {
             return;

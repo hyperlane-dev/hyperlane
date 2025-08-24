@@ -9,7 +9,7 @@ async fn get_panic_from_context() {
         Some("test".to_string()),
     );
     ctx.set_panic(set_panic.clone()).await;
-    let get_panic: Panic = ctx.get_panic().await.unwrap();
+    let get_panic: Panic = ctx.try_get_panic().await.unwrap();
     assert_eq!(set_panic, get_panic);
 }
 
@@ -41,7 +41,7 @@ async fn run_set_func() {
     };
     ctx.set_attribute(KEY, func).await;
     let get_key = ctx
-        .get_attribute::<&(dyn Fn(&str) -> String + Send + Sync)>(KEY)
+        .try_get_attribute::<&(dyn Fn(&str) -> String + Send + Sync)>(KEY)
         .await
         .unwrap();
     assert_eq!(get_key(PARAM), func(PARAM));

@@ -16,7 +16,11 @@ use crate::*;
 pub fn assert_hook_unique_order(list: Vec<HookMacro>) {
     let mut seen: HashSet<(HookType, isize)> = HashSet::new();
     list.iter()
-        .filter_map(|hook| hook.hook_type.get().map(|order| (hook.hook_type, order)))
+        .filter_map(|hook| {
+            hook.hook_type
+                .try_get()
+                .map(|order| (hook.hook_type, order))
+        })
         .for_each(|(key, order)| {
             if !seen.insert((key, order)) {
                 panic!("Duplicate hook detected: {} with order {}", key, order);

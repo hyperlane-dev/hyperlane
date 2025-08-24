@@ -36,7 +36,7 @@ impl Panic {
     /// # Returns
     ///
     /// - `OptionString` - The extracted message, or None if the payload is not a string type.
-    fn extract_panic_message_from_any(panic_payload: &dyn Any) -> OptionString {
+    fn try_extract_panic_message(panic_payload: &dyn Any) -> OptionString {
         if let Some(s) = panic_payload.downcast_ref::<&str>() {
             Some(s.to_string())
         } else if let Some(s) = panic_payload.downcast_ref::<String>() {
@@ -61,7 +61,7 @@ impl Panic {
     pub(crate) fn from_join_error(join_error: JoinError) -> Self {
         let default_message: String = join_error.to_string();
         let mut message: OptionString = if let Ok(panic_join_error) = join_error.try_into_panic() {
-            Self::extract_panic_message_from_any(&panic_join_error)
+            Self::try_extract_panic_message(&panic_join_error)
         } else {
             None
         };

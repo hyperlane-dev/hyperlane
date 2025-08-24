@@ -22,12 +22,12 @@ async fn server() {
         if !ctx.get_request().await.is_ws() {
             return;
         }
-        let socket_addr: String = ctx.get_socket_addr_or_default_string().await;
+        let socket_addr: String = ctx.get_socket_addr_string().await;
         let _ = ctx.set_response_body(socket_addr).await.send_body().await;
     }
 
     async fn request_middleware(ctx: Context) {
-        let socket_addr: String = ctx.get_socket_addr_or_default_string().await;
+        let socket_addr: String = ctx.get_socket_addr_string().await;
         ctx.set_response_version(HttpVersion::HTTP1_1)
             .await
             .set_response_status_code(200)
@@ -66,7 +66,7 @@ async fn server() {
 
     async fn ws_route(ctx: Context) {
         let key: RequestHeadersValueItem = ctx
-            .get_request_header_back(SEC_WEBSOCKET_KEY)
+            .try_get_request_header_back(SEC_WEBSOCKET_KEY)
             .await
             .unwrap_or_default();
         let request_body: Vec<u8> = ctx.get_request_body().await;
@@ -96,7 +96,7 @@ async fn server() {
     }
 
     async fn panic_hook(ctx: Context) {
-        let error: Panic = ctx.get_panic().await.unwrap_or_default();
+        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
         let response_body: String = error.to_string();
         eprintln!("{}", response_body);
         let _ = std::io::Write::flush(&mut std::io::stderr());

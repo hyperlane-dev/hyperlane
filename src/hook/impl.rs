@@ -91,7 +91,7 @@ impl HookType {
     /// # Returns
     ///
     /// - `Option<isize>` - `Some(order)` if the hook defines a priority, otherwise `None`.
-    pub fn get(&self) -> Option<isize> {
+    pub fn try_get(&self) -> Option<isize> {
         match *self {
             HookType::RequestMiddleware(order)
             | HookType::ResponseMiddleware(order)
