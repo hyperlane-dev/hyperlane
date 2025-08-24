@@ -1,6 +1,6 @@
 use crate::*;
 
-/// Verify that a `Hook` list with the same type and non-zero priority are unique.
+/// Verify that each `Hook` in the list with the same type and non-zero priority is unique.
 ///
 /// This function iterates over all provided `Hook` items and ensures that no two
 /// `Hook` items of the same type define the same non-zero `order`. If a duplicate
@@ -8,14 +8,15 @@ use crate::*;
 ///
 /// # Arguments
 ///
-/// - `&[HookMacro]`: A slice of `HookMacro` instances to be checked.
+/// - `&[&HookMacro]`: A slice of references to `HookMacro` structs to be checked.
 ///
 /// # Panics
 ///
 /// - Panics if two or more `Hook` items of the same type define the same non-zero `order`.
-pub fn assert_hook_unique_order(list: &[HookMacro]) {
+pub fn assert_hook_unique_order(slice: &[&HookMacro]) {
     let mut seen: HashSet<(HookType, isize)> = HashSet::new();
-    list.iter()
+    slice
+        .iter()
         .filter_map(|hook| hook.hook_type.get().map(|order| (hook.hook_type, order)))
         .for_each(|(key, order)| {
             if !seen.insert((key, order)) {
