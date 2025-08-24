@@ -128,7 +128,7 @@ async fn server() {
         let server: Server = Server::from(config).await;
         server.panic_hook(panic_hook).await;
         server.connected_hook(connected_hook).await;
-        server.pre_upgrade_hook(request_middleware).await;
+        server.prologue_upgrade_hook(request_middleware).await;
         server.request_middleware(request_middleware).await;
         server.response_middleware(response_middleware).await;
         server.route("/", root_route).await;

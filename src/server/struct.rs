@@ -53,7 +53,7 @@ pub(crate) struct ServerInner {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) pre_upgrade_hook: VecArcFnContextPinBoxSendSync<()>,
+    pub(super) prologue_upgrade_hook: VecArcFnContextPinBoxSendSync<()>,
     /// A collection of hooks that are executed immediately after a new client connection is established.
     #[debug(skip)]
     #[get(pub(super))]

@@ -13,7 +13,7 @@ impl Default for ServerInner {
             route: RouteMatcher::new(),
             request_middleware: vec![],
             response_middleware: vec![],
-            pre_upgrade_hook: vec![],
+            prologue_upgrade_hook: vec![],
             connected_hook: vec![],
             disable_http_hook: RouteMatcher::new(),
             disable_ws_hook: RouteMatcher::new(),
@@ -44,7 +44,7 @@ impl PartialEq for ServerInner {
             && self.response_middleware.len() == other.response_middleware.len()
             && self.panic_hook.len() == other.panic_hook.len()
             && self.connected_hook.len() == other.connected_hook.len()
-            && self.pre_upgrade_hook.len() == other.pre_upgrade_hook.len()
+            && self.prologue_upgrade_hook.len() == other.prologue_upgrade_hook.len()
             && self
                 .request_middleware
                 .iter()
@@ -56,9 +56,9 @@ impl PartialEq for ServerInner {
                 .zip(other.response_middleware.iter())
                 .all(|(a, b)| Arc::ptr_eq(a, b))
             && self
-                .pre_upgrade_hook
+                .prologue_upgrade_hook
                 .iter()
-                .zip(other.pre_upgrade_hook.iter())
+                .zip(other.prologue_upgrade_hook.iter())
                 .all(|(a, b)| Arc::ptr_eq(a, b))
             && self
                 .connected_hook
@@ -201,7 +201,7 @@ impl Server {
                 self.connected_hook(hook.handler).await;
             }
             HookType::PreUpgradeHook(_) => {
-                self.pre_upgrade_hook(hook.handler).await;
+                self.prologue_upgrade_hook(hook.handler).await;
             }
             HookType::RequestMiddleware(_) => {
                 self.request_middleware(hook.handler).await;
@@ -349,14 +349,14 @@ impl Server {
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn pre_upgrade_hook<F, Fut>(&self, func: F) -> &Self
+    pub async fn prologue_upgrade_hook<F, Fut>(&self, func: F) -> &Self
     where
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
         self.write()
             .await
-            .get_mut_pre_upgrade_hook()
+            .get_mut_prologue_upgrade_hook()
             .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
         self
     }
@@ -660,8 +660,8 @@ impl Server {
     /// # Returns
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    async fn run_pre_upgrade_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) -> bool {
-        for func in self.read().await.get_pre_upgrade_hook().iter() {
+    async fn run_prologue_upgrade_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) -> bool {
+        for func in self.read().await.get_prologue_upgrade_hook().iter() {
             self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| func(ctx))
                 .await;
             if lifecycle.is_abort() {
@@ -875,7 +875,7 @@ impl Server {
             .get_route()
             .try_resolve_route(ctx, &route)
             .await;
-        if self.run_pre_upgrade_hook(ctx, &mut lifecycle).await {
+        if self.run_prologue_upgrade_hook(ctx, &mut lifecycle).await {
             return;
         }
         if ctx.upgrade_to_ws().await.is_err() {
