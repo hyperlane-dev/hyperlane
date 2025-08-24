@@ -176,6 +176,45 @@ impl Server {
         self.get_0().write().await
     }
 
+    /// Handle a given hook macro asynchronously.
+    ///
+    /// This function dispatches the provided `HookMacro` to the appropriate
+    /// internal handler based on its `HookType`. Supported hook types include
+    /// panic hooks, disable HTTP/WS hooks, connected hooks, pre-upgrade hooks,
+    /// request/response middleware, and routes.
+    ///
+    /// # Arguments
+    ///
+    /// - `HookMacro`: The `HookMacro` instance containing the `HookType` and its handler.
+    pub async fn handle_hook(&self, hook: HookMacro) {
+        match hook.hook_type {
+            HookType::PanicHook(_) => {
+                self.panic_hook(hook.handler).await;
+            }
+            HookType::DisableHttpHook(path) => {
+                self.disable_http_hook(path).await;
+            }
+            HookType::DisableWsHook(path) => {
+                self.disable_ws_hook(path).await;
+            }
+            HookType::ConnectedHook(_) => {
+                self.connected_hook(hook.handler).await;
+            }
+            HookType::PreUpgradeHook(_) => {
+                self.pre_upgrade_hook(hook.handler).await;
+            }
+            HookType::RequestMiddleware(_) => {
+                self.request_middleware(hook.handler).await;
+            }
+            HookType::Route(path) => {
+                self.route(path, hook.handler).await;
+            }
+            HookType::ResponseMiddleware(_) => {
+                self.response_middleware(hook.handler).await;
+            }
+        };
+    }
+
     /// Sets the server configuration from a string.
     ///
     /// # Arguments

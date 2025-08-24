@@ -89,6 +89,7 @@ impl HookType {
     /// Hooks without an `order` are considered unordered and are ignored in duplicate checks.
     ///
     /// # Returns
+    ///
     /// - `Option<isize>` - `Some(order)` if the hook defines a priority, otherwise `None`.
     pub fn get(&self) -> Option<isize> {
         match *self {

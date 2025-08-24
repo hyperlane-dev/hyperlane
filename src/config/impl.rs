@@ -45,7 +45,7 @@ impl PartialEq for ServerConfig {
     /// It first checks for pointer equality for performance. If the pointers are not equal,
     /// it compares the inner `ServerConfigInner` values.
     ///
-    /// # Parameters
+    /// # Arguments
     ///
     /// - `&Self`: The other `ServerConfig` to compare against.
     ///
@@ -112,7 +112,7 @@ impl ServerConfig {
 
     /// Sets the host address for the server.
     ///
-    /// # Parameters
+    /// # Arguments
     ///
     /// - `H`: The host address to set.
     ///
@@ -126,7 +126,7 @@ impl ServerConfig {
 
     /// Sets the port for the server.
     ///
-    /// # Parameters
+    /// # Arguments
     ///
     /// - `usize`: The port number to set.
     ///
@@ -140,7 +140,7 @@ impl ServerConfig {
 
     /// Sets the WebSocket buffer size.
     ///
-    /// # Parameters
+    /// # Arguments
     ///
     /// - `usize`: The WebSocket buffer size to set.
     ///
@@ -154,7 +154,7 @@ impl ServerConfig {
 
     /// Sets the HTTP buffer size.
     ///
-    /// # Parameters
+    /// # Arguments
     ///
     /// - `usize`: The HTTP buffer size to set.
     ///
@@ -168,7 +168,7 @@ impl ServerConfig {
 
     /// Sets the `TCP_NODELAY` option.
     ///
-    /// # Parameters
+    /// # Arguments
     ///
     /// - `bool`: The `bool` value for `TCP_NODELAY`.
     ///
@@ -200,7 +200,7 @@ impl ServerConfig {
 
     /// Sets the `SO_LINGER` option.
     ///
-    /// # Parameters
+    /// # Arguments
     ///
     /// - `Duration`: The `Duration` value for `SO_LINGER`.
     ///
@@ -214,7 +214,7 @@ impl ServerConfig {
 
     /// Sets the `IP_TTL` option.
     ///
-    /// # Parameters
+    /// # Arguments
     ///
     /// - `u32`: The `u32` value for `IP_TTL`.
     ///
@@ -228,7 +228,7 @@ impl ServerConfig {
 
     /// Creates a `ServerConfig` from a JSON string.
     ///
-    /// # Parameters
+    /// # Arguments
     ///
     /// - `&str`: The JSON string to parse.
     ///
