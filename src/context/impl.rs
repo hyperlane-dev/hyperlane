@@ -463,7 +463,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the header exists, otherwise false.
-    pub async fn has_request_header<K>(&self, key: K) -> bool
+    pub async fn get_request_has_header<K>(&self, key: K) -> bool
     where
         K: Into<RequestHeadersKey>,
     {
@@ -480,7 +480,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if header contains the value.
-    pub async fn has_request_header_value<K, V>(&self, key: K, value: V) -> bool
+    pub async fn get_request_has_header_value<K, V>(&self, key: K, value: V) -> bool
     where
         K: Into<RequestHeadersKey>,
         V: Into<RequestHeadersValueItem>,
@@ -530,7 +530,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if this is a WebSocket upgrade request.
-    pub async fn is_request_ws(&self) -> bool {
+    pub async fn get_request_is_ws(&self) -> bool {
         self.read().await.get_request().is_ws()
     }
 
@@ -539,7 +539,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if this is an h2c upgrade request.
-    pub async fn is_request_h2c(&self) -> bool {
+    pub async fn get_request_is_h2c(&self) -> bool {
         self.read().await.get_request().is_h2c()
     }
 
@@ -548,7 +548,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if this is a TLS upgrade request.
-    pub async fn is_request_tls(&self) -> bool {
+    pub async fn get_request_is_tls(&self) -> bool {
         self.read().await.get_request().is_tls()
     }
 
@@ -557,7 +557,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the upgrade type is unknown.
-    pub async fn is_request_unknown_upgrade(&self) -> bool {
+    pub async fn get_request_is_unknown_upgrade(&self) -> bool {
         self.read().await.get_request().is_unknown_upgrade()
     }
 
@@ -566,7 +566,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the version is HTTP/1.1 or higher.
-    pub async fn is_request_http1_1_or_higher(&self) -> bool {
+    pub async fn get_request_is_http1_1_or_higher(&self) -> bool {
         self.read().await.get_request().is_http1_1_or_higher()
     }
 
@@ -575,7 +575,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the version is HTTP/0.9.
-    pub async fn is_request_http0_9(&self) -> bool {
+    pub async fn get_request_is_http0_9(&self) -> bool {
         self.read().await.get_request().is_http0_9()
     }
 
@@ -584,7 +584,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the version is HTTP/1.0.
-    pub async fn is_request_http1_0(&self) -> bool {
+    pub async fn get_request_is_http1_0(&self) -> bool {
         self.read().await.get_request().is_http1_0()
     }
 
@@ -593,7 +593,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the version is HTTP/1.1.
-    pub async fn is_request_http1_1(&self) -> bool {
+    pub async fn get_request_is_http1_1(&self) -> bool {
         self.read().await.get_request().is_http1_1()
     }
 
@@ -602,7 +602,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the version is HTTP/2.
-    pub async fn is_request_http2(&self) -> bool {
+    pub async fn get_request_is_http2(&self) -> bool {
         self.read().await.get_request().is_http2()
     }
 
@@ -611,7 +611,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the version is HTTP/3.
-    pub async fn is_request_http3(&self) -> bool {
+    pub async fn get_request_is_http3(&self) -> bool {
         self.read().await.get_request().is_http3()
     }
 
@@ -620,7 +620,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the version is unknown.
-    pub async fn is_request_unknown_version(&self) -> bool {
+    pub async fn get_request_is_unknown_version(&self) -> bool {
         self.read().await.get_request().is_unknown_version()
     }
 
@@ -629,7 +629,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the version belongs to HTTP family.
-    pub async fn is_request_http(&self) -> bool {
+    pub async fn get_request_is_http(&self) -> bool {
         self.read().await.get_request().is_http()
     }
 
@@ -638,7 +638,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the method is GET.
-    pub async fn is_request_get(&self) -> bool {
+    pub async fn get_request_is_get(&self) -> bool {
         self.read().await.get_request().is_get()
     }
 
@@ -647,7 +647,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the method is POST.
-    pub async fn is_request_post(&self) -> bool {
+    pub async fn get_request_is_post(&self) -> bool {
         self.read().await.get_request().is_post()
     }
 
@@ -656,7 +656,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the method is PUT.
-    pub async fn is_request_put(&self) -> bool {
+    pub async fn get_request_is_put(&self) -> bool {
         self.read().await.get_request().is_put()
     }
 
@@ -665,7 +665,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the method is DELETE.
-    pub async fn is_request_delete(&self) -> bool {
+    pub async fn get_request_is_delete(&self) -> bool {
         self.read().await.get_request().is_delete()
     }
 
@@ -674,7 +674,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the method is PATCH.
-    pub async fn is_request_patch(&self) -> bool {
+    pub async fn get_request_is_patch(&self) -> bool {
         self.read().await.get_request().is_patch()
     }
 
@@ -683,7 +683,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the method is HEAD.
-    pub async fn is_request_head(&self) -> bool {
+    pub async fn get_request_is_head(&self) -> bool {
         self.read().await.get_request().is_head()
     }
 
@@ -692,7 +692,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the method is OPTIONS.
-    pub async fn is_request_options(&self) -> bool {
+    pub async fn get_request_is_options(&self) -> bool {
         self.read().await.get_request().is_options()
     }
 
@@ -701,7 +701,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the method is CONNECT.
-    pub async fn is_request_connect(&self) -> bool {
+    pub async fn get_request_is_connect(&self) -> bool {
         self.read().await.get_request().is_connect()
     }
 
@@ -710,7 +710,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the method is TRACE.
-    pub async fn is_request_trace(&self) -> bool {
+    pub async fn get_request_is_trace(&self) -> bool {
         self.read().await.get_request().is_trace()
     }
 
@@ -719,7 +719,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the method is unknown.
-    pub async fn is_request_unknown_method(&self) -> bool {
+    pub async fn get_request_is_unknown_method(&self) -> bool {
         self.read().await.get_request().is_unknown_method()
     }
 
@@ -728,7 +728,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the Connection header suggests keeping the connection alive, otherwise false.
-    pub async fn is_request_enable_keep_alive(&self) -> bool {
+    pub async fn get_request_is_enable_keep_alive(&self) -> bool {
         self.read().await.get_request().is_enable_keep_alive()
     }
 
@@ -737,7 +737,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if keep-alive should be disabled.
-    pub async fn is_request_disable_keep_alive(&self) -> bool {
+    pub async fn get_request_is_disable_keep_alive(&self) -> bool {
         self.read().await.get_request().is_disable_keep_alive()
     }
 
@@ -915,7 +915,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the header contains the specified value, otherwise false.
-    pub async fn has_response_header_value<K, V>(&self, key: K, value: V) -> bool
+    pub async fn get_response_header_value<K, V>(&self, key: K, value: V) -> bool
     where
         K: Into<ResponseHeadersKey>,
         V: Into<ResponseHeadersValueItem>,
@@ -944,7 +944,7 @@ impl Context {
     /// # Returns
     ///
     /// - `usize` - The number of values for the specified header.
-    pub async fn get_response_header_len<K>(&self, key: K) -> usize
+    pub async fn get_response_header_length<K>(&self, key: K) -> usize
     where
         K: Into<ResponseHeadersKey>,
     {
