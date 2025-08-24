@@ -525,6 +525,222 @@ impl Context {
         self.read().await.get_request().get_upgrade_type()
     }
 
+    /// Checks if the request is a WebSocket upgrade request.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if this is a WebSocket upgrade request.
+    pub async fn is_request_ws(&self) -> bool {
+        self.read().await.get_request().is_ws()
+    }
+
+    /// Checks if the request is an HTTP/2 cleartext (h2c) upgrade.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if this is an h2c upgrade request.
+    pub async fn is_request_h2c(&self) -> bool {
+        self.read().await.get_request().is_h2c()
+    }
+
+    /// Checks if the request is a TLS upgrade.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if this is a TLS upgrade request.
+    pub async fn is_request_tls(&self) -> bool {
+        self.read().await.get_request().is_tls()
+    }
+
+    /// Checks if the request has an unknown upgrade type.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the upgrade type is unknown.
+    pub async fn is_request_unknown_upgrade(&self) -> bool {
+        self.read().await.get_request().is_unknown_upgrade()
+    }
+
+    /// Checks if the request HTTP version is HTTP/1.1 or higher.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the version is HTTP/1.1 or higher.
+    pub async fn is_request_http1_1_or_higher(&self) -> bool {
+        self.read().await.get_request().is_http1_1_or_higher()
+    }
+
+    /// Checks if the request HTTP version is HTTP/0.9.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the version is HTTP/0.9.
+    pub async fn is_request_http0_9(&self) -> bool {
+        self.read().await.get_request().is_http0_9()
+    }
+
+    /// Checks if the request HTTP version is HTTP/1.0.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the version is HTTP/1.0.
+    pub async fn is_request_http1_0(&self) -> bool {
+        self.read().await.get_request().is_http1_0()
+    }
+
+    /// Checks if the request HTTP version is HTTP/1.1.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the version is HTTP/1.1.
+    pub async fn is_request_http1_1(&self) -> bool {
+        self.read().await.get_request().is_http1_1()
+    }
+
+    /// Checks if the request HTTP version is HTTP/2.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the version is HTTP/2.
+    pub async fn is_request_http2(&self) -> bool {
+        self.read().await.get_request().is_http2()
+    }
+
+    /// Checks if the request HTTP version is HTTP/3.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the version is HTTP/3.
+    pub async fn is_request_http3(&self) -> bool {
+        self.read().await.get_request().is_http3()
+    }
+
+    /// Checks if the request has an unknown HTTP version.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the version is unknown.
+    pub async fn is_request_unknown_version(&self) -> bool {
+        self.read().await.get_request().is_unknown_version()
+    }
+
+    /// Checks if the request uses HTTP protocol.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the version belongs to HTTP family.
+    pub async fn is_request_http(&self) -> bool {
+        self.read().await.get_request().is_http()
+    }
+
+    /// Checks if the request method is GET.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the method is GET.
+    pub async fn is_request_get(&self) -> bool {
+        self.read().await.get_request().is_get()
+    }
+
+    /// Checks if the request method is POST.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the method is POST.
+    pub async fn is_request_post(&self) -> bool {
+        self.read().await.get_request().is_post()
+    }
+
+    /// Checks if the request method is PUT.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the method is PUT.
+    pub async fn is_request_put(&self) -> bool {
+        self.read().await.get_request().is_put()
+    }
+
+    /// Checks if the request method is DELETE.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the method is DELETE.
+    pub async fn is_request_delete(&self) -> bool {
+        self.read().await.get_request().is_delete()
+    }
+
+    /// Checks if the request method is PATCH.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the method is PATCH.
+    pub async fn is_request_patch(&self) -> bool {
+        self.read().await.get_request().is_patch()
+    }
+
+    /// Checks if the request method is HEAD.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the method is HEAD.
+    pub async fn is_request_head(&self) -> bool {
+        self.read().await.get_request().is_head()
+    }
+
+    /// Checks if the request method is OPTIONS.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the method is OPTIONS.
+    pub async fn is_request_options(&self) -> bool {
+        self.read().await.get_request().is_options()
+    }
+
+    /// Checks if the request method is CONNECT.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the method is CONNECT.
+    pub async fn is_request_connect(&self) -> bool {
+        self.read().await.get_request().is_connect()
+    }
+
+    /// Checks if the request method is TRACE.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the method is TRACE.
+    pub async fn is_request_trace(&self) -> bool {
+        self.read().await.get_request().is_trace()
+    }
+
+    /// Checks if the request method is unknown.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the method is unknown.
+    pub async fn is_request_unknown_method(&self) -> bool {
+        self.read().await.get_request().is_unknown_method()
+    }
+
+    /// Checks if the connection should be kept alive based on request headers.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the Connection header suggests keeping the connection alive, otherwise false.
+    pub async fn is_request_enable_keep_alive(&self) -> bool {
+        self.read().await.get_request().is_enable_keep_alive()
+    }
+
+    /// Checks if keep-alive should be disabled for the request.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if keep-alive should be disabled.
+    pub async fn is_request_disable_keep_alive(&self) -> bool {
+        self.read().await.get_request().is_disable_keep_alive()
+    }
+
     /// Retrieves the current HTTP response.
     ///
     /// # Returns
@@ -1129,15 +1345,6 @@ impl Context {
     /// - `bool` - True if the connection is both aborted and closed, otherwise false.
     pub async fn is_terminated(&self) -> bool {
         self.get_aborted().await || self.get_closed().await
-    }
-
-    /// Checks if the connection should be kept alive based on request headers.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the Connection header suggests keeping the connection alive, otherwise false.
-    pub async fn is_enable_keep_alive(&self) -> bool {
-        self.get_request().await.is_enable_keep_alive()
     }
 
     /// Handles the WebSocket upgrade handshake and sends the appropriate response.
