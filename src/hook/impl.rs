@@ -95,9 +95,7 @@ impl HookType {
         match *self {
             HookType::RequestMiddleware(order)
             | HookType::ResponseMiddleware(order)
-            | HookType::PanicHook(order)
-            | HookType::ConnectedHook(order)
-            | HookType::PreUpgradeHook(order) => order,
+            | HookType::PanicHook(order) => order,
             _ => None,
         }
     }

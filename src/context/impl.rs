@@ -1349,38 +1349,6 @@ impl Context {
         self.get_aborted().await || self.get_closed().await
     }
 
-    /// Handles the WebSocket upgrade handshake and sends the appropriate response.
-    ///
-    /// This method constructs and sends the WebSocket handshake response if the
-    /// request is a valid upgrade request.
-    ///
-    /// # Returns
-    ///
-    /// - `ResponseResult` - The outcome of the handshake operation.
-    pub async fn upgrade_to_ws(&self) -> ResponseResult {
-        if let Some(key) = &self.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
-            let accept_key: String = WebSocketFrame::generate_accept_key(key);
-            let result: ResponseResult = self
-                .set_response_version(HttpVersion::HTTP1_1)
-                .await
-                .set_response_status_code(101)
-                .await
-                .set_response_header(UPGRADE, WEBSOCKET)
-                .await
-                .set_response_header(CONNECTION, UPGRADE)
-                .await
-                .set_response_header(SEC_WEBSOCKET_ACCEPT, accept_key)
-                .await
-                .send()
-                .await;
-            return result;
-        }
-        Err(ResponseError::WebSocketHandShake(format!(
-            "missing {} header",
-            SEC_WEBSOCKET_KEY
-        )))
-    }
-
     /// Reads an HTTP request from the underlying stream.
     ///
     /// # Arguments

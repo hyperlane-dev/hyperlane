@@ -17,16 +17,11 @@ pub(crate) struct ServerConfigInner {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) port: usize,
-    /// The buffer size for WebSocket connections.
-    #[get(pub(crate))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) ws_buffer: usize,
     /// The buffer size for HTTP connections.
     #[get(pub(crate))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) http_buffer: usize,
+    pub(super) buffer: usize,
     /// The `TCP_NODELAY` option for sockets.
     #[get(pub(crate))]
     #[get_mut(pub(super))]

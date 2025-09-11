@@ -440,63 +440,6 @@ impl RouteMatcher {
         Ok(())
     }
 
-    /// Removes a route from the matcher based on its pattern.
-    ///
-    /// # Arguments
-    ///
-    /// - `&str` - The pattern of the route to remove.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - true if route was removed, false otherwise.
-    pub(crate) fn remove(&mut self, pattern: &str) -> bool {
-        if let Ok(route_pattern) = RoutePattern::new(pattern) {
-            if route_pattern.is_static() {
-                return self.get_mut_static_routes().remove(pattern).is_some();
-            }
-            let target_vec: &mut VecRoutePatternArcFnPinBoxSendSync = if route_pattern.is_dynamic()
-            {
-                self.get_mut_dynamic_routes()
-            } else {
-                self.get_mut_regex_routes()
-            };
-            if let Some(pos) = target_vec
-                .iter()
-                .position(|(tmp_pattern, _)| tmp_pattern == &route_pattern)
-            {
-                target_vec.remove(pos);
-                return true;
-            }
-        }
-        false
-    }
-
-    /// Checks if a path matches any registered routes.
-    ///
-    /// # Arguments
-    ///
-    /// - `&str` - The request path to check.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - true if matching route found, false otherwise.
-    pub(crate) fn match_route(&self, path: &str) -> bool {
-        if self.get_static_routes().contains_key(path) {
-            return true;
-        }
-        for (pattern, _) in self.get_dynamic_routes().iter() {
-            if pattern.try_match_path(path).is_some() {
-                return true;
-            }
-        }
-        for (pattern, _) in self.get_regex_routes().iter() {
-            if pattern.try_match_path(path).is_some() {
-                return true;
-            }
-        }
-        false
-    }
-
     /// Finds the handler for a path by matching against registered routes.
     ///
     /// # Arguments

@@ -10,14 +10,10 @@ impl Default for ServerInner {
     fn default() -> Self {
         Self {
             config: ServerConfigInner::default(),
-            route: RouteMatcher::new(),
-            request_middleware: vec![],
-            response_middleware: vec![],
-            prologue_upgrade_hook: vec![],
-            connected_hook: vec![],
-            disable_http_hook: RouteMatcher::new(),
-            disable_ws_hook: RouteMatcher::new(),
             panic_hook: vec![],
+            request_middleware: vec![],
+            route: RouteMatcher::new(),
+            response_middleware: vec![],
         }
     }
 }
@@ -38,13 +34,9 @@ impl PartialEq for ServerInner {
     fn eq(&self, other: &Self) -> bool {
         self.config == other.config
             && self.route == other.route
-            && self.disable_http_hook == other.disable_http_hook
-            && self.disable_ws_hook == other.disable_ws_hook
             && self.request_middleware.len() == other.request_middleware.len()
             && self.response_middleware.len() == other.response_middleware.len()
             && self.panic_hook.len() == other.panic_hook.len()
-            && self.connected_hook.len() == other.connected_hook.len()
-            && self.prologue_upgrade_hook.len() == other.prologue_upgrade_hook.len()
             && self
                 .request_middleware
                 .iter()
@@ -54,16 +46,6 @@ impl PartialEq for ServerInner {
                 .response_middleware
                 .iter()
                 .zip(other.response_middleware.iter())
-                .all(|(a, b)| Arc::ptr_eq(a, b))
-            && self
-                .prologue_upgrade_hook
-                .iter()
-                .zip(other.prologue_upgrade_hook.iter())
-                .all(|(a, b)| Arc::ptr_eq(a, b))
-            && self
-                .connected_hook
-                .iter()
-                .zip(other.connected_hook.iter())
                 .all(|(a, b)| Arc::ptr_eq(a, b))
             && self
                 .panic_hook
@@ -112,19 +94,24 @@ impl Eq for Server {}
 ///
 /// This struct provides a convenient way to pass around the necessary components
 /// for processing a request or WebSocket frame.
-impl<'a> HandlerState<'a> {
+impl<'a> HandlerState {
     /// Creates a new HandlerState instance.
     ///
     /// # Arguments
     ///
     /// - `&'a ArcRwLockStream` - The network stream.
     /// - `&'a Context` - The request context.
+    /// - `usize` - The buffer size for reading HTTP requests.
     ///
     /// # Returns
     ///
     /// - `Self` - The newly created handler state.
-    pub(super) fn new(stream: &'a ArcRwLockStream, ctx: &'a Context) -> Self {
-        Self { stream, ctx }
+    pub(super) fn new(stream: ArcRwLockStream, ctx: Context, buffer: usize) -> Self {
+        Self {
+            stream,
+            ctx,
+            buffer,
+        }
     }
 }
 
@@ -190,18 +177,6 @@ impl Server {
         match hook.hook_type {
             HookType::PanicHook(_) => {
                 self.panic_hook(hook.handler).await;
-            }
-            HookType::DisableHttpHook(path) => {
-                self.disable_http_hook(path).await;
-            }
-            HookType::DisableWsHook(path) => {
-                self.disable_ws_hook(path).await;
-            }
-            HookType::ConnectedHook(_) => {
-                self.connected_hook(hook.handler).await;
-            }
-            HookType::PreUpgradeHook(_) => {
-                self.prologue_upgrade_hook(hook.handler).await;
             }
             HookType::RequestMiddleware(_) => {
                 self.request_middleware(hook.handler).await;
@@ -337,150 +312,6 @@ impl Server {
             .get_mut_response_middleware()
             .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
         self
-    }
-
-    /// Adds a hook executed before WebSocket connection upgrade.
-    ///
-    /// # Arguments
-    ///
-    /// - `F: FnContextSendSyncStatic<Fut, ()>` - The hook function.
-    /// - `Fut: FutureSendStatic<()>` - The future returned by the hook.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn prologue_upgrade_hook<F, Fut>(&self, func: F) -> &Self
-    where
-        F: FnContextSendSyncStatic<Fut, ()>,
-        Fut: FutureSendStatic<()>,
-    {
-        self.write()
-            .await
-            .get_mut_prologue_upgrade_hook()
-            .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
-        self
-    }
-
-    /// Adds a hook executed after new client connection is established.
-    ///
-    /// # Arguments
-    ///
-    /// - `F: FnContextSendSyncStatic<Fut, ()>` - The hook function.
-    /// - `Fut: FutureSendStatic<()>` - The future returned by the hook.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn connected_hook<F, Fut>(&self, func: F) -> &Self
-    where
-        F: FnContextSendSyncStatic<Fut, ()>,
-        Fut: FutureSendStatic<()>,
-    {
-        self.write()
-            .await
-            .get_mut_connected_hook()
-            .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
-        self
-    }
-
-    /// Re-enables default HTTP handling for a route.
-    ///
-    /// # Arguments
-    ///
-    /// - `R: ToString` - The route path.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn enable_http_hook<R: ToString>(&self, route: R) -> &Self {
-        let route_string: String = route.to_string();
-        self.write()
-            .await
-            .get_mut_disable_http_hook()
-            .remove(&route_string);
-        self
-    }
-
-    /// Disables default HTTP handling for a route.
-    ///
-    /// # Arguments
-    ///
-    /// - `R: ToString` - The route path.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn disable_http_hook<R: ToString>(&self, route: R) -> &Self {
-        let route_string: String = route.to_string();
-        let _ = self
-            .write()
-            .await
-            .get_mut_disable_http_hook()
-            .add(&route_string, Arc::new(|_: Context| Box::pin(async {})));
-        self
-    }
-
-    /// Re-enables default WebSocket handling for a route.
-    ///
-    /// # Arguments
-    ///
-    /// - `R: ToString` - The route path.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn enable_ws_hook<R: ToString>(&self, route: R) -> &Self {
-        let route_string: String = route.to_string();
-        self.write()
-            .await
-            .get_mut_disable_ws_hook()
-            .remove(&route_string);
-        self
-    }
-
-    /// Disables default WebSocket handling for a route.
-    ///
-    /// # Arguments
-    ///
-    /// - `R: ToString` - The route path.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn disable_ws_hook<R: ToString>(&self, route: R) -> &Self {
-        let route_string: String = route.to_string();
-        let _ = self
-            .write()
-            .await
-            .get_mut_disable_ws_hook()
-            .add(&route_string, Arc::new(|_: Context| Box::pin(async {})));
-        self
-    }
-
-    /// Checks if default HTTP handling is disabled for a route.
-    ///
-    /// # Arguments
-    ///
-    /// - `&str` - The route path.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if HTTP handling is disabled.
-    async fn contains_disable_http_hook(&self, route: &str) -> bool {
-        self.read().await.get_disable_http_hook().match_route(route)
-    }
-
-    /// Checks if default WebSocket handling is disabled for a route.
-    ///
-    /// # Arguments
-    ///
-    /// - `&str` - The route path.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if WebSocket handling is disabled.
-    async fn contains_disable_ws_hook(&self, route: &str) -> bool {
-        self.read().await.get_disable_ws_hook().match_route(route)
     }
 
     /// Formats the host and port into a bindable address string.
@@ -624,9 +455,9 @@ impl Server {
     /// - `ArcRwLockStream` - The thread-safe stream representing the client connection.
     async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
         let server: Server = self.clone();
-        let http_buffer: usize = *self.read().await.get_config().get_http_buffer();
+        let buffer: usize = *self.read().await.get_config().get_buffer();
         spawn(async move {
-            server.handle_connection(stream, http_buffer).await;
+            server.handle_connection(stream, buffer).await;
         });
     }
 
@@ -638,58 +469,12 @@ impl Server {
     ///
     /// - `ArcRwLockStream` - The stream for the client connection.
     /// - `usize` - The buffer size to use for reading the initial HTTP request.
-    async fn handle_connection(&self, stream: ArcRwLockStream, http_buffer: usize) {
-        if let Ok(mut request) = Request::http_from_stream(&stream, http_buffer).await {
+    async fn handle_connection(&self, stream: ArcRwLockStream, buffer: usize) {
+        if let Ok(request) = Request::http_from_stream(&stream, buffer).await {
             let ctx: Context = Context::create_context(&stream, &request);
-            let handler: HandlerState = HandlerState::new(&stream, &ctx);
-            if request.is_ws() {
-                self.ws_hook(&handler, &mut request).await;
-            } else {
-                self.http_hook(&handler, &request).await;
-            }
+            let handler: HandlerState = HandlerState::new(stream, ctx, buffer);
+            self.handle_http_requests(&handler, &request).await;
         }
-    }
-
-    /// Executes all registered pre-upgrade hooks for a WebSocket connection.
-    ///
-    /// # Arguments
-    ///
-    /// - `&Context` - The request context.
-    /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    async fn run_prologue_upgrade_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) -> bool {
-        for func in self.read().await.get_prologue_upgrade_hook().iter() {
-            self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| func(ctx))
-                .await;
-            if lifecycle.is_abort() {
-                return true;
-            }
-        }
-        false
-    }
-
-    /// Executes all registered `connected` hooks.
-    ///
-    /// # Arguments
-    ///
-    /// - `&Context` - The request context.
-    /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    async fn run_connected_hook(&self, ctx: &Context, lifecycle: &mut Lifecycle) -> bool {
-        for func in self.read().await.get_connected_hook().iter() {
-            self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| func(ctx))
-                .await;
-            if lifecycle.is_abort() {
-                return true;
-            }
-        }
-        false
     }
 
     /// Executes all registered request middleware in sequence.
@@ -765,17 +550,17 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `&HandlerState<'a>` - The `HandlerState` for the current connection.
+    /// - `&HandlerState` - The `HandlerState` for the current connection.
     /// - `&Request` - The incoming request to be processed.
     ///
     /// # Returns
     ///
     /// - `bool` - A boolean indicating whether the connection should be kept alive.
-    async fn request_hook<'a>(&self, state: &HandlerState<'a>, request: &Request) -> bool {
+    async fn request_hook<'a>(&self, state: &HandlerState, request: &Request) -> bool {
         let route: &str = request.get_path();
-        let ctx: &Context = state.ctx;
+        let ctx: &Context = state.get_ctx();
         ctx.set_request(request).await;
-        let mut lifecycle: Lifecycle = Lifecycle::new_continue(request.is_enable_keep_alive());
+        let mut lifecycle: Lifecycle = Lifecycle::new(request.is_enable_keep_alive());
         let route_hook: OptionArcFnContextPinBoxSendSync<()> = self
             .read()
             .await
@@ -796,95 +581,19 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `&HandlerState<'a>` - The `HandlerState` for the current connection.
+    /// - `&HandlerState` - The `HandlerState` for the current connection.
     /// - `&Request` - The initial request that established the keep-alive connection.
-    async fn handle_http_requests<'a>(&self, state: &HandlerState<'a>, request: &Request) {
-        let route: &str = request.get_path();
-        let contains_disable_http_hook: bool = self.contains_disable_http_hook(route).await;
-        let buffer: usize = *self.read().await.get_config().get_http_buffer();
-        if contains_disable_http_hook {
-            while self.request_hook(state, request).await {}
+    async fn handle_http_requests<'a>(&self, state: &HandlerState, request: &Request) {
+        if self.request_hook(state, request).await {
             return;
         }
-        while let Ok(new_request) = &Request::http_from_stream(state.stream, buffer).await {
+        let stream: &ArcRwLockStream = state.get_stream();
+        let buffer: usize = *state.get_buffer();
+        while let Ok(new_request) = &Request::http_from_stream(stream, buffer).await {
             if !self.request_hook(state, new_request).await {
                 return;
             }
         }
-    }
-
-    /// The main entry point for handling an HTTP connection.
-    ///
-    /// It runs connected hooks and then enters the request handling loop.
-    ///
-    /// # Arguments
-    ///
-    /// - `&HandlerState<'a>` - The `HandlerState` for the current connection.
-    /// - `&Request` - The initial HTTP request from the client.
-    async fn http_hook<'a>(&self, state: &HandlerState<'a>, request: &Request) {
-        let ctx: &Context = state.ctx;
-        let mut lifecycle: Lifecycle = Lifecycle::new();
-        if self.run_connected_hook(ctx, &mut lifecycle).await {
-            return;
-        }
-        if !self.request_hook(state, request).await {
-            return;
-        }
-        self.handle_http_requests(state, request).await;
-    }
-
-    /// Handles the stream of incoming WebSocket frames after a connection is established.
-    ///
-    /// # Arguments
-    ///
-    /// - `&HandlerState<'a>` - The `HandlerState` for the current connection.
-    /// - `&mut Request` - The mutable request object, which will be updated with each new frame.
-    /// - `&str` - The route path that the WebSocket connection was established on.
-    async fn handle_ws_requests<'a>(
-        &self,
-        state: &HandlerState<'a>,
-        request: &mut Request,
-        route: &str,
-    ) {
-        let disable_ws_hook_contains: bool = self.contains_disable_ws_hook(route).await;
-        let buffer: usize = *self.read().await.get_config().get_ws_buffer();
-        if disable_ws_hook_contains {
-            while self.request_hook(state, request).await {}
-            return;
-        }
-        while let Ok(new_request) = &Request::ws_from_stream(state.stream, buffer, request).await {
-            let _ = self.request_hook(state, new_request).await;
-        }
-    }
-
-    /// The main entry point for handling a WebSocket connection.
-    ///
-    /// This function manages the upgrade process, runs pre-upgrade and connected hooks,
-    /// and then enters the WebSocket frame handling loop.
-    ///
-    /// # Arguments
-    ///
-    /// - `&HandlerState<'a>` - The `HandlerState` for the current connection.
-    /// - `&mut Request` - The mutable HTTP request that initiated the WebSocket upgrade.
-    async fn ws_hook<'a>(&self, state: &HandlerState<'a>, request: &mut Request) {
-        let route: String = request.get_path().clone();
-        let ctx: &Context = state.ctx;
-        let mut lifecycle: Lifecycle = Lifecycle::new();
-        self.read()
-            .await
-            .get_route()
-            .try_resolve_route(ctx, &route)
-            .await;
-        if self.run_prologue_upgrade_hook(ctx, &mut lifecycle).await {
-            return;
-        }
-        if ctx.upgrade_to_ws().await.is_err() {
-            return;
-        }
-        if self.run_connected_hook(ctx, &mut lifecycle).await {
-            return;
-        }
-        self.handle_ws_requests(state, request, &route).await;
     }
 
     /// Starts the server, binds to the configured address, and begins listening for connections.

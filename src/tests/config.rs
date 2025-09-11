@@ -5,9 +5,8 @@ async fn config_from_str() {
     let config_str: &'static str = r#"
         {
             "host": "0.0.0.0",
-            "port": 80,
-            "ws_buffer": 4096,
-            "http_buffer": 4096,
+            "port": 80,           
+            "buffer": 4096,
             "nodelay": true,
             "linger": { "secs": 64, "nanos": 0 },
             "ttl": 64
@@ -17,8 +16,7 @@ async fn config_from_str() {
     let new_config: ServerConfig = ServerConfig::new().await;
     new_config.host("0.0.0.0").await;
     new_config.port(80).await;
-    new_config.ws_buffer(4096).await;
-    new_config.http_buffer(4096).await;
+    new_config.buffer(4096).await;
     new_config.enable_nodelay().await;
     new_config.linger(std::time::Duration::from_secs(64)).await;
     new_config.ttl(64).await;

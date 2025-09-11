@@ -13,8 +13,7 @@ impl Default for ServerConfigInner {
         Self {
             host: DEFAULT_HOST.to_owned(),
             port: DEFAULT_WEB_PORT,
-            ws_buffer: DEFAULT_BUFFER_SIZE,
-            http_buffer: DEFAULT_BUFFER_SIZE,
+            buffer: DEFAULT_BUFFER_SIZE,
             nodelay: DEFAULT_NODELAY,
             linger: DEFAULT_LINGER,
             ttl: DEFAULT_TTI,
@@ -138,20 +137,6 @@ impl ServerConfig {
         self
     }
 
-    /// Sets the WebSocket buffer size.
-    ///
-    /// # Arguments
-    ///
-    /// - `usize`: The WebSocket buffer size to set.
-    ///
-    /// # Returns
-    ///
-    /// A reference to `Self` for method chaining.
-    pub async fn ws_buffer(&self, ws_buffer: usize) -> &Self {
-        self.write().await.set_ws_buffer(ws_buffer);
-        self
-    }
-
     /// Sets the HTTP buffer size.
     ///
     /// # Arguments
@@ -161,8 +146,8 @@ impl ServerConfig {
     /// # Returns
     ///
     /// A reference to `Self` for method chaining.
-    pub async fn http_buffer(&self, http_buffer: usize) -> &Self {
-        self.write().await.set_http_buffer(http_buffer);
+    pub async fn buffer(&self, buffer: usize) -> &Self {
+        self.write().await.set_buffer(buffer);
         self
     }
 

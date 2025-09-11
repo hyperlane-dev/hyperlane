@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "8.1.6"
+version = "9.0.0"
 readme = "README.md"
 edition = "2024"
 authors = ["root@ltpp.vip"]

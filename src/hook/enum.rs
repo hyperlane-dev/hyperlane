@@ -12,22 +12,6 @@ pub enum HookType {
     ///
     /// - `Option<isize>`: Optional priority of the panic hook. `None` means default.
     PanicHook(Option<isize>),
-    /// Disables the default HTTP handler for a specific route.
-    ///
-    /// - `&'static str`: The route path for which the HTTP handler is disabled.
-    DisableHttpHook(&'static str),
-    /// Disables the default WebSocket handler for a specific route.
-    ///
-    /// - `&'static str`: The route path for which the WebSocket handler is disabled.
-    DisableWsHook(&'static str),
-    /// Triggered when a client successfully establishes a connection.
-    ///
-    /// - `Option<isize>`: Optional priority of the connected hook.
-    ConnectedHook(Option<isize>),
-    /// Triggered before a protocol upgrade.
-    ///
-    /// - `Option<isize>`: Optional priority of the pre-upgrade hook.
-    PreUpgradeHook(Option<isize>),
     /// Executed before a request reaches its designated route handler.
     ///
     /// - `Option<isize>`: Optional priority of the request middleware.

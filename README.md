@@ -40,14 +40,6 @@ git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
 ```rust
 use hyperlane::*;
 
-async fn connected_hook(ctx: Context) {
-    if !ctx.get_request().await.is_ws() {
-        return;
-    }
-    let socket_addr: String = ctx.get_socket_addr_string().await;
-    let _ = ctx.set_response_body(socket_addr).await.send_body().await;
-}
-
 async fn request_middleware(ctx: Context) {
     let socket_addr: String = ctx.get_socket_addr_string().await;
     ctx.set_response_version(HttpVersion::HTTP1_1)
@@ -64,6 +56,26 @@ async fn request_middleware(ctx: Context) {
         .await;
 }
 
+async fn upgrade_hook(ctx: Context) {
+    if !ctx.get_request().await.is_ws() {
+        return;
+    }
+    if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
+        let accept_key: String = WebSocketFrame::generate_accept_key(key);
+        ctx.set_response_status_code(101)
+            .await
+            .set_response_header(UPGRADE, WEBSOCKET)
+            .await
+            .set_response_header(CONNECTION, UPGRADE)
+            .await
+            .set_response_header(SEC_WEBSOCKET_ACCEPT, accept_key)
+            .await
+            .send()
+            .await
+            .unwrap();
+    }
+}
+
 async fn response_middleware(ctx: Context) {
     if ctx.get_request().await.is_ws() {
         return;
@@ -76,9 +88,7 @@ async fn root_route(ctx: Context) {
     let response_body: String = format!("Hello hyperlane => {}", path);
     let cookie1: String = CookieBuilder::new("key1", "value1").http_only().build();
     let cookie2: String = CookieBuilder::new("key2", "value2").http_only().build();
-    ctx.set_response_status_code(200)
-        .await
-        .set_response_header(SET_COOKIE, cookie1)
+    ctx.set_response_header(SET_COOKIE, cookie1)
         .await
         .set_response_header(SET_COOKIE, cookie2)
         .await
@@ -91,9 +101,19 @@ async fn ws_route(ctx: Context) {
         .try_get_request_header_back(SEC_WEBSOCKET_KEY)
         .await
         .unwrap_or_default();
-    let request_body: Vec<u8> = ctx.get_request_body().await;
-    let _ = ctx.set_response_body(key).await.send_body().await;
-    let _ = ctx.set_response_body(request_body).await.send_body().await;
+    while ctx.ws_from_stream(1000).await.is_ok() {
+        let request_body: Vec<u8> = ctx.get_request_body().await;
+        ctx.set_response_body(key.clone())
+            .await
+            .send_body()
+            .await
+            .unwrap();
+        ctx.set_response_body(request_body)
+            .await
+            .send_body()
+            .await
+            .unwrap();
+    }
 }
 
 async fn sse_route(ctx: Context) {
@@ -124,8 +144,6 @@ async fn panic_hook(ctx: Context) {
     let _ = std::io::Write::flush(&mut std::io::stderr());
     let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
     let _ = ctx
-        .set_response_version(HttpVersion::HTTP1_1)
-        .await
         .set_response_status_code(500)
         .await
         .clear_response_headers()
@@ -146,13 +164,11 @@ async fn main() {
     config.host("0.0.0.0").await;
     config.port(60000).await;
     config.enable_nodelay().await;
-    config.http_buffer(4096).await;
-    config.ws_buffer(4096).await;
+    config.buffer(4096).await;
     let server: Server = Server::from(config).await;
     server.panic_hook(panic_hook).await;
-    server.connected_hook(connected_hook).await;
-    server.prologue_upgrade_hook(request_middleware).await;
     server.request_middleware(request_middleware).await;
+    server.request_middleware(upgrade_hook).await;
     server.response_middleware(response_middleware).await;
     server.route("/", root_route).await;
     server.route("/ws", ws_route).await;

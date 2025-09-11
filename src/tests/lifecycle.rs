@@ -2,25 +2,15 @@ use crate::*;
 
 #[tokio::test]
 async fn test_lifecycle_new() {
-    let lifecycle: Lifecycle = Lifecycle::new();
+    let lifecycle: Lifecycle = Lifecycle::new(true);
     assert_eq!(lifecycle, Lifecycle::Continue(true));
     assert!(lifecycle.is_keep_alive());
     assert!(!lifecycle.is_abort());
 }
 
 #[tokio::test]
-async fn test_lifecycle_new_continue() {
-    let lifecycle_keep_alive: Lifecycle = Lifecycle::new_continue(true);
-    assert_eq!(lifecycle_keep_alive, Lifecycle::Continue(true));
-    assert!(lifecycle_keep_alive.is_keep_alive());
-    let lifecycle_close: Lifecycle = Lifecycle::new_continue(false);
-    assert_eq!(lifecycle_close, Lifecycle::Continue(false));
-    assert!(!lifecycle_close.is_keep_alive());
-}
-
-#[tokio::test]
 async fn test_lifecycle_update_status() {
-    let mut lifecycle: Lifecycle = Lifecycle::new();
+    let mut lifecycle: Lifecycle = Lifecycle::new(true);
     lifecycle.update_status(true, true);
     assert_eq!(lifecycle, Lifecycle::Abort(true));
     assert!(lifecycle.is_abort());

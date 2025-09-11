@@ -5,14 +5,17 @@ use crate::*;
 /// This struct encapsulates the necessary context for processing a connection,
 /// including a reference to the network stream and the request context. It is created
 /// for each connection and passed to the relevant handlers.
-#[derive(Clone, CustomDebug, DisplayDebug)]
-pub(crate) struct HandlerState<'a> {
+#[derive(Clone, CustomDebug, DisplayDebug, Getter)]
+pub(crate) struct HandlerState {
     /// A reference to the underlying network stream for the connection.
     /// This provides access to the raw TCP stream for reading and writing data.
-    pub(super) stream: &'a ArcRwLockStream,
+    pub(super) stream: ArcRwLockStream,
     /// A reference to the context of the current request.
     /// This contains request-specific information, such as headers, method, and URI.
-    pub(super) ctx: &'a Context,
+    pub(super) ctx: Context,
+    /// The size of the buffer used for reading HTTP requests.
+    /// This is used to determine the maximum size of the request body.
+    pub(super) buffer: usize,
 }
 
 /// Represents the internal, mutable state of the web server.
@@ -47,29 +50,6 @@ pub(crate) struct ServerInner {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) response_middleware: VecArcFnContextPinBoxSendSync<()>,
-    /// A collection of hooks that are executed before a connection is upgraded to WebSocket.
-    /// This allows for custom logic, such as authentication, to be performed.
-    #[debug(skip)]
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) prologue_upgrade_hook: VecArcFnContextPinBoxSendSync<()>,
-    /// A collection of hooks that are executed immediately after a new client connection is established.
-    #[debug(skip)]
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) connected_hook: VecArcFnContextPinBoxSendSync<()>,
-    /// A route matcher used to specify routes for which the default HTTP hook should be disabled.
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) disable_http_hook: RouteMatcher,
-    /// A route matcher used to specify routes for which the default WebSocket hook should be disabled.
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) disable_ws_hook: RouteMatcher,
     /// A custom error handler that is invoked when a panic occurs during request processing.
     /// This allows for graceful error recovery and customized error responses.
     #[debug(skip)]

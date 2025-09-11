@@ -2,15 +2,6 @@ use super::*;
 
 /// Implementation of methods for the `Lifecycle` enum.
 impl Lifecycle {
-    /// Creates a new Lifecycle instance with default continue and keep-alive state.
-    ///
-    /// # Returns
-    ///
-    /// - `Lifecycle` - A new Lifecycle::Continue(true) instance.
-    pub(crate) fn new() -> Self {
-        Self::Continue(true)
-    }
-
     /// Creates a new Lifecycle instance with Continue state.
     ///
     /// # Arguments
@@ -20,7 +11,7 @@ impl Lifecycle {
     /// # Returns
     ///
     /// - `Lifecycle` - A new Lifecycle::Continue instance.
-    pub(crate) fn new_continue(keep_alive: bool) -> Self {
+    pub(crate) fn new(keep_alive: bool) -> Self {
         Self::Continue(keep_alive)
     }
 
