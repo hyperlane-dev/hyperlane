@@ -425,7 +425,8 @@ impl RouteMatcher {
                 .insert(pattern.to_string(), handler);
             return Ok(());
         }
-        let target_vec: &mut VecRoutePatternArcFnPinBoxSendSync = if route_pattern.is_dynamic() {
+        let target_vec: &mut VecRoutePatternArcFnPinBoxSendSync<()> = if route_pattern.is_dynamic()
+        {
             self.get_mut_dynamic_routes()
         } else {
             self.get_mut_regex_routes()
