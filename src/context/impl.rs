@@ -1278,12 +1278,12 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `InternalAttributeKey` - The internal attribute key to retrieve.
+    /// - `InternalAttribute` - The internal attribute key to retrieve.
     ///
     /// # Returns
     ///
     /// - `Option<V>` - The attribute's value if it exists and can be cast to the specified type.
-    async fn try_get_internal_attribute<V>(&self, key: InternalAttributeKey) -> Option<V>
+    async fn try_get_internal_attribute<V>(&self, key: InternalAttribute) -> Option<V>
     where
         V: AnySendSyncClone,
     {
@@ -1299,13 +1299,13 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `InternalAttributeKey` - The internal attribute key to set.
+    /// - `InternalAttribute` - The internal attribute key to set.
     /// - `V` - The value of the attribute.
     ///
     /// # Returns
     ///
     /// - `&Self` - A reference to the modified context.
-    async fn set_internal_attribute<V>(&self, key: InternalAttributeKey, value: V) -> &Self
+    async fn set_internal_attribute<V>(&self, key: InternalAttribute, value: V) -> &Self
     where
         V: AnySendSyncClone,
     {
@@ -1322,7 +1322,7 @@ impl Context {
     ///
     /// - `OptionPanic` - The panic information if a panic was caught.
     pub async fn try_get_panic(&self) -> OptionPanic {
-        self.try_get_internal_attribute(InternalAttributeKey::Panic)
+        self.try_get_internal_attribute(InternalAttribute::Panic)
             .await
     }
 
@@ -1336,7 +1336,69 @@ impl Context {
     ///
     /// - `&Self` - A reference to the modified context.
     pub(crate) async fn set_panic(&self, panic: Panic) -> &Self {
-        self.set_internal_attribute(InternalAttributeKey::Panic, panic)
+        self.set_internal_attribute(InternalAttribute::Panic, panic)
+            .await
+    }
+
+    /// Sets the send body function for the context.
+    ///
+    /// # Arguments
+    ///
+    /// - `F` - The send body function to store.
+    ///
+    /// # Returns
+    ///
+    /// - `&Self` - A reference to the modified context.
+    pub async fn set_send_body_hook<F, Fut>(&self, send_body_hook: F) -> &Self
+    where
+        F: FnContextSendSyncStatic<Fut, ()>,
+        Fut: FutureSendStatic<()>,
+    {
+        self.set_internal_attribute(
+            InternalAttribute::SendBodyHook,
+            Arc::new(move |ctx: Context| Box::pin(send_body_hook(ctx))),
+        )
+        .await
+    }
+
+    /// Retrieves the send body function if it has been set.
+    ///
+    /// # Returns
+    ///
+    /// - `OptionArcFnContextPinBoxSendSync<()>` - The send body function if it has been set.
+    pub async fn try_get_send_body_hook(&self) -> OptionArcFnContextPinBoxSendSync<()> {
+        self.try_get_internal_attribute(InternalAttribute::SendBodyHook)
+            .await
+    }
+
+    /// Sets the send function for the context.
+    ///
+    /// # Arguments
+    ///
+    /// - `F` - The send function to store.
+    ///
+    /// # Returns
+    ///
+    /// - `&Self` - A reference to the modified context.
+    pub async fn set_send_hook<F, Fut>(&self, send_hook: F) -> &Self
+    where
+        F: FnContextSendSyncStatic<Fut, ()>,
+        Fut: FutureSendStatic<()>,
+    {
+        self.set_internal_attribute(
+            InternalAttribute::SendHook,
+            Arc::new(move |ctx: Context| Box::pin(send_hook(ctx))),
+        )
+        .await
+    }
+
+    /// Retrieves the send function if it has been set.
+    ///
+    /// # Returns
+    ///
+    /// - `OptionArcFnContextPinBoxSendSync<()>` - The send function if it has been set.
+    pub async fn try_get_send_hook(&self) -> OptionArcFnContextPinBoxSendSync<()> {
+        self.try_get_internal_attribute(InternalAttribute::SendHook)
             .await
     }
 
@@ -1425,7 +1487,7 @@ impl Context {
         }
         if let Some(stream) = self.try_get_stream().await {
             let response_res: ResponseData = self.write().await.get_mut_response().build();
-            return stream.send(&response_res).await;
+            return stream.send(response_res).await;
         }
         Err(ResponseError::NotFoundStream)
     }
@@ -1455,9 +1517,8 @@ impl Context {
             return Err(ResponseError::Terminated);
         }
         if let Some(stream) = self.try_get_stream().await {
-            let is_ws: bool = self.get_request_upgrade_type().await.is_ws();
             let response_body: ResponseBody = self.get_response_body().await;
-            return stream.send_body_conditional(&response_body, is_ws).await;
+            return stream.send_body(response_body).await;
         }
         Err(ResponseError::NotFoundStream)
     }

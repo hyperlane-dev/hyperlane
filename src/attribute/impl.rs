@@ -33,17 +33,17 @@ impl From<String> for AttributeKey {
 }
 
 /// Implementation of `From` trait for `AttributeKey`.
-impl From<InternalAttributeKey> for AttributeKey {
-    /// Converts an `InternalAttributeKey` into an `AttributeKey`.
+impl From<InternalAttribute> for AttributeKey {
+    /// Converts an `InternalAttribute` into an `AttributeKey`.
     ///
     /// # Arguments
     ///
-    /// - `InternalAttributeKey` - The internal attribute key to convert.
+    /// - `InternalAttribute` - The internal attribute key to convert.
     ///
     /// # Returns
     ///
     /// - `AttributeKey` - The converted attribute key.
-    fn from(key: InternalAttributeKey) -> Self {
+    fn from(key: InternalAttribute) -> Self {
         AttributeKey::Internal(key)
     }
 }

@@ -18,7 +18,19 @@ async fn server_inner_partial_eq() {
 
 #[tokio::test]
 async fn server() {
+    async fn send_body_hook(ctx: Context) {
+        let body: ResponseBody = ctx.get_request_body().await;
+        if ctx.get_request().await.is_ws() {
+            for body in WebSocketFrame::create_response_frame_list(&body) {
+                ctx.set_response_body(body).await.send_body().await.unwrap();
+            }
+        } else {
+            ctx.send_body().await.unwrap();
+        }
+    }
+
     async fn request_middleware(ctx: Context) {
+        ctx.set_send_body_hook(send_body_hook).await;
         let socket_addr: String = ctx.get_socket_addr_string().await;
         ctx.set_response_version(HttpVersion::HTTP1_1)
             .await
@@ -75,22 +87,12 @@ async fn server() {
     }
 
     async fn ws_route(ctx: Context) {
-        let key: RequestHeadersValueItem = ctx
-            .try_get_request_header_back(SEC_WEBSOCKET_KEY)
-            .await
-            .unwrap_or_default();
         while ctx.ws_from_stream(1000).await.is_ok() {
             let request_body: Vec<u8> = ctx.get_request_body().await;
-            ctx.set_response_body(key.clone())
-                .await
-                .send_body()
-                .await
-                .unwrap();
-            ctx.set_response_body(request_body)
-                .await
-                .send_body()
-                .await
-                .unwrap();
+            ctx.set_response_body(request_body).await;
+            if let Some(send_body_hook) = ctx.try_get_send_body_hook().await {
+                send_body_hook(ctx.clone()).await;
+            }
         }
     }
 
@@ -118,8 +120,6 @@ async fn server() {
     async fn panic_hook(ctx: Context) {
         let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
         let response_body: String = error.to_string();
-        eprintln!("{}", response_body);
-        let _ = std::io::Write::flush(&mut std::io::stderr());
         let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
         let _ = ctx
             .set_response_status_code(500)
