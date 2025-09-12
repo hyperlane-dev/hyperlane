@@ -1365,7 +1365,7 @@ impl Context {
     {
         self.set_internal_attribute(
             InternalAttribute::SendHook,
-            Arc::new(move |ctx: Context| Box::pin(send_hook(ctx))),
+            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(send_hook(ctx)) }),
         )
         .await
     }
@@ -1396,7 +1396,7 @@ impl Context {
     {
         self.set_internal_attribute(
             InternalAttribute::SendBodyHook,
-            Arc::new(move |ctx: Context| Box::pin(send_body_hook(ctx))),
+            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(send_body_hook(ctx)) }),
         )
         .await
     }

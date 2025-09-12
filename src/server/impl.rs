@@ -229,15 +229,14 @@ impl Server {
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn panic_hook<F, Fut>(&self, func: F) -> &Self
+    pub async fn panic_hook<F, Fut>(&self, hook: F) -> &Self
     where
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
-        self.write()
-            .await
-            .get_mut_panic_hook()
-            .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
+        let panic_hook: ArcFnContextPinBoxSendSync<()> =
+            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
+        self.write().await.get_mut_panic_hook().push(panic_hook);
         self
     }
 
@@ -252,21 +251,20 @@ impl Server {
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn route<R, F, Fut>(&self, route: R, func: F) -> &Self
+    pub async fn route<R, F, Fut>(&self, route: R, hook: F) -> &Self
     where
         R: ToString,
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
         let route_str: String = route.to_string();
+        let route_hook: ArcFnContextPinBoxSendSync<()> =
+            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
         self.write()
             .await
             .get_mut_route()
-            .add(
-                &route_str,
-                Arc::new(move |ctx: Context| Box::pin(func(ctx))),
-            )
-            .unwrap_or_else(|err| panic!("{}", err));
+            .add(&route_str, route_hook)
+            .unwrap();
         self
     }
 
@@ -280,15 +278,17 @@ impl Server {
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn request_middleware<F, Fut>(&self, func: F) -> &Self
+    pub async fn request_middleware<F, Fut>(&self, hook: F) -> &Self
     where
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
+        let request_middleware_hook: ArcFnContextPinBoxSendSync<()> =
+            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
         self.write()
             .await
             .get_mut_request_middleware()
-            .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
+            .push(request_middleware_hook);
         self
     }
 
@@ -302,15 +302,17 @@ impl Server {
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn response_middleware<F, Fut>(&self, func: F) -> &Self
+    pub async fn response_middleware<F, Fut>(&self, hook: F) -> &Self
     where
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
+        let response_middleware_hook: ArcFnContextPinBoxSendSync<()> =
+            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
         self.write()
             .await
             .get_mut_response_middleware()
-            .push(Arc::new(move |ctx: Context| Box::pin(func(ctx))));
+            .push(response_middleware_hook);
         self
     }
 
@@ -345,8 +347,8 @@ impl Server {
     async fn handle_panic_with_context(&self, ctx: &Context, panic: &Panic) {
         let panic_clone: Panic = panic.clone();
         ctx.cancel_aborted().await.set_panic(panic_clone).await;
-        for func in self.read().await.get_panic_hook().iter() {
-            func(ctx.clone()).await;
+        for hook in self.read().await.get_panic_hook().iter() {
+            hook(ctx.clone()).await;
             if ctx.get_aborted().await {
                 return;
             }
@@ -488,9 +490,13 @@ impl Server {
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
     async fn run_request_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) -> bool {
-        for func in self.read().await.get_request_middleware().iter() {
-            self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| func(ctx))
-                .await;
+        for hook in self.read().await.get_request_middleware().iter() {
+            self.run_hook_with_lifecycle(
+                ctx,
+                lifecycle,
+                move |ctx: Context| -> PinBoxFutureSend<()> { hook(ctx) },
+            )
+            .await;
             if lifecycle.is_abort() {
                 return true;
             }
@@ -515,9 +521,13 @@ impl Server {
         handler: &OptionArcFnContextPinBoxSendSync<()>,
         lifecycle: &mut Lifecycle,
     ) -> bool {
-        if let Some(func) = handler {
-            self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| func(ctx))
-                .await;
+        if let Some(hook) = handler {
+            self.run_hook_with_lifecycle(
+                ctx,
+                lifecycle,
+                move |ctx: Context| -> PinBoxFutureSend<()> { hook(ctx) },
+            )
+            .await;
         }
         lifecycle.is_abort()
     }
@@ -533,9 +543,13 @@ impl Server {
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
     async fn run_response_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) -> bool {
-        for func in self.read().await.get_response_middleware().iter() {
-            self.run_hook_with_lifecycle(ctx, lifecycle, move |ctx: Context| func(ctx))
-                .await;
+        for hook in self.read().await.get_response_middleware().iter() {
+            self.run_hook_with_lifecycle(
+                ctx,
+                lifecycle,
+                move |ctx: Context| -> PinBoxFutureSend<()> { hook(ctx) },
+            )
+            .await;
             if lifecycle.is_abort() {
                 return true;
             }
