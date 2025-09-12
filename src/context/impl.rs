@@ -139,6 +139,15 @@ impl Context {
         self
     }
 
+    /// Checks if the connection has been terminated (aborted and closed).
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the connection is both aborted and closed, otherwise false.
+    pub async fn is_terminated(&self) -> bool {
+        self.get_aborted().await || self.get_closed().await
+    }
+
     /// Retrieves the underlying network stream, if available.
     ///
     /// # Returns
@@ -1340,37 +1349,6 @@ impl Context {
             .await
     }
 
-    /// Sets the send body function for the context.
-    ///
-    /// # Arguments
-    ///
-    /// - `F` - The send body function to store.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - A reference to the modified context.
-    pub async fn set_send_body_hook<F, Fut>(&self, send_body_hook: F) -> &Self
-    where
-        F: FnContextSendSyncStatic<Fut, ()>,
-        Fut: FutureSendStatic<()>,
-    {
-        self.set_internal_attribute(
-            InternalAttribute::SendBodyHook,
-            Arc::new(move |ctx: Context| Box::pin(send_body_hook(ctx))),
-        )
-        .await
-    }
-
-    /// Retrieves the send body function if it has been set.
-    ///
-    /// # Returns
-    ///
-    /// - `OptionArcFnContextPinBoxSendSync<()>` - The send body function if it has been set.
-    pub async fn try_get_send_body_hook(&self) -> OptionArcFnContextPinBoxSendSync<()> {
-        self.try_get_internal_attribute(InternalAttribute::SendBodyHook)
-            .await
-    }
-
     /// Sets the send function for the context.
     ///
     /// # Arguments
@@ -1402,67 +1380,35 @@ impl Context {
             .await
     }
 
-    /// Checks if the connection has been terminated (aborted and closed).
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the connection is both aborted and closed, otherwise false.
-    pub async fn is_terminated(&self) -> bool {
-        self.get_aborted().await || self.get_closed().await
-    }
-
-    /// Reads an HTTP request from the underlying stream.
+    /// Sets the send body function for the context.
     ///
     /// # Arguments
     ///
-    /// - `usize` - The read buffer size.
+    /// - `F` - The send body function to store.
     ///
     /// # Returns
     ///
-    /// - `RequestReaderHandleResult` - The parsed request or error.
-    pub async fn http_from_stream(&self, buffer: usize) -> RequestReaderHandleResult {
-        if self.get_aborted().await {
-            return Err(RequestError::RequestAborted);
-        }
-        if let Some(stream) = self.try_get_stream().await.as_ref() {
-            let request_res: RequestReaderHandleResult =
-                Request::http_from_stream(stream, buffer).await;
-            if let Ok(request) = request_res.as_ref() {
-                self.set_request(request).await;
-            }
-            return request_res;
-        };
-        Err(RequestError::GetTcpStream)
+    /// - `&Self` - A reference to the modified context.
+    pub async fn set_send_body_hook<F, Fut>(&self, send_body_hook: F) -> &Self
+    where
+        F: FnContextSendSyncStatic<Fut, ()>,
+        Fut: FutureSendStatic<()>,
+    {
+        self.set_internal_attribute(
+            InternalAttribute::SendBodyHook,
+            Arc::new(move |ctx: Context| Box::pin(send_body_hook(ctx))),
+        )
+        .await
     }
 
-    /// Reads a WebSocket frame from the underlying stream.
-    ///
-    /// # Arguments
-    ///
-    /// - `usize` - The read buffer size.
+    /// Retrieves the send body function if it has been set.
     ///
     /// # Returns
     ///
-    /// - `RequestReaderHandleResult` - The parsed frame or error.
-    pub async fn ws_from_stream(&self, buffer: usize) -> RequestReaderHandleResult {
-        if self.get_aborted().await {
-            return Err(RequestError::RequestAborted);
-        }
-        if let Some(stream) = self.try_get_stream().await.as_ref() {
-            let mut last_request: Request = self.get_request().await;
-            let request_res: RequestReaderHandleResult =
-                Request::ws_from_stream(stream, buffer, &mut last_request).await;
-            match request_res.as_ref() {
-                Ok(request) => {
-                    self.set_request(&request).await;
-                }
-                Err(_) => {
-                    self.set_request(&last_request).await;
-                }
-            }
-            return request_res;
-        };
-        Err(RequestError::GetTcpStream)
+    /// - `OptionArcFnContextPinBoxSendSync<()>` - The send body function if it has been set.
+    pub async fn try_get_send_body_hook(&self) -> OptionArcFnContextPinBoxSendSync<()> {
+        self.try_get_internal_attribute(InternalAttribute::SendBodyHook)
+            .await
     }
 
     /// Updates the lifecycle status based on the current context state.
@@ -1665,5 +1611,59 @@ impl Context {
             return Ok(());
         }
         Err(ResponseError::NotFoundStream)
+    }
+
+    /// Reads an HTTP request from the underlying stream.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - The read buffer size.
+    ///
+    /// # Returns
+    ///
+    /// - `RequestReaderHandleResult` - The parsed request or error.
+    pub async fn http_from_stream(&self, buffer: usize) -> RequestReaderHandleResult {
+        if self.get_aborted().await {
+            return Err(RequestError::RequestAborted);
+        }
+        if let Some(stream) = self.try_get_stream().await.as_ref() {
+            let request_res: RequestReaderHandleResult =
+                Request::http_from_stream(stream, buffer).await;
+            if let Ok(request) = request_res.as_ref() {
+                self.set_request(request).await;
+            }
+            return request_res;
+        };
+        Err(RequestError::GetTcpStream)
+    }
+
+    /// Reads a WebSocket frame from the underlying stream.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - The read buffer size.
+    ///
+    /// # Returns
+    ///
+    /// - `RequestReaderHandleResult` - The parsed frame or error.
+    pub async fn ws_from_stream(&self, buffer: usize) -> RequestReaderHandleResult {
+        if self.get_aborted().await {
+            return Err(RequestError::RequestAborted);
+        }
+        if let Some(stream) = self.try_get_stream().await.as_ref() {
+            let mut last_request: Request = self.get_request().await;
+            let request_res: RequestReaderHandleResult =
+                Request::ws_from_stream(stream, buffer, &mut last_request).await;
+            match request_res.as_ref() {
+                Ok(request) => {
+                    self.set_request(&request).await;
+                }
+                Err(_) => {
+                    self.set_request(&last_request).await;
+                }
+            }
+            return request_res;
+        };
+        Err(RequestError::GetTcpStream)
     }
 }
