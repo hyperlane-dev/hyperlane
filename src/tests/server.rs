@@ -21,9 +21,8 @@ async fn server() {
     async fn send_body_hook(ctx: Context) {
         let body: ResponseBody = ctx.get_request_body().await;
         if ctx.get_request().await.is_ws() {
-            for body in WebSocketFrame::create_response_frame_list(&body) {
-                ctx.set_response_body(body).await.send_body().await.unwrap();
-            }
+            let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
+            ctx.send_body_list_with_data(body_list).await.unwrap();
         } else {
             ctx.send_body().await.unwrap();
         }
@@ -31,6 +30,7 @@ async fn server() {
 
     async fn request_middleware(ctx: Context) {
         ctx.set_send_body_hook(send_body_hook).await;
+        ctx.try_get_send_body_hook().await.unwrap();
         let socket_addr: String = ctx.get_socket_addr_string().await;
         ctx.set_response_version(HttpVersion::HTTP1_1)
             .await
@@ -87,10 +87,10 @@ async fn server() {
     }
 
     async fn ws_route(ctx: Context) {
-        while ctx.ws_from_stream(1000).await.is_ok() {
-            let request_body: Vec<u8> = ctx.get_request_body().await;
-            ctx.set_response_body(request_body).await;
-            if let Some(send_body_hook) = ctx.try_get_send_body_hook().await {
+        if let Some(send_body_hook) = ctx.try_get_send_body_hook().await {
+            while ctx.ws_from_stream(1000).await.is_ok() {
+                let request_body: Vec<u8> = ctx.get_request_body().await;
+                ctx.set_response_body(request_body).await;
                 send_body_hook(ctx.clone()).await;
             }
         }
@@ -140,8 +140,8 @@ async fn server() {
         let config: ServerConfig = ServerConfig::new().await;
         config.host("0.0.0.0").await;
         config.port(60000).await;
-        config.enable_nodelay().await;
         config.buffer(4096).await;
+        config.enable_nodelay().await;
         let server: Server = Server::from(config).await;
         server.panic_hook(panic_hook).await;
         server.request_middleware(request_middleware).await;

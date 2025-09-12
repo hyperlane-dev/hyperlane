@@ -5,7 +5,7 @@ use crate::*;
 /// Attributes can be either external, defined by a user-provided string,
 /// or internal, representing framework-specific functionality.
 #[derive(CustomDebug, Clone, PartialEq, Eq, Hash, DisplayDebug)]
-pub(crate) enum AttributeKey {
+pub(crate) enum Attribute {
     /// An external attribute identified by a string.
     External(String),
     /// An internal attribute with a predefined key.

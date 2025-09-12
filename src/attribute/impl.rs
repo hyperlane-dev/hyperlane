@@ -1,8 +1,8 @@
 use crate::*;
 
-/// Implementation of `From` trait for `AttributeKey`.
-impl From<&str> for AttributeKey {
-    /// Converts a string slice into an `AttributeKey`.
+/// Implementation of `From` trait for `Attribute`.
+impl From<&str> for Attribute {
+    /// Converts a string slice into an `Attribute`.
     ///
     /// # Arguments
     ///
@@ -10,15 +10,15 @@ impl From<&str> for AttributeKey {
     ///
     /// # Returns
     ///
-    /// - `AttributeKey` - The converted attribute key.
+    /// - `Attribute` - The converted attribute key.
     fn from(key: &str) -> Self {
-        AttributeKey::External(key.to_string())
+        Attribute::External(key.to_string())
     }
 }
 
-/// Implementation of `From` trait for `AttributeKey`.
-impl From<String> for AttributeKey {
-    /// Converts a `String` into an `AttributeKey`.
+/// Implementation of `From` trait for `Attribute`.
+impl From<String> for Attribute {
+    /// Converts a `String` into an `Attribute`.
     ///
     /// # Arguments
     ///
@@ -26,15 +26,15 @@ impl From<String> for AttributeKey {
     ///
     /// # Returns
     ///
-    /// - `AttributeKey` - The converted attribute key.
+    /// - `Attribute` - The converted attribute key.
     fn from(key: String) -> Self {
-        AttributeKey::External(key)
+        Attribute::External(key)
     }
 }
 
-/// Implementation of `From` trait for `AttributeKey`.
-impl From<InternalAttribute> for AttributeKey {
-    /// Converts an `InternalAttribute` into an `AttributeKey`.
+/// Implementation of `From` trait for `Attribute`.
+impl From<InternalAttribute> for Attribute {
+    /// Converts an `InternalAttribute` into an `Attribute`.
     ///
     /// # Arguments
     ///
@@ -42,8 +42,8 @@ impl From<InternalAttribute> for AttributeKey {
     ///
     /// # Returns
     ///
-    /// - `AttributeKey` - The converted attribute key.
+    /// - `Attribute` - The converted attribute key.
     fn from(key: InternalAttribute) -> Self {
-        AttributeKey::Internal(key)
+        Attribute::Internal(key)
     }
 }

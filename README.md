@@ -44,7 +44,7 @@ async fn send_body_hook(ctx: Context) {
     let body: ResponseBody = ctx.get_request_body().await;
     if ctx.get_request().await.is_ws() {
         for body in WebSocketFrame::create_response_frame_list(&body) {
-            ctx.set_response_body(body).await.send_body().await.unwrap();
+            ctx.send_body_with_data(body).await.unwrap();
         }
     } else {
         ctx.send_body().await.unwrap();
