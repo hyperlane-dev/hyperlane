@@ -376,16 +376,14 @@ impl Server {
     ///
     /// - `ctx: &Context` - The request context.
     /// - `lifecycle: &mut Lifecycle` - A mutable reference to the current `Lifecycle` state.
-    /// - `F: Fn(Context) -> PinBoxFutureSendStatic` - The hook function to execute.
-    async fn run_hook_with_lifecycle<F>(
+    /// - `hook: ArcFnContextPinBoxSendSync<()>` - The hook function to execute.
+    async fn run_hook_with_lifecycle(
         &self,
         ctx: &Context,
         lifecycle: &mut Lifecycle,
-        hook_func: F,
-    ) where
-        F: Fn(Context) -> PinBoxFutureSendStatic,
-    {
-        let result: ResultJoinError<()> = spawn(hook_func(ctx.clone())).await;
+        hook: &ArcFnContextPinBoxSendSync<()>,
+    ) {
+        let result: ResultJoinError<()> = spawn(hook(ctx.clone())).await;
         ctx.update_lifecycle_status(lifecycle).await;
         if let Err(join_error) = result {
             if join_error.is_panic() {
@@ -491,12 +489,7 @@ impl Server {
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
     async fn run_request_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) -> bool {
         for hook in self.read().await.get_request_middleware().iter() {
-            self.run_hook_with_lifecycle(
-                ctx,
-                lifecycle,
-                move |ctx: Context| -> PinBoxFutureSend<()> { hook(ctx) },
-            )
-            .await;
+            self.run_hook_with_lifecycle(ctx, lifecycle, hook).await;
             if lifecycle.is_abort() {
                 return true;
             }
@@ -522,12 +515,7 @@ impl Server {
         lifecycle: &mut Lifecycle,
     ) -> bool {
         if let Some(hook) = handler {
-            self.run_hook_with_lifecycle(
-                ctx,
-                lifecycle,
-                move |ctx: Context| -> PinBoxFutureSend<()> { hook(ctx) },
-            )
-            .await;
+            self.run_hook_with_lifecycle(ctx, lifecycle, hook).await;
         }
         lifecycle.is_abort()
     }
@@ -544,12 +532,7 @@ impl Server {
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
     async fn run_response_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) -> bool {
         for hook in self.read().await.get_response_middleware().iter() {
-            self.run_hook_with_lifecycle(
-                ctx,
-                lifecycle,
-                move |ctx: Context| -> PinBoxFutureSend<()> { hook(ctx) },
-            )
-            .await;
+            self.run_hook_with_lifecycle(ctx, lifecycle, hook).await;
             if lifecycle.is_abort() {
                 return true;
             }
