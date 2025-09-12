@@ -1358,14 +1358,14 @@ impl Context {
     /// # Returns
     ///
     /// - `&Self` - A reference to the modified context.
-    pub async fn set_send_hook<F, Fut>(&self, send_hook: F) -> &Self
+    pub async fn set_send_hook<F, Fut>(&self, hook: F) -> &Self
     where
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
         self.set_internal_attribute(
             InternalAttribute::SendHook,
-            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(send_hook(ctx)) }),
+            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) }),
         )
         .await
     }
@@ -1389,14 +1389,14 @@ impl Context {
     /// # Returns
     ///
     /// - `&Self` - A reference to the modified context.
-    pub async fn set_send_body_hook<F, Fut>(&self, send_body_hook: F) -> &Self
+    pub async fn set_send_body_hook<F, Fut>(&self, hook: F) -> &Self
     where
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
         self.set_internal_attribute(
             InternalAttribute::SendBodyHook,
-            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(send_body_hook(ctx)) }),
+            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) }),
         )
         .await
     }
