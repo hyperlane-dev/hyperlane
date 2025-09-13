@@ -79,9 +79,9 @@ async fn server() {
         let response_body: String = format!("Hello hyperlane => {}", path);
         let cookie1: String = CookieBuilder::new("key1", "value1").http_only().build();
         let cookie2: String = CookieBuilder::new("key2", "value2").http_only().build();
-        ctx.set_response_header(SET_COOKIE, cookie1)
+        ctx.add_response_header(SET_COOKIE, cookie1)
             .await
-            .set_response_header(SET_COOKIE, cookie2)
+            .add_response_header(SET_COOKIE, cookie2)
             .await
             .set_response_body(response_body)
             .await;
