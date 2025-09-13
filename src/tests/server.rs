@@ -30,7 +30,6 @@ async fn server() {
 
     async fn request_middleware(ctx: Context) {
         ctx.set_send_body_hook(send_body_hook).await;
-        ctx.try_get_send_body_hook().await.unwrap();
         let socket_addr: String = ctx.get_socket_addr_string().await;
         ctx.set_response_version(HttpVersion::HTTP1_1)
             .await
@@ -88,7 +87,7 @@ async fn server() {
 
     async fn ws_route(ctx: Context) {
         if let Some(send_body_hook) = ctx.try_get_send_body_hook().await {
-            while ctx.ws_from_stream(1000).await.is_ok() {
+            while ctx.ws_from_stream(1024).await.is_ok() {
                 let request_body: Vec<u8> = ctx.get_request_body().await;
                 ctx.set_response_body(request_body).await;
                 send_body_hook(ctx.clone()).await;

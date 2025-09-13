@@ -43,9 +43,8 @@ use hyperlane::*;
 async fn send_body_hook(ctx: Context) {
     let body: ResponseBody = ctx.get_request_body().await;
     if ctx.get_request().await.is_ws() {
-        for body in WebSocketFrame::create_response_frame_list(&body) {
-            ctx.send_body_with_data(body).await.unwrap();
-        }
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
+        ctx.send_body_list_with_data(body_list).await.unwrap();
     } else {
         ctx.send_body().await.unwrap();
     }
@@ -109,10 +108,10 @@ async fn root_route(ctx: Context) {
 }
 
 async fn ws_route(ctx: Context) {
-    while ctx.ws_from_stream(1000).await.is_ok() {
-        let request_body: Vec<u8> = ctx.get_request_body().await;
-        ctx.set_response_body(request_body).await;
-        if let Some(send_body_hook) = ctx.try_get_send_body_hook().await {
+    if let Some(send_body_hook) = ctx.try_get_send_body_hook().await {
+        while ctx.ws_from_stream(1024).await.is_ok() {
+            let request_body: Vec<u8> = ctx.get_request_body().await;
+            ctx.set_response_body(request_body).await;
             send_body_hook(ctx.clone()).await;
         }
     }

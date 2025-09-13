@@ -1363,11 +1363,10 @@ impl Context {
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
-        self.set_internal_attribute(
-            InternalAttribute::SendHook,
-            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) }),
-        )
-        .await
+        let send_hook: ArcFnContextPinBoxSendSync<()> =
+            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
+        self.set_internal_attribute(InternalAttribute::SendHook, send_hook)
+            .await
     }
 
     /// Retrieves the send function if it has been set.
@@ -1394,11 +1393,10 @@ impl Context {
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
-        self.set_internal_attribute(
-            InternalAttribute::SendBodyHook,
-            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) }),
-        )
-        .await
+        let send_body_hook: ArcFnContextPinBoxSendSync<()> =
+            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
+        self.set_internal_attribute(InternalAttribute::SendBodyHook, send_body_hook)
+            .await
     }
 
     /// Retrieves the send body function if it has been set.
