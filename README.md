@@ -63,6 +63,8 @@ async fn request_middleware(ctx: Context) {
         .await
         .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
         .await
+        .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
+        .await
         .set_response_header("SocketAddr", socket_addr)
         .await;
 }
