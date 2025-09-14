@@ -59,7 +59,7 @@ async fn server() {
                 .await
                 .set_response_header(CONNECTION, UPGRADE)
                 .await
-                .set_response_header(SEC_WEBSOCKET_ACCEPT, accept_key)
+                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
                 .await
                 .send()
                 .await

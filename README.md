@@ -81,7 +81,7 @@ async fn upgrade_hook(ctx: Context) {
             .await
             .set_response_header(CONNECTION, UPGRADE)
             .await
-            .set_response_header(SEC_WEBSOCKET_ACCEPT, accept_key)
+            .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
             .await
             .send()
             .await
@@ -159,6 +159,7 @@ async fn panic_hook(ctx: Context) {
         .await;
 }
 
+#[tokio::main]
 async fn main() {
     let config: ServerConfig = ServerConfig::new().await;
     config.host("0.0.0.0").await;
