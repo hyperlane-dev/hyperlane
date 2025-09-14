@@ -1,7 +1,7 @@
 use crate::*;
 
 #[test]
-fn test_panic_new() {
+fn panic_new() {
     let panic: Panic = Panic::new(
         Some("message".to_string()),
         Some("location".to_string()),
@@ -13,18 +13,18 @@ fn test_panic_new() {
 }
 
 #[tokio::test]
-async fn test_from_join_error() {
+async fn from_join_error() {
     let handle: JoinHandle<()> = tokio::spawn(async {
         panic!("test panic");
     });
     let result: Result<(), JoinError> = handle.await;
     assert!(result.is_err());
     if let Err(join_error) = result {
-        let is_test_panic: bool = Panic::from_join_error(join_error)
+        let is_panic: bool = Panic::from_join_error(join_error)
             .get_message()
             .clone()
             .unwrap_or_default()
             .contains("test panic");
-        assert!(is_test_panic);
+        assert!(is_panic);
     }
 }

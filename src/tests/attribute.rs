@@ -14,6 +14,21 @@ async fn get_panic_from_context() {
 }
 
 #[tokio::test]
+async fn context_attributes() {
+    let ctx: Context = Context::default();
+    ctx.set_attribute("key1", "value1".to_string()).await;
+    let value: Option<String> = ctx.try_get_attribute("key1").await;
+    assert_eq!(value, Some("value1".to_string()));
+    ctx.remove_attribute("key1").await;
+    let value: Option<String> = ctx.try_get_attribute("key1").await;
+    assert_eq!(value, None);
+    ctx.set_attribute("key2", 123).await;
+    ctx.clear_attribute().await;
+    let value: Option<i32> = ctx.try_get_attribute("key2").await;
+    assert_eq!(value, None);
+}
+
+#[tokio::test]
 async fn get_panic_from_join_error() {
     let message: &'static str = "Test panic message";
     let join_handle: JoinHandle<()> = spawn(async {
@@ -40,19 +55,17 @@ async fn run_set_func() {
         return msg.to_string();
     };
     ctx.set_attribute(KEY, func).await;
-    let get_key = ctx
-        .try_get_attribute::<&(dyn Fn(&str) -> String + Send + Sync)>(KEY)
-        .await
-        .unwrap();
+    let get_key: &(dyn Fn(&str) -> String + Send + Sync) =
+        ctx.try_get_attribute(KEY).await.unwrap();
     assert_eq!(get_key(PARAM), func(PARAM));
 }
 
 #[tokio::test]
 async fn send_body_hook() {
     let ctx: Context = Context::default();
-    async fn test_send_body_hook_fn(ctx: Context) {
+    async fn send_body_hook_fn(ctx: Context) {
         let _ = ctx.send_body().await;
     }
-    ctx.set_send_body_hook(test_send_body_hook_fn).await;
+    ctx.set_send_body_hook(send_body_hook_fn).await;
     assert!(ctx.try_get_send_body_hook().await.is_some());
 }

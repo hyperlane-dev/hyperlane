@@ -330,14 +330,14 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K` - The query parameter key.
+    /// - `AsRef<str>` - The query parameter key.
     ///
     /// # Returns
     ///
     /// - `OptionRequestQuerysValue` - The query parameter value if exists.
     pub async fn try_get_request_query<K>(&self, key: K) -> OptionRequestQuerysValue
     where
-        K: Into<RequestHeadersKey>,
+        K: AsRef<str>,
     {
         self.read().await.get_request().try_get_query(key)
     }
@@ -378,14 +378,14 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K` - The header key.
+    /// - `AsRef<str>` - The header key.
     ///
     /// # Returns
     ///
     /// - `OptionRequestHeadersValue` - The header values if exists.
     pub async fn try_get_request_header<K>(&self, key: K) -> OptionRequestHeadersValue
     where
-        K: Into<RequestHeadersKey>,
+        K: AsRef<str>,
     {
         self.read().await.get_request().try_get_header(key)
     }
@@ -403,14 +403,14 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K` - The key of the header.
+    /// - `AsRef<str>` - The key of the header.
     ///
     /// # Returns
     ///
     /// - `OptionRequestHeadersValueItem` - The first value of the header if it exists.
     pub async fn try_get_request_header_front<K>(&self, key: K) -> OptionRequestHeadersValueItem
     where
-        K: Into<RequestHeadersKey>,
+        K: AsRef<str>,
     {
         self.read().await.get_request().try_get_header_front(key)
     }
@@ -419,14 +419,14 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K` - The key of the header.
+    /// - `AsRef<str>` - The key of the header.
     ///
     /// # Returns
     ///
     /// - `OptionRequestHeadersValueItem` - The last value of the header if it exists.
     pub async fn try_get_request_header_back<K>(&self, key: K) -> OptionRequestHeadersValueItem
     where
-        K: Into<RequestHeadersKey>,
+        K: AsRef<str>,
     {
         self.read().await.get_request().try_get_header_back(key)
     }
@@ -435,14 +435,14 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K` - The key of the header.
+    /// - `AsRef<str>` - The key of the header.
     ///
     /// # Returns
     ///
     /// - `usize` - The number of values for the specified header.
     pub async fn get_request_header_len<K>(&self, key: K) -> usize
     where
-        K: Into<RequestHeadersKey>,
+        K: AsRef<str>,
     {
         self.read().await.get_request().get_header_length(key)
     }
@@ -469,14 +469,14 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K` - The key of the header to check.
+    /// - `AsRef<str>` - The key of the header to check.
     ///
     /// # Returns
     ///
     /// - `bool` - True if the header exists, otherwise false.
     pub async fn get_request_has_header<K>(&self, key: K) -> bool
     where
-        K: Into<RequestHeadersKey>,
+        K: AsRef<str>,
     {
         self.read().await.get_request().has_header(key)
     }
@@ -485,16 +485,16 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K` - The header key.
-    /// - `V` - The value to check.
+    /// - `AsRef<str>` - The header key.
+    /// - `AsRef<str>` - The value to check.
     ///
     /// # Returns
     ///
     /// - `bool` - True if header contains the value.
     pub async fn get_request_has_header_value<K, V>(&self, key: K, value: V) -> bool
     where
-        K: Into<RequestHeadersKey>,
-        V: Into<RequestHeadersValueItem>,
+        K: AsRef<str>,
+        V: AsRef<str>,
     {
         self.read().await.get_request().has_header_value(key, value)
     }
@@ -515,16 +515,16 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K` - The cookie name.
+    /// - `AsRef<str>` - The cookie name.
     ///
     /// # Returns
     ///
     /// - `OptionCookiesValue` - The cookie value if exists.
     pub async fn try_get_request_cookie<K>(&self, key: K) -> OptionCookiesValue
     where
-        K: Into<CookieKey>,
+        K: AsRef<str>,
     {
-        self.get_request_cookies().await.get(&key.into()).cloned()
+        self.get_request_cookies().await.get(key.as_ref()).cloned()
     }
 
     /// Retrieves the upgrade type of the request.
@@ -765,13 +765,16 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `Response` - The response to set in the context.
+    /// - `Borrow<Response>` - The response to set in the context.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to the modified context.
-    pub async fn set_response(&self, response: Response) -> &Self {
-        self.write().await.set_response(response);
+    pub async fn set_response<T>(&self, response: T) -> &Self
+    where
+        T: Borrow<Response>,
+    {
+        self.write().await.set_response(response.borrow().clone());
         self
     }
 
@@ -837,14 +840,14 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K` - The key of the header to retrieve.
+    /// - `AsRef<str>` - The key of the header to retrieve.
     ///
     /// # Returns
     ///
     /// - `OptionResponseHeadersValue` - The header values if the header exists.
     pub async fn try_get_response_header<K>(&self, key: K) -> OptionResponseHeadersValue
     where
-        K: Into<ResponseHeadersKey>,
+        K: AsRef<str>,
     {
         self.read().await.get_response().try_get_header(key)
     }
@@ -861,8 +864,8 @@ impl Context {
     /// - `&Self` - Reference to the modified context.
     pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self
     where
-        K: Into<ResponseHeadersKey>,
-        V: Into<String>,
+        K: AsRef<str>,
+        V: AsRef<str>,
     {
         self.write().await.get_mut_response().set_header(key, value);
         self
@@ -872,14 +875,14 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K` - The key of the header.
+    /// - `AsRef<str>` - The key of the header.
     ///
     /// # Returns
     ///
     /// - `OptionResponseHeadersValueItem` - The first value of the header if it exists.
     pub async fn try_get_response_header_front<K>(&self, key: K) -> OptionResponseHeadersValueItem
     where
-        K: Into<ResponseHeadersKey>,
+        K: AsRef<str>,
     {
         self.read().await.get_response().try_get_header_front(key)
     }
@@ -888,14 +891,14 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K` - The key of the header.
+    /// - `AsRef<str>` - The key of the header.
     ///
     /// # Returns
     ///
     /// - `OptionResponseHeadersValueItem` - The last value of the header if it exists.
     pub async fn try_get_response_header_back<K>(&self, key: K) -> OptionResponseHeadersValueItem
     where
-        K: Into<ResponseHeadersKey>,
+        K: AsRef<str>,
     {
         self.read().await.get_response().try_get_header_back(key)
     }
@@ -904,14 +907,14 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K` - The key of the header to check.
+    /// - `AsRef<str>` - The key of the header to check.
     ///
     /// # Returns
     ///
     /// - `bool` - True if the header exists, otherwise false.
     pub async fn get_response_has_header<K>(&self, key: K) -> bool
     where
-        K: Into<ResponseHeadersKey>,
+        K: AsRef<str>,
     {
         self.read().await.get_response().has_header(key)
     }
@@ -920,16 +923,16 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K` - The key of the header.
-    /// - `V` - The value to check for.
+    /// - `AsRef<str>` - The key of the header.
+    /// - `AsRef<str>` - The value to check for.
     ///
     /// # Returns
     ///
     /// - `bool` - True if the header contains the specified value, otherwise false.
     pub async fn get_response_header_value<K, V>(&self, key: K, value: V) -> bool
     where
-        K: Into<ResponseHeadersKey>,
-        V: Into<ResponseHeadersValueItem>,
+        K: AsRef<str>,
+        V: AsRef<str>,
     {
         self.read()
             .await
@@ -950,14 +953,14 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K` - The key of the header.
+    /// - `AsRef<str>` - The key of the header.
     ///
     /// # Returns
     ///
     /// - `usize` - The number of values for the specified header.
     pub async fn get_response_header_length<K>(&self, key: K) -> usize
     where
-        K: Into<ResponseHeadersKey>,
+        K: AsRef<str>,
     {
         self.read().await.get_response().get_header_length(key)
     }
@@ -975,16 +978,16 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K` - The header key.
-    /// - `V` - The header value.
+    /// - `AsRef<str>` - The header key.
+    /// - `AsRef<str>` - The header value.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
     pub async fn add_response_header<K, V>(&self, key: K, value: V) -> &Self
     where
-        K: Into<String>,
-        V: Into<String>,
+        K: AsRef<str>,
+        V: AsRef<str>,
     {
         self.write().await.get_mut_response().add_header(key, value);
         self
@@ -994,14 +997,14 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K` - The key of the header to remove.
+    /// - `AsRef<str>` - The key of the header to remove.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to the modified context.
     pub async fn remove_response_header<K>(&self, key: K) -> &Self
     where
-        K: Into<ResponseHeadersKey>,
+        K: AsRef<str>,
     {
         self.write().await.get_mut_response().remove_header(key);
         self
@@ -1011,16 +1014,16 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K` - The header key.
-    /// - `V` - The value to remove.
+    /// - `AsRef<str>` - The header key.
+    /// - `AsRef<str>` - The value to remove.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
     pub async fn remove_response_header_value<K, V>(&self, key: K, value: V) -> &Self
     where
-        K: Into<ResponseHeadersKey>,
-        V: Into<String>,
+        K: AsRef<str>,
+        V: AsRef<str>,
     {
         self.write()
             .await
@@ -1055,16 +1058,16 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K` - The name of the cookie to retrieve.
+    /// - `AsRef<str>` - The name of the cookie to retrieve.
     ///
     /// # Returns
     ///
     /// - `OptionCookiesValue` - The cookie's value if it exists.
     pub async fn try_get_response_cookie<K>(&self, key: K) -> OptionCookiesValue
     where
-        K: Into<CookieKey>,
+        K: AsRef<str>,
     {
-        self.get_response_cookies().await.get(&key.into()).cloned()
+        self.get_response_cookies().await.get(key.as_ref()).cloned()
     }
 
     /// Retrieves the body of the response.
@@ -1087,7 +1090,7 @@ impl Context {
     /// - `&Self` - Reference to the modified context.
     pub async fn set_response_body<B>(&self, body: B) -> &Self
     where
-        B: Into<ResponseBody>,
+        B: AsRef<[u8]>,
     {
         self.write().await.get_mut_response().set_body(body);
         self
@@ -1127,14 +1130,14 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `P` - The reason phrase to set.
+    /// - `AsRef<str>` - The reason phrase to set.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to the modified context.
     pub async fn set_response_reason_phrase<P>(&self, reason_phrase: P) -> &Self
     where
-        P: Into<ResponseReasonPhrase>,
+        P: AsRef<str>,
     {
         self.write()
             .await
@@ -1196,13 +1199,20 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `&str` - The name of the route parameter to retrieve.
+    /// - `AsRef<str>` - The name of the route parameter to retrieve.
     ///
     /// # Returns
     ///
     /// - `OptionString` - The value of the route parameter if it exists.
-    pub async fn try_get_route_param(&self, name: &str) -> OptionString {
-        self.read().await.get_route_params().get(name).cloned()
+    pub async fn try_get_route_param<T>(&self, name: T) -> OptionString
+    where
+        T: AsRef<str>,
+    {
+        self.read()
+            .await
+            .get_route_params()
+            .get(name.as_ref())
+            .cloned()
     }
 
     /// Retrieves all attributes stored in the context.
@@ -1218,19 +1228,20 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `&str` - The key of the attribute to retrieve.
+    /// - `AsRef<str>` - The key of the attribute to retrieve.
     ///
     /// # Returns
     ///
     /// - `Option<V>` - The attribute's value if it exists and can be cast to the specified type.
-    pub async fn try_get_attribute<V>(&self, key: &str) -> Option<V>
+    pub async fn try_get_attribute<K, V>(&self, key: K) -> Option<V>
     where
+        K: AsRef<str>,
         V: AnySendSyncClone,
     {
         self.read()
             .await
             .get_attributes()
-            .get(&Attribute::External(key.to_owned()).to_string())
+            .get(&Attribute::External(key.as_ref().to_owned()).to_string())
             .and_then(|arc| arc.downcast_ref::<V>())
             .cloned()
     }
@@ -1239,18 +1250,19 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `&str` - The key of the attribute to set.
-    /// - `V` - The value of the attribute.
+    /// - `AsRef<str>` - The key of the attribute to set.
+    /// - `AnySendSyncClone` - The value of the attribute.
     ///
     /// # Returns
     ///
     /// - `&Self` - A reference to the modified context.
-    pub async fn set_attribute<V>(&self, key: &str, value: V) -> &Self
+    pub async fn set_attribute<K, V>(&self, key: K, value: V) -> &Self
     where
+        K: AsRef<str>,
         V: AnySendSyncClone,
     {
         self.write().await.get_mut_attributes().insert(
-            Attribute::External(key.to_owned()).to_string(),
+            Attribute::External(key.as_ref().to_owned()).to_string(),
             Arc::new(value),
         );
         self
@@ -1260,16 +1272,19 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `&str` - The key of the attribute to remove.
+    /// - `AsRef<str>` - The key of the attribute to remove.
     ///
     /// # Returns
     ///
     /// - `&Self` - A reference to the modified context.
-    pub async fn remove_attribute(&self, key: &str) -> &Self {
+    pub async fn remove_attribute<K>(&self, key: K) -> &Self
+    where
+        K: AsRef<str>,
+    {
         self.write()
             .await
             .get_mut_attributes()
-            .remove(&Attribute::External(key.to_owned()).to_string());
+            .remove(&Attribute::External(key.as_ref().to_owned()).to_string());
         self
     }
 
@@ -1309,7 +1324,7 @@ impl Context {
     /// # Arguments
     ///
     /// - `InternalAttribute` - The internal attribute key to set.
-    /// - `V` - The value of the attribute.
+    /// - `AnySendSyncClone` - The value of the attribute.
     ///
     /// # Returns
     ///
@@ -1353,7 +1368,7 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `F` - The send function to store.
+    /// - `F: FnContextSendSyncStatic<Fut, ()>, Fut: FutureSendStatic<()>` - The send function to store.
     ///
     /// # Returns
     ///
@@ -1470,14 +1485,14 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `Into<ResponseData>` - The additional data to send.
+    /// - `AsRef<[u8]>` - The additional data to send.
     ///
     /// # Returns
     ///
     /// - `ResponseResult` - The outcome of the send operation.
     pub async fn send_with_data<D>(&self, data: D) -> ResponseResult
     where
-        D: Into<ResponseData>,
+        D: AsRef<[u8]>,
     {
         if self.is_terminated().await {
             return Err(ResponseError::Terminated);
@@ -1494,14 +1509,14 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `Into<ResponseData>` - The additional data to send.
+    /// - `AsRef<[u8]>` - The additional data to send.
     ///
     /// # Returns
     ///
     /// - `ResponseResult` - The outcome of the send operation.
     pub async fn send_once_with_data<D>(&self, data: D) -> ResponseResult
     where
-        D: Into<ResponseData>,
+        D: AsRef<[u8]>,
     {
         let res: ResponseResult = self.send_with_data(data).await;
         self.closed().await;
@@ -1514,14 +1529,14 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `Into<ResponseBody>` - The additional data to send as the body.
+    /// - `AsRef<[u8]>` - The additional data to send as the body.
     ///
     /// # Returns
     ///
     /// - `ResponseResult` - The outcome of the send operation.
     pub async fn send_body_with_data<D>(&self, data: D) -> ResponseResult
     where
-        D: Into<ResponseBody>,
+        D: AsRef<[u8]>,
     {
         if self.is_terminated().await {
             return Err(ResponseError::Terminated);
@@ -1538,14 +1553,14 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `Into<ResponseBody>` - The additional data to send as the body.
+    /// - `AsRef<[u8]>` - The additional data to send as the body.
     ///
     /// # Returns
     ///
     /// - `ResponseResult` - The outcome of the send operation.
     pub async fn send_body_once_with_data<D>(&self, data: D) -> ResponseResult
     where
-        D: Into<ResponseBody>,
+        D: AsRef<[u8]>,
     {
         let res: ResponseResult = self.send_body_with_data(data).await;
         self.closed().await;
@@ -1558,7 +1573,7 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `IntoIterator<Item = Into<ResponseBody>>` - The additional data to send as a list of bodies.
+    /// - `I: IntoIterator<Item = D>, D: AsRef<[u8]>` - The additional data to send as a list of bodies.
     ///
     /// # Returns
     ///
@@ -1566,7 +1581,7 @@ impl Context {
     pub async fn send_body_list_with_data<I, D>(&self, data_iter: I) -> ResponseResult
     where
         I: IntoIterator<Item = D>,
-        D: Into<ResponseBody>,
+        D: AsRef<[u8]>,
     {
         if self.is_terminated().await {
             return Err(ResponseError::Terminated);
@@ -1583,7 +1598,7 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `IntoIterator<Item = Into<ResponseBody>>` - The additional data to send as a list of bodies.
+    /// - `I: IntoIterator<Item = D>, D: AsRef<[u8]>` - The additional data to send as a list of bodies.
     ///
     /// # Returns
     ///
@@ -1591,7 +1606,7 @@ impl Context {
     pub async fn send_body_list_once_with_data<I, D>(&self, data_iter: I) -> ResponseResult
     where
         I: IntoIterator<Item = D>,
-        D: Into<ResponseBody>,
+        D: AsRef<[u8]>,
     {
         let res: ResponseResult = self.send_body_list_with_data(data_iter).await;
         self.closed().await;

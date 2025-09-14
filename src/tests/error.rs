@@ -1,7 +1,7 @@
 use crate::*;
 
 #[tokio::test]
-async fn test_server_error() {
+async fn server_error() {
     let tcp_bind_error: ServerError = ServerError::TcpBind("address in use".to_string());
     let new_tcp_bind_error: ServerError = ServerError::TcpBind("address in use".to_string());
     assert_eq!(tcp_bind_error, new_tcp_bind_error);
@@ -18,7 +18,7 @@ async fn test_server_error() {
 }
 
 #[tokio::test]
-async fn test_route_error() {
+async fn route_error() {
     let empty_pattern_error: RouteError = RouteError::EmptyPattern;
     assert_eq!(empty_pattern_error, RouteError::EmptyPattern);
     let duplicate_pattern_error: RouteError = RouteError::DuplicatePattern("/home".to_string());

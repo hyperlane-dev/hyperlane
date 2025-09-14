@@ -32,7 +32,7 @@ where
 }
 
 #[tokio::test]
-async fn test_empty_route() {
+async fn empty_route() {
     assert_panic_message_contains(
         || async {
             let _server: &Server = Server::new()
@@ -46,7 +46,7 @@ async fn test_empty_route() {
 }
 
 #[tokio::test]
-async fn test_duplicate_route() {
+async fn duplicate_route() {
     assert_panic_message_contains(
         || async {
             let _server: &Server = Server::new()

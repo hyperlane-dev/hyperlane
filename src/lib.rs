@@ -35,6 +35,7 @@ pub(crate) use lifecycle::*;
 
 pub(crate) use std::{
     any::Any,
+    borrow::Borrow,
     cmp::Ordering,
     collections::{HashMap, HashSet},
     future::Future,

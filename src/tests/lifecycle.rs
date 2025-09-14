@@ -1,7 +1,7 @@
 use crate::*;
 
 #[tokio::test]
-async fn test_lifecycle_new() {
+async fn lifecycle_new() {
     let lifecycle: Lifecycle = Lifecycle::new(true);
     assert_eq!(lifecycle, Lifecycle::Continue(true));
     assert!(lifecycle.is_keep_alive());
@@ -9,7 +9,7 @@ async fn test_lifecycle_new() {
 }
 
 #[tokio::test]
-async fn test_lifecycle_update_status() {
+async fn lifecycle_update_status() {
     let mut lifecycle: Lifecycle = Lifecycle::new(true);
     lifecycle.update_status(true, true);
     assert_eq!(lifecycle, Lifecycle::Abort(true));
@@ -30,7 +30,7 @@ async fn test_lifecycle_update_status() {
 }
 
 #[tokio::test]
-async fn test_lifecycle_is_abort() {
+async fn lifecycle_is_abort() {
     let abort_true: Lifecycle = Lifecycle::Abort(true);
     assert!(abort_true.is_abort());
     let abort_false: Lifecycle = Lifecycle::Abort(false);
@@ -42,7 +42,7 @@ async fn test_lifecycle_is_abort() {
 }
 
 #[tokio::test]
-async fn test_lifecycle_is_keep_alive() {
+async fn lifecycle_is_keep_alive() {
     let abort_true: Lifecycle = Lifecycle::Abort(true);
     assert!(abort_true.is_keep_alive());
     let abort_false: Lifecycle = Lifecycle::Abort(false);
@@ -54,7 +54,7 @@ async fn test_lifecycle_is_keep_alive() {
 }
 
 #[tokio::test]
-async fn test_lifecycle_keep_alive() {
+async fn lifecycle_keep_alive() {
     let abort_true: Lifecycle = Lifecycle::Abort(true);
     assert!(abort_true.keep_alive());
     let abort_false: Lifecycle = Lifecycle::Abort(false);

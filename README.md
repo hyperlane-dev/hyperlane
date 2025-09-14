@@ -44,7 +44,7 @@ async fn send_body_hook(ctx: Context) {
     let body: ResponseBody = ctx.get_request_body().await;
     if ctx.get_request().await.is_ws() {
         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
-        ctx.send_body_list_with_data(body_list).await.unwrap();
+        ctx.send_body_list_with_data(&body_list).await.unwrap();
     } else {
         ctx.send_body().await.unwrap();
     }
@@ -65,7 +65,7 @@ async fn request_middleware(ctx: Context) {
         .await
         .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
         .await
-        .set_response_header("SocketAddr", socket_addr)
+        .set_response_header("SocketAddr", &socket_addr)
         .await;
 }
 
@@ -101,11 +101,11 @@ async fn root_route(ctx: Context) {
     let response_body: String = format!("Hello hyperlane => {}", path);
     let cookie1: String = CookieBuilder::new("key1", "value1").http_only().build();
     let cookie2: String = CookieBuilder::new("key2", "value2").http_only().build();
-    ctx.add_response_header(SET_COOKIE, cookie1)
+    ctx.add_response_header(SET_COOKIE, &cookie1)
         .await
-        .add_response_header(SET_COOKIE, cookie2)
+        .add_response_header(SET_COOKIE, &cookie2)
         .await
-        .set_response_body(response_body)
+        .set_response_body(&response_body)
         .await;
 }
 
@@ -113,7 +113,7 @@ async fn ws_route(ctx: Context) {
     if let Some(send_body_hook) = ctx.try_get_send_body_hook().await {
         while ctx.ws_from_stream(1024).await.is_ok() {
             let request_body: Vec<u8> = ctx.get_request_body().await;
-            ctx.set_response_body(request_body).await;
+            ctx.set_response_body(&request_body).await;
             send_body_hook(ctx.clone()).await;
         }
     }
@@ -127,7 +127,7 @@ async fn sse_route(ctx: Context) {
         .await;
     for i in 0..10 {
         let _ = ctx
-            .set_response_body(format!("data:{}{}", i, HTTP_DOUBLE_BR))
+            .set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
             .await
             .send_body()
             .await;
@@ -151,21 +151,20 @@ async fn panic_hook(ctx: Context) {
         .await
         .set_response_header(SERVER, HYPERLANE)
         .await
-        .set_response_header(CONTENT_TYPE, content_type)
+        .set_response_header(CONTENT_TYPE, &content_type)
         .await
-        .set_response_body(response_body)
+        .set_response_body(&response_body)
         .await
         .send()
         .await;
 }
 
-#[tokio::main]
 async fn main() {
     let config: ServerConfig = ServerConfig::new().await;
     config.host("0.0.0.0").await;
     config.port(60000).await;
-    config.enable_nodelay().await;
     config.buffer(4096).await;
+    config.enable_nodelay().await;
     let server: Server = Server::from(config).await;
     server.panic_hook(panic_hook).await;
     server.request_middleware(request_middleware).await;
