@@ -83,6 +83,8 @@ async fn upgrade_hook(ctx: Context) {
             .await
             .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
             .await
+            .set_response_body(&vec![])
+            .await
             .send()
             .await
             .unwrap();
