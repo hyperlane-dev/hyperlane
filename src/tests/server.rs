@@ -142,7 +142,8 @@ async fn server() {
         config.host("0.0.0.0").await;
         config.port(60000).await;
         config.buffer(4096).await;
-        config.enable_nodelay().await;
+        config.disable_linger().await;
+        config.disable_nodelay().await;
         let server: Server = Server::from(config).await;
         server.panic_hook(panic_hook).await;
         server.request_middleware(request_middleware).await;
