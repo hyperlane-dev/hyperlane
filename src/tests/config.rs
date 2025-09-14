@@ -18,7 +18,7 @@ async fn config_from_str() {
     new_config.port(80).await;
     new_config.buffer(4096).await;
     new_config.enable_nodelay().await;
-    new_config.linger(std::time::Duration::from_secs(64)).await;
+    new_config.linger(Some(Duration::from_secs(64))).await;
     new_config.ttl(64).await;
     assert_eq!(config, new_config);
 }

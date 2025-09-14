@@ -187,13 +187,37 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
+    /// - `OptionDuration`: The `Duration` value for `SO_LINGER`.
+    ///
+    /// # Returns
+    ///
+    /// A reference to `Self` for method chaining.
+    pub async fn linger(&self, linger_opt: OptionDuration) -> &Self {
+        self.write().await.set_linger(linger_opt);
+        self
+    }
+
+    /// Enables the `SO_LINGER` option.
+    ///
+    /// # Arguments
+    ///
     /// - `Duration`: The `Duration` value for `SO_LINGER`.
     ///
     /// # Returns
     ///
     /// A reference to `Self` for method chaining.
-    pub async fn linger(&self, linger: Duration) -> &Self {
-        self.write().await.set_linger(Some(linger));
+    pub async fn enable_linger(&self, linger: Duration) -> &Self {
+        self.linger(Some(linger)).await;
+        self
+    }
+
+    /// Disables the `SO_LINGER` option.
+    ///
+    /// # Returns
+    ///
+    /// A reference to `Self` for method chaining.
+    pub async fn disable_linger(&self) -> &Self {
+        self.linger(None).await;
         self
     }
 
