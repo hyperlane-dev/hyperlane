@@ -435,16 +435,17 @@ impl Server {
     ///
     /// - `&TcpStream` - A reference to the `TcpStream` to configure.
     async fn configure_stream(&self, stream: &TcpStream) {
-        let config: ServerConfigInner = self.read().await.get_config().clone();
-        let nodelay_opt: OptionBool = *config.get_nodelay();
-        let linger_opt: OptionDuration = *config.get_linger();
-        let ttl_opt: OptionU32 = *config.get_ttl();
-        let _ = stream.set_linger(linger_opt);
+        let server_inner: RwLockReadGuardServerInner = self.read().await;
+        let config: &ServerConfigInner = server_inner.get_config();
+        let linger_opt: &OptionDuration = config.get_linger();
+        let nodelay_opt: &OptionBool = config.get_nodelay();
+        let ttl_opt: &OptionU32 = config.get_ttl();
+        let _ = stream.set_linger(*linger_opt);
         if let Some(nodelay) = nodelay_opt {
-            let _ = stream.set_nodelay(nodelay);
+            let _ = stream.set_nodelay(*nodelay);
         }
         if let Some(ttl) = ttl_opt {
-            let _ = stream.set_ttl(ttl);
+            let _ = stream.set_ttl(*ttl);
         }
     }
 
