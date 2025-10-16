@@ -1,6 +1,5 @@
 use crate::*;
 
-// Collects route macro definitions for the inventory system.
 collect!(HookMacro);
 
 /// Provides a default implementation for RouteMatcher.

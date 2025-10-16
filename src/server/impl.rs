@@ -197,7 +197,6 @@ impl Server {
                     .push(handler);
             }
             _ => {
-                // Invalid combination of hook type and handler type
                 panic!("Invalid hook type and handler combination");
             }
         };
@@ -367,7 +366,6 @@ impl Server {
             let result: ResultJoinError<()> = spawn(hook(initial)).await;
             if let Err(join_error) = result {
                 if join_error.is_panic() {
-                    // Panic in panic hook - just log and continue
                     eprintln!("Panic occurred in panic hook: {:?}", join_error);
                 }
             }
