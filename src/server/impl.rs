@@ -235,49 +235,34 @@ impl Server {
     /// Registers a panic hook handler to the processing pipeline.
     ///
     /// This method allows registering panic hooks that implement the `PanicHook` trait,
-    /// which will be executed when a panic occurs during request processing. The panic hook
-    /// can have any `Prev` type that is `Send` and can be constructed from `DefaultInitialHook`.
+    /// which will be executed when a panic occurs during request processing.
     ///
     /// # Type Parameters
     ///
-    /// - `P` - The panic hook type that implements `PanicHook`.
+    /// - `PanicHook` - The panic hook type that implements `PanicHook`.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// // Using DefaultInitialHook as Prev (most common case)
-    /// server.panic_hook::<MyPanicHook>().await;
-    ///
-    /// // Using custom Prev type (requires From<DefaultInitialHook> implementation)
-    /// server.panic_hook::<MyPanicHookWithCustomPrev>().await;
-    /// ```
     pub async fn panic_hook<P>(&self) -> &Self
     where
         P: PanicHook,
-        P::Prev: From<DefaultInitialHook>,
     {
-        let handler: ArcPinBoxFutureSendSync = create_panic_hook_handler::<P>();
-        self.write().await.get_mut_panic_hook().push(handler);
+        self.write()
+            .await
+            .get_mut_panic_hook()
+            .push(create_panic_hook_handler::<P>());
         self
     }
-
-    /// Adds a route handler for a specific path.
-    ///
-    /// # Arguments
 
     /// Registers a route handler for a specific path.
     ///
     /// This method allows registering route handlers that implement the `Route` trait,
-    /// providing type safety and better code organization. The route handler can have
-    /// any `Prev` type that is `Send` and can be constructed from `DefaultInitialHook`.
+    /// providing type safety and better code organization.
     ///
     /// # Type Parameters
     ///
-    /// - `R` - The route handler type that implements `Route`.
+    /// - `Route` - The route handler type that implements `Route`.
     ///
     /// # Arguments
     ///
@@ -289,14 +274,11 @@ impl Server {
     pub async fn route<R>(&self, path: impl ToString) -> &Self
     where
         R: Route,
-        R::Prev: From<DefaultInitialHook>,
     {
-        let route_str: String = path.to_string();
-        let handler: ArcPinBoxFutureSendSync = create_route_handler::<R>();
         self.write()
             .await
             .get_mut_route()
-            .add(&route_str, handler)
+            .add(&path.to_string(), create_route_handler::<R>())
             .unwrap();
         self
     }
@@ -304,12 +286,11 @@ impl Server {
     /// Registers request middleware to the processing pipeline.
     ///
     /// This method allows registering middleware that implements the `Middleware` trait,
-    /// which will be executed before route handlers for every incoming request. The middleware
-    /// can have any `Prev` type that is `Send` and can be constructed from `DefaultInitialHook`.
+    /// which will be executed before route handlers for every incoming request.
     ///
     /// # Type Parameters
     ///
-    /// - `M` - The middleware type that implements `Middleware`.
+    /// - `Middleware` - The middleware type that implements `Middleware`.
     ///
     /// # Returns
     ///
@@ -317,25 +298,22 @@ impl Server {
     pub async fn request_middleware<M>(&self) -> &Self
     where
         M: Middleware,
-        M::Prev: From<DefaultInitialHook>,
     {
-        let handler: ArcPinBoxFutureSendSync = create_middleware_handler::<M>();
         self.write()
             .await
             .get_mut_request_middleware()
-            .push(handler);
+            .push(create_middleware_handler::<M>());
         self
     }
 
     /// Registers response middleware to the processing pipeline.
     ///
     /// This method allows registering middleware that implements the `Middleware` trait,
-    /// which will be executed after route handlers for every outgoing response. The middleware
-    /// can have any `Prev` type that is `Send` and can be constructed from `DefaultInitialHook`.
+    /// which will be executed after route handlers for every outgoing response.
     ///
     /// # Type Parameters
     ///
-    /// - `M` - The middleware type that implements `Middleware`.
+    /// - `Middleware` - The middleware type that implements `Middleware`.
     ///
     /// # Returns
     ///
@@ -343,13 +321,11 @@ impl Server {
     pub async fn response_middleware<M>(&self) -> &Self
     where
         M: Middleware,
-        M::Prev: From<DefaultInitialHook>,
     {
-        let handler: ArcPinBoxFutureSendSync = create_middleware_handler::<M>();
         self.write()
             .await
             .get_mut_response_middleware()
-            .push(handler);
+            .push(create_middleware_handler::<M>());
         self
     }
 

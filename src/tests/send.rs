@@ -1,20 +1,14 @@
 use crate::*;
 
 #[allow(dead_code)]
-struct TestSendRoute {
-    context: Context,
-}
+struct TestSendRoute;
 
 impl Route for TestSendRoute {
-    type Prev = DefaultInitialHook;
-
-    async fn new(prev: &Self::Prev) -> Self {
-        Self {
-            context: prev.context.clone(),
-        }
+    async fn new(_ctx: Context) -> Self {
+        Self
     }
 
-    async fn handle(self) {}
+    async fn handle(self, _ctx: Context) {}
 }
 
 #[tokio::test]

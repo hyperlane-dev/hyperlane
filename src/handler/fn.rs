@@ -16,18 +16,16 @@ use crate::*;
 ///
 /// # Note
 ///
-/// The `Prev` type parameter of the `Route` trait can be any type that is `Send`.
-/// At runtime, a `DefaultInitialHook` is created and converted to the route's `Prev` type,
-/// then passed by reference to the `new` method. The `Prev` type must implement
-/// `From<DefaultInitialHook>` to enable this conversion.
+/// At runtime, a `DefaultInitialHook` is created and its `Context` is extracted
+/// and passed directly to the route's `new` and `handle` methods.
 pub(crate) fn create_route_handler<R>() -> ArcPinBoxFutureSendSync
 where
     R: Route,
-    R::Prev: From<DefaultInitialHook>,
 {
     Arc::new(move |initial: DefaultInitialHook| -> PinBoxFutureSend<()> {
         Box::pin(async move {
-            R::new(&R::Prev::from(initial)).await.handle().await;
+            let ctx = initial.context.clone();
+            R::new(ctx.clone()).await.handle(ctx).await;
         })
     })
 }
@@ -48,18 +46,16 @@ where
 ///
 /// # Note
 ///
-/// The `Prev` type parameter of the `Middleware` trait can be any type that is `Send`.
-/// At runtime, a `DefaultInitialHook` is created and converted to the middleware's `Prev` type,
-/// then passed by reference to the `new` method. The `Prev` type must implement
-/// `From<DefaultInitialHook>` to enable this conversion.
+/// At runtime, a `DefaultInitialHook` is created and its `Context` is extracted
+/// and passed directly to the middleware's `new` and `handle` methods.
 pub(crate) fn create_middleware_handler<M>() -> ArcPinBoxFutureSendSync
 where
     M: Middleware,
-    M::Prev: From<DefaultInitialHook>,
 {
     Arc::new(move |initial: DefaultInitialHook| -> PinBoxFutureSend<()> {
         Box::pin(async move {
-            M::new(&M::Prev::from(initial)).await.handle().await;
+            let ctx = initial.context.clone();
+            M::new(ctx.clone()).await.handle(ctx).await;
         })
     })
 }
@@ -80,18 +76,16 @@ where
 ///
 /// # Note
 ///
-/// The `Prev` type parameter of the `PanicHook` trait can be any type that is `Send`.
-/// At runtime, a `DefaultInitialHook` is created and converted to the panic hook's `Prev` type,
-/// then passed by reference to the `new` method. The `Prev` type must implement
-/// `From<DefaultInitialHook>` to enable this conversion.
+/// At runtime, a `DefaultInitialHook` is created and its `Context` is extracted
+/// and passed directly to the panic hook's `new` and `handle` methods.
 pub(crate) fn create_panic_hook_handler<P>() -> ArcPinBoxFutureSendSync
 where
     P: PanicHook,
-    P::Prev: From<DefaultInitialHook>,
 {
     Arc::new(move |initial: DefaultInitialHook| -> PinBoxFutureSend<()> {
         Box::pin(async move {
-            P::new(&P::Prev::from(initial)).await.handle().await;
+            let ctx = initial.context.clone();
+            P::new(ctx.clone()).await.handle(ctx).await;
         })
     })
 }

@@ -3,110 +3,107 @@ use crate::*;
 /// Trait for route handlers that process HTTP requests.
 ///
 /// Route handlers are responsible for processing matched routes and generating
-/// responses. Each route handler receives the previous handler in the chain
-/// through its `new` method, allowing it to extract the `Context` and any
-/// other state from the previous stage.
+/// responses. Each route handler receives the `Context` directly through its
+/// `new` method for initialization and through the `handle` method for processing.
 pub trait Route: Send + Sync + 'static {
-    /// The type of the previous handler in the processing chain.
-    ///
-    /// This associated type must be `Send` to ensure thread safety.
-    type Prev: Send;
-
-    /// Creates a new instance of this route handler from the previous handler.
+    /// Creates a new instance of this route handler from the context.
     ///
     /// This method is called by the framework to instantiate the route handler,
-    /// passing in a reference to the previous handler from which the `Context` can be extracted.
+    /// passing in the `Context` directly.
     ///
     /// # Arguments
     ///
-    /// - `&Self::Prev` - A reference to the previous handler in the chain, which contains the `Context`.
+    /// - `Context` - The request context containing all request/response data.
     ///
     /// # Returns
     ///
     /// A future that resolves to a new instance of this route handler.
-    fn new(prev: &Self::Prev) -> impl Future<Output = Self> + Send;
+    fn new(ctx: Context) -> impl Future<Output = Self> + Send;
 
     /// Executes the route handling logic.
     ///
     /// This method contains the actual business logic for processing the request
-    /// and generating a response. It has access to the `Context` through `self`.
+    /// and generating a response. It receives the `Context` as a parameter.
+    ///
+    /// # Arguments
+    ///
+    /// - `Context` - The request context for accessing request/response data.
     ///
     /// # Returns
     ///
     /// A future that resolves when the route handling is complete.
-    fn handle(self) -> impl Future<Output = ()> + Send;
+    fn handle(self, ctx: Context) -> impl Future<Output = ()> + Send;
 }
 
 /// Trait for middleware that can process requests or responses.
 ///
 /// Middleware handlers are executed before and after route handlers, allowing
 /// for cross-cutting concerns like logging, authentication, and response
-/// modification. Like route handlers, middleware receives the previous handler
-/// through its `new` method.
+/// modification. Middleware receives the `Context` directly through its
+/// `new` method for initialization and through the `handle` method for processing.
 pub trait Middleware: Send + Sync + 'static {
-    /// The type of the previous handler in the processing chain.
-    ///
-    /// This associated type must be `Send` to ensure thread safety.
-    type Prev: Send;
-
-    /// Creates a new instance of this middleware from the previous handler.
+    /// Creates a new instance of this middleware from the context.
     ///
     /// This method is called by the framework to instantiate the middleware,
-    /// passing in a reference to the previous handler from which the `Context` can be extracted.
+    /// passing in the `Context` directly.
     ///
     /// # Arguments
     ///
-    /// - `&Self::Prev` - A reference to the previous handler in the chain, which contains the `Context`.
+    /// - `Context` - The request context containing all request/response data.
     ///
     /// # Returns
     ///
     /// A future that resolves to a new instance of this middleware.
-    fn new(prev: &Self::Prev) -> impl Future<Output = Self> + Send;
+    fn new(ctx: Context) -> impl Future<Output = Self> + Send;
 
     /// Executes the middleware logic.
     ///
     /// This method contains the middleware's processing logic, which may modify
-    /// the request, response, or context. It has access to the `Context` through `self`.
+    /// the request, response, or context. It receives the `Context` as a parameter.
+    ///
+    /// # Arguments
+    ///
+    /// - `Context` - The request context for accessing request/response data.
     ///
     /// # Returns
     ///
     /// A future that resolves when the middleware processing is complete.
-    fn handle(self) -> impl Future<Output = ()> + Send;
+    fn handle(self, ctx: Context) -> impl Future<Output = ()> + Send;
 }
 
 /// Trait for panic hook handlers that process panics during request processing.
 ///
 /// Panic hooks are executed when a panic occurs in a route handler or middleware,
-/// allowing for custom error handling, logging, and recovery. Like other handlers,
-/// panic hooks receive the previous handler through their `new` method.
+/// allowing for custom error handling, logging, and recovery. Panic hooks receive
+/// the `Context` directly through its `new` method for initialization and through
+/// the `handle` method for processing.
 pub trait PanicHook: Send + Sync + 'static {
-    /// The type of the previous handler in the processing chain.
-    ///
-    /// This associated type must be `Send` to ensure thread safety.
-    type Prev: Send;
-
-    /// Creates a new instance of this panic hook from the previous handler.
+    /// Creates a new instance of this panic hook from the context.
     ///
     /// This method is called by the framework to instantiate the panic hook,
-    /// passing in a reference to the previous handler from which the `Context` can be extracted.
+    /// passing in the `Context` directly.
     ///
     /// # Arguments
     ///
-    /// - `&Self::Prev` - A reference to the previous handler in the chain, which contains the `Context`.
+    /// - `Context` - The request context containing all request/response data.
     ///
     /// # Returns
     ///
     /// A future that resolves to a new instance of this panic hook.
-    fn new(prev: &Self::Prev) -> impl Future<Output = Self> + Send;
+    fn new(ctx: Context) -> impl Future<Output = Self> + Send;
 
     /// Executes the panic hook logic.
     ///
     /// This method contains the panic handling logic, which may log the error,
-    /// send error responses, or perform cleanup. It has access to the `Context`
-    /// (which contains the panic information) through `self`.
+    /// send error responses, or perform cleanup. It receives the `Context`
+    /// (which contains the panic information) as a parameter.
+    ///
+    /// # Arguments
+    ///
+    /// - `Context` - The request context for accessing panic information.
     ///
     /// # Returns
     ///
     /// A future that resolves when the panic handling is complete.
-    fn handle(self) -> impl Future<Output = ()> + Send;
+    fn handle(self, ctx: Context) -> impl Future<Output = ()> + Send;
 }
