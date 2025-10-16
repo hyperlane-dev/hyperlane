@@ -6,7 +6,7 @@ use crate::*;
 /// - `wait_hook`: A future that resolves when the server has stopped accepting new connections.
 /// - `shutdown_hook`: A function that can be called to gracefully shut down the server.
 #[derive(Clone, CustomDebug, DisplayDebug, Getter, Setter)]
-pub struct ServerHook {
+pub struct ServerControlHook {
     /// A hook that returns a future, which completes when the server's main task finishes.
     /// This is typically used to wait for the server to stop accepting connections before
     /// the application exits.

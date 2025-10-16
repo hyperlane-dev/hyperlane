@@ -234,35 +234,35 @@ impl Server {
 
     /// Registers a panic hook handler to the processing pipeline.
     ///
-    /// This method allows registering panic hooks that implement the `PanicHook` trait,
+    /// This method allows registering panic hooks that implement the `ServerHook` trait,
     /// which will be executed when a panic occurs during request processing.
     ///
     /// # Type Parameters
     ///
-    /// - `PanicHook` - The panic hook type that implements `PanicHook`.
+    /// - `ServerHook` - The panic hook type that implements `ServerHook`.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn panic_hook<P>(&self) -> &Self
+    pub async fn panic_hook<S>(&self) -> &Self
     where
-        P: PanicHook,
+        S: ServerHook,
     {
         self.write()
             .await
             .get_mut_panic_hook()
-            .push(create_panic_hook_handler::<P>());
+            .push(create_panic_hook_handler::<S>());
         self
     }
 
     /// Registers a route handler for a specific path.
     ///
-    /// This method allows registering route handlers that implement the `Route` trait,
+    /// This method allows registering route handlers that implement the `ServerHook` trait,
     /// providing type safety and better code organization.
     ///
     /// # Type Parameters
     ///
-    /// - `Route` - The route handler type that implements `Route`.
+    /// - `ServerHook` - The route handler type that implements `ServerHook`.
     ///
     /// # Arguments
     ///
@@ -271,61 +271,61 @@ impl Server {
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn route<R>(&self, path: impl ToString) -> &Self
+    pub async fn route<S>(&self, path: impl ToString) -> &Self
     where
-        R: Route,
+        S: ServerHook,
     {
         self.write()
             .await
             .get_mut_route()
-            .add(&path.to_string(), create_route_handler::<R>())
+            .add(&path.to_string(), create_route_handler::<S>())
             .unwrap();
         self
     }
 
     /// Registers request middleware to the processing pipeline.
     ///
-    /// This method allows registering middleware that implements the `Middleware` trait,
+    /// This method allows registering middleware that implements the `ServerHook` trait,
     /// which will be executed before route handlers for every incoming request.
     ///
     /// # Type Parameters
     ///
-    /// - `Middleware` - The middleware type that implements `Middleware`.
+    /// - `ServerHook` - The middleware type that implements `ServerHook`.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn request_middleware<M>(&self) -> &Self
+    pub async fn request_middleware<S>(&self) -> &Self
     where
-        M: Middleware,
+        S: ServerHook,
     {
         self.write()
             .await
             .get_mut_request_middleware()
-            .push(create_middleware_handler::<M>());
+            .push(create_middleware_handler::<S>());
         self
     }
 
     /// Registers response middleware to the processing pipeline.
     ///
-    /// This method allows registering middleware that implements the `Middleware` trait,
+    /// This method allows registering middleware that implements the `ServerHook` trait,
     /// which will be executed after route handlers for every outgoing response.
     ///
     /// # Type Parameters
     ///
-    /// - `Middleware` - The middleware type that implements `Middleware`.
+    /// - `ServerHook` - The middleware type that implements `ServerHook`.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn response_middleware<M>(&self) -> &Self
+    pub async fn response_middleware<S>(&self) -> &Self
     where
-        M: Middleware,
+        S: ServerHook,
     {
         self.write()
             .await
             .get_mut_response_middleware()
-            .push(create_middleware_handler::<M>());
+            .push(create_middleware_handler::<S>());
         self
     }
 
@@ -592,7 +592,7 @@ impl Server {
     /// Returns a `ServerResult` containing a shutdown function on success.
     /// Calling this function will shut down the server by aborting its main task.
     /// Returns an error if the server fails to start.
-    pub async fn run(&self) -> ServerResult<ServerHook> {
+    pub async fn run(&self) -> ServerResult<ServerControlHook> {
         let tcp_listener: TcpListener = self.create_tcp_listener().await?;
         let server: Server = self.clone();
         let (wait_sender, wait_receiver) = channel(());
@@ -617,10 +617,10 @@ impl Server {
             let _ = shutdown_receiver.changed().await;
             accept_connections.abort();
         });
-        let mut server_hook: ServerHook = ServerHook::default();
-        server_hook.set_shutdown_hook(shutdown_hook);
-        server_hook.set_wait_hook(wait_hook);
-        Ok(server_hook)
+        let mut server_lifecycle: ServerControlHook = ServerControlHook::default();
+        server_lifecycle.set_shutdown_hook(shutdown_hook);
+        server_lifecycle.set_wait_hook(wait_hook);
+        Ok(server_lifecycle)
     }
 
     /// Executes trait-based request middleware in sequence.

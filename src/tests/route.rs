@@ -33,7 +33,7 @@ where
 
 struct TestRoute;
 
-impl Route for TestRoute {
+impl ServerHook for TestRoute {
     async fn new(_ctx: Context) -> Self {
         Self
     }

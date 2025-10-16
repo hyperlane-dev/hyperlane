@@ -3,7 +3,7 @@ use crate::*;
 #[allow(dead_code)]
 struct TestSendRoute;
 
-impl Route for TestSendRoute {
+impl ServerHook for TestSendRoute {
     async fn new(_ctx: Context) -> Self {
         Self
     }

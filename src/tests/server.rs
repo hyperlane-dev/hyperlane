@@ -25,7 +25,7 @@ struct SseRoute;
 struct WsRoute;
 struct DynamicRoute;
 
-impl Middleware for SendBodyMiddleware {
+impl ServerHook for SendBodyMiddleware {
     async fn new(_ctx: Context) -> Self {
         Self
     }
@@ -49,7 +49,7 @@ impl Middleware for SendBodyMiddleware {
     }
 }
 
-impl Middleware for UpgradeMiddleware {
+impl ServerHook for UpgradeMiddleware {
     async fn new(_ctx: Context) -> Self {
         Self
     }
@@ -77,7 +77,7 @@ impl Middleware for UpgradeMiddleware {
     }
 }
 
-impl Middleware for ResponseMiddleware {
+impl ServerHook for ResponseMiddleware {
     async fn new(_ctx: Context) -> Self {
         Self
     }
@@ -90,7 +90,7 @@ impl Middleware for ResponseMiddleware {
     }
 }
 
-impl Route for RootRoute {
+impl ServerHook for RootRoute {
     async fn new(_ctx: Context) -> Self {
         Self
     }
@@ -121,7 +121,7 @@ impl WsRoute {
     }
 }
 
-impl Route for WsRoute {
+impl ServerHook for WsRoute {
     async fn new(_ctx: Context) -> Self {
         Self
     }
@@ -135,7 +135,7 @@ impl Route for WsRoute {
     }
 }
 
-impl Route for SseRoute {
+impl ServerHook for SseRoute {
     async fn new(_ctx: Context) -> Self {
         Self
     }
@@ -157,7 +157,7 @@ impl Route for SseRoute {
     }
 }
 
-impl Route for DynamicRoute {
+impl ServerHook for DynamicRoute {
     async fn new(_ctx: Context) -> Self {
         Self
     }
@@ -168,7 +168,7 @@ impl Route for DynamicRoute {
     }
 }
 
-impl PanicHook for ServerPanicHook {
+impl ServerHook for ServerPanicHook {
     async fn new(_ctx: Context) -> Self {
         Self {}
     }
@@ -212,11 +212,11 @@ async fn main() {
     server.route::<SseRoute>("/sse").await;
     server.route::<DynamicRoute>("/dynamic/{routing}").await;
     server.route::<DynamicRoute>("/regex/{file:^.*$}").await;
-    let server_hook: ServerHook = server.run().await.unwrap_or_default();
-    let server_hook_clone: ServerHook = server_hook.clone();
+    let server_lifecycle: ServerControlHook = server.run().await.unwrap_or_default();
+    let server_lifecycle_clone: ServerControlHook = server_lifecycle.clone();
     tokio::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-        server_hook.shutdown().await;
+        server_lifecycle.shutdown().await;
     });
-    server_hook_clone.wait().await;
+    server_lifecycle_clone.wait().await;
 }

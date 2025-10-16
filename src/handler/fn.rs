@@ -1,14 +1,14 @@
 use crate::*;
 
-/// Creates a type-erased route handler from a concrete Route implementation.
+/// Creates a type-erased route handler from a concrete ServerHook implementation.
 ///
-/// This function takes a type that implements the `Route` trait and converts it
+/// This function takes a type that implements the `ServerHook` trait and converts it
 /// into a `ArcPinBoxFutureSendSync` that can be stored alongside other route handlers
 /// of different concrete types.
 ///
 /// # Type Parameters
 ///
-/// - `Route` - The concrete route handler type that implements `Route`.
+/// - `ServerHook` - The concrete route handler type that implements `ServerHook`.
 ///
 /// # Returns
 ///
@@ -17,10 +17,10 @@ use crate::*;
 /// # Note
 ///
 /// At runtime, a `DefaultInitialHook` is created and its `Context` is extracted
-/// and passed directly to the route's `new` and `handle` methods.
+/// and passed directly to the handler's `new` and `handle` methods.
 pub(crate) fn create_route_handler<R>() -> ArcPinBoxFutureSendSync
 where
-    R: Route,
+    R: ServerHook,
 {
     Arc::new(move |initial: DefaultInitialHook| -> PinBoxFutureSend<()> {
         Box::pin(async move {
@@ -30,15 +30,15 @@ where
     })
 }
 
-/// Creates a type-erased middleware handler from a concrete Middleware implementation.
+/// Creates a type-erased middleware handler from a concrete ServerHook implementation.
 ///
-/// This function takes a type that implements the `Middleware` trait and converts it
+/// This function takes a type that implements the `ServerHook` trait and converts it
 /// into a `ArcPinBoxFutureSendSync` that can be stored alongside other middleware handlers
 /// of different concrete types.
 ///
 /// # Type Parameters
 ///
-/// - `Middleware` - The concrete middleware type that implements `Middleware`.
+/// - `ServerHook` - The concrete middleware type that implements `ServerHook`.
 ///
 /// # Returns
 ///
@@ -47,10 +47,10 @@ where
 /// # Note
 ///
 /// At runtime, a `DefaultInitialHook` is created and its `Context` is extracted
-/// and passed directly to the middleware's `new` and `handle` methods.
+/// and passed directly to the handler's `new` and `handle` methods.
 pub(crate) fn create_middleware_handler<M>() -> ArcPinBoxFutureSendSync
 where
-    M: Middleware,
+    M: ServerHook,
 {
     Arc::new(move |initial: DefaultInitialHook| -> PinBoxFutureSend<()> {
         Box::pin(async move {
@@ -60,15 +60,15 @@ where
     })
 }
 
-/// Creates a type-erased panic hook handler from a concrete PanicHook implementation.
+/// Creates a type-erased panic hook handler from a concrete ServerHook implementation.
 ///
-/// This function takes a type that implements the `PanicHook` trait and converts it
+/// This function takes a type that implements the `ServerHook` trait and converts it
 /// into a `ArcPinBoxFutureSendSync` that can be stored alongside other panic hook handlers
 /// of different concrete types.
 ///
 /// # Type Parameters
 ///
-/// - `PanicHook` - The concrete panic hook type that implements `PanicHook`.
+/// - `ServerHook` - The concrete panic hook type that implements `ServerHook`.
 ///
 /// # Returns
 ///
@@ -77,10 +77,10 @@ where
 /// # Note
 ///
 /// At runtime, a `DefaultInitialHook` is created and its `Context` is extracted
-/// and passed directly to the panic hook's `new` and `handle` methods.
+/// and passed directly to the handler's `new` and `handle` methods.
 pub(crate) fn create_panic_hook_handler<P>() -> ArcPinBoxFutureSendSync
 where
-    P: PanicHook,
+    P: ServerHook,
 {
     Arc::new(move |initial: DefaultInitialHook| -> PinBoxFutureSend<()> {
         Box::pin(async move {
