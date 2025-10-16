@@ -1364,66 +1364,6 @@ impl Context {
             .await
     }
 
-    /// Sets the send function for the context.
-    ///
-    /// # Arguments
-    ///
-    /// - `F: FnContextSendSyncStatic<Fut, ()>, Fut: FutureSendStatic<()>` - The send function to store.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - A reference to the modified context.
-    pub async fn set_send_hook<F, Fut>(&self, hook: F) -> &Self
-    where
-        F: FnContextSendSyncStatic<Fut, ()>,
-        Fut: FutureSendStatic<()>,
-    {
-        let send_hook: ArcFnContextPinBoxSendSync<()> =
-            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
-        self.set_internal_attribute(InternalAttribute::SendHook, send_hook)
-            .await
-    }
-
-    /// Retrieves the send function if it has been set.
-    ///
-    /// # Returns
-    ///
-    /// - `OptionArcFnContextPinBoxSendSync<()>` - The send function if it has been set.
-    pub async fn try_get_send_hook(&self) -> OptionArcFnContextPinBoxSendSync<()> {
-        self.try_get_internal_attribute(InternalAttribute::SendHook)
-            .await
-    }
-
-    /// Sets the send body function for the context.
-    ///
-    /// # Arguments
-    ///
-    /// - `F` - The send body function to store.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - A reference to the modified context.
-    pub async fn set_send_body_hook<F, Fut>(&self, hook: F) -> &Self
-    where
-        F: FnContextSendSyncStatic<Fut, ()>,
-        Fut: FutureSendStatic<()>,
-    {
-        let send_body_hook: ArcFnContextPinBoxSendSync<()> =
-            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
-        self.set_internal_attribute(InternalAttribute::SendBodyHook, send_body_hook)
-            .await
-    }
-
-    /// Retrieves the send body function if it has been set.
-    ///
-    /// # Returns
-    ///
-    /// - `OptionArcFnContextPinBoxSendSync<()>` - The send body function if it has been set.
-    pub async fn try_get_send_body_hook(&self) -> OptionArcFnContextPinBoxSendSync<()> {
-        self.try_get_internal_attribute(InternalAttribute::SendBodyHook)
-            .await
-    }
-
     /// Updates the lifecycle status based on the current context state.
     ///
     /// # Arguments

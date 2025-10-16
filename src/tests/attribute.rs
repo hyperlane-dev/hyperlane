@@ -59,13 +59,3 @@ async fn run_set_func() {
         ctx.try_get_attribute(KEY).await.unwrap();
     assert_eq!(get_key(PARAM), func(PARAM));
 }
-
-#[tokio::test]
-async fn send_body_hook() {
-    let ctx: Context = Context::default();
-    async fn send_body_hook_fn(ctx: Context) {
-        let _ = ctx.send_body().await;
-    }
-    ctx.set_send_body_hook(send_body_hook_fn).await;
-    assert!(ctx.try_get_send_body_hook().await.is_some());
-}

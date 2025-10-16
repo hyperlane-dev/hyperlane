@@ -31,14 +31,28 @@ where
     );
 }
 
+#[allow(dead_code)]
+struct TestRoute {
+    context: Context,
+}
+
+impl Route for TestRoute {
+    type Prev = DefaultInitialHook;
+
+    async fn new(prev: &Self::Prev) -> Self {
+        Self {
+            context: prev.context.clone(),
+        }
+    }
+
+    async fn handle(self) {}
+}
+
 #[tokio::test]
 async fn empty_route() {
     assert_panic_message_contains(
         || async {
-            let _server: &Server = Server::new()
-                .await
-                .route(EMPTY_STR, |_| async move {})
-                .await;
+            let _server: &Server = Server::new().await.route::<TestRoute>(EMPTY_STR).await;
         },
         &RouteError::EmptyPattern.to_string(),
     )
@@ -51,9 +65,9 @@ async fn duplicate_route() {
         || async {
             let _server: &Server = Server::new()
                 .await
-                .route(ROOT_PATH, |_| async move {})
+                .route::<TestRoute>(ROOT_PATH)
                 .await
-                .route(ROOT_PATH, |_| async move {})
+                .route::<TestRoute>(ROOT_PATH)
                 .await;
         },
         &RouteError::DuplicatePattern(ROOT_PATH.to_string()).to_string(),

@@ -27,17 +27,17 @@ pub(crate) struct RouteMatcher {
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
-    pub(super) static_routes: HashMapStringArcFnPinBoxSendSyncXxHash3_64<()>,
+    pub(super) static_routes: HashMapStringArcPinBoxFutureSendSync,
     /// A vector of routes that contain dynamic segments.
     /// These are evaluated sequentially if no static route matches.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
-    pub(super) dynamic_routes: VecRoutePatternArcFnPinBoxSendSync<()>,
+    pub(super) dynamic_routes: VecArcPinBoxFutureSendSync,
     /// A vector of routes that use regular expressions for matching.
     /// These provide the most flexibility but are evaluated last due to their performance overhead.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
-    pub(super) regex_routes: VecRoutePatternArcFnPinBoxSendSync<()>,
+    pub(super) regex_routes: VecArcPinBoxFutureSendSync,
 }

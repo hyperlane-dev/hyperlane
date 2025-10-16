@@ -16,22 +16,23 @@ async fn server_inner_partial_eq() {
     assert_eq!(inner1, inner2);
 }
 
-#[tokio::test]
-async fn server() {
-    async fn send_body_hook(ctx: Context) {
-        let body: ResponseBody = ctx.get_response_body().await;
-        if ctx.get_request().await.is_ws() {
-            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-            ctx.send_body_list_with_data(&frame_list).await.unwrap();
-        } else {
-            ctx.send_body().await.unwrap();
+struct SendBodyMiddleware {
+    ctx: Context,
+}
+
+impl Middleware for SendBodyMiddleware {
+    type Prev = DefaultInitialHook;
+
+    async fn new(prev: &Self::Prev) -> Self {
+        Self {
+            ctx: prev.context.clone(),
         }
     }
 
-    async fn request_middleware(ctx: Context) {
-        ctx.set_send_body_hook(send_body_hook).await;
-        let socket_addr: String = ctx.get_socket_addr_string().await;
-        ctx.set_response_version(HttpVersion::HTTP1_1)
+    async fn handle(self) {
+        let socket_addr: String = self.ctx.get_socket_addr_string().await;
+        self.ctx
+            .set_response_version(HttpVersion::HTTP1_1)
             .await
             .set_response_status_code(200)
             .await
@@ -46,14 +47,33 @@ async fn server() {
             .set_response_header("SocketAddr", &socket_addr)
             .await;
     }
+}
 
-    async fn upgrade_hook(ctx: Context) {
-        if !ctx.get_request().await.is_ws() {
+struct UpgradeMiddleware {
+    ctx: Context,
+}
+
+impl Middleware for UpgradeMiddleware {
+    type Prev = DefaultInitialHook;
+
+    async fn new(prev: &Self::Prev) -> Self {
+        Self {
+            ctx: prev.context.clone(),
+        }
+    }
+
+    async fn handle(self) {
+        if !self.ctx.get_request().await.is_ws() {
             return;
         }
-        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
+        if let Some(key) = &self
+            .ctx
+            .try_get_request_header_back(SEC_WEBSOCKET_KEY)
+            .await
+        {
             let accept_key: String = WebSocketFrame::generate_accept_key(key);
-            ctx.set_response_status_code(101)
+            self.ctx
+                .set_response_status_code(101)
                 .await
                 .set_response_header(UPGRADE, WEBSOCKET)
                 .await
@@ -68,63 +88,164 @@ async fn server() {
                 .unwrap();
         }
     }
+}
 
-    async fn response_middleware(ctx: Context) {
-        if ctx.get_request().await.is_ws() {
-            return;
+struct ResponseMiddleware {
+    ctx: Context,
+}
+
+impl Middleware for ResponseMiddleware {
+    type Prev = DefaultInitialHook;
+
+    async fn new(prev: &Self::Prev) -> Self {
+        Self {
+            ctx: prev.context.clone(),
         }
-        let _ = ctx.send().await;
     }
 
-    async fn root_route(ctx: Context) {
-        let path: RequestPath = ctx.get_request_path().await;
+    async fn handle(self) {
+        if self.ctx.get_request().await.is_ws() {
+            return;
+        }
+        let _ = self.ctx.send().await;
+    }
+}
+
+struct RootRoute {
+    ctx: Context,
+}
+
+impl Route for RootRoute {
+    type Prev = DefaultInitialHook;
+
+    async fn new(prev: &Self::Prev) -> Self {
+        Self {
+            ctx: prev.context.clone(),
+        }
+    }
+
+    async fn handle(self) {
+        let path: RequestPath = self.ctx.get_request_path().await;
         let response_body: String = format!("Hello hyperlane => {}", path);
         let cookie1: String = CookieBuilder::new("key1", "value1").http_only().build();
         let cookie2: String = CookieBuilder::new("key2", "value2").http_only().build();
-        ctx.add_response_header(SET_COOKIE, &cookie1)
+        self.ctx
+            .add_response_header(SET_COOKIE, &cookie1)
             .await
             .add_response_header(SET_COOKIE, &cookie2)
             .await
             .set_response_body(&response_body)
             .await;
     }
+}
 
-    async fn ws_route(ctx: Context) {
-        if let Some(send_body_hook) = ctx.try_get_send_body_hook().await {
-            while ctx.ws_from_stream(4096).await.is_ok() {
-                let request_body: Vec<u8> = ctx.get_request_body().await;
-                ctx.set_response_body(&request_body).await;
-                send_body_hook(ctx.clone()).await;
-            }
+struct WsRoute {
+    ctx: Context,
+}
+
+impl WsRoute {
+    async fn send_body_hook(&self) {
+        let body: ResponseBody = self.ctx.get_response_body().await;
+        if self.ctx.get_request().await.is_ws() {
+            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+            self.ctx
+                .send_body_list_with_data(&frame_list)
+                .await
+                .unwrap();
+        } else {
+            self.ctx.send_body().await.unwrap();
+        }
+    }
+}
+
+impl Route for WsRoute {
+    type Prev = DefaultInitialHook;
+
+    async fn new(prev: &Self::Prev) -> Self {
+        Self {
+            ctx: prev.context.clone(),
         }
     }
 
-    async fn sse_route(ctx: Context) {
-        let _ = ctx
+    async fn handle(self) {
+        while self.ctx.ws_from_stream(4096).await.is_ok() {
+            let request_body: Vec<u8> = self.ctx.get_request_body().await;
+            self.ctx.set_response_body(&request_body).await;
+            self.send_body_hook().await;
+        }
+    }
+}
+
+struct SseRoute {
+    ctx: Context,
+}
+
+impl Route for SseRoute {
+    type Prev = DefaultInitialHook;
+
+    async fn new(prev: &Self::Prev) -> Self {
+        Self {
+            ctx: prev.context.clone(),
+        }
+    }
+
+    async fn handle(self) {
+        let _ = self
+            .ctx
             .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
             .await
             .send()
             .await;
         for i in 0..10 {
-            let _ = ctx
+            let _ = self
+                .ctx
                 .set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
                 .await
                 .send_body()
                 .await;
         }
-        let _ = ctx.closed().await;
+        let _ = self.ctx.closed().await;
+    }
+}
+
+struct DynamicRoute {
+    ctx: Context,
+}
+
+impl Route for DynamicRoute {
+    type Prev = DefaultInitialHook;
+
+    async fn new(prev: &Self::Prev) -> Self {
+        Self {
+            ctx: prev.context.clone(),
+        }
     }
 
-    async fn dynamic_route(ctx: Context) {
-        let param: RouteParams = ctx.get_route_params().await;
+    async fn handle(self) {
+        let param: RouteParams = self.ctx.get_route_params().await;
         panic!("Test panic {:?}", param);
     }
+}
 
-    async fn panic_hook(ctx: Context) {
-        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
+struct PanicHooks {
+    ctx: Context,
+}
+
+impl PanicHook for PanicHooks {
+    type Prev = DefaultInitialHook;
+
+    async fn new(prev: &Self::Prev) -> Self {
+        Self {
+            ctx: prev.context.clone(),
+        }
+    }
+
+    async fn handle(self) {
+        let error: Panic = self.ctx.try_get_panic().await.unwrap_or_default();
         let response_body: String = error.to_string();
         let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
-        let _ = ctx
+        let _ = self
+            .ctx
             .set_response_status_code(500)
             .await
             .clear_response_headers()
@@ -138,32 +259,32 @@ async fn server() {
             .send()
             .await;
     }
+}
 
-    async fn main() {
-        let config: ServerConfig = ServerConfig::new().await;
-        config.host("0.0.0.0").await;
-        config.port(60000).await;
-        config.buffer(4096).await;
-        config.disable_linger().await;
-        config.disable_nodelay().await;
-        let server: Server = Server::from(config).await;
-        server.panic_hook(panic_hook).await;
-        server.request_middleware(request_middleware).await;
-        server.request_middleware(upgrade_hook).await;
-        server.response_middleware(response_middleware).await;
-        server.route("/", root_route).await;
-        server.route("/ws", ws_route).await;
-        server.route("/sse", sse_route).await;
-        server.route("/dynamic/{routing}", dynamic_route).await;
-        server.route("/regex/{file:^.*$}", dynamic_route).await;
-        let server_hook: ServerHook = server.run().await.unwrap_or_default();
-        let server_hook_clone: ServerHook = server_hook.clone();
-        tokio::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-            server_hook.shutdown().await;
-        });
-        server_hook_clone.wait().await;
-    }
+#[tokio::test]
 
-    main().await;
+async fn main() {
+    let config: ServerConfig = ServerConfig::new().await;
+    config.host("0.0.0.0").await;
+    config.port(60000).await;
+    config.buffer(4096).await;
+    config.disable_linger().await;
+    config.disable_nodelay().await;
+    let server: Server = Server::from(config).await;
+    server.request_middleware::<SendBodyMiddleware>().await;
+    server.request_middleware::<UpgradeMiddleware>().await;
+    server.response_middleware::<ResponseMiddleware>().await;
+    server.panic_hook::<PanicHooks>().await;
+    server.route::<RootRoute>("/").await;
+    server.route::<WsRoute>("/ws").await;
+    server.route::<SseRoute>("/sse").await;
+    server.route::<DynamicRoute>("/dynamic/{routing}").await;
+    server.route::<DynamicRoute>("/regex/{file:^.*$}").await;
+    let server_hook: ServerHook = server.run().await.unwrap_or_default();
+    let server_hook_clone: ServerHook = server_hook.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+        server_hook.shutdown().await;
+    });
+    server_hook_clone.wait().await;
 }

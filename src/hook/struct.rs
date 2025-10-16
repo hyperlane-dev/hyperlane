@@ -23,14 +23,46 @@ pub struct ServerHook {
     pub(super) shutdown_hook: ArcFnPinBoxFutureSend<()>,
 }
 
+/// Represents different handler types for hooks.
+#[derive(Clone)]
+pub enum HookHandler {
+    /// Function-based handler (used for panic hooks)
+    Function(fn(Context) -> PinBoxFutureSend<()>),
+    /// Arc handler (used for request/response middleware and routes)
+    Handler(ArcPinBoxFutureSendSync),
+}
+
+impl std::fmt::Debug for HookHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HookHandler::Function(_) => write!(f, "Function"),
+            HookHandler::Handler(_) => write!(f, "Handler"),
+        }
+    }
+}
+
+impl PartialEq for HookHandler {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (HookHandler::Function(a), HookHandler::Function(b)) => {
+                std::ptr::eq(a as *const _, b as *const _)
+            }
+            (HookHandler::Handler(a), HookHandler::Handler(b)) => Arc::ptr_eq(a, b),
+            _ => false,
+        }
+    }
+}
+
+impl Eq for HookHandler {}
+
 /// Represents a route definition created by a macro.
 ///
 /// This struct encapsulates the necessary information to register a new hook.
 #[derive(Getter, Setter, Clone, Debug, PartialEq, Eq)]
 pub struct HookMacro {
-    /// Represents the asynchronous handler function that is executed when
+    /// Represents the asynchronous handler that is executed when
     /// the associated hook is triggered.
-    pub handler: fn(Context) -> PinBoxFutureSend<()>,
+    pub handler: HookHandler,
     /// Represents the type of the hook that determines when the handler
     /// should be executed.
     pub hook_type: HookType,

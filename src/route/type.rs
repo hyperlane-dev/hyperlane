@@ -12,16 +12,6 @@ pub(crate) type VecRouteSegment = Vec<RouteSegment>;
 ///
 /// This is often used for path components.
 pub(crate) type VecStrRef<'a> = Vec<&'a str>;
-/// A type alias for a vector containing tuples of a `RoutePattern` and its associated handler function.
-///
-/// This is used for storing dynamic and regex routes.
-pub(crate) type VecRoutePatternArcFnPinBoxSendSync<T> =
-    Vec<(RoutePattern, ArcFnContextPinBoxSendSync<T>)>;
-/// A type alias for a hash map that stores static routes and their handlers.
-///
-/// The key is the exact path string.
-pub(crate) type HashMapStringArcFnPinBoxSendSyncXxHash3_64<T> =
-    HashMapXxHash3_64<String, ArcFnContextPinBoxSendSync<T>>;
 /// A type alias for a `Result` returned when adding a new route.
 ///
 /// This indicates success or a `RouteError`.
