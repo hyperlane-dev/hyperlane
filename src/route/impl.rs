@@ -293,11 +293,11 @@ impl RoutePattern {
             return None;
         }
         let mut path_segments: VecStrRef = Vec::with_capacity(route_segments_len);
-        let mut segment_start: usize = 0;
         let path_bytes: &[u8] = path.as_bytes();
-        let path_separator_byte: u8 = b'/';
-        for i in 0..path_bytes.len() {
-            if path_bytes[i] == path_separator_byte {
+        let path_separator_byte: u8 = DEFAULT_HTTP_PATH_BYTES[0];
+        let mut segment_start: usize = 0;
+        for (i, &byte) in path_bytes.iter().enumerate() {
+            if byte == path_separator_byte {
                 if segment_start < i {
                     path_segments.push(&path[segment_start..i]);
                 }
@@ -322,7 +322,7 @@ impl RoutePattern {
                     }
                 }
                 RouteSegment::Dynamic(param_name) => {
-                    let Some(value) = path_segments.get(idx) else {
+                    let Some(&value) = path_segments.get(idx) else {
                         return None;
                     };
                     params.insert(param_name.clone(), value.to_string());

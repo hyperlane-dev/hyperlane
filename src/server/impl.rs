@@ -384,9 +384,11 @@ impl Server {
         self.handle_panic_with_context(&ctx, &panic).await;
     }
 
-    /// Executes a middleware handler within a spawned task and manages the request lifecycle.
+    /// Executes a middleware handler and manages the request lifecycle.
     ///
-    /// This function also handles panics that may occur within the middleware's execution.
+    /// This function executes middleware with spawn to catch panics properly.
+    /// While this adds some overhead, it's necessary to ensure panic hooks
+    /// can send error responses to clients.
     ///
     /// # Arguments
     ///
@@ -407,9 +409,11 @@ impl Server {
         }
     }
 
-    /// Executes a route handler within a spawned task and manages the request lifecycle.
+    /// Executes a route handler and manages the request lifecycle.
     ///
-    /// This function also handles panics that may occur within the route's execution.
+    /// This function executes the route handler with spawn to catch panics properly.
+    /// While this adds some overhead, it's necessary to ensure panic hooks
+    /// can send error responses to clients.
     ///
     /// # Arguments
     ///
