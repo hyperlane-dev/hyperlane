@@ -4,11 +4,11 @@
 /// should proceed to the next stage or be terminated prematurely. It also tracks
 /// whether the underlying connection should be kept alive for subsequent requests.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Lifecycle {
+pub(crate) enum RequestLifecycle {
     /// Indicates that the request processing should be aborted.
     /// The boolean value specifies whether the connection should be kept alive (`true`) or closed (`false`).
-    Abort(bool),
+    Aborted(bool),
     /// Indicates that the request processing should continue to the next stage.
     /// The boolean value specifies whether the connection should be kept alive (`true`) or closed (`false`).
-    Continue(bool),
+    Continuing(bool),
 }

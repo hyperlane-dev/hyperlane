@@ -393,12 +393,12 @@ impl Server {
     /// # Arguments
     ///
     /// - `&Context` - The request context.
-    /// - `&mut Lifecycle` - A mutable reference to the current `Lifecycle` state.
+    /// - `&mut RequestLifecycle` - A mutable reference to the current request lifecycle state.
     /// - `&ArcPinBoxFutureSendSync` - The middleware handler to execute.
     async fn run_middleware_with_lifecycle(
         &self,
         ctx: &Context,
-        lifecycle: &mut Lifecycle,
+        lifecycle: &mut RequestLifecycle,
         handler: &ArcPinBoxFutureSendSync,
     ) {
         ctx.update_lifecycle_status(lifecycle).await;
@@ -418,12 +418,12 @@ impl Server {
     /// # Arguments
     ///
     /// - `&Context` - The request context.
-    /// - `&mut Lifecycle` - A mutable reference to the current `Lifecycle` state.
+    /// - `&mut RequestLifecycle` - A mutable reference to the current request lifecycle state.
     /// - `&ArcPinBoxFutureSendSync` - The route handler to execute.
     async fn run_route_with_lifecycle(
         &self,
         ctx: &Context,
-        lifecycle: &mut Lifecycle,
+        lifecycle: &mut RequestLifecycle,
         handler: &ArcPinBoxFutureSendSync,
     ) {
         ctx.update_lifecycle_status(lifecycle).await;
@@ -537,7 +537,7 @@ impl Server {
         let route: &str = request.get_path();
         let ctx: &Context = state.get_ctx();
         ctx.set_request(request).await;
-        let mut lifecycle: Lifecycle = Lifecycle::new(request.is_enable_keep_alive());
+        let mut lifecycle: RequestLifecycle = RequestLifecycle::new(request.is_enable_keep_alive());
         if self.run_request_middleware(ctx, &mut lifecycle).await {
             return lifecycle.keep_alive();
         }
@@ -618,7 +618,7 @@ impl Server {
     /// # Arguments
     ///
     /// - `&Context` - The request context.
-    /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
+    /// - `&mut RequestLifecycle` - A mutable reference to the request lifecycle state.
     ///
     /// # Returns
     ///
@@ -626,12 +626,12 @@ impl Server {
     pub(super) async fn run_request_middleware(
         &self,
         ctx: &Context,
-        lifecycle: &mut Lifecycle,
+        lifecycle: &mut RequestLifecycle,
     ) -> bool {
         for handler in self.read().await.get_request_middleware().iter() {
             self.run_middleware_with_lifecycle(ctx, lifecycle, handler)
                 .await;
-            if lifecycle.is_abort() {
+            if lifecycle.is_aborted() {
                 return true;
             }
         }
@@ -644,7 +644,7 @@ impl Server {
     ///
     /// - `&Context` - The request context.
     /// - `&str` - The request path to match.
-    /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
+    /// - `&mut RequestLifecycle` - A mutable reference to the request lifecycle state.
     ///
     /// # Returns
     ///
@@ -653,13 +653,13 @@ impl Server {
         &self,
         ctx: &Context,
         path: &str,
-        lifecycle: &mut Lifecycle,
+        lifecycle: &mut RequestLifecycle,
     ) -> bool {
         let route_matcher: RouteMatcher = self.read().await.get_route().clone();
         if let Some(handler) = route_matcher.try_resolve_route(ctx, path).await {
             self.run_route_with_lifecycle(ctx, lifecycle, &handler)
                 .await;
-            if lifecycle.is_abort() {
+            if lifecycle.is_aborted() {
                 return true;
             }
         }
@@ -671,7 +671,7 @@ impl Server {
     /// # Arguments
     ///
     /// - `&Context` - The request context.
-    /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
+    /// - `&mut RequestLifecycle` - A mutable reference to the request lifecycle state.
     ///
     /// # Returns
     ///
@@ -679,12 +679,12 @@ impl Server {
     pub(super) async fn run_response_middleware(
         &self,
         ctx: &Context,
-        lifecycle: &mut Lifecycle,
+        lifecycle: &mut RequestLifecycle,
     ) -> bool {
         for handler in self.read().await.get_response_middleware().iter() {
             self.run_middleware_with_lifecycle(ctx, lifecycle, handler)
                 .await;
-            if lifecycle.is_abort() {
+            if lifecycle.is_aborted() {
                 return true;
             }
         }
