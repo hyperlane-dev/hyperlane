@@ -17,9 +17,8 @@ pub(crate) fn create_route_handler<R>() -> ArcPinBoxFutureSendSync
 where
     R: ServerHook,
 {
-    Arc::new(move |initial: DefaultInitialHook| -> PinBoxFutureSend<()> {
+    Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> {
         Box::pin(async move {
-            let ctx = initial.context.clone();
             R::new(ctx.clone()).await.handle(ctx).await;
         })
     })
@@ -42,9 +41,8 @@ pub(crate) fn create_middleware_handler<M>() -> ArcPinBoxFutureSendSync
 where
     M: ServerHook,
 {
-    Arc::new(move |initial: DefaultInitialHook| -> PinBoxFutureSend<()> {
+    Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> {
         Box::pin(async move {
-            let ctx = initial.context.clone();
             M::new(ctx.clone()).await.handle(ctx).await;
         })
     })
@@ -67,9 +65,8 @@ pub(crate) fn create_panic_hook_handler<P>() -> ArcPinBoxFutureSendSync
 where
     P: ServerHook,
 {
-    Arc::new(move |initial: DefaultInitialHook| -> PinBoxFutureSend<()> {
+    Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> {
         Box::pin(async move {
-            let ctx = initial.context.clone();
             P::new(ctx.clone()).await.handle(ctx).await;
         })
     })

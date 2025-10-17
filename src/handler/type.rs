@@ -3,15 +3,15 @@ use crate::*;
 /// Type alias for a thread-safe, type-erased handler function.
 ///
 /// This type allows storing handlers (routes and middleware) of different concrete types
-/// in the same collection. The handler takes a `DefaultInitialHook` and returns
+/// in the same collection. The handler takes a `Context` and returns
 /// a pinned, boxed future that resolves to `()`.
 pub(crate) type ArcPinBoxFutureSendSync =
-    Arc<dyn Fn(DefaultInitialHook) -> PinBoxFutureSend<()> + Send + Sync>;
+    Arc<dyn Fn(Context) -> PinBoxFutureSend<()> + Send + Sync>;
 
 /// Type alias for an optional handler function.
 ///
 /// This type allows storing optional handlers of different concrete types in
-/// the same collection. The handler takes a `DefaultInitialHook` and returns
+/// the same collection. The handler takes a `Context` and returns
 /// a pinned, boxed future that resolves to `()`.
 pub(crate) type OptionArcPinBoxFutureSendSync = Option<ArcPinBoxFutureSendSync>;
 
