@@ -16,12 +16,12 @@ pub trait ServerHook: Send + Sync + 'static {
     ///
     /// # Arguments
     ///
-    /// - `Context` - The request context containing all request/response data.
+    /// - `&Context` - The request context containing all request/response data.
     ///
     /// # Returns
     ///
     /// A future that resolves to a new instance of this hook.
-    fn new(ctx: Context) -> impl Future<Output = Self> + Send;
+    fn new(ctx: &Context) -> impl Future<Output = Self> + Send;
 
     /// Executes the hook's processing logic.
     ///
@@ -30,10 +30,10 @@ pub trait ServerHook: Send + Sync + 'static {
     ///
     /// # Arguments
     ///
-    /// - `Context` - The request context for accessing request/response data.
+    /// - `&Context` - The request context for accessing request/response data.
     ///
     /// # Returns
     ///
     /// A future that resolves when the processing is complete.
-    fn handle(self, ctx: Context) -> impl Future<Output = ()> + Send;
+    fn handle(self, ctx: &Context) -> impl Future<Output = ()> + Send;
 }

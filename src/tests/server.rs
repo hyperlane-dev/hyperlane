@@ -26,11 +26,11 @@ struct WsRoute;
 struct DynamicRoute;
 
 impl ServerHook for SendBodyMiddleware {
-    async fn new(_ctx: Context) -> Self {
+    async fn new(_ctx: &Context) -> Self {
         Self
     }
 
-    async fn handle(self, ctx: Context) {
+    async fn handle(self, ctx: &Context) {
         let socket_addr: String = ctx.get_socket_addr_string().await;
         ctx.set_response_version(HttpVersion::HTTP1_1)
             .await
@@ -50,11 +50,11 @@ impl ServerHook for SendBodyMiddleware {
 }
 
 impl ServerHook for UpgradeMiddleware {
-    async fn new(_ctx: Context) -> Self {
+    async fn new(_ctx: &Context) -> Self {
         Self
     }
 
-    async fn handle(self, ctx: Context) {
+    async fn handle(self, ctx: &Context) {
         if !ctx.get_request().await.is_ws() {
             return;
         }
@@ -78,11 +78,11 @@ impl ServerHook for UpgradeMiddleware {
 }
 
 impl ServerHook for ResponseMiddleware {
-    async fn new(_ctx: Context) -> Self {
+    async fn new(_ctx: &Context) -> Self {
         Self
     }
 
-    async fn handle(self, ctx: Context) {
+    async fn handle(self, ctx: &Context) {
         if ctx.get_request().await.is_ws() {
             return;
         }
@@ -91,11 +91,11 @@ impl ServerHook for ResponseMiddleware {
 }
 
 impl ServerHook for RootRoute {
-    async fn new(_ctx: Context) -> Self {
+    async fn new(_ctx: &Context) -> Self {
         Self
     }
 
-    async fn handle(self, ctx: Context) {
+    async fn handle(self, ctx: &Context) {
         let path: RequestPath = ctx.get_request_path().await;
         let response_body: String = format!("Hello hyperlane => {}", path);
         let cookie1: String = CookieBuilder::new("key1", "value1").http_only().build();
@@ -122,25 +122,25 @@ impl WsRoute {
 }
 
 impl ServerHook for WsRoute {
-    async fn new(_ctx: Context) -> Self {
+    async fn new(_ctx: &Context) -> Self {
         Self
     }
 
-    async fn handle(self, ctx: Context) {
+    async fn handle(self, ctx: &Context) {
         while ctx.ws_from_stream(4096).await.is_ok() {
             let request_body: Vec<u8> = ctx.get_request_body().await;
             ctx.set_response_body(&request_body).await;
-            self.send_body_hook(&ctx).await;
+            self.send_body_hook(ctx).await;
         }
     }
 }
 
 impl ServerHook for SseRoute {
-    async fn new(_ctx: Context) -> Self {
+    async fn new(_ctx: &Context) -> Self {
         Self
     }
 
-    async fn handle(self, ctx: Context) {
+    async fn handle(self, ctx: &Context) {
         let _ = ctx
             .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
             .await
@@ -158,22 +158,22 @@ impl ServerHook for SseRoute {
 }
 
 impl ServerHook for DynamicRoute {
-    async fn new(_ctx: Context) -> Self {
+    async fn new(_ctx: &Context) -> Self {
         Self
     }
 
-    async fn handle(self, ctx: Context) {
+    async fn handle(self, ctx: &Context) {
         let param: RouteParams = ctx.get_route_params().await;
         panic!("Test panic {:?}", param);
     }
 }
 
 impl ServerHook for ServerPanicHook {
-    async fn new(_ctx: Context) -> Self {
+    async fn new(_ctx: &Context) -> Self {
         Self {}
     }
 
-    async fn handle(self, ctx: Context) {
+    async fn handle(self, ctx: &Context) {
         let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
         let response_body: String = error.to_string();
         let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);

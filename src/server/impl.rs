@@ -360,8 +360,7 @@ impl Server {
         let panic_clone: Panic = panic.clone();
         ctx.cancel_aborted().await.set_panic(panic_clone).await;
         for hook in self.read().await.get_panic_hook().iter() {
-            let result: ResultJoinError<()> = spawn(hook(ctx.clone())).await;
-            if let Err(join_error) = result {
+            if let Err(join_error) = spawn(hook(ctx)).await {
                 if join_error.is_panic() {
                     eprintln!("Panic occurred in panic hook: {:?}", join_error);
                 }
@@ -400,9 +399,8 @@ impl Server {
         lifecycle: &mut Lifecycle,
         handler: &ArcPinBoxFutureSendSync,
     ) {
-        let result: ResultJoinError<()> = spawn(handler(ctx.clone())).await;
         ctx.update_lifecycle_status(lifecycle).await;
-        if let Err(join_error) = result {
+        if let Err(join_error) = spawn(handler(ctx)).await {
             if join_error.is_panic() {
                 self.handle_task_panic(&ctx, join_error).await;
             }
@@ -424,9 +422,8 @@ impl Server {
         lifecycle: &mut Lifecycle,
         handler: &ArcPinBoxFutureSendSync,
     ) {
-        let result: ResultJoinError<()> = spawn(handler(ctx.clone())).await;
         ctx.update_lifecycle_status(lifecycle).await;
-        if let Err(join_error) = result {
+        if let Err(join_error) = spawn(handler(ctx)).await {
             if join_error.is_panic() {
                 self.handle_task_panic(&ctx, join_error).await;
             }

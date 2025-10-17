@@ -34,11 +34,11 @@ where
 struct TestRoute;
 
 impl ServerHook for TestRoute {
-    async fn new(_ctx: Context) -> Self {
+    async fn new(_ctx: &Context) -> Self {
         Self
     }
 
-    async fn handle(self, _ctx: Context) {}
+    async fn handle(self, _ctx: &Context) {}
 }
 
 #[tokio::test]
