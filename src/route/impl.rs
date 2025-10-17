@@ -1,6 +1,5 @@
 use crate::*;
 
-// Collects route macro definitions for the inventory system.
 collect!(HookMacro);
 
 /// Provides a default implementation for RouteMatcher.
@@ -294,11 +293,11 @@ impl RoutePattern {
             return None;
         }
         let mut path_segments: VecStrRef = Vec::with_capacity(route_segments_len);
-        let mut segment_start: usize = 0;
         let path_bytes: &[u8] = path.as_bytes();
-        let path_separator_byte: u8 = b'/';
-        for i in 0..path_bytes.len() {
-            if path_bytes[i] == path_separator_byte {
+        let path_separator_byte: u8 = DEFAULT_HTTP_PATH_BYTES[0];
+        let mut segment_start: usize = 0;
+        for (i, &byte) in path_bytes.iter().enumerate() {
+            if byte == path_separator_byte {
                 if segment_start < i {
                     path_segments.push(&path[segment_start..i]);
                 }
@@ -323,7 +322,7 @@ impl RoutePattern {
                     }
                 }
                 RouteSegment::Dynamic(param_name) => {
-                    let Some(value) = path_segments.get(idx) else {
+                    let Some(&value) = path_segments.get(idx) else {
                         return None;
                     };
                     params.insert(param_name.clone(), value.to_string());
@@ -359,6 +358,7 @@ impl RoutePattern {
     /// # Returns
     ///
     /// - `bool` - true if the pattern is static, false otherwise.
+    #[inline]
     pub(crate) fn is_static(&self) -> bool {
         self.get_0()
             .iter()
@@ -370,6 +370,7 @@ impl RoutePattern {
     /// # Returns
     ///
     /// - `bool` - true if the pattern is dynamic, false otherwise.
+    #[inline]
     pub(crate) fn is_dynamic(&self) -> bool {
         self.get_0()
             .iter()
@@ -401,12 +402,15 @@ impl RouteMatcher {
 
     /// Adds a new route and its handler to the matcher.
     ///
-    /// The route is categorized as static, dynamic, or regex based on its pattern.
+    /// Adds a route handler to the matcher.
+    ///
+    /// This method categorizes the route as static, dynamic, or regex based on its pattern
+    /// and stores it in the appropriate collection.
     ///
     /// # Arguments
     ///
     /// - `&str` - The route pattern string.
-    /// - `ArcFnContextPinBoxSendSync` - The handler function for this route.
+    /// - `ArcPinBoxFutureSendSync` - The boxed route handler.
     ///
     /// # Returns
     ///
@@ -414,7 +418,7 @@ impl RouteMatcher {
     pub(crate) fn add(
         &mut self,
         pattern: &str,
-        handler: ArcFnContextPinBoxSendSync<()>,
+        handler: ArcPinBoxFutureSendSync,
     ) -> ResultAddRoute {
         let route_pattern: RoutePattern = RoutePattern::new(pattern)?;
         if route_pattern.is_static() {
@@ -425,8 +429,7 @@ impl RouteMatcher {
                 .insert(pattern.to_string(), handler);
             return Ok(());
         }
-        let target_vec: &mut VecRoutePatternArcFnPinBoxSendSync<()> = if route_pattern.is_dynamic()
-        {
+        let target_vec: &mut VecArcPinBoxFutureSendSync = if route_pattern.is_dynamic() {
             self.get_mut_dynamic_routes()
         } else {
             self.get_mut_regex_routes()
@@ -441,7 +444,10 @@ impl RouteMatcher {
         Ok(())
     }
 
-    /// Finds the handler for a path by matching against registered routes.
+    /// Resolves and executes a route handler.
+    ///
+    /// This method searches for a matching route and executes it if found.
+    /// Finds a matching route handler for the given path.
     ///
     /// # Arguments
     ///
@@ -450,12 +456,12 @@ impl RouteMatcher {
     ///
     /// # Returns
     ///
-    /// - `Option<ArcFnContextPinBoxSendSync>` - Some handler if match found, None otherwise.
+    /// - `OptionArcPinBoxFutureSendSync` - The matched route handler if found, None otherwise.
     pub(crate) async fn try_resolve_route(
         &self,
         ctx: &Context,
         path: &str,
-    ) -> OptionArcFnContextPinBoxSendSync<()> {
+    ) -> OptionArcPinBoxFutureSendSync {
         if let Some(handler) = self.get_static_routes().get(path) {
             ctx.set_route_params(RouteParams::default()).await;
             return Some(handler.clone());

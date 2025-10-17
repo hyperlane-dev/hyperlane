@@ -36,27 +36,25 @@ pub(crate) struct ServerInner {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) route: RouteMatcher,
-    /// A collection of middleware functions that are executed for every incoming request
-    /// before it is passed to the corresponding route handler.
-    #[debug(skip)]
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) request_middleware: VecArcFnContextPinBoxSendSync<()>,
-    /// A collection of middleware functions that are executed for every outgoing response
-    /// before it is sent back to the client.
-    #[debug(skip)]
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) response_middleware: VecArcFnContextPinBoxSendSync<()>,
-    /// A custom error handler that is invoked when a panic occurs during request processing.
+    /// A collection of panic hook handlers that are invoked when a panic occurs during request processing.
     /// This allows for graceful error recovery and customized error responses.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) panic_hook: VecArcFnContextPinBoxSendSync<()>,
+    pub(super) panic_hook: VecHandlers,
+    /// A collection of request middleware handlers.
+    #[debug(skip)]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) request_middleware: VecHandlers,
+    /// A collection of response middleware handlers.
+    #[debug(skip)]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) response_middleware: VecHandlers,
 }
 
 /// The primary server structure that provides a thread-safe interface to the server's state.

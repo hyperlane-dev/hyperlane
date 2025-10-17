@@ -31,14 +31,21 @@ where
     );
 }
 
+struct TestRoute;
+
+impl ServerHook for TestRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, _ctx: &Context) {}
+}
+
 #[tokio::test]
 async fn empty_route() {
     assert_panic_message_contains(
         || async {
-            let _server: &Server = Server::new()
-                .await
-                .route(EMPTY_STR, |_| async move {})
-                .await;
+            let _server: &Server = Server::new().await.route::<TestRoute>(EMPTY_STR).await;
         },
         &RouteError::EmptyPattern.to_string(),
     )
@@ -51,9 +58,9 @@ async fn duplicate_route() {
         || async {
             let _server: &Server = Server::new()
                 .await
-                .route(ROOT_PATH, |_| async move {})
+                .route::<TestRoute>(ROOT_PATH)
                 .await
-                .route(ROOT_PATH, |_| async move {})
+                .route::<TestRoute>(ROOT_PATH)
                 .await;
         },
         &RouteError::DuplicatePattern(ROOT_PATH.to_string()).to_string(),

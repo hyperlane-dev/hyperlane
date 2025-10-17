@@ -1,5 +1,16 @@
 use crate::*;
 
+#[allow(dead_code)]
+struct TestSendRoute;
+
+impl ServerHook for TestSendRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, _ctx: &Context) {}
+}
+
 #[tokio::test]
 async fn server_send_sync() {
     fn assert_send<T: Send>() {}
@@ -14,7 +25,7 @@ async fn server_send_sync() {
 async fn server_clone_across_threads() {
     let server: Server = Server::new()
         .await
-        .route("/test", |_| async move {})
+        .route::<TestSendRoute>("/test")
         .await
         .clone();
     let server_clone: Server = server.clone();
@@ -31,7 +42,7 @@ async fn server_share_across_threads() {
     let server: Arc<Server> = Arc::new(
         Server::new()
             .await
-            .route("/test", |_| async move {})
+            .route::<TestSendRoute>("/test")
             .await
             .clone(),
     );

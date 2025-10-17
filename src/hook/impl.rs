@@ -38,16 +38,16 @@ impl<T, O> FutureSend<O> for T where T: Future<Output = O> + Send {}
 /// Blanket implementation of `FnPinBoxFutureSend` for any type that satisfies the bounds.
 impl<T, O> FnPinBoxFutureSend<O> for T where T: Fn() -> PinBoxFutureSend<O> + Send + Sync {}
 
-/// Provides a default implementation for `ServerHook`.
-impl Default for ServerHook {
-    /// Creates a new `ServerHook` instance with default no-op hooks.
+/// Provides a default implementation for `ServerControlHook`.
+impl Default for ServerControlHook {
+    /// Creates a new `ServerControlHook` instance with default no-op hooks.
     ///
     /// The default `wait_hook` and `shutdown_hook` do nothing, allowing the server
     /// to run without specific shutdown or wait logic unless configured otherwise.
     ///
     /// # Returns
     ///
-    /// - `Self` - A new `ServerHook` instance with default hooks.
+    /// - `Self` - A new `ServerControlHook` instance with default hooks.
     fn default() -> Self {
         Self {
             wait_hook: Arc::new(|| Box::pin(async {})),
@@ -59,7 +59,7 @@ impl Default for ServerHook {
 /// Manages server lifecycle hooks, including waiting and shutdown procedures.
 ///
 /// This struct holds closures that are executed during specific server lifecycle events.
-impl ServerHook {
+impl ServerControlHook {
     /// Waits for the server's shutdown signal or completion.
     ///
     /// This method asynchronously waits until the server's `wait_hook` is triggered,
@@ -91,6 +91,7 @@ impl HookType {
     /// # Returns
     ///
     /// - `Option<isize>` - `Some(order)` if the hook defines a priority, otherwise `None`.
+    #[inline]
     pub fn try_get(&self) -> Option<isize> {
         match *self {
             HookType::RequestMiddleware(order)

@@ -11,8 +11,8 @@ impl Default for ServerInner {
         Self {
             config: ServerConfigInner::default(),
             panic_hook: vec![],
-            request_middleware: vec![],
             route: RouteMatcher::new(),
+            request_middleware: vec![],
             response_middleware: vec![],
         }
     }
@@ -34,9 +34,14 @@ impl PartialEq for ServerInner {
     fn eq(&self, other: &Self) -> bool {
         self.config == other.config
             && self.route == other.route
+            && self.panic_hook.len() == other.panic_hook.len()
             && self.request_middleware.len() == other.request_middleware.len()
             && self.response_middleware.len() == other.response_middleware.len()
-            && self.panic_hook.len() == other.panic_hook.len()
+            && self
+                .panic_hook
+                .iter()
+                .zip(other.panic_hook.iter())
+                .all(|(a, b)| Arc::ptr_eq(a, b))
             && self
                 .request_middleware
                 .iter()
@@ -46,11 +51,6 @@ impl PartialEq for ServerInner {
                 .response_middleware
                 .iter()
                 .zip(other.response_middleware.iter())
-                .all(|(a, b)| Arc::ptr_eq(a, b))
-            && self
-                .panic_hook
-                .iter()
-                .zip(other.panic_hook.iter())
                 .all(|(a, b)| Arc::ptr_eq(a, b))
     }
 }
@@ -106,6 +106,7 @@ impl<'a> HandlerState {
     /// # Returns
     ///
     /// - `Self` - The newly created handler state.
+    #[inline]
     pub(super) fn new(stream: ArcRwLockStream, ctx: Context, buffer: usize) -> Self {
         Self {
             stream,
@@ -150,7 +151,7 @@ impl Server {
     /// # Returns
     ///
     /// - `RwLockReadGuardServerInner` - The read guard for ServerInner.
-    async fn read(&self) -> RwLockReadGuardServerInner {
+    pub(super) async fn read(&self) -> RwLockReadGuardServerInner {
         self.get_0().read().await
     }
 
@@ -167,25 +168,37 @@ impl Server {
     ///
     /// This function dispatches the provided `HookMacro` to the appropriate
     /// internal handler based on its `HookType`. Supported hook types include
-    /// panic hooks, disable HTTP/WS hooks, connected hooks, pre-upgrade hooks,
-    /// request/response middleware, and routes.
+    /// panic hooks, request/response middleware, and routes.
     ///
     /// # Arguments
     ///
     /// - `HookMacro`: The `HookMacro` instance containing the `HookType` and its handler.
     pub async fn handle_hook(&self, hook: HookMacro) {
-        match hook.hook_type {
-            HookType::PanicHook(_) => {
-                self.panic_hook(hook.handler).await;
+        match (hook.hook_type, hook.handler) {
+            (HookType::PanicHook(_), HookHandler::Handler(handler)) => {
+                self.write().await.get_mut_panic_hook().push(handler);
             }
-            HookType::RequestMiddleware(_) => {
-                self.request_middleware(hook.handler).await;
+            (HookType::RequestMiddleware(_), HookHandler::Handler(handler)) => {
+                self.write()
+                    .await
+                    .get_mut_request_middleware()
+                    .push(handler);
             }
-            HookType::Route(path) => {
-                self.route(path, hook.handler).await;
+            (HookType::Route(path), HookHandler::Handler(handler)) => {
+                self.write()
+                    .await
+                    .get_mut_route()
+                    .add(path, handler)
+                    .unwrap();
             }
-            HookType::ResponseMiddleware(_) => {
-                self.response_middleware(hook.handler).await;
+            (HookType::ResponseMiddleware(_), HookHandler::Handler(handler)) => {
+                self.write()
+                    .await
+                    .get_mut_response_middleware()
+                    .push(handler);
+            }
+            _ => {
+                panic!("Invalid hook type and handler combination");
             }
         };
     }
@@ -219,100 +232,100 @@ impl Server {
         self
     }
 
-    /// Sets a custom panic hook for request processing.
+    /// Registers a panic hook handler to the processing pipeline.
     ///
-    /// # Arguments
+    /// This method allows registering panic hooks that implement the `ServerHook` trait,
+    /// which will be executed when a panic occurs during request processing.
     ///
-    /// - `F: FnContextSendSyncStatic<Fut, ()>` - The panic handler function.
-    /// - `Fut: FutureSendStatic<()>` - The future returned by the panic handler.
+    /// # Type Parameters
+    ///
+    /// - `ServerHook` - The panic hook type that implements `ServerHook`.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn panic_hook<F, Fut>(&self, hook: F) -> &Self
+    pub async fn panic_hook<S>(&self) -> &Self
     where
-        F: FnContextSendSyncStatic<Fut, ()>,
-        Fut: FutureSendStatic<()>,
+        S: ServerHook,
     {
-        let panic_hook: ArcFnContextPinBoxSendSync<()> =
-            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
-        self.write().await.get_mut_panic_hook().push(panic_hook);
+        self.write()
+            .await
+            .get_mut_panic_hook()
+            .push(create_panic_hook_handler::<S>());
         self
     }
 
-    /// Adds a route handler for a specific path.
+    /// Registers a route handler for a specific path.
+    ///
+    /// This method allows registering route handlers that implement the `ServerHook` trait,
+    /// providing type safety and better code organization.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `ServerHook` - The route handler type that implements `ServerHook`.
     ///
     /// # Arguments
     ///
-    /// - `R: ToString` - The route path pattern.
-    /// - `F: FnContextSendSyncStatic<Fut, ()>` - The handler function for the route.
-    /// - `Fut: FutureSendStatic<()>` - The future returned by the handler.
+    /// - `path` - The route path pattern.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn route<R, F, Fut>(&self, route: R, hook: F) -> &Self
+    pub async fn route<S>(&self, path: impl ToString) -> &Self
     where
-        R: ToString,
-        F: FnContextSendSyncStatic<Fut, ()>,
-        Fut: FutureSendStatic<()>,
+        S: ServerHook,
     {
-        let route_str: String = route.to_string();
-        let route_hook: ArcFnContextPinBoxSendSync<()> =
-            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
         self.write()
             .await
             .get_mut_route()
-            .add(&route_str, route_hook)
+            .add(&path.to_string(), create_route_handler::<S>())
             .unwrap();
         self
     }
 
-    /// Adds request middleware to the processing pipeline.
+    /// Registers request middleware to the processing pipeline.
     ///
-    /// # Arguments
+    /// This method allows registering middleware that implements the `ServerHook` trait,
+    /// which will be executed before route handlers for every incoming request.
     ///
-    /// - `F: FnContextSendSyncStatic<Fut, ()>` - The middleware function.
-    /// - `Fut: FutureSendStatic<()>` - The future returned by the middleware.
+    /// # Type Parameters
+    ///
+    /// - `ServerHook` - The middleware type that implements `ServerHook`.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn request_middleware<F, Fut>(&self, hook: F) -> &Self
+    pub async fn request_middleware<S>(&self) -> &Self
     where
-        F: FnContextSendSyncStatic<Fut, ()>,
-        Fut: FutureSendStatic<()>,
+        S: ServerHook,
     {
-        let request_middleware_hook: ArcFnContextPinBoxSendSync<()> =
-            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
         self.write()
             .await
             .get_mut_request_middleware()
-            .push(request_middleware_hook);
+            .push(create_middleware_handler::<S>());
         self
     }
 
-    /// Adds response middleware to the processing pipeline.
+    /// Registers response middleware to the processing pipeline.
     ///
-    /// # Arguments
+    /// This method allows registering middleware that implements the `ServerHook` trait,
+    /// which will be executed after route handlers for every outgoing response.
     ///
-    /// - `F: FnContextSendSyncStatic<Fut, ()>` - The middleware function.
-    /// - `Fut: FutureSendStatic<()>` - The future returned by the middleware.
+    /// # Type Parameters
+    ///
+    /// - `ServerHook` - The middleware type that implements `ServerHook`.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn response_middleware<F, Fut>(&self, hook: F) -> &Self
+    pub async fn response_middleware<S>(&self) -> &Self
     where
-        F: FnContextSendSyncStatic<Fut, ()>,
-        Fut: FutureSendStatic<()>,
+        S: ServerHook,
     {
-        let response_middleware_hook: ArcFnContextPinBoxSendSync<()> =
-            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
         self.write()
             .await
             .get_mut_response_middleware()
-            .push(response_middleware_hook);
+            .push(create_middleware_handler::<S>());
         self
     }
 
@@ -326,6 +339,7 @@ impl Server {
     /// # Returns
     ///
     /// - `String` - The formatted address string.
+    #[inline]
     pub fn format_host_port<H: ToString>(host: H, port: usize) -> String {
         format!("{}{}{}", host.to_string(), COLON_SPACE_SYMBOL, port)
     }
@@ -348,7 +362,11 @@ impl Server {
         let panic_clone: Panic = panic.clone();
         ctx.cancel_aborted().await.set_panic(panic_clone).await;
         for hook in self.read().await.get_panic_hook().iter() {
-            hook(ctx.clone()).await;
+            if let Err(join_error) = spawn(hook(ctx)).await {
+                if join_error.is_panic() {
+                    eprintln!("Panic occurred in panic hook: {:?}", join_error);
+                }
+            }
             if ctx.get_aborted().await {
                 return;
             }
@@ -368,24 +386,50 @@ impl Server {
         self.handle_panic_with_context(&ctx, &panic).await;
     }
 
-    /// Executes a given hook function within a spawned task and manages the request lifecycle.
+    /// Executes a middleware handler and manages the request lifecycle.
     ///
-    /// This function also handles panics that may occur within the hook's execution.
+    /// This function executes middleware with spawn to catch panics properly.
+    /// While this adds some overhead, it's necessary to ensure panic hooks
+    /// can send error responses to clients.
     ///
     /// # Arguments
     ///
-    /// - `ctx: &Context` - The request context.
-    /// - `lifecycle: &mut Lifecycle` - A mutable reference to the current `Lifecycle` state.
-    /// - `hook: ArcFnContextPinBoxSendSync<()>` - The hook function to execute.
-    async fn run_hook_with_lifecycle(
+    /// - `&Context` - The request context.
+    /// - `&mut RequestLifecycle` - A mutable reference to the current request lifecycle state.
+    /// - `&ArcPinBoxFutureSendSync` - The middleware handler to execute.
+    async fn run_middleware_with_lifecycle(
         &self,
         ctx: &Context,
-        lifecycle: &mut Lifecycle,
-        hook: &ArcFnContextPinBoxSendSync<()>,
+        lifecycle: &mut RequestLifecycle,
+        handler: &ArcPinBoxFutureSendSync,
     ) {
-        let result: ResultJoinError<()> = spawn(hook(ctx.clone())).await;
         ctx.update_lifecycle_status(lifecycle).await;
-        if let Err(join_error) = result {
+        if let Err(join_error) = spawn(handler(ctx)).await {
+            if join_error.is_panic() {
+                self.handle_task_panic(&ctx, join_error).await;
+            }
+        }
+    }
+
+    /// Executes a route handler and manages the request lifecycle.
+    ///
+    /// This function executes the route handler with spawn to catch panics properly.
+    /// While this adds some overhead, it's necessary to ensure panic hooks
+    /// can send error responses to clients.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Context` - The request context.
+    /// - `&mut RequestLifecycle` - A mutable reference to the current request lifecycle state.
+    /// - `&ArcPinBoxFutureSendSync` - The route handler to execute.
+    async fn run_route_with_lifecycle(
+        &self,
+        ctx: &Context,
+        lifecycle: &mut RequestLifecycle,
+        handler: &ArcPinBoxFutureSendSync,
+    ) {
+        ctx.update_lifecycle_status(lifecycle).await;
+        if let Err(join_error) = spawn(handler(ctx)).await {
             if join_error.is_panic() {
                 self.handle_task_panic(&ctx, join_error).await;
             }
@@ -478,73 +522,10 @@ impl Server {
         }
     }
 
-    /// Executes all registered request middleware in sequence.
-    ///
-    /// # Arguments
-    ///
-    /// - `&Context` - The request context.
-    /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    async fn run_request_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) -> bool {
-        for hook in self.read().await.get_request_middleware().iter() {
-            self.run_hook_with_lifecycle(ctx, lifecycle, hook).await;
-            if lifecycle.is_abort() {
-                return true;
-            }
-        }
-        false
-    }
-
-    /// Executes the matched route handler.
-    ///
-    /// # Arguments
-    ///
-    /// - `&Context` - The request context.
-    /// - `&OptionArcFnContextPinBoxSendSync` - An `Option` containing the handler function if a route was matched.
-    /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    async fn run_route_hook(
-        &self,
-        ctx: &Context,
-        handler: &OptionArcFnContextPinBoxSendSync<()>,
-        lifecycle: &mut Lifecycle,
-    ) -> bool {
-        if let Some(hook) = handler {
-            self.run_hook_with_lifecycle(ctx, lifecycle, hook).await;
-        }
-        lifecycle.is_abort()
-    }
-
-    /// Executes all registered response middleware in sequence.
-    ///
-    /// # Arguments
-    ///
-    /// - `&Context` - The request context.
-    /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    async fn run_response_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) -> bool {
-        for hook in self.read().await.get_response_middleware().iter() {
-            self.run_hook_with_lifecycle(ctx, lifecycle, hook).await;
-            if lifecycle.is_abort() {
-                return true;
-            }
-        }
-        false
-    }
-
     /// The core request handling pipeline.
     ///
     /// This function orchestrates the execution of request middleware, the route handler,
-    /// and response middleware.
+    /// and response middleware. It supports both function-based and trait-based handlers.
     ///
     /// # Arguments
     ///
@@ -558,20 +539,19 @@ impl Server {
         let route: &str = request.get_path();
         let ctx: &Context = state.get_ctx();
         ctx.set_request(request).await;
-        let mut lifecycle: Lifecycle = Lifecycle::new(request.is_enable_keep_alive());
-        let route_hook: OptionArcFnContextPinBoxSendSync<()> = self
-            .read()
-            .await
-            .get_route()
-            .try_resolve_route(ctx, route)
-            .await;
+        let mut lifecycle: RequestLifecycle = RequestLifecycle::new(request.is_enable_keep_alive());
         if self.run_request_middleware(ctx, &mut lifecycle).await {
             return lifecycle.keep_alive();
         }
-        if self.run_route_hook(ctx, &route_hook, &mut lifecycle).await {
+        if self.run_route(ctx, route, &mut lifecycle).await {
             return lifecycle.keep_alive();
         }
-        self.run_response_middleware(ctx, &mut lifecycle).await;
+        if self.run_response_middleware(ctx, &mut lifecycle).await {
+            return lifecycle.keep_alive();
+        }
+        if let Some(panic) = ctx.try_get_panic().await {
+            self.handle_panic_with_context(ctx, &panic).await;
+        }
         lifecycle.keep_alive()
     }
 
@@ -604,7 +584,7 @@ impl Server {
     /// Returns a `ServerResult` containing a shutdown function on success.
     /// Calling this function will shut down the server by aborting its main task.
     /// Returns an error if the server fails to start.
-    pub async fn run(&self) -> ServerResult<ServerHook> {
+    pub async fn run(&self) -> ServerResult<ServerControlHook> {
         let tcp_listener: TcpListener = self.create_tcp_listener().await?;
         let server: Server = self.clone();
         let (wait_sender, wait_receiver) = channel(());
@@ -629,9 +609,87 @@ impl Server {
             let _ = shutdown_receiver.changed().await;
             accept_connections.abort();
         });
-        let mut server_hook: ServerHook = ServerHook::default();
-        server_hook.set_shutdown_hook(shutdown_hook);
-        server_hook.set_wait_hook(wait_hook);
-        Ok(server_hook)
+        let mut server_lifecycle: ServerControlHook = ServerControlHook::default();
+        server_lifecycle.set_shutdown_hook(shutdown_hook);
+        server_lifecycle.set_wait_hook(wait_hook);
+        Ok(server_lifecycle)
+    }
+
+    /// Executes trait-based request middleware in sequence.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Context` - The request context.
+    /// - `&mut RequestLifecycle` - A mutable reference to the request lifecycle state.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
+    pub(super) async fn run_request_middleware(
+        &self,
+        ctx: &Context,
+        lifecycle: &mut RequestLifecycle,
+    ) -> bool {
+        for handler in self.read().await.get_request_middleware().iter() {
+            self.run_middleware_with_lifecycle(ctx, lifecycle, handler)
+                .await;
+            if lifecycle.is_aborted() {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Executes a trait-based route handler if one matches.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Context` - The request context.
+    /// - `&str` - The request path to match.
+    /// - `&mut RequestLifecycle` - A mutable reference to the request lifecycle state.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
+    pub(super) async fn run_route(
+        &self,
+        ctx: &Context,
+        path: &str,
+        lifecycle: &mut RequestLifecycle,
+    ) -> bool {
+        let route_matcher: RouteMatcher = self.read().await.get_route().clone();
+        if let Some(handler) = route_matcher.try_resolve_route(ctx, path).await {
+            self.run_route_with_lifecycle(ctx, lifecycle, &handler)
+                .await;
+            if lifecycle.is_aborted() {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Executes trait-based response middleware in sequence.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Context` - The request context.
+    /// - `&mut RequestLifecycle` - A mutable reference to the request lifecycle state.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
+    pub(super) async fn run_response_middleware(
+        &self,
+        ctx: &Context,
+        lifecycle: &mut RequestLifecycle,
+    ) -> bool {
+        for handler in self.read().await.get_response_middleware().iter() {
+            self.run_middleware_with_lifecycle(ctx, lifecycle, handler)
+                .await;
+            if lifecycle.is_aborted() {
+                return true;
+            }
+        }
+        false
     }
 }

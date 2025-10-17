@@ -13,6 +13,7 @@ use crate::*;
 /// # Panics
 ///
 /// - Panics if two or more `Hook` items of the same type define the same non-zero `order`.
+#[inline]
 pub fn assert_hook_unique_order(list: Vec<HookMacro>) {
     let mut seen: HashSet<(HookType, isize)> = HashSet::new();
     list.iter()

@@ -11,6 +11,7 @@ impl Context {
     /// # Returns
     ///
     /// - `Context` - The newly created context instance.
+    #[inline]
     pub(crate) fn from_internal_context(ctx: ContextInner) -> Self {
         Self(arc_rwlock(ctx))
     }
@@ -1428,8 +1429,8 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `&mut Lifecycle` - The lifecycle to update.
-    pub(crate) async fn update_lifecycle_status(&self, lifecycle: &mut Lifecycle) {
+    /// - `&mut RequestLifecycle` - The request lifecycle to update.
+    pub(crate) async fn update_lifecycle_status(&self, lifecycle: &mut RequestLifecycle) {
         let keep_alive: bool = !self.get_closed().await && lifecycle.is_keep_alive();
         let aborted: bool = self.get_aborted().await;
         lifecycle.update_status(aborted, keep_alive);
