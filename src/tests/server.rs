@@ -22,7 +22,7 @@ struct ResponseMiddleware;
 struct ServerPanicHook;
 struct RootRoute;
 struct SseRoute;
-struct WsRoute;
+struct WebsocketRoute;
 struct DynamicRoute;
 
 impl ServerHook for SendBodyMiddleware {
@@ -109,7 +109,7 @@ impl ServerHook for RootRoute {
     }
 }
 
-impl WsRoute {
+impl WebsocketRoute {
     async fn send_body_hook(&self, ctx: &Context) {
         let body: ResponseBody = ctx.get_response_body().await;
         if ctx.get_request().await.is_ws() {
@@ -121,7 +121,7 @@ impl WsRoute {
     }
 }
 
-impl ServerHook for WsRoute {
+impl ServerHook for WebsocketRoute {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
@@ -207,7 +207,7 @@ async fn main() {
     server.response_middleware::<ResponseMiddleware>().await;
     server.panic_hook::<ServerPanicHook>().await;
     server.route::<RootRoute>("/").await;
-    server.route::<WsRoute>("/ws").await;
+    server.route::<WebsocketRoute>("/websocket").await;
     server.route::<SseRoute>("/sse").await;
     server.route::<DynamicRoute>("/dynamic/{routing}").await;
     server.route::<DynamicRoute>("/regex/{file:^.*$}").await;
