@@ -1365,63 +1365,42 @@ impl Context {
             .await
     }
 
-    /// Sets the send function for the context.
+    /// Sets a hook function for the context with a custom key.
     ///
     /// # Arguments
     ///
-    /// - `F: FnContextSendSyncStatic<Fut, ()>, Fut: FutureSendStatic<()>` - The send function to store.
+    /// - `ToString` - The key to identify this hook.
+    /// - `FnContextSendSyncStatic<Fut, ()>, Fut: FutureSendStatic<()>` - The hook function to store.
     ///
     /// # Returns
     ///
     /// - `&Self` - A reference to the modified context.
-    pub async fn set_send_hook<F, Fut>(&self, hook: F) -> &Self
+    pub async fn set_hook<K, F, Fut>(&self, key: K, hook: F) -> &Self
     where
+        K: ToString,
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
-        let send_hook: ArcFnContextPinBoxSendSync<()> =
+        let hook_fn: ArcFnContextPinBoxSendSync<()> =
             Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
-        self.set_internal_attribute(InternalAttribute::SendHook, send_hook)
+        self.set_internal_attribute(InternalAttribute::Hook(key.to_string()), hook_fn)
             .await
     }
 
-    /// Retrieves the send function if it has been set.
-    ///
-    /// # Returns
-    ///
-    /// - `OptionArcFnContextPinBoxSendSync<()>` - The send function if it has been set.
-    pub async fn try_get_send_hook(&self) -> OptionArcFnContextPinBoxSendSync<()> {
-        self.try_get_internal_attribute(InternalAttribute::SendHook)
-            .await
-    }
-
-    /// Sets the send body function for the context.
+    /// Retrieves a hook function if it has been set.
     ///
     /// # Arguments
     ///
-    /// - `F` - The send body function to store.
+    /// - `K: ToString` - The key to identify the hook.
     ///
     /// # Returns
     ///
-    /// - `&Self` - A reference to the modified context.
-    pub async fn set_send_body_hook<F, Fut>(&self, hook: F) -> &Self
+    /// - `OptionArcFnContextPinBoxSendSync<()>` - The hook function if it has been set.
+    pub async fn try_get_hook<K>(&self, key: K) -> OptionArcFnContextPinBoxSendSync<()>
     where
-        F: FnContextSendSyncStatic<Fut, ()>,
-        Fut: FutureSendStatic<()>,
+        K: ToString,
     {
-        let send_body_hook: ArcFnContextPinBoxSendSync<()> =
-            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
-        self.set_internal_attribute(InternalAttribute::SendBodyHook, send_body_hook)
-            .await
-    }
-
-    /// Retrieves the send body function if it has been set.
-    ///
-    /// # Returns
-    ///
-    /// - `OptionArcFnContextPinBoxSendSync<()>` - The send body function if it has been set.
-    pub async fn try_get_send_body_hook(&self) -> OptionArcFnContextPinBoxSendSync<()> {
-        self.try_get_internal_attribute(InternalAttribute::SendBodyHook)
+        self.try_get_internal_attribute(InternalAttribute::Hook(key.to_string()))
             .await
     }
 

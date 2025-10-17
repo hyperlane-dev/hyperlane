@@ -66,6 +66,6 @@ async fn send_body_hook() {
     async fn send_body_hook_fn(ctx: Context) {
         let _ = ctx.send_body().await;
     }
-    ctx.set_send_body_hook(send_body_hook_fn).await;
-    assert!(ctx.try_get_send_body_hook().await.is_some());
+    ctx.set_hook("send_body", send_body_hook_fn).await;
+    assert!(ctx.try_get_hook("send_body").await.is_some());
 }

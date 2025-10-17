@@ -19,8 +19,6 @@ pub(crate) enum Attribute {
 pub(crate) enum InternalAttribute {
     /// The attribute key for panic handling.
     Panic,
-    /// The attribute key for send body hook.
-    SendBodyHook,
-    /// The attribute key for send hook.
-    SendHook,
+    /// The attribute key for hook functions with a custom identifier.
+    Hook(String),
 }
