@@ -40,7 +40,6 @@ git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
 ```rust
 use hyperlane::*;
 
-
 struct UpgradeMiddleware;
 struct SendBodyMiddleware;
 struct ResponseMiddleware;
