@@ -13,6 +13,7 @@ use crate::*;
 /// # Returns
 ///
 /// - `ArcPinBoxFutureSendSync` that wraps the route handler's instantiation and execution logic.
+#[inline]
 pub(crate) fn create_route_handler<R>() -> ArcPinBoxFutureSendSync
 where
     R: ServerHook,
@@ -38,6 +39,7 @@ where
 /// # Returns
 ///
 /// - `ArcPinBoxFutureSendSync` that wraps the middleware's instantiation and execution logic.
+#[inline]
 pub(crate) fn create_middleware_handler<M>() -> ArcPinBoxFutureSendSync
 where
     M: ServerHook,
@@ -63,6 +65,7 @@ where
 /// # Returns
 ///
 /// - `ArcPinBoxFutureSendSync` that wraps the panic hook's instantiation and execution logic.
+#[inline]
 pub(crate) fn create_panic_hook_handler<P>() -> ArcPinBoxFutureSendSync
 where
     P: ServerHook,

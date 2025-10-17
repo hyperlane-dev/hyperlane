@@ -11,6 +11,7 @@ impl Context {
     /// # Returns
     ///
     /// - `Context` - The newly created context instance.
+    #[inline]
     pub(crate) fn from_internal_context(ctx: ContextInner) -> Self {
         Self(arc_rwlock(ctx))
     }

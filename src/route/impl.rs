@@ -358,6 +358,7 @@ impl RoutePattern {
     /// # Returns
     ///
     /// - `bool` - true if the pattern is static, false otherwise.
+    #[inline]
     pub(crate) fn is_static(&self) -> bool {
         self.get_0()
             .iter()
@@ -369,6 +370,7 @@ impl RoutePattern {
     /// # Returns
     ///
     /// - `bool` - true if the pattern is dynamic, false otherwise.
+    #[inline]
     pub(crate) fn is_dynamic(&self) -> bool {
         self.get_0()
             .iter()

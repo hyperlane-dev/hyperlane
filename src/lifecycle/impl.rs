@@ -11,6 +11,7 @@ impl RequestLifecycle {
     /// # Returns
     ///
     /// - `RequestLifecycle` - A new RequestLifecycle::Continuing instance.
+    #[inline]
     pub(crate) fn new(keep_alive: bool) -> Self {
         Self::Continuing(keep_alive)
     }
@@ -22,6 +23,7 @@ impl RequestLifecycle {
     /// - `&mut self` - A mutable reference to the `RequestLifecycle` instance.
     /// - `bool` - Whether the request processing has been aborted.
     /// - `bool` - Whether the connection should be kept alive.
+    #[inline]
     pub(crate) fn update_status(&mut self, aborted: bool, keep_alive: bool) {
         *self = if aborted {
             RequestLifecycle::Aborted(keep_alive)
@@ -35,6 +37,7 @@ impl RequestLifecycle {
     /// # Returns
     ///
     /// - `bool` - true if in Aborted state, false otherwise.
+    #[inline]
     pub(crate) fn is_aborted(&self) -> bool {
         matches!(self, RequestLifecycle::Aborted(_))
     }
@@ -44,6 +47,7 @@ impl RequestLifecycle {
     /// # Returns
     ///
     /// - `bool` - true if keep-alive flag is set, false otherwise.
+    #[inline]
     pub(crate) fn is_keep_alive(&self) -> bool {
         matches!(
             self,
@@ -56,6 +60,7 @@ impl RequestLifecycle {
     /// # Returns
     ///
     /// - `bool` - The keep-alive flag value.
+    #[inline]
     pub(crate) fn keep_alive(&self) -> bool {
         match self {
             RequestLifecycle::Continuing(res) | RequestLifecycle::Aborted(res) => *res,

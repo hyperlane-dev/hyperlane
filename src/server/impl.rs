@@ -106,6 +106,7 @@ impl<'a> HandlerState {
     /// # Returns
     ///
     /// - `Self` - The newly created handler state.
+    #[inline]
     pub(super) fn new(stream: ArcRwLockStream, ctx: Context, buffer: usize) -> Self {
         Self {
             stream,
@@ -338,6 +339,7 @@ impl Server {
     /// # Returns
     ///
     /// - `String` - The formatted address string.
+    #[inline]
     pub fn format_host_port<H: ToString>(host: H, port: usize) -> String {
         format!("{}{}{}", host.to_string(), COLON_SPACE_SYMBOL, port)
     }

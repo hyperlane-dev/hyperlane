@@ -13,6 +13,7 @@ impl Panic {
     /// # Returns
     ///
     /// - `Panic` - A new panic instance.
+    #[inline]
     pub(crate) fn new(
         message: OptionString,
         location: OptionString,
