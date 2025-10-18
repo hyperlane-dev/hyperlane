@@ -80,7 +80,13 @@ impl ServerControlHook {
 impl PartialEq for HookHandler {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (HookHandler::Handler(a), HookHandler::Handler(b)) => Arc::ptr_eq(a, b),
+            (HookHandler::Handler(handler_a), HookHandler::Handler(handler_b)) => {
+                Arc::ptr_eq(handler_a, handler_b)
+            }
+            (HookHandler::Factory(factory_a), HookHandler::Factory(factory_b)) => {
+                std::ptr::eq(factory_a as *const _, factory_b as *const _)
+            }
+            _ => false,
         }
     }
 }

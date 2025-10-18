@@ -5,6 +5,8 @@ use crate::*;
 pub enum HookHandler {
     /// Arc handler (used for request/response middleware and routes)
     Handler(ServerHookHandler),
+    /// Factory function that creates a handler when called
+    Factory(ServerHookHandlerFactory),
 }
 
 /// Represents different kinds of hooks in the server lifecycle.

@@ -28,3 +28,8 @@ pub type SendableAsyncTask<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 ///
 /// This is useful for creating and sharing asynchronous task factories.
 pub type SharedAsyncTaskFactory<T> = Arc<dyn FnPinBoxFutureSend<T>>;
+/// A type alias for a hook handler factory function.
+///
+/// This function pointer type is used to create ServerHookHandler instances
+/// based on generic types. It allows delayed instantiation of hooks.
+pub type ServerHookHandlerFactory = fn() -> ServerHookHandler;

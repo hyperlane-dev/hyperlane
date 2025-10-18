@@ -178,11 +178,20 @@ impl Server {
             (HookType::PanicHook(_), HookHandler::Handler(handler)) => {
                 self.write().await.get_mut_panic_hook().push(handler);
             }
+            (HookType::PanicHook(_), HookHandler::Factory(factory)) => {
+                self.write().await.get_mut_panic_hook().push(factory());
+            }
             (HookType::RequestMiddleware(_), HookHandler::Handler(handler)) => {
                 self.write()
                     .await
                     .get_mut_request_middleware()
                     .push(handler);
+            }
+            (HookType::RequestMiddleware(_), HookHandler::Factory(factory)) => {
+                self.write()
+                    .await
+                    .get_mut_request_middleware()
+                    .push(factory());
             }
             (HookType::Route(path), HookHandler::Handler(handler)) => {
                 self.write()
@@ -191,11 +200,24 @@ impl Server {
                     .add(path, handler)
                     .unwrap();
             }
+            (HookType::Route(path), HookHandler::Factory(factory)) => {
+                self.write()
+                    .await
+                    .get_mut_route()
+                    .add(path, factory())
+                    .unwrap();
+            }
             (HookType::ResponseMiddleware(_), HookHandler::Handler(handler)) => {
                 self.write()
                     .await
                     .get_mut_response_middleware()
                     .push(handler);
+            }
+            (HookType::ResponseMiddleware(_), HookHandler::Factory(factory)) => {
+                self.write()
+                    .await
+                    .get_mut_response_middleware()
+                    .push(factory());
             }
         };
     }
