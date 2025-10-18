@@ -53,7 +53,7 @@ impl HookMacro {
     /// - `Self` - The created HookMacro instance.
     pub fn panic_hook<P: ServerHook>(order: Option<isize>) -> Self {
         Self {
-            handler: HookHandler::Factory(create_panic_hook::<P>),
+            handler: HookHandler::Factory(create_server_hook::<P>),
             hook_type: HookType::PanicHook(order),
         }
     }
@@ -73,7 +73,7 @@ impl HookMacro {
     /// - `Self` - The created HookMacro instance.
     pub fn request_middleware<M: ServerHook>(order: Option<isize>) -> Self {
         Self {
-            handler: HookHandler::Factory(create_middleware_hook::<M>),
+            handler: HookHandler::Factory(create_server_hook::<M>),
             hook_type: HookType::RequestMiddleware(order),
         }
     }
@@ -93,7 +93,7 @@ impl HookMacro {
     /// - `Self` - The created HookMacro instance.
     pub fn response_middleware<M: ServerHook>(order: Option<isize>) -> Self {
         Self {
-            handler: HookHandler::Factory(create_middleware_hook::<M>),
+            handler: HookHandler::Factory(create_server_hook::<M>),
             hook_type: HookType::ResponseMiddleware(order),
         }
     }
@@ -113,7 +113,7 @@ impl HookMacro {
     /// - `Self` - The created HookMacro instance.
     pub fn route<R: ServerHook>(path: &'static str) -> Self {
         Self {
-            handler: HookHandler::Factory(create_route_hook::<R>),
+            handler: HookHandler::Factory(create_server_hook::<R>),
             hook_type: HookType::Route(path),
         }
     }
