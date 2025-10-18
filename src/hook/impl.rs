@@ -77,6 +77,16 @@ impl ServerControlHook {
     }
 }
 
+impl PartialEq for HookHandler {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (HookHandler::Handler(a), HookHandler::Handler(b)) => Arc::ptr_eq(a, b),
+        }
+    }
+}
+
+impl Eq for HookHandler {}
+
 /// Implementation block for `HookType`.
 ///
 /// This block defines utility methods associated with the `HookType` enum.

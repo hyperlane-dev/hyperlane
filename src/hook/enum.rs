@@ -1,5 +1,12 @@
 use crate::*;
 
+/// Represents different handler types for hooks.
+#[derive(Clone)]
+pub enum HookHandler {
+    /// Arc handler (used for request/response middleware and routes)
+    Handler(ServerHookHandler),
+}
+
 /// Represents different kinds of hooks in the server lifecycle.
 ///
 /// Each variant corresponds to a specific hook that can be registered

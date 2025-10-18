@@ -197,9 +197,6 @@ impl Server {
                     .get_mut_response_middleware()
                     .push(handler);
             }
-            _ => {
-                panic!("Invalid hook type and handler combination");
-            }
         };
     }
 
