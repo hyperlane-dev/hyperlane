@@ -194,7 +194,7 @@ impl ServerHook for DynamicRoute {
 
 impl ServerHook for ServerPanicHook {
     async fn new(_ctx: &Context) -> Self {
-        Self {}
+        Self
     }
 
     async fn handle(self, ctx: &Context) {
