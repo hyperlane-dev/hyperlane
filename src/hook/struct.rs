@@ -13,23 +13,23 @@ pub struct ServerControlHook {
     #[debug(skip)]
     #[get(pub)]
     #[set(pub(crate))]
-    pub(super) wait_hook: ArcFnPinBoxFutureSend<()>,
+    pub(super) wait_hook: SharedAsyncTaskFactory<()>,
     /// A hook that, when called, initiates a graceful shutdown of the server.
     /// This will stop the server from accepting new connections and allow existing ones
     /// to complete.
     #[debug(skip)]
     #[get(pub)]
     #[set(pub(crate))]
-    pub(super) shutdown_hook: ArcFnPinBoxFutureSend<()>,
+    pub(super) shutdown_hook: SharedAsyncTaskFactory<()>,
 }
 
 /// Represents different handler types for hooks.
 #[derive(Clone)]
 pub enum HookHandler {
     /// Function-based handler (used for panic hooks)
-    Function(fn(Context) -> PinBoxFutureSend<()>),
+    Function(fn(Context) -> SendableAsyncTask<()>),
     /// Arc handler (used for request/response middleware and routes)
-    Handler(ArcPinBoxFutureSendSync),
+    Handler(ServerHookHandler),
 }
 
 impl std::fmt::Debug for HookHandler {

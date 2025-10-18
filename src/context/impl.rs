@@ -40,8 +40,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `RwLockReadContextInner` - The read guard for the inner context.
-    async fn read(&self) -> RwLockReadContextInner {
+    /// - `ContextReadGuard` - The read guard for the inner context.
+    async fn read(&self) -> ContextReadGuard {
         self.get_0().read().await
     }
 
@@ -49,8 +49,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `RwLockWriteContextInner` - The write guard for the inner context.
-    async fn write(&self) -> RwLockWriteContextInner {
+    /// - `ContextWriteGuard` - The write guard for the inner context.
+    async fn write(&self) -> ContextWriteGuard {
         self.get_0().write().await
     }
 
@@ -1220,8 +1220,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `HashMapArcAnySendSync` - A map containing all attributes.
-    pub async fn get_attributes(&self) -> HashMapArcAnySendSync {
+    /// - `ThreadSafeAttributeStore` - A map containing all attributes.
+    pub async fn get_attributes(&self) -> ThreadSafeAttributeStore {
         self.read().await.get_attributes().clone()
     }
 
@@ -1345,8 +1345,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionPanic` - The panic information if a panic was caught.
-    pub async fn try_get_panic(&self) -> OptionPanic {
+    /// - `OptionalPanicInfo` - The panic information if a panic was caught.
+    pub async fn try_get_panic(&self) -> OptionalPanicInfo {
         self.try_get_internal_attribute(InternalAttribute::Panic)
             .await
     }
@@ -1381,8 +1381,8 @@ impl Context {
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
-        let hook_fn: ArcFnContextPinBoxSendSync<()> =
-            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
+        let hook_fn: SharedHookHandler<()> =
+            Arc::new(move |ctx: Context| -> SendableAsyncTask<()> { Box::pin(hook(ctx)) });
         self.set_internal_attribute(InternalAttribute::Hook(key.to_string()), hook_fn)
             .await
     }
@@ -1395,8 +1395,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionArcFnContextPinBoxSendSync<()>` - The hook function if it has been set.
-    pub async fn try_get_hook<K>(&self, key: K) -> OptionArcFnContextPinBoxSendSync<()>
+    /// - `OptionalHookHandler<()>` - The hook function if it has been set.
+    pub async fn try_get_hook<K>(&self, key: K) -> OptionalHookHandler<()>
     where
         K: ToString,
     {

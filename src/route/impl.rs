@@ -26,7 +26,7 @@ impl PartialEq for RoutePattern {
     ///
     /// # Arguments
     ///
-    /// - `&Self`: The other `RoutePattern` instance to compare against.
+    /// - `&Self` - The other `RoutePattern` instance to compare against.
     ///
     /// # Returns
     ///
@@ -219,7 +219,7 @@ impl RoutePattern {
     /// # Returns
     ///
     /// - `Result<RoutePattern, RouteError>` - The parsed RoutePattern on success, or RouteError on failure.
-    pub(crate) fn new(route: &str) -> ResultRoutePatternRouteError {
+    pub(crate) fn new(route: &str) -> RoutePatternResult {
         Ok(Self(Self::parse_route(route)?))
     }
 
@@ -234,7 +234,7 @@ impl RoutePattern {
     /// # Returns
     ///
     /// - `Result<Vec<RouteSegment>, RouteError>` - Vector of RouteSegments on success, or RouteError on failure.
-    fn parse_route(route: &str) -> ResultVecRouteSegmentRouteError {
+    fn parse_route(route: &str) -> RouteParseResult {
         if route.is_empty() {
             return Err(RouteError::EmptyPattern);
         }
@@ -243,7 +243,7 @@ impl RoutePattern {
             return Ok(Vec::new());
         }
         let estimated_segments: usize = route.matches(DEFAULT_HTTP_PATH).count() + 1;
-        let mut segments: VecRouteSegment = Vec::with_capacity(estimated_segments);
+        let mut segments: RouteSegmentList = Vec::with_capacity(estimated_segments);
         for segment in route.split(DEFAULT_HTTP_PATH) {
             if segment.starts_with(DYNAMIC_ROUTE_LEFT_BRACKET)
                 && segment.ends_with(DYNAMIC_ROUTE_RIGHT_BRACKET)
@@ -282,7 +282,7 @@ impl RoutePattern {
     /// # Returns
     ///
     /// - `Option<RouteParams>` - Some with parameters if matched, None otherwise.
-    pub(crate) fn try_match_path(&self, path: &str) -> OptionRouteParams {
+    pub(crate) fn try_match_path(&self, path: &str) -> OptionalRouteParameters {
         let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
         let route_segments_len: usize = self.get_0().len();
         let is_tail_regex: bool = matches!(self.get_0().last(), Some(RouteSegment::Regex(_, _)));
@@ -292,7 +292,7 @@ impl RoutePattern {
             }
             return None;
         }
-        let mut path_segments: VecStrRef = Vec::with_capacity(route_segments_len);
+        let mut path_segments: PathComponentList = Vec::with_capacity(route_segments_len);
         let path_bytes: &[u8] = path.as_bytes();
         let path_separator_byte: u8 = DEFAULT_HTTP_PATH_BYTES[0];
         let mut segment_start: usize = 0;
@@ -410,7 +410,7 @@ impl RouteMatcher {
     /// # Arguments
     ///
     /// - `&str` - The route pattern string.
-    /// - `ArcPinBoxFutureSendSync` - The boxed route handler.
+    /// - `ServerHookHandler` - The boxed route handler.
     ///
     /// # Returns
     ///
@@ -418,8 +418,8 @@ impl RouteMatcher {
     pub(crate) fn add(
         &mut self,
         pattern: &str,
-        handler: ArcPinBoxFutureSendSync,
-    ) -> ResultAddRoute {
+        handler: ServerHookHandler,
+    ) -> RouteRegistrationResult {
         let route_pattern: RoutePattern = RoutePattern::new(pattern)?;
         if route_pattern.is_static() {
             if self.get_static_routes().contains_key(pattern) {
@@ -429,7 +429,7 @@ impl RouteMatcher {
                 .insert(pattern.to_string(), handler);
             return Ok(());
         }
-        let target_vec: &mut VecArcPinBoxFutureSendSync = if route_pattern.is_dynamic() {
+        let target_vec: &mut ServerHookPatternRoutes = if route_pattern.is_dynamic() {
             self.get_mut_dynamic_routes()
         } else {
             self.get_mut_regex_routes()
@@ -456,12 +456,12 @@ impl RouteMatcher {
     ///
     /// # Returns
     ///
-    /// - `OptionArcPinBoxFutureSendSync` - The matched route handler if found, None otherwise.
+    /// - `OptionalServerHookHandler` - The matched route handler if found, None otherwise.
     pub(crate) async fn try_resolve_route(
         &self,
         ctx: &Context,
         path: &str,
-    ) -> OptionArcPinBoxFutureSendSync {
+    ) -> OptionalServerHookHandler {
         if let Some(handler) = self.get_static_routes().get(path) {
             ctx.set_route_params(RouteParams::default()).await;
             return Some(handler.clone());

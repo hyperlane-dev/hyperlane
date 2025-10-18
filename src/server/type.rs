@@ -1,26 +1,26 @@
 use crate::*;
 
-/// A type alias for a `Result` that returns a `ServerError` on failure.
+/// A type alias for server operation result.
 ///
 /// This is commonly used throughout the server's public-facing API.
-pub type ServerResult<T> = Result<T, ServerError>;
-/// A type alias for a `Result` that returns a `JoinError` on failure.
+pub type ServerOperationResult<T> = Result<T, ServerError>;
+/// A type alias for task join result.
 ///
 /// This is used when waiting for asynchronous tasks to complete.
-pub type ResultJoinError<T> = Result<T, JoinError>;
-/// A type alias for a thread-safe, reference-counted read-write lock over `ServerInner`.
+pub type TaskJoinResult<T> = Result<T, JoinError>;
+/// A type alias for shared server state.
 ///
 /// This is the core mechanism for sharing server state across threads.
-pub(crate) type ArcRwLockServerInner = ArcRwLock<ServerInner>;
-/// A type alias for a thread-safe, reference-counted read-write lock over `ServerConfigInner`.
+pub(crate) type SharedServerState = ArcRwLock<ServerInner>;
+/// A type alias for shared server configuration.
 ///
 /// This is the core mechanism for sharing server config state across threads.
-pub(crate) type ArcRwLockServerConfigInner = ArcRwLock<ServerConfigInner>;
-/// A type alias for a read guard on the `ServerInner`'s `RwLock`.
+pub(crate) type SharedServerConfig = ArcRwLock<ServerConfigInner>;
+/// A type alias for server state read guard.
 ///
 /// This provides read-only access to the server's internal state.
-pub(crate) type RwLockReadGuardServerInner<'a> = RwLockReadGuard<'a, ServerInner>;
-/// A type alias for a write guard on the `ServerInner`'s `RwLock`.
+pub(crate) type ServerStateReadGuard<'a> = RwLockReadGuard<'a, ServerInner>;
+/// A type alias for server state write guard.
 ///
 /// This provides mutable access to the server's internal state.
-pub(crate) type RwLockWriteGuardServerInner<'a> = RwLockWriteGuard<'a, ServerInner>;
+pub(crate) type ServerStateWriteGuard<'a> = RwLockWriteGuard<'a, ServerInner>;

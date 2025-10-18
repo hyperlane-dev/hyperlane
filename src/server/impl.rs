@@ -150,8 +150,8 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// - `RwLockReadGuardServerInner` - The read guard for ServerInner.
-    pub(super) async fn read(&self) -> RwLockReadGuardServerInner {
+    /// - `ServerStateReadGuard` - The read guard for ServerInner.
+    pub(super) async fn read(&self) -> ServerStateReadGuard {
         self.get_0().read().await
     }
 
@@ -159,8 +159,8 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// - `RwLockWriteGuardServerInner` - The write guard for ServerInner.
-    async fn write(&self) -> RwLockWriteGuardServerInner {
+    /// - `ServerStateWriteGuard` - The write guard for ServerInner.
+    async fn write(&self) -> ServerStateWriteGuard {
         self.get_0().write().await
     }
 
@@ -396,12 +396,12 @@ impl Server {
     ///
     /// - `&Context` - The request context.
     /// - `&mut RequestLifecycle` - A mutable reference to the current request lifecycle state.
-    /// - `&ArcPinBoxFutureSendSync` - The middleware handler to execute.
+    /// - `&ServerHookHandler` - The middleware handler to execute.
     async fn run_middleware_with_lifecycle(
         &self,
         ctx: &Context,
         lifecycle: &mut RequestLifecycle,
-        handler: &ArcPinBoxFutureSendSync,
+        handler: &ServerHookHandler,
     ) {
         ctx.update_lifecycle_status(lifecycle).await;
         if let Err(join_error) = spawn(handler(ctx)).await {
@@ -421,12 +421,12 @@ impl Server {
     ///
     /// - `&Context` - The request context.
     /// - `&mut RequestLifecycle` - A mutable reference to the current request lifecycle state.
-    /// - `&ArcPinBoxFutureSendSync` - The route handler to execute.
+    /// - `&ServerHookHandler` - The route handler to execute.
     async fn run_route_with_lifecycle(
         &self,
         ctx: &Context,
         lifecycle: &mut RequestLifecycle,
-        handler: &ArcPinBoxFutureSendSync,
+        handler: &ServerHookHandler,
     ) {
         ctx.update_lifecycle_status(lifecycle).await;
         if let Err(join_error) = spawn(handler(ctx)).await {
@@ -440,9 +440,9 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// Returns a `ServerResult` containing the bound `TcpListener` on success,
+    /// Returns a `ServerOperationResult` containing the bound `TcpListener` on success,
     /// or a `ServerError` on failure.
-    async fn create_tcp_listener(&self) -> ServerResult<TcpListener> {
+    async fn create_tcp_listener(&self) -> ServerOperationResult<TcpListener> {
         let config: ServerConfigInner = self.read().await.get_config().clone();
         let host: String = config.get_host().clone();
         let port: usize = *config.get_port();
@@ -460,9 +460,9 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// - `ServerResult<()>` - A `ServerResult` which is typically `Ok(())` unless an unrecoverable
+    /// - `ServerOperationResult<()>` - A `ServerOperationResult` which is typically `Ok(())` unless an unrecoverable
     /// error occurs.
-    async fn accept_connections(&self, tcp_listener: &TcpListener) -> ServerResult<()> {
+    async fn accept_connections(&self, tcp_listener: &TcpListener) -> ServerOperationResult<()> {
         while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
             self.configure_stream(&stream).await;
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
@@ -479,7 +479,7 @@ impl Server {
     ///
     /// - `&TcpStream` - A reference to the `TcpStream` to configure.
     async fn configure_stream(&self, stream: &TcpStream) {
-        let server_inner: RwLockReadGuardServerInner = self.read().await;
+        let server_inner: ServerStateReadGuard = self.read().await;
         let config: &ServerConfigInner = server_inner.get_config();
         let linger_opt: &OptionDuration = config.get_linger();
         let nodelay_opt: &OptionBool = config.get_nodelay();
@@ -581,10 +581,10 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// Returns a `ServerResult` containing a shutdown function on success.
+    /// Returns a `ServerOperationResult` containing a shutdown function on success.
     /// Calling this function will shut down the server by aborting its main task.
     /// Returns an error if the server fails to start.
-    pub async fn run(&self) -> ServerResult<ServerControlHook> {
+    pub async fn run(&self) -> ServerOperationResult<ServerControlHook> {
         let tcp_listener: TcpListener = self.create_tcp_listener().await?;
         let server: Server = self.clone();
         let (wait_sender, wait_receiver) = channel(());
@@ -593,13 +593,13 @@ impl Server {
             let _ = server.accept_connections(&tcp_listener).await;
             let _ = wait_sender.send(());
         });
-        let wait_hook: ArcFnPinBoxFutureSend<()> = Arc::new(move || {
+        let wait_hook: SharedAsyncTaskFactory<()> = Arc::new(move || {
             let mut wait_receiver_clone: Receiver<()> = wait_receiver.clone();
             Box::pin(async move {
                 let _ = wait_receiver_clone.changed().await;
             })
         });
-        let shutdown_hook: ArcFnPinBoxFutureSend<()> = Arc::new(move || {
+        let shutdown_hook: SharedAsyncTaskFactory<()> = Arc::new(move || {
             let shutdown_sender_clone: Sender<()> = shutdown_sender.clone();
             Box::pin(async move {
                 let _ = shutdown_sender_clone.send(());

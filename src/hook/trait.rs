@@ -11,7 +11,7 @@ pub trait FnContextSendSync<R>: Fn(Context) -> R + Send + Sync {}
 /// This trait is essential for creating type-erased async function pointers,
 /// which is a common pattern for storing and dynamically dispatching different
 /// asynchronous handlers in a collection.
-pub trait FnContextPinBoxSendSync<T>: FnContextSendSync<PinBoxFutureSend<T>> {}
+pub trait FnContextPinBoxSendSync<T>: FnContextSendSync<SendableAsyncTask<T>> {}
 /// A trait for static, sendable, synchronous functions that return a future.
 ///
 /// This trait ensures that a handler function is safe to be sent across threads
@@ -29,5 +29,5 @@ where
 pub trait FutureSendStatic<T>: Future<Output = T> + Send + 'static {}
 /// A trait for `Send`-able futures with a generic output.
 pub trait FutureSend<T>: Future<Output = T> + Send {}
-/// A trait for thread-safe, reference-counted closures that produce a `PinBoxFutureSend`.
-pub trait FnPinBoxFutureSend<T>: Fn() -> PinBoxFutureSend<T> + Send + Sync {}
+/// A trait for thread-safe, reference-counted closures that produce a sendable async task.
+pub trait FnPinBoxFutureSend<T>: Fn() -> SendableAsyncTask<T> + Send + Sync {}

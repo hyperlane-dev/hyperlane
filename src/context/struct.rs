@@ -40,7 +40,7 @@ pub(crate) struct ContextInner {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    attributes: HashMapArcAnySendSync,
+    attributes: ThreadSafeAttributeStore,
 }
 
 /// The main application context, providing thread-safe access to request and response data.

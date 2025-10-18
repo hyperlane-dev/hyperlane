@@ -1,32 +1,30 @@
 use crate::*;
 
-/// Type alias for a thread-safe, type-erased handler function.
+/// Type alias for a shared server hook handler.
 ///
 /// This type allows storing handlers (routes and middleware) of different concrete types
 /// in the same collection. The handler takes a `&Context` and returns
 /// a pinned, boxed future that resolves to `()`.
-pub(crate) type ArcPinBoxFutureSendSync =
-    Arc<dyn Fn(&Context) -> PinBoxFutureSend<()> + Send + Sync>;
+pub type ServerHookHandler = Arc<dyn Fn(&Context) -> SendableAsyncTask<()> + Send + Sync>;
 
-/// Type alias for an optional handler function.
+/// Type alias for an optional server hook handler.
 ///
 /// This type allows storing optional handlers of different concrete types in
 /// the same collection. The handler takes a `&Context` and returns
 /// a pinned, boxed future that resolves to `()`.
-pub(crate) type OptionArcPinBoxFutureSendSync = Option<ArcPinBoxFutureSendSync>;
+pub type OptionalServerHookHandler = Option<ServerHookHandler>;
 
-/// Type alias for a vector of route handlers with their patterns.
+/// Type alias for a collection of pattern-based server hook routes.
 ///
-/// Used to store multiple route handlers in the routing system.
-pub(crate) type VecArcPinBoxFutureSendSync = Vec<(RoutePattern, ArcPinBoxFutureSendSync)>;
+/// Used to store dynamic and regex route handlers with their matching patterns.
+pub type ServerHookPatternRoutes = Vec<(RoutePattern, ServerHookHandler)>;
 
-/// Type alias for a vector of handler functions.
+/// Type alias for a list of server hooks.
 ///
 /// Used to store middleware handlers in the request/response processing pipeline.
-pub(crate) type VecHandlers = Vec<ArcPinBoxFutureSendSync>;
+pub type ServerHookList = Vec<ServerHookHandler>;
 
-/// Type alias for a hash map of static route paths to handlers.
+/// Type alias for a map of server hook handlers.
 ///
 /// Used for fast lookup of exact-match routes.
-pub(crate) type HashMapStringArcPinBoxFutureSendSync =
-    HashMapXxHash3_64<String, ArcPinBoxFutureSendSync>;
+pub type ServerHookMap = HashMapXxHash3_64<String, ServerHookHandler>;

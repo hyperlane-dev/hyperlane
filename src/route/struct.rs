@@ -9,7 +9,7 @@ use crate::*;
 pub(crate) struct RoutePattern(
     /// The collection of segments that make up the route pattern.
     #[get(pub(super))]
-    pub(super) VecRouteSegment,
+    pub(super) RouteSegmentList,
 );
 
 /// The core routing engine responsible for matching request paths to their corresponding handlers.
@@ -27,17 +27,17 @@ pub(crate) struct RouteMatcher {
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
-    pub(super) static_routes: HashMapStringArcPinBoxFutureSendSync,
+    pub(super) static_routes: ServerHookMap,
     /// A vector of routes that contain dynamic segments.
     /// These are evaluated sequentially if no static route matches.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
-    pub(super) dynamic_routes: VecArcPinBoxFutureSendSync,
+    pub(super) dynamic_routes: ServerHookPatternRoutes,
     /// A vector of routes that use regular expressions for matching.
     /// These provide the most flexibility but are evaluated last due to their performance overhead.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
-    pub(super) regex_routes: VecArcPinBoxFutureSendSync,
+    pub(super) regex_routes: ServerHookPatternRoutes,
 }

@@ -11,7 +11,7 @@ impl<F, R> FnContextSendSync<R> for F where F: Fn(Context) -> R + Send + Sync {}
 /// This trait is a common pattern for asynchronous handlers in Rust, enabling type
 /// erasure and dynamic dispatch for futures. It is essential for storing different
 /// async functions in a collection.
-impl<F, T> FnContextPinBoxSendSync<T> for F where F: FnContextSendSync<PinBoxFutureSend<T>> {}
+impl<F, T> FnContextPinBoxSendSync<T> for F where F: FnContextSendSync<SendableAsyncTask<T>> {}
 
 /// A blanket implementation for static, sendable, synchronous functions that return a future.
 ///
@@ -36,7 +36,7 @@ impl<T, R> FutureSendStatic<R> for T where T: Future<Output = R> + Send + 'stati
 impl<T, O> FutureSend<O> for T where T: Future<Output = O> + Send {}
 
 /// Blanket implementation of `FnPinBoxFutureSend` for any type that satisfies the bounds.
-impl<T, O> FnPinBoxFutureSend<O> for T where T: Fn() -> PinBoxFutureSend<O> + Send + Sync {}
+impl<T, O> FnPinBoxFutureSend<O> for T where T: Fn() -> SendableAsyncTask<O> + Send + Sync {}
 
 /// Provides a default implementation for `ServerControlHook`.
 impl Default for ServerControlHook {

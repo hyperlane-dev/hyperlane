@@ -8,7 +8,7 @@ impl Default for ServerConfigInner {
     ///
     /// # Returns
     ///
-    /// A `ServerConfigInner` instance with default settings.
+    /// - `Self` - A `ServerConfigInner` instance with default settings.
     fn default() -> Self {
         Self {
             host: DEFAULT_HOST.to_owned(),
@@ -29,7 +29,7 @@ impl Default for ServerConfig {
     ///
     /// # Returns
     ///
-    /// A `ServerConfig` instance with default settings.
+    /// - `Self` - A `ServerConfig` instance with default settings.
     fn default() -> Self {
         Self(arc_rwlock(ServerConfigInner::default()))
     }
@@ -50,7 +50,7 @@ impl PartialEq for ServerConfig {
     ///
     /// # Returns
     ///
-    /// A `bool` indicating whether the configurations are equal.
+    /// - `bool` - Indicating whether the configurations are equal.
     fn eq(&self, other: &Self) -> bool {
         if Arc::ptr_eq(self.get_0(), other.get_0()) {
             return true;
@@ -74,7 +74,7 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A new `ServerConfig` instance.
+    /// - `Self` - A new `ServerConfig` instance.
     pub async fn new() -> Self {
         Self::default()
     }
@@ -83,8 +83,8 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A `RwLockReadGuardServerConfigInner` for the inner configuration.
-    async fn read(&self) -> RwLockReadGuardServerConfigInner {
+    /// - `ConfigReadGuard` - A `ConfigReadGuard` for the inner configuration.
+    async fn read(&self) -> ConfigReadGuard {
         self.get_0().read().await
     }
 
@@ -92,8 +92,8 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A `RwLockWriteGuardServerConfigInner` for the inner configuration.
-    async fn write(&self) -> RwLockWriteGuardServerConfigInner {
+    /// - `ConfigWriteGuard` - A `ConfigWriteGuard` for the inner configuration.
+    async fn write(&self) -> ConfigWriteGuard {
         self.get_0().write().await
     }
 
@@ -104,7 +104,7 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A `ServerConfigInner` instance containing the current server configuration.
+    /// - `ServerConfigInner` - A `ServerConfigInner` instance containing the current server configuration.
     pub(crate) async fn get_inner(&self) -> ServerConfigInner {
         self.read().await.clone()
     }
@@ -117,7 +117,7 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A reference to `Self` for method chaining.
+    /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn host<H: ToString>(&self, host: H) -> &Self {
         self.write().await.set_host(host.to_string());
         self
@@ -131,7 +131,7 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A reference to `Self` for method chaining.
+    /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn port(&self, port: usize) -> &Self {
         self.write().await.set_port(port);
         self
@@ -145,7 +145,7 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A reference to `Self` for method chaining.
+    /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn buffer(&self, buffer: usize) -> &Self {
         self.write().await.set_buffer(buffer);
         self
@@ -159,7 +159,7 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A reference to `Self` for method chaining.
+    /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn nodelay(&self, nodelay: bool) -> &Self {
         self.write().await.set_nodelay(Some(nodelay));
         self
@@ -169,7 +169,7 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A reference to `Self` for method chaining.
+    /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn enable_nodelay(&self) -> &Self {
         self.nodelay(true).await
     }
@@ -178,7 +178,7 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A reference to `Self` for method chaining.
+    /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn disable_nodelay(&self) -> &Self {
         self.nodelay(false).await
     }
@@ -191,7 +191,7 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A reference to `Self` for method chaining.
+    /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn linger(&self, linger_opt: OptionDuration) -> &Self {
         self.write().await.set_linger(linger_opt);
         self
@@ -205,7 +205,7 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A reference to `Self` for method chaining.
+    /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn enable_linger(&self, linger: Duration) -> &Self {
         self.linger(Some(linger)).await;
         self
@@ -215,7 +215,7 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A reference to `Self` for method chaining.
+    /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn disable_linger(&self) -> &Self {
         self.linger(None).await;
         self
@@ -229,7 +229,7 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A reference to `Self` for method chaining.
+    /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn ttl(&self, ttl: u32) -> &Self {
         self.write().await.set_ttl(Some(ttl));
         self
@@ -243,8 +243,8 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A `ServerConfigResult` which is a `Result` containing either the `ServerConfig` or a `serde_json::Error`.
-    pub fn from_str(config_str: &str) -> ServerConfigResult {
+    /// - `ConfigLoadResult` - A `ConfigLoadResult` which is a `Result` containing either the `ServerConfig` or a `serde_json::Error`.
+    pub fn from_str(config_str: &str) -> ConfigLoadResult {
         serde_json::from_str(config_str).map(|config: ServerConfigInner| Self(arc_rwlock(config)))
     }
 }

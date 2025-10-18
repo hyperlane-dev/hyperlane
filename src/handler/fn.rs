@@ -3,7 +3,7 @@ use crate::*;
 /// Creates a type-erased route handler from a concrete ServerHook implementation.
 ///
 /// This function takes a type that implements the `ServerHook` trait and converts it
-/// into a `ArcPinBoxFutureSendSync` that can be stored alongside other route handlers
+/// into a `ServerHookHandler` that can be stored alongside other route handlers
 /// of different concrete types.
 ///
 /// # Type Parameters
@@ -12,13 +12,13 @@ use crate::*;
 ///
 /// # Returns
 ///
-/// - `ArcPinBoxFutureSendSync` that wraps the route handler's instantiation and execution logic.
+/// - `ServerHookHandler` - A `ServerHookHandler` that wraps the route handler's instantiation and execution logic.
 #[inline]
-pub(crate) fn create_route_handler<R>() -> ArcPinBoxFutureSendSync
+pub(crate) fn create_route_handler<R>() -> ServerHookHandler
 where
     R: ServerHook,
 {
-    Arc::new(move |ctx: &Context| -> PinBoxFutureSend<()> {
+    Arc::new(move |ctx: &Context| -> SendableAsyncTask<()> {
         let ctx: Context = ctx.clone();
         Box::pin(async move {
             R::new(&ctx).await.handle(&ctx).await;
@@ -29,7 +29,7 @@ where
 /// Creates a type-erased middleware handler from a concrete ServerHook implementation.
 ///
 /// This function takes a type that implements the `ServerHook` trait and converts it
-/// into a `ArcPinBoxFutureSendSync` that can be stored alongside other middleware handlers
+/// into a `ServerHookHandler` that can be stored alongside other middleware handlers
 /// of different concrete types.
 ///
 /// # Type Parameters
@@ -38,13 +38,13 @@ where
 ///
 /// # Returns
 ///
-/// - `ArcPinBoxFutureSendSync` that wraps the middleware's instantiation and execution logic.
+/// - `ServerHookHandler` - A `ServerHookHandler` that wraps the middleware's instantiation and execution logic.
 #[inline]
-pub(crate) fn create_middleware_handler<M>() -> ArcPinBoxFutureSendSync
+pub(crate) fn create_middleware_handler<M>() -> ServerHookHandler
 where
     M: ServerHook,
 {
-    Arc::new(move |ctx: &Context| -> PinBoxFutureSend<()> {
+    Arc::new(move |ctx: &Context| -> SendableAsyncTask<()> {
         let ctx: Context = ctx.clone();
         Box::pin(async move {
             M::new(&ctx).await.handle(&ctx).await;
@@ -55,7 +55,7 @@ where
 /// Creates a type-erased panic hook handler from a concrete ServerHook implementation.
 ///
 /// This function takes a type that implements the `ServerHook` trait and converts it
-/// into a `ArcPinBoxFutureSendSync` that can be stored alongside other panic hook handlers
+/// into a `ServerHookHandler` that can be stored alongside other panic hook handlers
 /// of different concrete types.
 ///
 /// # Type Parameters
@@ -64,13 +64,13 @@ where
 ///
 /// # Returns
 ///
-/// - `ArcPinBoxFutureSendSync` that wraps the panic hook's instantiation and execution logic.
+/// - `ServerHookHandler` - A `ServerHookHandler` that wraps the panic hook's instantiation and execution logic.
 #[inline]
-pub(crate) fn create_panic_hook_handler<P>() -> ArcPinBoxFutureSendSync
+pub(crate) fn create_panic_hook_handler<P>() -> ServerHookHandler
 where
     P: ServerHook,
 {
-    Arc::new(move |ctx: &Context| -> PinBoxFutureSend<()> {
+    Arc::new(move |ctx: &Context| -> SendableAsyncTask<()> {
         let ctx: Context = ctx.clone();
         Box::pin(async move {
             P::new(&ctx).await.handle(&ctx).await;

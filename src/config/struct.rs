@@ -44,4 +44,4 @@ pub(crate) struct ServerConfigInner {
 /// This structure wraps `ServerConfigInner` in an `Arc<RwLock<ServerConfigInner>>`
 /// to allow for safe concurrent access and modification of the server settings.
 #[derive(Clone, Getter, CustomDebug, DisplayDebug)]
-pub struct ServerConfig(#[get(pub(super))] pub(super) ArcRwLockServerConfigInner);
+pub struct ServerConfig(#[get(pub(super))] pub(super) SharedServerConfig);

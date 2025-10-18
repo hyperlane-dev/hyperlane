@@ -42,19 +42,19 @@ pub(crate) struct ServerInner {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) panic_hook: VecHandlers,
+    pub(super) panic_hook: ServerHookList,
     /// A collection of request middleware handlers.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) request_middleware: VecHandlers,
+    pub(super) request_middleware: ServerHookList,
     /// A collection of response middleware handlers.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) response_middleware: VecHandlers,
+    pub(super) response_middleware: ServerHookList,
 }
 
 /// The primary server structure that provides a thread-safe interface to the server's state.
@@ -63,4 +63,4 @@ pub(crate) struct ServerInner {
 /// It allows multiple parts of the application to safely share and modify the server's
 /// configuration and state across different threads and asynchronous tasks.
 #[derive(Clone, Getter, CustomDebug, DisplayDebug, Default)]
-pub struct Server(#[get(pub(super))] pub(super) ArcRwLockServerInner);
+pub struct Server(#[get(pub(super))] pub(super) SharedServerState);
