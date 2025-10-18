@@ -14,7 +14,7 @@ use crate::*;
 ///
 /// - `ServerHookHandler` - A `ServerHookHandler` that wraps the route handler's instantiation and execution logic.
 #[inline]
-pub(crate) fn create_route_handler<R>() -> ServerHookHandler
+pub(crate) fn create_route_hook<R>() -> ServerHookHandler
 where
     R: ServerHook,
 {
@@ -40,7 +40,7 @@ where
 ///
 /// - `ServerHookHandler` - A `ServerHookHandler` that wraps the middleware's instantiation and execution logic.
 #[inline]
-pub(crate) fn create_middleware_handler<M>() -> ServerHookHandler
+pub(crate) fn create_middleware_hook<M>() -> ServerHookHandler
 where
     M: ServerHook,
 {
@@ -66,7 +66,7 @@ where
 ///
 /// - `ServerHookHandler` - A `ServerHookHandler` that wraps the panic hook's instantiation and execution logic.
 #[inline]
-pub(crate) fn create_panic_hook_handler<P>() -> ServerHookHandler
+pub(crate) fn create_panic_hook<P>() -> ServerHookHandler
 where
     P: ServerHook,
 {
