@@ -46,7 +46,7 @@ impl PartialEq for ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `&Self`: The other `ServerConfig` to compare against.
+    /// - `&Self`- The other `ServerConfig` to compare against.
     ///
     /// # Returns
     ///
@@ -113,7 +113,7 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `H`: The host address to set.
+    /// - `H`- The host address to set.
     ///
     /// # Returns
     ///
@@ -127,7 +127,7 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `usize`: The port number to set.
+    /// - `usize`- The port number to set.
     ///
     /// # Returns
     ///
@@ -141,7 +141,7 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `usize`: The HTTP buffer size to set.
+    /// - `usize`- The HTTP buffer size to set.
     ///
     /// # Returns
     ///
@@ -155,7 +155,7 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `bool`: The `bool` value for `TCP_NODELAY`.
+    /// - `bool`- The `bool` value for `TCP_NODELAY`.
     ///
     /// # Returns
     ///
@@ -187,7 +187,7 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `OptionDuration`: The `Duration` value for `SO_LINGER`.
+    /// - `OptionDuration`- The `Duration` value for `SO_LINGER`.
     ///
     /// # Returns
     ///
@@ -201,7 +201,7 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `Duration`: The `Duration` value for `SO_LINGER`.
+    /// - `Duration`- The `Duration` value for `SO_LINGER`.
     ///
     /// # Returns
     ///
@@ -225,7 +225,7 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `u32`: The `u32` value for `IP_TTL`.
+    /// - `u32`- The `u32` value for `IP_TTL`.
     ///
     /// # Returns
     ///
@@ -239,7 +239,7 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `&str`: The JSON string to parse.
+    /// - `&str`- The JSON string to parse.
     ///
     /// # Returns
     ///

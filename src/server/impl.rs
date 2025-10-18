@@ -26,11 +26,11 @@ impl PartialEq for ServerInner {
     ///
     /// # Arguments
     ///
-    /// - `&Self`: The other `ServerInner` instance to compare against.
+    /// - `&Self`- The other `ServerInner` instance to compare against.
     ///
     /// # Returns
     ///
-    /// - `bool`: `true` if the instances are equal, `false` otherwise.
+    /// - `bool`- `true` if the instances are equal, `false` otherwise.
     fn eq(&self, other: &Self) -> bool {
         self.config == other.config
             && self.route == other.route
@@ -68,11 +68,11 @@ impl PartialEq for Server {
     ///
     /// # Arguments
     ///
-    /// - `&Self`: The other `Server` instance to compare against.
+    /// - `&Self`- The other `Server` instance to compare against.
     ///
     /// # Returns
     ///
-    /// - `bool`: `true` if the instances are equal, `false` otherwise.
+    /// - `bool`- `true` if the instances are equal, `false` otherwise.
     fn eq(&self, other: &Self) -> bool {
         if Arc::ptr_eq(&self.get_0(), &other.get_0()) {
             return true;
@@ -172,7 +172,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `HookMacro`: The `HookMacro` instance containing the `HookType` and its handler.
+    /// - `HookMacro`- The `HookMacro` instance containing the `HookType` and its handler.
     pub async fn handle_hook(&self, hook: HookMacro) {
         match (hook.hook_type, hook.handler) {
             (HookType::PanicHook(_), HookHandler::Handler(handler)) => {

@@ -10,18 +10,18 @@ use crate::*;
 pub enum HookType {
     /// Triggered when a panic occurs in the server.
     ///
-    /// - `Option<isize>`: Optional priority of the panic hook. `None` means default.
+    /// - `Option<isize>`- Optional priority of the panic hook. `None` means default.
     PanicHook(Option<isize>),
     /// Executed before a request reaches its designated route handler.
     ///
-    /// - `Option<isize>`: Optional priority of the request middleware.
+    /// - `Option<isize>`- Optional priority of the request middleware.
     RequestMiddleware(Option<isize>),
     /// Represents a route handler for a specific path.
     ///
-    /// - `&'static str`: The route path handled by this hook.
+    /// - `&'static str`- The route path handled by this hook.
     Route(&'static str),
     /// Executed after a route handler but before the response is sent.
     ///
-    /// - `Option<isize>`: Optional priority of the response middleware.
+    /// - `Option<isize>`- Optional priority of the response middleware.
     ResponseMiddleware(Option<isize>),
 }

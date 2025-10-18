@@ -30,7 +30,7 @@ impl PartialEq for RoutePattern {
     ///
     /// # Returns
     ///
-    /// - `bool`: `true` if the instances are equal, `false` otherwise.
+    /// - `bool`- `true` if the instances are equal, `false` otherwise.
     fn eq(&self, other: &Self) -> bool {
         self.get_0() == other.get_0()
     }
@@ -49,11 +49,11 @@ impl PartialOrd for RoutePattern {
     ///
     /// # Arguments
     ///
-    /// - `&Self`: The other `RoutePattern` instance to compare against.
+    /// - `&Self`- The other `RoutePattern` instance to compare against.
     ///
     /// # Returns
     ///
-    /// - `Option<Ordering>`: The ordering of the two instances.
+    /// - `Option<Ordering>`- The ordering of the two instances.
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -67,11 +67,11 @@ impl Ord for RoutePattern {
     ///
     /// # Arguments
     ///
-    /// - `&Self`: The other `RoutePattern` instance to compare against.
+    /// - `&Self`- The other `RoutePattern` instance to compare against.
     ///
     /// # Returns
     ///
-    /// - `Ordering`: The ordering of the two instances.
+    /// - `Ordering`- The ordering of the two instances.
     fn cmp(&self, other: &Self) -> Ordering {
         self.get_0().cmp(&other.get_0())
     }
@@ -85,11 +85,11 @@ impl PartialEq for RouteMatcher {
     ///
     /// # Arguments
     ///
-    /// - `&Self`: The other `RouteMatcher` instance to compare against.
+    /// - `&Self`- The other `RouteMatcher` instance to compare against.
     ///
     /// # Returns
     ///
-    /// - `bool`: `true` if the instances are equal, `false` otherwise.
+    /// - `bool`- `true` if the instances are equal, `false` otherwise.
     fn eq(&self, other: &Self) -> bool {
         let self_static_keys: HashSet<&String> = self.static_routes.keys().collect();
         let other_static_keys: HashSet<&String> = other.static_routes.keys().collect();
@@ -144,11 +144,11 @@ impl PartialOrd for RouteSegment {
     ///
     /// # Arguments
     ///
-    /// - `&Self`: The other `RouteSegment` instance to compare against.
+    /// - `&Self`- The other `RouteSegment` instance to compare against.
     ///
     /// # Returns
     ///
-    /// - `Option<Ordering>`: The ordering of the two instances.
+    /// - `Option<Ordering>`- The ordering of the two instances.
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -162,11 +162,11 @@ impl Ord for RouteSegment {
     ///
     /// # Arguments
     ///
-    /// - `&Self`: The other `RouteSegment` instance to compare against.
+    /// - `&Self`- The other `RouteSegment` instance to compare against.
     ///
     /// # Returns
     ///
-    /// - `Ordering`: The ordering of the two instances.
+    /// - `Ordering`- The ordering of the two instances.
     fn cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
             (Self::Static(s1), Self::Static(s2)) => s1.cmp(s2),
@@ -190,11 +190,11 @@ impl PartialEq for RouteSegment {
     ///
     /// # Arguments
     ///
-    /// - `&Self`: The other `RouteSegment` instance to compare against.
+    /// - `&Self`- The other `RouteSegment` instance to compare against.
     ///
     /// # Returns
     ///
-    /// - `bool`: `true` if the instances are equal, `false` otherwise.
+    /// - `bool`- `true` if the instances are equal, `false` otherwise.
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Static(l0), Self::Static(r0)) => l0 == r0,

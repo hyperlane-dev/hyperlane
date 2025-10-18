@@ -8,7 +8,7 @@ use crate::*;
 ///
 /// # Arguments
 ///
-/// - `Vec<HookMacro>`: A vector of `HookMacro` instances to be checked.
+/// - `Vec<HookMacro>`- A vector of `HookMacro` instances to be checked.
 ///
 /// # Panics
 ///
