@@ -19,7 +19,7 @@ pub type HookHandlerChain<T> = Vec<SharedHookHandler<T>>;
 ///
 /// This is a common return type for asynchronous handlers, providing a type-erased
 /// future that can be easily managed by the async runtime.
-pub type AsyncTask = Pin<Box<(dyn Future<Output = ()> + Send + 'static)>>;
+pub type AsyncTask = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 /// A type alias for a sendable asynchronous task with a generic output.
 ///
 /// This is often used to represent an asynchronous task that can be sent across threads.

@@ -41,7 +41,7 @@ impl Context {
     /// # Returns
     ///
     /// - `ContextReadGuard` - The read guard for the inner context.
-    async fn read(&self) -> ContextReadGuard {
+    async fn read(&self) -> ContextReadGuard<'_> {
         self.get_0().read().await
     }
 
@@ -50,7 +50,7 @@ impl Context {
     /// # Returns
     ///
     /// - `ContextWriteGuard` - The write guard for the inner context.
-    async fn write(&self) -> ContextWriteGuard {
+    async fn write(&self) -> ContextWriteGuard<'_> {
         self.get_0().write().await
     }
 

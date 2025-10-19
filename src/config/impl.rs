@@ -84,7 +84,7 @@ impl ServerConfig {
     /// # Returns
     ///
     /// - `ConfigReadGuard` - A `ConfigReadGuard` for the inner configuration.
-    async fn read(&self) -> ConfigReadGuard {
+    async fn read(&self) -> ConfigReadGuard<'_> {
         self.get_0().read().await
     }
 
@@ -93,7 +93,7 @@ impl ServerConfig {
     /// # Returns
     ///
     /// - `ConfigWriteGuard` - A `ConfigWriteGuard` for the inner configuration.
-    async fn write(&self) -> ConfigWriteGuard {
+    async fn write(&self) -> ConfigWriteGuard<'_> {
         self.get_0().write().await
     }
 

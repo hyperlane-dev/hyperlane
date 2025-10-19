@@ -151,7 +151,7 @@ impl Server {
     /// # Returns
     ///
     /// - `ServerStateReadGuard` - The read guard for ServerInner.
-    pub(super) async fn read(&self) -> ServerStateReadGuard {
+    pub(super) async fn read(&self) -> ServerStateReadGuard<'_> {
         self.get_0().read().await
     }
 
@@ -160,7 +160,7 @@ impl Server {
     /// # Returns
     ///
     /// - `ServerStateWriteGuard` - The write guard for ServerInner.
-    async fn write(&self) -> ServerStateWriteGuard {
+    async fn write(&self) -> ServerStateWriteGuard<'_> {
         self.get_0().write().await
     }
 
@@ -381,10 +381,10 @@ impl Server {
         let panic_clone: Panic = panic.clone();
         ctx.cancel_aborted().await.set_panic(panic_clone).await;
         for hook in self.read().await.get_panic_hook().iter() {
-            if let Err(join_error) = spawn(hook(ctx)).await {
-                if join_error.is_panic() {
-                    eprintln!("Panic occurred in panic hook: {:?}", join_error);
-                }
+            if let Err(join_error) = spawn(hook(ctx)).await
+                && join_error.is_panic()
+            {
+                eprintln!("Panic occurred in panic hook: {:?}", join_error);
             }
             if ctx.get_aborted().await {
                 return;
@@ -423,10 +423,10 @@ impl Server {
         handler: &ServerHookHandler,
     ) {
         ctx.update_lifecycle_status(lifecycle).await;
-        if let Err(join_error) = spawn(handler(ctx)).await {
-            if join_error.is_panic() {
-                self.handle_task_panic(ctx, join_error).await;
-            }
+        if let Err(join_error) = spawn(handler(ctx)).await
+            && join_error.is_panic()
+        {
+            self.handle_task_panic(ctx, join_error).await;
         }
     }
 
@@ -448,10 +448,10 @@ impl Server {
         handler: &ServerHookHandler,
     ) {
         ctx.update_lifecycle_status(lifecycle).await;
-        if let Err(join_error) = spawn(handler(ctx)).await {
-            if join_error.is_panic() {
-                self.handle_task_panic(ctx, join_error).await;
-            }
+        if let Err(join_error) = spawn(handler(ctx)).await
+            && join_error.is_panic()
+        {
+            self.handle_task_panic(ctx, join_error).await;
         }
     }
 

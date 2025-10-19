@@ -31,8 +31,10 @@ where
     );
 }
 
+#[cfg(test)]
 struct TestRoute;
 
+#[cfg(test)]
 impl ServerHook for TestRoute {
     async fn new(_ctx: &Context) -> Self {
         Self
