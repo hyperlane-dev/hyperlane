@@ -459,9 +459,9 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// Returns a `ServerOperationResult` containing the bound `TcpListener` on success,
+    /// Returns a `ServerResult` containing the bound `TcpListener` on success,
     /// or a `ServerError` on failure.
-    async fn create_tcp_listener(&self) -> ServerOperationResult<TcpListener> {
+    async fn create_tcp_listener(&self) -> ServerResult<TcpListener> {
         let config: ServerConfigInner = self.read().await.get_config().clone();
         let host: String = config.get_host().clone();
         let port: usize = *config.get_port();
@@ -479,9 +479,9 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// - `ServerOperationResult<()>` - A `ServerOperationResult` which is typically `Ok(())` unless an unrecoverable
+    /// - `ServerResult<()>` - A `ServerResult` which is typically `Ok(())` unless an unrecoverable
     ///   error occurs.
-    async fn accept_connections(&self, tcp_listener: &TcpListener) -> ServerOperationResult<()> {
+    async fn accept_connections(&self, tcp_listener: &TcpListener) -> ServerResult<()> {
         while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
             self.configure_stream(&stream).await;
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
@@ -600,10 +600,10 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// Returns a `ServerOperationResult` containing a shutdown function on success.
+    /// Returns a `ServerResult` containing a shutdown function on success.
     /// Calling this function will shut down the server by aborting its main task.
     /// Returns an error if the server fails to start.
-    pub async fn run(&self) -> ServerOperationResult<ServerControlHook> {
+    pub async fn run(&self) -> ServerResult<ServerControlHook> {
         let tcp_listener: TcpListener = self.create_tcp_listener().await?;
         let server: Server = self.clone();
         let (wait_sender, wait_receiver) = channel(());

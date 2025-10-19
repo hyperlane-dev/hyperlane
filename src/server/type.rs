@@ -3,7 +3,7 @@ use crate::*;
 /// A type alias for server operation result.
 ///
 /// This is commonly used throughout the server's public-facing API.
-pub type ServerOperationResult<T> = Result<T, ServerError>;
+pub type ServerResult<T> = Result<T, ServerError>;
 /// A type alias for task join result.
 ///
 /// This is used when waiting for asynchronous tasks to complete.
