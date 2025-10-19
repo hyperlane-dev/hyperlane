@@ -40,10 +40,8 @@ impl Panic {
     fn try_extract_panic_message(panic_payload: &dyn Any) -> OptionString {
         if let Some(s) = panic_payload.downcast_ref::<&str>() {
             Some(s.to_string())
-        } else if let Some(s) = panic_payload.downcast_ref::<String>() {
-            Some(s.clone())
         } else {
-            None
+            panic_payload.downcast_ref::<String>().cloned()
         }
     }
 

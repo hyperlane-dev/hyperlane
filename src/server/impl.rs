@@ -74,7 +74,7 @@ impl PartialEq for Server {
     ///
     /// - `bool`- `true` if the instances are equal, `false` otherwise.
     fn eq(&self, other: &Self) -> bool {
-        if Arc::ptr_eq(&self.get_0(), &other.get_0()) {
+        if Arc::ptr_eq(self.get_0(), other.get_0()) {
             return true;
         }
         if let (Ok(s), Ok(o)) = (self.get_0().try_read(), other.get_0().try_read()) {
@@ -94,7 +94,7 @@ impl Eq for Server {}
 ///
 /// This struct provides a convenient way to pass around the necessary components
 /// for processing a request or WebSocket frame.
-impl<'a> HandlerState {
+impl HandlerState {
     /// Creates a new HandlerState instance.
     ///
     /// # Arguments
@@ -232,7 +232,7 @@ impl Server {
     ///
     /// - `&Self` - Reference to self for method chaining.
     pub async fn config_str<C: ToString>(&self, config_str: C) -> &Self {
-        let config: ServerConfig = ServerConfig::from_str(&config_str.to_string()).unwrap();
+        let config: ServerConfig = ServerConfig::from_json_str(&config_str.to_string()).unwrap();
         self.write().await.set_config(config.get_inner().await);
         self
     }
@@ -402,7 +402,7 @@ impl Server {
     /// - `JoinError` - The `JoinError` returned from the panicked task.
     async fn handle_task_panic(&self, ctx: &Context, join_error: JoinError) {
         let panic: Panic = Panic::from_join_error(join_error);
-        self.handle_panic_with_context(&ctx, &panic).await;
+        self.handle_panic_with_context(ctx, &panic).await;
     }
 
     /// Executes a middleware handler and manages the request lifecycle.
@@ -425,7 +425,7 @@ impl Server {
         ctx.update_lifecycle_status(lifecycle).await;
         if let Err(join_error) = spawn(handler(ctx)).await {
             if join_error.is_panic() {
-                self.handle_task_panic(&ctx, join_error).await;
+                self.handle_task_panic(ctx, join_error).await;
             }
         }
     }
@@ -450,7 +450,7 @@ impl Server {
         ctx.update_lifecycle_status(lifecycle).await;
         if let Err(join_error) = spawn(handler(ctx)).await {
             if join_error.is_panic() {
-                self.handle_task_panic(&ctx, join_error).await;
+                self.handle_task_panic(ctx, join_error).await;
             }
         }
     }
@@ -480,7 +480,7 @@ impl Server {
     /// # Returns
     ///
     /// - `ServerOperationResult<()>` - A `ServerOperationResult` which is typically `Ok(())` unless an unrecoverable
-    /// error occurs.
+    ///   error occurs.
     async fn accept_connections(&self, tcp_listener: &TcpListener) -> ServerOperationResult<()> {
         while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
             self.configure_stream(&stream).await;
@@ -554,7 +554,7 @@ impl Server {
     /// # Returns
     ///
     /// - `bool` - A boolean indicating whether the connection should be kept alive.
-    async fn request_hook<'a>(&self, state: &HandlerState, request: &Request) -> bool {
+    async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {
         let route: &str = request.get_path();
         let ctx: &Context = state.get_ctx();
         ctx.set_request(request).await;
@@ -580,7 +580,7 @@ impl Server {
     ///
     /// - `&HandlerState` - The `HandlerState` for the current connection.
     /// - `&Request` - The initial request that established the keep-alive connection.
-    async fn handle_http_requests<'a>(&self, state: &HandlerState, request: &Request) {
+    async fn handle_http_requests(&self, state: &HandlerState, request: &Request) {
         if self.request_hook(state, request).await {
             return;
         }

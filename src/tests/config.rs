@@ -12,7 +12,7 @@ async fn config_from_str() {
             "ttl": 64
         }
     "#;
-    let config: ServerConfig = ServerConfig::from_str(config_str).unwrap();
+    let config: ServerConfig = ServerConfig::from_json_str(config_str).unwrap();
     let new_config: ServerConfig = ServerConfig::new().await;
     new_config.host("0.0.0.0").await;
     new_config.port(80).await;

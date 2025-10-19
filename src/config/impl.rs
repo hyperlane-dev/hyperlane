@@ -244,7 +244,16 @@ impl ServerConfig {
     /// # Returns
     ///
     /// - `ConfigLoadResult` - A `ConfigLoadResult` which is a `Result` containing either the `ServerConfig` or a `serde_json::Error`.
-    pub fn from_str(config_str: &str) -> ConfigLoadResult {
+    ///   Creates a `ServerConfig` from a JSON string.
+    ///
+    /// # Arguments
+    ///
+    /// - `config_str` - The JSON string to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `ConfigLoadResult` - A `ConfigLoadResult` which is a `Result` containing either the `ServerConfig` or a `serde_json::Error`.
+    pub fn from_json_str(config_str: &str) -> ConfigLoadResult {
         serde_json::from_str(config_str).map(|config: ServerConfigInner| Self(arc_rwlock(config)))
     }
 }

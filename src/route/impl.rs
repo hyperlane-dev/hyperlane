@@ -73,7 +73,7 @@ impl Ord for RoutePattern {
     ///
     /// - `Ordering`- The ordering of the two instances.
     fn cmp(&self, other: &Self) -> Ordering {
-        self.get_0().cmp(&other.get_0())
+        self.get_0().cmp(other.get_0())
     }
 }
 
@@ -322,9 +322,7 @@ impl RoutePattern {
                     }
                 }
                 RouteSegment::Dynamic(param_name) => {
-                    let Some(&value) = path_segments.get(idx) else {
-                        return None;
-                    };
+                    let &value = path_segments.get(idx)?;
                     params.insert(param_name.clone(), value.to_string());
                 }
                 RouteSegment::Regex(param_name, regex) => {

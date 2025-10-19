@@ -165,9 +165,7 @@ impl Context {
     /// - `OptionSocketAddr` - The socket address of the remote peer if available.
     pub async fn try_get_socket_addr(&self) -> OptionSocketAddr {
         let stream_result: OptionArcRwLockStream = self.try_get_stream().await;
-        if stream_result.is_none() {
-            return None;
-        }
+        stream_result.as_ref()?;
         stream_result.unwrap().read().await.peer_addr().ok()
     }
 
@@ -1153,7 +1151,7 @@ impl Context {
     ///
     /// The status code of the response.
     pub async fn get_response_status_code(&self) -> ResponseStatusCode {
-        self.read().await.get_response().get_status_code().clone()
+        *self.read().await.get_response().get_status_code()
     }
 
     /// Sets the status code for the response.
@@ -1649,7 +1647,7 @@ impl Context {
                 Request::ws_from_stream(stream, buffer, &mut last_request).await;
             match request_res.as_ref() {
                 Ok(request) => {
-                    self.set_request(&request).await;
+                    self.set_request(request).await;
                 }
                 Err(_) => {
                     self.set_request(&last_request).await;
