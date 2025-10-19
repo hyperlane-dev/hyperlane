@@ -32,6 +32,7 @@ pub use route::*;
 pub use server::*;
 
 pub use http_type::*;
+pub use inventory::{collect as server_collect, submit as server_submit};
 
 pub(crate) use lifecycle::*;
 
@@ -48,7 +49,6 @@ pub(crate) use std::{
     time::Duration,
 };
 
-pub(crate) use inventory::collect;
 pub(crate) use lombok_macros::*;
 pub(crate) use regex::Regex;
 pub(crate) use serde::{Deserialize, Serialize, de::DeserializeOwned};

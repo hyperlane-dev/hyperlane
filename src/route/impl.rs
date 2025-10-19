@@ -1,6 +1,6 @@
 use crate::*;
 
-collect!(HookMacro);
+server_collect!(HookMacro);
 
 /// Provides a default implementation for RouteMatcher.
 impl Default for RouteMatcher {
