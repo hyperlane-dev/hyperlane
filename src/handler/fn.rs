@@ -10,7 +10,7 @@ use crate::*;
 ///
 /// - `ServerHookHandler` - A new `ServerHookHandler` instance.
 #[inline]
-pub(crate) fn create_server_hook<R>() -> ServerHookHandler
+pub fn server_hook_factory<R>() -> ServerHookHandler
 where
     R: ServerHook,
 {

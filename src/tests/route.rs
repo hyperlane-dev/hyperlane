@@ -32,15 +32,21 @@ where
 }
 
 #[cfg(test)]
-struct TestRoute;
+struct TestRoute {
+    data: String,
+}
 
 #[cfg(test)]
 impl ServerHook for TestRoute {
     async fn new(_ctx: &Context) -> Self {
-        Self
+        Self {
+            data: String::new(),
+        }
     }
 
-    async fn handle(self, _ctx: &Context) {}
+    async fn handle(mut self, _ctx: &Context) {
+        self.data = String::from("test");
+    }
 }
 
 #[tokio::test]

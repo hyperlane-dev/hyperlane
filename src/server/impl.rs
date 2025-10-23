@@ -270,7 +270,7 @@ impl Server {
         self.write()
             .await
             .get_mut_panic_hook()
-            .push(create_server_hook::<S>());
+            .push(server_hook_factory::<S>());
         self
     }
 
@@ -297,7 +297,7 @@ impl Server {
         self.write()
             .await
             .get_mut_route()
-            .add(&path.to_string(), create_server_hook::<S>())
+            .add(&path.to_string(), server_hook_factory::<S>())
             .unwrap();
         self
     }
@@ -321,7 +321,7 @@ impl Server {
         self.write()
             .await
             .get_mut_request_middleware()
-            .push(create_server_hook::<S>());
+            .push(server_hook_factory::<S>());
         self
     }
 
@@ -344,7 +344,7 @@ impl Server {
         self.write()
             .await
             .get_mut_response_middleware()
-            .push(create_server_hook::<S>());
+            .push(server_hook_factory::<S>());
         self
     }
 
