@@ -19,10 +19,19 @@ async fn server_inner_partial_eq() {
 #[tokio::test]
 async fn test_server() {
     struct UpgradeMiddleware;
-    struct SendBodyMiddleware;
+    struct SendBodyMiddleware {
+        socket_addr: String,
+    }
     struct ResponseMiddleware;
-    struct ServerPanicHook;
-    struct RootRoute;
+    struct ServerPanicHook {
+        response_body: String,
+        content_type: String,
+    }
+    struct RootRoute {
+        response_body: String,
+        cookie1: String,
+        cookie2: String,
+    }
     struct SseRoute;
     struct WebsocketRoute;
     struct DynamicRoute {
@@ -30,12 +39,12 @@ async fn test_server() {
     }
 
     impl ServerHook for SendBodyMiddleware {
-        async fn new(_ctx: &Context) -> Self {
-            Self
+        async fn new(ctx: &Context) -> Self {
+            let socket_addr: String = ctx.get_socket_addr_string().await;
+            Self { socket_addr }
         }
 
         async fn handle(self, ctx: &Context) {
-            let socket_addr: String = ctx.get_socket_addr_string().await;
             ctx.set_response_version(HttpVersion::HTTP1_1)
                 .await
                 .set_response_status_code(200)
@@ -48,7 +57,7 @@ async fn test_server() {
                 .await
                 .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
                 .await
-                .set_response_header("SocketAddr", &socket_addr)
+                .set_response_header("SocketAddr", &self.socket_addr)
                 .await;
         }
     }
@@ -95,20 +104,24 @@ async fn test_server() {
     }
 
     impl ServerHook for RootRoute {
-        async fn new(_ctx: &Context) -> Self {
-            Self
-        }
-
-        async fn handle(self, ctx: &Context) {
+        async fn new(ctx: &Context) -> Self {
             let path: RequestPath = ctx.get_request_path().await;
             let response_body: String = format!("Hello hyperlane => {}", path);
             let cookie1: String = CookieBuilder::new("key1", "value1").http_only().build();
             let cookie2: String = CookieBuilder::new("key2", "value2").http_only().build();
-            ctx.add_response_header(SET_COOKIE, &cookie1)
+            Self {
+                response_body,
+                cookie1,
+                cookie2,
+            }
+        }
+
+        async fn handle(self, ctx: &Context) {
+            ctx.add_response_header(SET_COOKIE, &self.cookie1)
                 .await
-                .add_response_header(SET_COOKIE, &cookie2)
+                .add_response_header(SET_COOKIE, &self.cookie2)
                 .await
-                .set_response_body(&response_body)
+                .set_response_body(&self.response_body)
                 .await;
         }
     }
@@ -175,15 +188,18 @@ async fn test_server() {
     }
 
     impl ServerHook for ServerPanicHook {
-        async fn new(_ctx: &Context) -> Self {
-            Self
-        }
-
-        async fn handle(self, ctx: &Context) {
+        async fn new(ctx: &Context) -> Self {
             let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
             let response_body: String = error.to_string();
             let content_type: String =
                 ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+            Self {
+                response_body,
+                content_type,
+            }
+        }
+
+        async fn handle(self, ctx: &Context) {
             let _ = ctx
                 .set_response_status_code(500)
                 .await
@@ -191,9 +207,9 @@ async fn test_server() {
                 .await
                 .set_response_header(SERVER, HYPERLANE)
                 .await
-                .set_response_header(CONTENT_TYPE, &content_type)
+                .set_response_header(CONTENT_TYPE, &self.content_type)
                 .await
-                .set_response_body(&response_body)
+                .set_response_body(&self.response_body)
                 .await
                 .send()
                 .await;
