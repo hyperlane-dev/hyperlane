@@ -25,7 +25,9 @@ async fn test_server() {
     struct RootRoute;
     struct SseRoute;
     struct WebsocketRoute;
-    struct DynamicRoute;
+    struct DynamicRoute {
+        params: RouteParams,
+    }
 
     impl ServerHook for SendBodyMiddleware {
         async fn new(_ctx: &Context) -> Self {
@@ -160,13 +162,15 @@ async fn test_server() {
     }
 
     impl ServerHook for DynamicRoute {
-        async fn new(_ctx: &Context) -> Self {
-            Self
+        async fn new(ctx: &Context) -> Self {
+            Self {
+                params: ctx.get_route_params().await,
+            }
         }
 
-        async fn handle(self, ctx: &Context) {
-            let param: RouteParams = ctx.get_route_params().await;
-            panic!("Test panic {:?}", param);
+        async fn handle(mut self, _ctx: &Context) {
+            self.params.insert("key".to_owned(), "value".to_owned());
+            panic!("Test panic {:?}", self.params);
         }
     }
 

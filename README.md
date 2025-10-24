@@ -47,7 +47,9 @@ struct ServerPanicHook;
 struct RootRoute;
 struct SseRoute;
 struct WebsocketRoute;
-struct DynamicRoute;
+struct DynamicRoute {
+    params: RouteParams,
+}
 
 impl ServerHook for SendBodyMiddleware {
     async fn new(_ctx: &Context) -> Self {
@@ -182,13 +184,15 @@ impl ServerHook for SseRoute {
 }
 
 impl ServerHook for DynamicRoute {
-    async fn new(_ctx: &Context) -> Self {
-        Self
+    async fn new(ctx: &Context) -> Self {
+        Self {
+            params: ctx.get_route_params().await,
+        }
     }
 
-    async fn handle(self, ctx: &Context) {
-        let param: RouteParams = ctx.get_route_params().await;
-        panic!("Test panic {:?}", param);
+    async fn handle(mut self, _ctx: &Context) {
+        self.params.insert("key".to_owned(), "value".to_owned());
+        panic!("Test panic {:?}", self.params);
     }
 }
 
@@ -200,7 +204,8 @@ impl ServerHook for ServerPanicHook {
     async fn handle(self, ctx: &Context) {
         let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
         let response_body: String = error.to_string();
-        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+        let content_type: String =
+            ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
         let _ = ctx
             .set_response_status_code(500)
             .await
@@ -235,8 +240,8 @@ async fn main() {
     server.route::<SseRoute>("/sse").await;
     server.route::<DynamicRoute>("/dynamic/{routing}").await;
     server.route::<DynamicRoute>("/regex/{file:^.*$}").await;
-    let server_hook: ServerControlHook = server.run().await.unwrap_or_default();
-    server_hook.wait().await;
+    let server_lifecycle: ServerControlHook = server.run().await.unwrap_or_default();
+    server_lifecycle.wait().await;
 }
 ```
 
