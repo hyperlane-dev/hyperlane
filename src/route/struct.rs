@@ -28,14 +28,14 @@ pub(crate) struct RouteMatcher {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     pub(super) static_route: ServerHookMap,
-    /// A vector of route that contain dynamic segments.
-    /// These are evaluated sequentially if no static route matches.
+    /// A layered map of dynamic routes grouped by segment count.
+    /// Routes are organized by path segment count for efficient filtering during matching.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
     pub(super) dynamic_route: ServerHookPatternRoute,
-    /// A vector of route that use regular expressions for matching.
-    /// These provide the most flexibility but are evaluated last due to their performance overhead.
+    /// A layered map of regex routes grouped by segment count.
+    /// Routes with tail regex patterns can match paths with more segments.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]

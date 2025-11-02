@@ -40,6 +40,7 @@ pub(crate) use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
     future::Future,
+    hash::{Hash, Hasher},
     net::SocketAddr,
     panic::Location,
     pin::Pin,

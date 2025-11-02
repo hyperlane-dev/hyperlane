@@ -12,8 +12,8 @@ impl Default for RouteMatcher {
     fn default() -> Self {
         Self {
             static_route: hash_map_xx_hash3_64(),
-            dynamic_route: Vec::new(),
-            regex_route: Vec::new(),
+            dynamic_route: hash_map_xx_hash3_64(),
+            regex_route: hash_map_xx_hash3_64(),
         }
     }
 }
@@ -40,6 +40,20 @@ impl PartialEq for RoutePattern {
 ///
 /// This indicates that `RoutePattern` has a total equality relation.
 impl Eq for RoutePattern {}
+
+/// Implements the `Hash` trait for `RoutePattern`.
+///
+/// This allows `RoutePattern` to be used as a key in hash-based collections.
+impl Hash for RoutePattern {
+    /// Hashes the `RoutePattern` instance.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut Hasher` - The hasher to use.
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.get_0().hash(state);
+    }
+}
 
 /// Implements the `PartialOrd` trait for `RoutePattern`.
 ///
@@ -96,28 +110,28 @@ impl PartialEq for RouteMatcher {
         if self_static_keys != other_static_keys {
             return false;
         }
-        let self_dynamic_patterns: HashSet<Vec<&str>> = self
+        let self_dynamic_patterns: HashSet<&RoutePattern> = self
             .dynamic_route
-            .iter()
-            .map(|(p, _)| segment_key(p))
+            .values()
+            .flat_map(|routes| routes.iter().map(|(p, _)| p))
             .collect();
-        let other_dynamic_patterns: HashSet<Vec<&str>> = other
+        let other_dynamic_patterns: HashSet<&RoutePattern> = other
             .dynamic_route
-            .iter()
-            .map(|(p, _)| segment_key(p))
+            .values()
+            .flat_map(|routes| routes.iter().map(|(p, _)| p))
             .collect();
         if self_dynamic_patterns != other_dynamic_patterns {
             return false;
         }
-        let self_regex_patterns: HashSet<Vec<&str>> = self
+        let self_regex_patterns: HashSet<&RoutePattern> = self
             .regex_route
-            .iter()
-            .map(|(p, _)| segment_key(p))
+            .values()
+            .flat_map(|routes| routes.iter().map(|(p, _)| p))
             .collect();
-        let other_regex_patterns: HashSet<Vec<&str>> = other
+        let other_regex_patterns: HashSet<&RoutePattern> = other
             .regex_route
-            .iter()
-            .map(|(p, _)| segment_key(p))
+            .values()
+            .flat_map(|routes| routes.iter().map(|(p, _)| p))
             .collect();
         if self_regex_patterns != other_regex_patterns {
             return false;
@@ -201,6 +215,34 @@ impl PartialEq for RouteSegment {
             (Self::Dynamic(l0), Self::Dynamic(r0)) => l0 == r0,
             (Self::Regex(l0, l1), Self::Regex(r0, r1)) => l0 == r0 && l1.as_str() == r1.as_str(),
             _ => false,
+        }
+    }
+}
+
+/// Implements the `Hash` trait for `RouteSegment`.
+///
+/// This allows `RouteSegment` to be used in hash-based collections.
+impl Hash for RouteSegment {
+    /// Hashes the `RouteSegment` instance.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut HHasher` - The hasher to use.
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Self::Static(s) => {
+                0u8.hash(state);
+                s.hash(state);
+            }
+            Self::Dynamic(d) => {
+                1u8.hash(state);
+                d.hash(state);
+            }
+            Self::Regex(name, regex) => {
+                2u8.hash(state);
+                name.hash(state);
+                regex.as_str().hash(state);
+            }
         }
     }
 }
@@ -378,6 +420,26 @@ impl RoutePattern {
                 .iter()
                 .all(|seg| !matches!(seg, RouteSegment::Regex(_, _)))
     }
+
+    /// Gets the number of segments in this route pattern.
+    ///
+    /// # Returns
+    ///
+    /// - `usize` - The number of segments.
+    #[inline]
+    pub(crate) fn segment_count(&self) -> usize {
+        self.get_0().len()
+    }
+
+    /// Checks if the last segment is a regex pattern.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - true if the last segment is a regex, false otherwise.
+    #[inline]
+    pub(crate) fn has_tail_regex(&self) -> bool {
+        matches!(self.get_0().last(), Some(RouteSegment::Regex(_, _)))
+    }
 }
 
 /// Manages a collection of route, enabling efficient lookup and dispatch.
@@ -393,8 +455,8 @@ impl RouteMatcher {
     pub(crate) fn new() -> Self {
         Self {
             static_route: hash_map_xx_hash3_64(),
-            dynamic_route: Vec::new(),
-            regex_route: Vec::new(),
+            dynamic_route: hash_map_xx_hash3_64(),
+            regex_route: hash_map_xx_hash3_64(),
         }
     }
 
@@ -427,18 +489,21 @@ impl RouteMatcher {
                 .insert(pattern.to_string(), handler);
             return Ok(());
         }
-        let target_vec: &mut ServerHookPatternRoute = if route_pattern.is_dynamic() {
+        let target_map: &mut ServerHookPatternRoute = if route_pattern.is_dynamic() {
             self.get_mut_dynamic_route()
         } else {
             self.get_mut_regex_route()
         };
-        let has_same_pattern: bool = target_vec
+        let segment_count: usize = route_pattern.segment_count();
+        let routes_for_count: &mut Vec<(RoutePattern, ServerHookHandler)> =
+            target_map.entry(segment_count).or_default();
+        let has_same_pattern: bool = routes_for_count
             .iter()
             .any(|(tmp_pattern, _)| tmp_pattern == &route_pattern);
         if has_same_pattern {
             return Err(RouteError::DuplicatePattern(pattern.to_owned()));
         }
-        target_vec.push((route_pattern, handler));
+        routes_for_count.push((route_pattern, handler));
         Ok(())
     }
 
@@ -464,18 +529,42 @@ impl RouteMatcher {
             ctx.set_route_params(RouteParams::default()).await;
             return Some(handler.clone());
         }
-        for (pattern, handler) in self.get_dynamic_route().iter() {
-            if let Some(params) = pattern.try_match_path(path) {
-                ctx.set_route_params(params).await;
-                return Some(handler.clone());
+        let path_segment_count: usize = Self::count_path_segments(path);
+        if let Some(routes) = self.get_dynamic_route().get(&path_segment_count) {
+            for (pattern, handler) in routes {
+                if let Some(params) = pattern.try_match_path(path) {
+                    ctx.set_route_params(params).await;
+                    return Some(handler.clone());
+                }
             }
         }
-        for (pattern, handler) in self.get_regex_route().iter() {
-            if let Some(params) = pattern.try_match_path(path) {
-                ctx.set_route_params(params).await;
-                return Some(handler.clone());
+        for (segment_count, routes) in self.get_regex_route() {
+            for (pattern, handler) in routes {
+                if (pattern.has_tail_regex() || path_segment_count == *segment_count)
+                    && let Some(params) = pattern.try_match_path(path)
+                {
+                    ctx.set_route_params(params).await;
+                    return Some(handler.clone());
+                }
             }
         }
         None
+    }
+
+    /// Counts the number of segments in a path.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - The path to count segments in.
+    ///
+    /// # Returns
+    ///
+    /// - `usize` - The number of segments.
+    fn count_path_segments(path: &str) -> usize {
+        let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
+        if path.is_empty() {
+            return 0;
+        }
+        path.matches(DEFAULT_HTTP_PATH).count() + 1
     }
 }

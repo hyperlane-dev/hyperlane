@@ -53,7 +53,9 @@ pub type ServerHookList = Vec<ServerHookHandler>;
 ///
 /// Used for fast lookup of exact-match route.
 pub type ServerHookMap = HashMapXxHash3_64<String, ServerHookHandler>;
-/// Type alias for a collection of pattern-based server hook route.
+/// Type alias for a collection of pattern-based server hook route grouped by segment count.
 ///
-/// Used to store dynamic and regex route handlers with their matching patterns.
-pub(crate) type ServerHookPatternRoute = Vec<(RoutePattern, ServerHookHandler)>;
+/// The outer HashMap uses segment count as key for fast filtering.
+/// The inner Vec stores patterns with the same segment count, maintaining insertion order.
+pub(crate) type ServerHookPatternRoute =
+    HashMapXxHash3_64<usize, Vec<(RoutePattern, ServerHookHandler)>>;
