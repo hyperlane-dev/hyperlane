@@ -609,13 +609,13 @@ impl RouteMatcher {
                 }
             }
         }
-        for (segment_count, routes) in self.get_regex_route() {
-            if *segment_count == path_segment_count {
+        for (&segment_count, routes) in self.get_regex_route() {
+            if segment_count == path_segment_count {
                 continue;
             }
             for (pattern, handler) in routes {
                 if pattern.has_tail_regex()
-                    && path_segment_count >= *segment_count
+                    && path_segment_count >= segment_count
                     && let Some(params) = pattern.try_match_path(path)
                 {
                     ctx.set_route_params(params).await;
