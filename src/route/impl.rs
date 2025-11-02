@@ -105,36 +105,43 @@ impl PartialEq for RouteMatcher {
     ///
     /// - `bool`- `true` if the instances are equal, `false` otherwise.
     fn eq(&self, other: &Self) -> bool {
-        let self_static_keys: HashSet<&String> = self.static_route.keys().collect();
-        let other_static_keys: HashSet<&String> = other.static_route.keys().collect();
-        if self_static_keys != other_static_keys {
+        if self.get_static_route().len() != other.get_static_route().len() {
             return false;
         }
-        let self_dynamic_patterns: HashSet<&RoutePattern> = self
-            .dynamic_route
-            .values()
-            .flat_map(|routes| routes.iter().map(|(p, _)| p))
-            .collect();
-        let other_dynamic_patterns: HashSet<&RoutePattern> = other
-            .dynamic_route
-            .values()
-            .flat_map(|routes| routes.iter().map(|(p, _)| p))
-            .collect();
-        if self_dynamic_patterns != other_dynamic_patterns {
+        for key in self.get_static_route().keys() {
+            if !other.get_static_route().contains_key(key) {
+                return false;
+            }
+        }
+        if self.get_dynamic_route().len() != other.get_dynamic_route().len() {
             return false;
         }
-        let self_regex_patterns: HashSet<&RoutePattern> = self
-            .regex_route
-            .values()
-            .flat_map(|routes| routes.iter().map(|(p, _)| p))
-            .collect();
-        let other_regex_patterns: HashSet<&RoutePattern> = other
-            .regex_route
-            .values()
-            .flat_map(|routes| routes.iter().map(|(p, _)| p))
-            .collect();
-        if self_regex_patterns != other_regex_patterns {
+        for (segment_count, routes) in self.get_dynamic_route() {
+            match other.get_dynamic_route().get(segment_count) {
+                Some(other_routes) if routes.len() == other_routes.len() => {
+                    for (pattern, _) in routes {
+                        if !other_routes.iter().any(|(p, _)| p == pattern) {
+                            return false;
+                        }
+                    }
+                }
+                _ => return false,
+            }
+        }
+        if self.get_regex_route().len() != other.get_regex_route().len() {
             return false;
+        }
+        for (segment_count, routes) in self.get_regex_route() {
+            match other.get_regex_route().get(segment_count) {
+                Some(other_routes) if routes.len() == other_routes.len() => {
+                    for (pattern, _) in routes {
+                        if !other_routes.iter().any(|(p, _)| p == pattern) {
+                            return false;
+                        }
+                    }
+                }
+                _ => return false,
+            }
         }
         true
     }
