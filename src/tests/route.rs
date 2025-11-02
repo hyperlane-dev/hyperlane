@@ -88,16 +88,16 @@ async fn get_route() {
         .await;
     let route_matcher: RouteMatcher = server.get_route_matcher().await;
     for (key1, _) in route_matcher.get_static_route() {
-        println!("get_route key: {key1}");
+        println!("Static route: {key1}");
     }
     for (_, value1) in route_matcher.get_dynamic_route() {
         for (key2, _) in value1 {
-            println!("get_route key: {key2}");
+            println!("Dynamic route: {key2}");
         }
     }
     for (_, value1) in route_matcher.get_regex_route() {
         for (key2, _) in value1 {
-            println!("get_route key: {key2}");
+            println!("Regex route: {key2}");
         }
     }
 }
