@@ -35,7 +35,7 @@ pub type SharedAsyncTaskFactory<T> = Arc<dyn FnPinBoxFutureSend<T>>;
 pub type ServerHookHandlerFactory = fn() -> ServerHookHandler;
 /// Type alias for a shared server hook handler.
 ///
-/// This type allows storing handlers (routes and middleware) of different concrete types
+/// This type allows storing handlers (route and middleware) of different concrete types
 /// in the same collection. The handler takes a `&Context` and returns
 /// a pinned, boxed future that resolves to `()`.
 pub type ServerHookHandler = Arc<dyn Fn(&Context) -> SendableAsyncTask<()> + Send + Sync>;
@@ -51,9 +51,9 @@ pub type OptionalServerHookHandler = Option<ServerHookHandler>;
 pub type ServerHookList = Vec<ServerHookHandler>;
 /// Type alias for a map of server hook handlers.
 ///
-/// Used for fast lookup of exact-match routes.
+/// Used for fast lookup of exact-match route.
 pub type ServerHookMap = HashMapXxHash3_64<String, ServerHookHandler>;
-/// Type alias for a collection of pattern-based server hook routes.
+/// Type alias for a collection of pattern-based server hook route.
 ///
 /// Used to store dynamic and regex route handlers with their matching patterns.
-pub(crate) type ServerHookPatternRoutes = Vec<(RoutePattern, ServerHookHandler)>;
+pub(crate) type ServerHookPatternRoute = Vec<(RoutePattern, ServerHookHandler)>;

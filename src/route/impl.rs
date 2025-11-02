@@ -8,12 +8,12 @@ impl Default for RouteMatcher {
     ///
     /// # Returns
     ///
-    /// - `RouteMatcher` - A new RouteMatcher with empty storage for static, dynamic, and regex routes.
+    /// - `RouteMatcher` - A new RouteMatcher with empty storage for static, dynamic, and regex route.
     fn default() -> Self {
         Self {
-            static_routes: hash_map_xx_hash3_64(),
-            dynamic_routes: Vec::new(),
-            regex_routes: Vec::new(),
+            static_route: hash_map_xx_hash3_64(),
+            dynamic_route: Vec::new(),
+            regex_route: Vec::new(),
         }
     }
 }
@@ -91,18 +91,18 @@ impl PartialEq for RouteMatcher {
     ///
     /// - `bool`- `true` if the instances are equal, `false` otherwise.
     fn eq(&self, other: &Self) -> bool {
-        let self_static_keys: HashSet<&String> = self.static_routes.keys().collect();
-        let other_static_keys: HashSet<&String> = other.static_routes.keys().collect();
+        let self_static_keys: HashSet<&String> = self.static_route.keys().collect();
+        let other_static_keys: HashSet<&String> = other.static_route.keys().collect();
         if self_static_keys != other_static_keys {
             return false;
         }
         let self_dynamic_patterns: HashSet<Vec<&str>> = self
-            .dynamic_routes
+            .dynamic_route
             .iter()
             .map(|(p, _)| segment_key(p))
             .collect();
         let other_dynamic_patterns: HashSet<Vec<&str>> = other
-            .dynamic_routes
+            .dynamic_route
             .iter()
             .map(|(p, _)| segment_key(p))
             .collect();
@@ -110,12 +110,12 @@ impl PartialEq for RouteMatcher {
             return false;
         }
         let self_regex_patterns: HashSet<Vec<&str>> = self
-            .regex_routes
+            .regex_route
             .iter()
             .map(|(p, _)| segment_key(p))
             .collect();
         let other_regex_patterns: HashSet<Vec<&str>> = other
-            .regex_routes
+            .regex_route
             .iter()
             .map(|(p, _)| segment_key(p))
             .collect();
@@ -380,9 +380,9 @@ impl RoutePattern {
     }
 }
 
-/// Manages a collection of routes, enabling efficient lookup and dispatch.
+/// Manages a collection of route, enabling efficient lookup and dispatch.
 ///
-/// This struct stores routes categorized by type (static, dynamic, regex)
+/// This struct stores route categorized by type (static, dynamic, regex)
 /// to quickly find the appropriate handler for incoming requests.
 impl RouteMatcher {
     /// Creates a new, empty RouteMatcher.
@@ -392,9 +392,9 @@ impl RouteMatcher {
     /// - `RouteMatcher` - A new RouteMatcher instance with empty route stores.
     pub(crate) fn new() -> Self {
         Self {
-            static_routes: hash_map_xx_hash3_64(),
-            dynamic_routes: Vec::new(),
-            regex_routes: Vec::new(),
+            static_route: hash_map_xx_hash3_64(),
+            dynamic_route: Vec::new(),
+            regex_route: Vec::new(),
         }
     }
 
@@ -420,17 +420,17 @@ impl RouteMatcher {
     ) -> RouteRegistrationResult {
         let route_pattern: RoutePattern = RoutePattern::new(pattern)?;
         if route_pattern.is_static() {
-            if self.get_static_routes().contains_key(pattern) {
+            if self.get_static_route().contains_key(pattern) {
                 return Err(RouteError::DuplicatePattern(pattern.to_owned()));
             }
-            self.get_mut_static_routes()
+            self.get_mut_static_route()
                 .insert(pattern.to_string(), handler);
             return Ok(());
         }
-        let target_vec: &mut ServerHookPatternRoutes = if route_pattern.is_dynamic() {
-            self.get_mut_dynamic_routes()
+        let target_vec: &mut ServerHookPatternRoute = if route_pattern.is_dynamic() {
+            self.get_mut_dynamic_route()
         } else {
-            self.get_mut_regex_routes()
+            self.get_mut_regex_route()
         };
         let has_same_pattern: bool = target_vec
             .iter()
@@ -460,17 +460,17 @@ impl RouteMatcher {
         ctx: &Context,
         path: &str,
     ) -> OptionalServerHookHandler {
-        if let Some(handler) = self.get_static_routes().get(path) {
+        if let Some(handler) = self.get_static_route().get(path) {
             ctx.set_route_params(RouteParams::default()).await;
             return Some(handler.clone());
         }
-        for (pattern, handler) in self.get_dynamic_routes().iter() {
+        for (pattern, handler) in self.get_dynamic_route().iter() {
             if let Some(params) = pattern.try_match_path(path) {
                 ctx.set_route_params(params).await;
                 return Some(handler.clone());
             }
         }
-        for (pattern, handler) in self.get_regex_routes().iter() {
+        for (pattern, handler) in self.get_regex_route().iter() {
             if let Some(params) = pattern.try_match_path(path) {
                 ctx.set_route_params(params).await;
                 return Some(handler.clone());

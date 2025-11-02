@@ -14,30 +14,30 @@ pub(crate) struct RoutePattern(
 
 /// The core routing engine responsible for matching request paths to their corresponding handlers.
 ///
-/// The matcher categorizes routes into three types for optimized performance:
-/// 1.  `static_routes`- For exact path matches, offering the fastest lookups.
-/// 2.  `dynamic_routes`- For paths with variable segments.
-/// 3.  `regex_routes`- For complex matching based on regular expressions.
+/// The matcher categorizes route into three types for optimized performance:
+/// 1.  `static_route`- For exact path matches, offering the fastest lookups.
+/// 2.  `dynamic_route`- For paths with variable segments.
+/// 3.  `regex_route`- For complex matching based on regular expressions.
 ///
 /// When a request comes in, the matcher checks these categories in order to find the appropriate handler.
 #[derive(Clone, CustomDebug, Getter, GetterMut, DisplayDebug)]
 pub(crate) struct RouteMatcher {
-    /// A hash map for storing and quickly retrieving handlers for static routes.
-    /// These are routes without any variable path segments.
+    /// A hash map for storing and quickly retrieving handlers for static route.
+    /// These are route without any variable path segments.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
-    pub(super) static_routes: ServerHookMap,
-    /// A vector of routes that contain dynamic segments.
+    pub(super) static_route: ServerHookMap,
+    /// A vector of route that contain dynamic segments.
     /// These are evaluated sequentially if no static route matches.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
-    pub(super) dynamic_routes: ServerHookPatternRoutes,
-    /// A vector of routes that use regular expressions for matching.
+    pub(super) dynamic_route: ServerHookPatternRoute,
+    /// A vector of route that use regular expressions for matching.
     /// These provide the most flexibility but are evaluated last due to their performance overhead.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
-    pub(super) regex_routes: ServerHookPatternRoutes,
+    pub(super) regex_route: ServerHookPatternRoute,
 }

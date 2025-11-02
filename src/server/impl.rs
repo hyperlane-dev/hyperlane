@@ -168,7 +168,7 @@ impl Server {
     ///
     /// This function dispatches the provided `HookMacro` to the appropriate
     /// internal handler based on its `HookType`. Supported hook types include
-    /// panic hooks, request/response middleware, and routes.
+    /// panic hooks, request/response middleware, and route.
     ///
     /// # Arguments
     ///
