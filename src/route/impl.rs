@@ -371,8 +371,7 @@ impl RoutePattern {
                     }
                 }
                 RouteSegment::Dynamic(param_name) => {
-                    let &value = path_segments.get(idx)?;
-                    params.insert(param_name.clone(), value.to_string());
+                    params.insert(param_name.clone(), path_segments.get(idx)?.to_string());
                 }
                 RouteSegment::Regex(param_name, regex) => {
                     let segment_value: String = if idx == route_segments_len - 1 {
@@ -519,7 +518,7 @@ impl RouteMatcher {
             self.set_ac_automaton(None);
             return;
         }
-        match AhoCorasick::new(&patterns) {
+        match RouteSearchEngine::new(&patterns) {
             Ok(ac) => self.set_ac_automaton(Some(ac)),
             Err(_) => self.set_ac_automaton(None),
         };
