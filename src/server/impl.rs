@@ -360,7 +360,7 @@ impl Server {
     /// - `String` - The formatted address string.
     #[inline]
     pub fn format_host_port<H: ToString>(host: H, port: usize) -> String {
-        format!("{}{}{}", host.to_string(), COLON_SPACE_SYMBOL, port)
+        format!("{}{COLON_SPACE}{port}", host.to_string())
     }
 
     /// Handles a panic that has been captured and associated with a specific request `Context`.

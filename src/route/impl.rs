@@ -294,11 +294,9 @@ impl RoutePattern {
         let estimated_segments: usize = route.matches(DEFAULT_HTTP_PATH).count() + 1;
         let mut segments: RouteSegmentList = Vec::with_capacity(estimated_segments);
         for segment in route.split(DEFAULT_HTTP_PATH) {
-            if segment.starts_with(DYNAMIC_ROUTE_LEFT_BRACKET)
-                && segment.ends_with(DYNAMIC_ROUTE_RIGHT_BRACKET)
-            {
+            if segment.starts_with(LEFT_BRACKET) && segment.ends_with(COLON_SPACE) {
                 let content: &str = &segment[1..segment.len() - 1];
-                if let Some((name, pattern)) = content.split_once(':') {
+                if let Some((name, pattern)) = content.split_once(COLON) {
                     match Regex::new(pattern) {
                         Ok(regex) => {
                             segments.push(RouteSegment::Regex(name.to_owned(), regex));
