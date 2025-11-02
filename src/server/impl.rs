@@ -368,7 +368,7 @@ impl Server {
     /// - `String` - The formatted address string.
     #[inline]
     pub fn format_host_port<H: ToString>(host: H, port: usize) -> String {
-        format!("{}{COLON_SPACE}{port}", host.to_string())
+        format!("{}{COLON}{port}", host.to_string())
     }
 
     /// Handles a panic that has been captured and associated with a specific request `Context`.
@@ -424,7 +424,7 @@ impl Server {
     /// - `&Context` - The request context.
     /// - `&mut RequestLifecycle` - A mutable reference to the current request lifecycle state.
     /// - `&ServerHookHandler` - The middleware handler to execute.
-    async fn run_middleware_with_lifecycle(
+    async fn handle_middleware_with_lifecycle(
         &self,
         ctx: &Context,
         lifecycle: &mut RequestLifecycle,
@@ -449,7 +449,7 @@ impl Server {
     /// - `&Context` - The request context.
     /// - `&mut RequestLifecycle` - A mutable reference to the current request lifecycle state.
     /// - `&ServerHookHandler` - The route handler to execute.
-    async fn run_route_matcher_with_lifecycle(
+    async fn handle_route_matcher_with_lifecycle(
         &self,
         ctx: &Context,
         lifecycle: &mut RequestLifecycle,
@@ -567,13 +567,13 @@ impl Server {
         let ctx: &Context = state.get_ctx();
         ctx.set_request(request).await;
         let mut lifecycle: RequestLifecycle = RequestLifecycle::new(request.is_enable_keep_alive());
-        if self.run_request_middleware(ctx, &mut lifecycle).await {
+        if self.handle_request_middleware(ctx, &mut lifecycle).await {
             return lifecycle.keep_alive();
         }
-        if self.run_route_matcher(ctx, route, &mut lifecycle).await {
+        if self.handle_route_matcher(ctx, route, &mut lifecycle).await {
             return lifecycle.keep_alive();
         }
-        if self.run_response_middleware(ctx, &mut lifecycle).await {
+        if self.handle_response_middleware(ctx, &mut lifecycle).await {
             return lifecycle.keep_alive();
         }
         if let Some(panic) = ctx.try_get_panic().await {
@@ -599,6 +599,84 @@ impl Server {
                 return;
             }
         }
+    }
+
+    /// Executes trait-based request middleware in sequence.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Context` - The request context.
+    /// - `&mut RequestLifecycle` - A mutable reference to the request lifecycle state.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
+    pub(super) async fn handle_request_middleware(
+        &self,
+        ctx: &Context,
+        lifecycle: &mut RequestLifecycle,
+    ) -> bool {
+        for handler in self.read().await.get_request_middleware().iter() {
+            self.handle_middleware_with_lifecycle(ctx, lifecycle, handler)
+                .await;
+            if lifecycle.is_aborted() {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Executes a trait-based route handler if one matches.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Context` - The request context.
+    /// - `&str` - The request path to match.
+    /// - `&mut RequestLifecycle` - A mutable reference to the request lifecycle state.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
+    pub(super) async fn handle_route_matcher(
+        &self,
+        ctx: &Context,
+        path: &str,
+        lifecycle: &mut RequestLifecycle,
+    ) -> bool {
+        let route_matcher: RouteMatcher = self.read().await.get_route_matcher().clone();
+        if let Some(handler) = route_matcher.try_resolve_route(ctx, path).await {
+            self.handle_route_matcher_with_lifecycle(ctx, lifecycle, &handler)
+                .await;
+            if lifecycle.is_aborted() {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Executes trait-based response middleware in sequence.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Context` - The request context.
+    /// - `&mut RequestLifecycle` - A mutable reference to the request lifecycle state.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
+    pub(super) async fn handle_response_middleware(
+        &self,
+        ctx: &Context,
+        lifecycle: &mut RequestLifecycle,
+    ) -> bool {
+        for handler in self.read().await.get_response_middleware().iter() {
+            self.handle_middleware_with_lifecycle(ctx, lifecycle, handler)
+                .await;
+            if lifecycle.is_aborted() {
+                return true;
+            }
+        }
+        false
     }
 
     /// Starts the server, binds to the configured address, and begins listening for connections.
@@ -640,83 +718,5 @@ impl Server {
         server_lifecycle.set_shutdown_hook(shutdown_hook);
         server_lifecycle.set_wait_hook(wait_hook);
         Ok(server_lifecycle)
-    }
-
-    /// Executes trait-based request middleware in sequence.
-    ///
-    /// # Arguments
-    ///
-    /// - `&Context` - The request context.
-    /// - `&mut RequestLifecycle` - A mutable reference to the request lifecycle state.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    pub(super) async fn run_request_middleware(
-        &self,
-        ctx: &Context,
-        lifecycle: &mut RequestLifecycle,
-    ) -> bool {
-        for handler in self.read().await.get_request_middleware().iter() {
-            self.run_middleware_with_lifecycle(ctx, lifecycle, handler)
-                .await;
-            if lifecycle.is_aborted() {
-                return true;
-            }
-        }
-        false
-    }
-
-    /// Executes a trait-based route handler if one matches.
-    ///
-    /// # Arguments
-    ///
-    /// - `&Context` - The request context.
-    /// - `&str` - The request path to match.
-    /// - `&mut RequestLifecycle` - A mutable reference to the request lifecycle state.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    pub(super) async fn run_route_matcher(
-        &self,
-        ctx: &Context,
-        path: &str,
-        lifecycle: &mut RequestLifecycle,
-    ) -> bool {
-        let route_matcher: RouteMatcher = self.read().await.get_route_matcher().clone();
-        if let Some(handler) = route_matcher.try_resolve_route(ctx, path).await {
-            self.run_route_matcher_with_lifecycle(ctx, lifecycle, &handler)
-                .await;
-            if lifecycle.is_aborted() {
-                return true;
-            }
-        }
-        false
-    }
-
-    /// Executes trait-based response middleware in sequence.
-    ///
-    /// # Arguments
-    ///
-    /// - `&Context` - The request context.
-    /// - `&mut RequestLifecycle` - A mutable reference to the request lifecycle state.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    pub(super) async fn run_response_middleware(
-        &self,
-        ctx: &Context,
-        lifecycle: &mut RequestLifecycle,
-    ) -> bool {
-        for handler in self.read().await.get_response_middleware().iter() {
-            self.run_middleware_with_lifecycle(ctx, lifecycle, handler)
-                .await;
-            if lifecycle.is_aborted() {
-                return true;
-            }
-        }
-        false
     }
 }
