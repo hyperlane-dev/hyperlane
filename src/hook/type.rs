@@ -57,5 +57,4 @@ pub type ServerHookMap = HashMapXxHash3_64<String, ServerHookHandler>;
 ///
 /// The outer HashMap uses segment count as key for fast filtering.
 /// The inner Vec stores patterns with the same segment count, maintaining insertion order.
-pub(crate) type ServerHookPatternRoute =
-    HashMapXxHash3_64<usize, Vec<(RoutePattern, ServerHookHandler)>>;
+pub type ServerHookPatternRoute = HashMapXxHash3_64<usize, Vec<(RoutePattern, ServerHookHandler)>>;

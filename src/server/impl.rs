@@ -11,7 +11,7 @@ impl Default for ServerInner {
         Self {
             config: ServerConfigInner::default(),
             panic_hook: vec![],
-            route: RouteMatcher::new(),
+            route_matcher: RouteMatcher::new(),
             request_middleware: vec![],
             response_middleware: vec![],
         }
@@ -33,7 +33,7 @@ impl PartialEq for ServerInner {
     /// - `bool`- `true` if the instances are equal, `false` otherwise.
     fn eq(&self, other: &Self) -> bool {
         self.config == other.config
-            && self.route == other.route
+            && self.route_matcher == other.route_matcher
             && self.panic_hook.len() == other.panic_hook.len()
             && self.request_middleware.len() == other.request_middleware.len()
             && self.response_middleware.len() == other.response_middleware.len()
@@ -164,6 +164,14 @@ impl Server {
         self.get_0().write().await
     }
 
+    /// Gets the route matcher.
+    ///
+    /// # Returns
+    /// - `RouteMatcher` - The route matcher.
+    pub async fn get_route_matcher(&self) -> RouteMatcher {
+        self.read().await.get_route_matcher().clone()
+    }
+
     /// Handle a given hook macro asynchronously.
     ///
     /// This function dispatches the provided `HookMacro` to the appropriate
@@ -196,14 +204,14 @@ impl Server {
             (HookType::Route(path), HookHandler::Handler(handler)) => {
                 self.write()
                     .await
-                    .get_mut_route()
+                    .get_mut_route_matcher()
                     .add(path, handler)
                     .unwrap();
             }
             (HookType::Route(path), HookHandler::Factory(factory)) => {
                 self.write()
                     .await
-                    .get_mut_route()
+                    .get_mut_route_matcher()
                     .add(path, factory())
                     .unwrap();
             }
@@ -296,7 +304,7 @@ impl Server {
     {
         self.write()
             .await
-            .get_mut_route()
+            .get_mut_route_matcher()
             .add(&path.to_string(), server_hook_factory::<S>())
             .unwrap();
         self
@@ -441,7 +449,7 @@ impl Server {
     /// - `&Context` - The request context.
     /// - `&mut RequestLifecycle` - A mutable reference to the current request lifecycle state.
     /// - `&ServerHookHandler` - The route handler to execute.
-    async fn run_route_with_lifecycle(
+    async fn run_route_matcher_with_lifecycle(
         &self,
         ctx: &Context,
         lifecycle: &mut RequestLifecycle,
@@ -562,7 +570,7 @@ impl Server {
         if self.run_request_middleware(ctx, &mut lifecycle).await {
             return lifecycle.keep_alive();
         }
-        if self.run_route(ctx, route, &mut lifecycle).await {
+        if self.run_route_matcher(ctx, route, &mut lifecycle).await {
             return lifecycle.keep_alive();
         }
         if self.run_response_middleware(ctx, &mut lifecycle).await {
@@ -670,15 +678,15 @@ impl Server {
     /// # Returns
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    pub(super) async fn run_route(
+    pub(super) async fn run_route_matcher(
         &self,
         ctx: &Context,
         path: &str,
         lifecycle: &mut RequestLifecycle,
     ) -> bool {
-        let route_matcher: RouteMatcher = self.read().await.get_route().clone();
+        let route_matcher: RouteMatcher = self.read().await.get_route_matcher().clone();
         if let Some(handler) = route_matcher.try_resolve_route(ctx, path).await {
-            self.run_route_with_lifecycle(ctx, lifecycle, &handler)
+            self.run_route_matcher_with_lifecycle(ctx, lifecycle, &handler)
                 .await;
             if lifecycle.is_aborted() {
                 return true;

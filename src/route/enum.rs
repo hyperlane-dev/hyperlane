@@ -6,7 +6,7 @@ use crate::*;
 /// `/users/:id/posts` would be broken down into `Static("users")`, `Dynamic("id")`,
 /// and `Static("posts")`.
 #[derive(CustomDebug, Clone)]
-pub(crate) enum RouteSegment {
+pub enum RouteSegment {
     /// A static, literal segment of a path.
     /// This must be an exact match. For example, in `/users/active`, "users" and "active"
     /// are both static segments.

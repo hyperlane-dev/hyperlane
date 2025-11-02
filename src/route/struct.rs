@@ -6,9 +6,9 @@ use crate::*;
 /// of a URL path. It is used internally by the `RouteMatcher` to perform efficient
 /// route matching against incoming requests.
 #[derive(Debug, Clone, Getter, DisplayDebug)]
-pub(crate) struct RoutePattern(
+pub struct RoutePattern(
     /// The collection of segments that make up the route pattern.
-    #[get(pub(super))]
+    #[get]
     pub(super) RouteSegmentList,
 );
 
@@ -21,23 +21,23 @@ pub(crate) struct RoutePattern(
 ///
 /// When a request comes in, the matcher checks these categories in order to find the appropriate handler.
 #[derive(Clone, CustomDebug, Getter, GetterMut, DisplayDebug)]
-pub(crate) struct RouteMatcher {
+pub struct RouteMatcher {
     /// A hash map for storing and quickly retrieving handlers for static route.
     /// These are route without any variable path segments.
-    #[debug(skip)]
-    #[get(pub(super))]
+    #[get]
     #[get_mut(pub(super))]
+    #[debug(skip)]
     pub(super) static_route: ServerHookMap,
     /// A layered map of dynamic routes grouped by segment count.
     /// Routes are organized by path segment count for efficient filtering during matching.
-    #[debug(skip)]
-    #[get(pub(super))]
+    #[get]
     #[get_mut(pub(super))]
+    #[debug(skip)]
     pub(super) dynamic_route: ServerHookPatternRoute,
     /// A layered map of regex routes grouped by segment count.
     /// Routes with tail regex patterns can match paths with more segments.
-    #[debug(skip)]
-    #[get(pub(super))]
+    #[get]
     #[get_mut(pub(super))]
+    #[debug(skip)]
     pub(super) regex_route: ServerHookPatternRoute,
 }

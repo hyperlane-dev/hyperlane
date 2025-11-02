@@ -35,7 +35,7 @@ pub(crate) struct ServerInner {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) route: RouteMatcher,
+    pub(super) route_matcher: RouteMatcher,
     /// A collection of panic hook handlers that are invoked when a panic occurs during request processing.
     /// This allows for graceful error recovery and customized error responses.
     #[debug(skip)]

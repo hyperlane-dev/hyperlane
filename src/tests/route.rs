@@ -75,3 +75,28 @@ async fn duplicate_route() {
     )
     .await;
 }
+
+#[tokio::test]
+async fn get_route() {
+    let server: Server = Server::new().await;
+    server
+        .route::<TestRoute>(ROOT_PATH)
+        .await
+        .route::<TestRoute>("/dynamic/{routing}")
+        .await
+        .route::<TestRoute>("/regex/{file:^.*$}")
+        .await;
+    for (key1, _value1) in server.get_route_matcher().await.get_static_route() {
+        println!("get_route key: {key1}");
+    }
+    for (_key1, value1) in server.get_route_matcher().await.get_dynamic_route() {
+        for (key2, _value2) in value1 {
+            println!("get_route key: {key2}");
+        }
+    }
+    for (_key1, value1) in server.get_route_matcher().await.get_regex_route() {
+        for (key2, _value2) in value1 {
+            println!("get_route key: {key2}");
+        }
+    }
+}
