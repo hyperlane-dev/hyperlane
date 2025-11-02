@@ -191,10 +191,10 @@ async fn large_dynamic_routes() {
     let server: Server = Server::new().await;
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
-        let path = format!("/api/resource{}/{{id}}", i);
+        let path: String = format!("/api/resource{i}/{{id}}");
         server.route::<TestRoute>(&path).await;
     }
-    let insert_duration = start_insert.elapsed();
+    let insert_duration: Duration = start_insert.elapsed();
     println!(
         "Inserted {} dynamic routes in: {:?}",
         ROUTE_COUNT, insert_duration
@@ -208,7 +208,7 @@ async fn large_dynamic_routes() {
     let ctx: Context = Context::default();
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
-        let path: String = format!("/api/resource{}/123", i);
+        let path: String = format!("/api/resource{i}/123");
         let _ = route_matcher.try_resolve_route(&ctx, &path).await;
     }
     let match_duration: Duration = start_match.elapsed();
@@ -228,10 +228,10 @@ async fn large_regex_routes() {
     let server: Server = Server::new().await;
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
-        let path = format!("/api/resource{}/{{id:[0-9]+}}", i);
+        let path: String = format!("/api/resource{i}/{{id:[0-9]+}}");
         server.route::<TestRoute>(&path).await;
     }
-    let insert_duration = start_insert.elapsed();
+    let insert_duration: Duration = start_insert.elapsed();
     println!(
         "Inserted {} regex routes in: {:?}",
         ROUTE_COUNT, insert_duration
@@ -245,7 +245,7 @@ async fn large_regex_routes() {
     let ctx: Context = Context::default();
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
-        let path: String = format!("/api/resource{}/123", i);
+        let path: String = format!("/api/resource{i}/123");
         let _ = route_matcher.try_resolve_route(&ctx, &path).await;
     }
     let match_duration: Duration = start_match.elapsed();
@@ -265,10 +265,10 @@ async fn large_tail_regex_routes() {
     let server: Server = Server::new().await;
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
-        let path = format!("/api/resource{}/{{path:.*}}", i);
+        let path: String = format!("/api/resource{i}/{{path:.*}}");
         server.route::<TestRoute>(&path).await;
     }
-    let insert_duration = start_insert.elapsed();
+    let insert_duration: Duration = start_insert.elapsed();
     println!(
         "Inserted {} tail regex routes in: {:?}",
         ROUTE_COUNT, insert_duration
@@ -282,7 +282,7 @@ async fn large_tail_regex_routes() {
     let ctx: Context = Context::default();
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
-        let path: String = format!("/api/resource{}/some/nested/path", i);
+        let path: String = format!("/api/resource{i}/some/nested/path");
         let _ = route_matcher.try_resolve_route(&ctx, &path).await;
     }
     let match_duration: Duration = start_match.elapsed();
