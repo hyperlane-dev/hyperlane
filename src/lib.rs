@@ -61,3 +61,6 @@ pub(crate) use tokio::{
     },
     task::{JoinError, JoinHandle},
 };
+
+#[cfg(test)]
+pub(crate) use std::time::Instant;

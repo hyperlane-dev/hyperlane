@@ -31,4 +31,4 @@ pub(crate) type RoutePatternResult = Result<RoutePattern, RouteError>;
 /// A type alias for optional route parameters.
 ///
 /// It is `Some` if a dynamic or regex route matches and captures parameters, and `None` otherwise.
-pub(crate) type OptionalRouteParameters = Option<RouteParams>;
+pub(crate) type OptionRouteParams = Option<RouteParams>;

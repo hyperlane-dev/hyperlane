@@ -50,9 +50,9 @@ pub struct RouteMatcher {
     #[debug(skip)]
     pub(super) ac_automaton: OptionAhoCorasick,
     /// Static segment patterns extracted from dynamic/regex routes for AC automaton.
-    /// Maps pattern index to (segment_count, route_index, is_regex).
+    /// Maps pattern_idx to (segment_count, route_index, is_regex).
     #[get]
     #[set(pub(super))]
     #[debug(skip)]
-    pub(super) ac_pattern_map: Vec<(usize, usize, bool)>,
+    pub(super) ac_pattern_map: HashMapXxHash3_64<usize, (usize, usize, bool)>,
 }

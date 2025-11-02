@@ -15,7 +15,7 @@ impl Default for RouteMatcher {
             dynamic_route: hash_map_xx_hash3_64(),
             regex_route: hash_map_xx_hash3_64(),
             ac_automaton: None,
-            ac_pattern_map: Vec::new(),
+            ac_pattern_map: hash_map_xx_hash3_64(),
         }
     }
 }
@@ -330,8 +330,8 @@ impl RoutePattern {
     ///
     /// # Returns
     ///
-    /// - `Option<RouteParams>` - Some with parameters if matched, None otherwise.
-    pub(crate) fn try_match_path(&self, path: &str) -> OptionalRouteParameters {
+    /// - `OptionRouteParams` - Some with parameters if matched, None otherwise.
+    pub(crate) fn try_match_path(&self, path: &str) -> OptionRouteParams {
         let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
         let route_segments_len: usize = self.get_0().len();
         let is_tail_regex: bool = matches!(self.get_0().last(), Some(RouteSegment::Regex(_, _)));
@@ -465,7 +465,7 @@ impl RouteMatcher {
             dynamic_route: hash_map_xx_hash3_64(),
             regex_route: hash_map_xx_hash3_64(),
             ac_automaton: None,
-            ac_pattern_map: Vec::new(),
+            ac_pattern_map: hash_map_xx_hash3_64(),
         }
     }
 
@@ -490,13 +490,15 @@ impl RouteMatcher {
     /// Extracts static segments from dynamic and regex routes for fast filtering.
     fn rebuild_ac_automaton(&mut self) {
         let mut patterns: Vec<String> = Vec::new();
-        let mut pattern_map: Vec<(usize, usize, bool)> = Vec::new();
+        let mut pattern_map: HashMapXxHash3_64<usize, (usize, usize, bool)> =
+            hash_map_xx_hash3_64();
         for (segment_count, routes) in self.get_dynamic_route() {
             for (route_idx, (pattern, _)) in routes.iter().enumerate() {
                 for segment in pattern.get_0() {
                     if let RouteSegment::Static(static_seg) = segment {
+                        let pattern_idx: usize = patterns.len();
                         patterns.push(static_seg.clone());
-                        pattern_map.push((*segment_count, route_idx, false));
+                        pattern_map.insert(pattern_idx, (*segment_count, route_idx, false));
                     }
                 }
             }
@@ -505,8 +507,9 @@ impl RouteMatcher {
             for (route_idx, (pattern, _)) in routes.iter().enumerate() {
                 for segment in pattern.get_0() {
                     if let RouteSegment::Static(static_seg) = segment {
+                        let pattern_idx: usize = patterns.len();
                         patterns.push(static_seg.clone());
-                        pattern_map.push((*segment_count, route_idx, true));
+                        pattern_map.insert(pattern_idx, (*segment_count, route_idx, true));
                     }
                 }
             }
@@ -559,13 +562,10 @@ impl RouteMatcher {
         let segment_count: usize = route_pattern.segment_count();
         let routes_for_count: &mut Vec<(RoutePattern, ServerHookHandler)> =
             target_map.entry(segment_count).or_default();
-        let has_same_pattern: bool = routes_for_count
-            .iter()
-            .any(|(tmp_pattern, _)| tmp_pattern == &route_pattern);
-        if has_same_pattern {
-            return Err(RouteError::DuplicatePattern(pattern.to_owned()));
+        match routes_for_count.binary_search_by(|(p, _)| p.cmp(&route_pattern)) {
+            Ok(_) => return Err(RouteError::DuplicatePattern(pattern.to_owned())),
+            Err(pos) => routes_for_count.insert(pos, (route_pattern, handler)),
         }
-        routes_for_count.push((route_pattern, handler));
         self.rebuild_ac_automaton();
         Ok(())
     }
@@ -593,25 +593,7 @@ impl RouteMatcher {
             return Some(handler.clone());
         }
         let path_segment_count: usize = Self::count_path_segments(path);
-        let mut candidate_routes: Vec<(usize, usize, bool)> = Vec::new();
-        if let Some(ref ac) = self.ac_automaton {
-            for mat in ac.find_iter(path) {
-                let pattern_info: (usize, usize, bool) = self.get_ac_pattern_map()[mat.pattern()];
-                candidate_routes.push(pattern_info);
-            }
-        }
         if let Some(routes) = self.get_dynamic_route().get(&path_segment_count) {
-            if !candidate_routes.is_empty() {
-                for &(seg_count, route_idx, is_regex) in &candidate_routes {
-                    if !is_regex && seg_count == path_segment_count && route_idx < routes.len() {
-                        let (pattern, handler) = &routes[route_idx];
-                        if let Some(params) = pattern.try_match_path(path) {
-                            ctx.set_route_params(params).await;
-                            return Some(handler.clone());
-                        }
-                    }
-                }
-            }
             for (pattern, handler) in routes {
                 if let Some(params) = pattern.try_match_path(path) {
                     ctx.set_route_params(params).await;
@@ -620,17 +602,6 @@ impl RouteMatcher {
             }
         }
         if let Some(routes) = self.get_regex_route().get(&path_segment_count) {
-            if !candidate_routes.is_empty() {
-                for &(seg_count, route_idx, is_regex) in &candidate_routes {
-                    if is_regex && seg_count == path_segment_count && route_idx < routes.len() {
-                        let (pattern, handler) = &routes[route_idx];
-                        if let Some(params) = pattern.try_match_path(path) {
-                            ctx.set_route_params(params).await;
-                            return Some(handler.clone());
-                        }
-                    }
-                }
-            }
             for (pattern, handler) in routes {
                 if let Some(params) = pattern.try_match_path(path) {
                     ctx.set_route_params(params).await;

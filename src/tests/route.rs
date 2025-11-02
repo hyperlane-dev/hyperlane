@@ -187,16 +187,32 @@ async fn mixed_route_types() {
 
 #[tokio::test]
 async fn large_dynamic_routes() {
+    const ROUTE_COUNT: usize = 1000;
     let server: Server = Server::new().await;
-    for i in 0..100 {
+    let start_insert: Instant = Instant::now();
+    for i in 0..ROUTE_COUNT {
         let path = format!("/api/resource{}/{{id}}", i);
         server.route::<TestRoute>(&path).await;
     }
+    let insert_duration = start_insert.elapsed();
+    println!("Inserted {} routes in: {:?}", ROUTE_COUNT, insert_duration);
     let route_matcher: RouteMatcher = server.get_route_matcher().await;
     assert!(!route_matcher.get_dynamic_route().is_empty());
     assert!(
         route_matcher.get_ac_automaton().is_some(),
         "AC automaton should be built for dynamic routes"
+    );
+    let ctx: Context = Context::default();
+    let start_match: Instant = Instant::now();
+    for i in 0..ROUTE_COUNT {
+        let path: String = format!("/api/resource{}/123", i);
+        let _ = route_matcher.try_resolve_route(&ctx, &path).await;
+    }
+    let match_duration: Duration = start_match.elapsed();
+    println!("Matched {} routes in: {:?}", ROUTE_COUNT, match_duration);
+    println!(
+        "Average per match: {:?}",
+        match_duration / ROUTE_COUNT as u32
     );
 }
 
