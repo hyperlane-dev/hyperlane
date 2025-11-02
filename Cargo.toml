@@ -26,6 +26,7 @@ serde_json = "1.0.145"
 serde = { version = "1.0.228", features = ["derive"] }
 regex = "1.12.2"
 inventory = "0.3.21"
+aho-corasick = "1.1.4"
 
 [profile.dev]
 incremental = false

@@ -101,3 +101,127 @@ async fn get_route() {
         }
     }
 }
+
+#[tokio::test]
+async fn ac_automaton_dynamic_routes() {
+    let server: Server = Server::new().await;
+    server.route::<TestRoute>("/api/users/{id}").await;
+    server.route::<TestRoute>("/api/posts/{id}").await;
+    server.route::<TestRoute>("/api/comments/{id}").await;
+    server.route::<TestRoute>("/static/files/{name}").await;
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    assert!(
+        route_matcher.get_ac_automaton().is_some(),
+        "AC automaton should be built for dynamic routes"
+    );
+    assert!(
+        !route_matcher.get_ac_pattern_map().is_empty(),
+        "AC pattern map should contain static segments"
+    );
+}
+
+#[tokio::test]
+async fn segment_count_optimization() {
+    let server: Server = Server::new().await;
+    server.route::<TestRoute>("/users/{id}").await;
+    server.route::<TestRoute>("/users/{id}/posts").await;
+    server
+        .route::<TestRoute>("/users/{id}/posts/{post_id}")
+        .await;
+    server.route::<TestRoute>("/api/v1/users/{id}").await;
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    assert!(
+        route_matcher.get_dynamic_route().contains_key(&2),
+        "Should have 2-segment routes"
+    );
+    assert!(
+        route_matcher.get_dynamic_route().contains_key(&3),
+        "Should have 3-segment routes"
+    );
+    assert!(
+        route_matcher.get_dynamic_route().contains_key(&4),
+        "Should have 4-segment routes"
+    );
+    assert_eq!(route_matcher.get_dynamic_route().get(&2).unwrap().len(), 1);
+    assert_eq!(route_matcher.get_dynamic_route().get(&3).unwrap().len(), 1);
+    assert_eq!(route_matcher.get_dynamic_route().get(&4).unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn regex_route_segment_count() {
+    let server: Server = Server::new().await;
+    server.route::<TestRoute>("/files/{path:.*}").await;
+    server.route::<TestRoute>("/api/{version:\\d+}/users").await;
+    server
+        .route::<TestRoute>("/api/{version:\\d+}/posts/{id:\\d+}")
+        .await;
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    assert!(
+        route_matcher.get_regex_route().contains_key(&2),
+        "Should have 2-segment regex routes"
+    );
+    assert!(
+        route_matcher.get_regex_route().contains_key(&3),
+        "Should have 3-segment regex routes"
+    );
+    assert!(
+        route_matcher.get_regex_route().contains_key(&4),
+        "Should have 4-segment regex routes"
+    );
+}
+
+#[tokio::test]
+async fn mixed_route_types() {
+    let server: Server = Server::new().await;
+    server.route::<TestRoute>("/").await;
+    server.route::<TestRoute>("/about").await;
+    server.route::<TestRoute>("/users/{id}").await;
+    server.route::<TestRoute>("/posts/{slug}").await;
+    server.route::<TestRoute>("/files/{path:.*}").await;
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    assert_eq!(route_matcher.get_static_route().len(), 2);
+    assert!(route_matcher.get_dynamic_route().contains_key(&2));
+    assert!(route_matcher.get_regex_route().contains_key(&2));
+    assert!(route_matcher.get_ac_automaton().is_some());
+}
+
+#[tokio::test]
+async fn large_dynamic_routes() {
+    let server: Server = Server::new().await;
+    for i in 0..100 {
+        let path = format!("/api/resource{}/{{id}}", i);
+        server.route::<TestRoute>(&path).await;
+    }
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    assert!(!route_matcher.get_dynamic_route().is_empty());
+    assert!(
+        route_matcher.get_ac_automaton().is_some(),
+        "AC automaton should be built for dynamic routes"
+    );
+}
+
+#[tokio::test]
+async fn ac_automaton_with_static_segments() {
+    let server: Server = Server::new().await;
+    server.route::<TestRoute>("/users/{id}").await;
+    server.route::<TestRoute>("/posts/{slug}").await;
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    assert!(
+        route_matcher.get_ac_automaton().is_some(),
+        "AC automaton should be built for routes with static segments"
+    );
+    assert!(!route_matcher.get_ac_pattern_map().is_empty());
+}
+
+#[tokio::test]
+async fn ac_automaton_regex_routes() {
+    let server: Server = Server::new().await;
+    server.route::<TestRoute>("/api/{version:\\d+}/users").await;
+    server.route::<TestRoute>("/files/{path:.*}").await;
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    assert!(
+        route_matcher.get_ac_automaton().is_some(),
+        "AC automaton should be built for regex routes"
+    );
+    assert!(!route_matcher.get_ac_pattern_map().is_empty());
+}

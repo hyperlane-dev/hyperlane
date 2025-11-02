@@ -29,6 +29,7 @@ pub use panic::*;
 pub use route::*;
 pub use server::*;
 
+pub use aho_corasick::AhoCorasick;
 pub use http_type::*;
 pub use inventory::{collect as server_collect, submit as server_submit};
 

@@ -14,6 +14,8 @@ impl Default for RouteMatcher {
             static_route: hash_map_xx_hash3_64(),
             dynamic_route: hash_map_xx_hash3_64(),
             regex_route: hash_map_xx_hash3_64(),
+            ac_automaton: None,
+            ac_pattern_map: Vec::new(),
         }
     }
 }
@@ -462,7 +464,62 @@ impl RouteMatcher {
             static_route: hash_map_xx_hash3_64(),
             dynamic_route: hash_map_xx_hash3_64(),
             regex_route: hash_map_xx_hash3_64(),
+            ac_automaton: None,
+            ac_pattern_map: Vec::new(),
         }
+    }
+
+    /// Counts the number of segments in a path.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - The path to count segments in.
+    ///
+    /// # Returns
+    ///
+    /// - `usize` - The number of segments.
+    fn count_path_segments(path: &str) -> usize {
+        let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
+        if path.is_empty() {
+            return 0;
+        }
+        path.matches(DEFAULT_HTTP_PATH).count() + 1
+    }
+
+    /// Rebuilds the AC automaton for dynamic/regex route matching.
+    /// Extracts static segments from dynamic and regex routes for fast filtering.
+    fn rebuild_ac_automaton(&mut self) {
+        let mut patterns: Vec<String> = Vec::new();
+        let mut pattern_map: Vec<(usize, usize, bool)> = Vec::new();
+        for (segment_count, routes) in self.get_dynamic_route() {
+            for (route_idx, (pattern, _)) in routes.iter().enumerate() {
+                for segment in pattern.get_0() {
+                    if let RouteSegment::Static(static_seg) = segment {
+                        patterns.push(static_seg.clone());
+                        pattern_map.push((*segment_count, route_idx, false));
+                    }
+                }
+            }
+        }
+        for (segment_count, routes) in self.get_regex_route() {
+            for (route_idx, (pattern, _)) in routes.iter().enumerate() {
+                for segment in pattern.get_0() {
+                    if let RouteSegment::Static(static_seg) = segment {
+                        patterns.push(static_seg.clone());
+                        pattern_map.push((*segment_count, route_idx, true));
+                    }
+                }
+            }
+        }
+        self.set_ac_pattern_map(pattern_map);
+        if patterns.is_empty() {
+            self.set_ac_automaton(None);
+            return;
+        }
+        match AhoCorasick::new(&patterns) {
+            Ok(ac) => self.set_ac_automaton(Some(ac)),
+            Err(_) => self.set_ac_automaton(None),
+        };
     }
 
     /// Adds a new route and its handler to the matcher.
@@ -509,6 +566,7 @@ impl RouteMatcher {
             return Err(RouteError::DuplicatePattern(pattern.to_owned()));
         }
         routes_for_count.push((route_pattern, handler));
+        self.rebuild_ac_automaton();
         Ok(())
     }
 
@@ -535,7 +593,44 @@ impl RouteMatcher {
             return Some(handler.clone());
         }
         let path_segment_count: usize = Self::count_path_segments(path);
+        let mut candidate_routes: Vec<(usize, usize, bool)> = Vec::new();
+        if let Some(ref ac) = self.ac_automaton {
+            for mat in ac.find_iter(path) {
+                let pattern_info: (usize, usize, bool) = self.get_ac_pattern_map()[mat.pattern()];
+                candidate_routes.push(pattern_info);
+            }
+        }
         if let Some(routes) = self.get_dynamic_route().get(&path_segment_count) {
+            if !candidate_routes.is_empty() {
+                for &(seg_count, route_idx, is_regex) in &candidate_routes {
+                    if !is_regex && seg_count == path_segment_count && route_idx < routes.len() {
+                        let (pattern, handler) = &routes[route_idx];
+                        if let Some(params) = pattern.try_match_path(path) {
+                            ctx.set_route_params(params).await;
+                            return Some(handler.clone());
+                        }
+                    }
+                }
+            }
+            for (pattern, handler) in routes {
+                if let Some(params) = pattern.try_match_path(path) {
+                    ctx.set_route_params(params).await;
+                    return Some(handler.clone());
+                }
+            }
+        }
+        if let Some(routes) = self.get_regex_route().get(&path_segment_count) {
+            if !candidate_routes.is_empty() {
+                for &(seg_count, route_idx, is_regex) in &candidate_routes {
+                    if is_regex && seg_count == path_segment_count && route_idx < routes.len() {
+                        let (pattern, handler) = &routes[route_idx];
+                        if let Some(params) = pattern.try_match_path(path) {
+                            ctx.set_route_params(params).await;
+                            return Some(handler.clone());
+                        }
+                    }
+                }
+            }
             for (pattern, handler) in routes {
                 if let Some(params) = pattern.try_match_path(path) {
                     ctx.set_route_params(params).await;
@@ -544,8 +639,12 @@ impl RouteMatcher {
             }
         }
         for (segment_count, routes) in self.get_regex_route() {
+            if *segment_count == path_segment_count {
+                continue;
+            }
             for (pattern, handler) in routes {
-                if (pattern.has_tail_regex() || path_segment_count == *segment_count)
+                if pattern.has_tail_regex()
+                    && path_segment_count >= *segment_count
                     && let Some(params) = pattern.try_match_path(path)
                 {
                     ctx.set_route_params(params).await;
@@ -554,22 +653,5 @@ impl RouteMatcher {
             }
         }
         None
-    }
-
-    /// Counts the number of segments in a path.
-    ///
-    /// # Arguments
-    ///
-    /// - `&str` - The path to count segments in.
-    ///
-    /// # Returns
-    ///
-    /// - `usize` - The number of segments.
-    fn count_path_segments(path: &str) -> usize {
-        let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
-        if path.is_empty() {
-            return 0;
-        }
-        path.matches(DEFAULT_HTTP_PATH).count() + 1
     }
 }
