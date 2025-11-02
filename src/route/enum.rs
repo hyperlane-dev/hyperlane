@@ -5,7 +5,7 @@ use crate::*;
 /// A route path is parsed into a sequence of these segments. For example, the path
 /// `/users/:id/posts` would be broken down into `Static("users")`, `Dynamic("id")`,
 /// and `Static("posts")`.
-#[derive(CustomDebug, Clone)]
+#[derive(Clone, CustomDebug, DisplayDebug)]
 pub enum RouteSegment {
     /// A static, literal segment of a path.
     /// This must be an exact match. For example, in `/users/active`, "users" and "active"
