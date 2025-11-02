@@ -87,17 +87,17 @@ async fn get_route() {
         .route::<TestRoute>("/regex/{file:^.*$}")
         .await;
     let route_matcher: RouteMatcher = server.get_route_matcher().await;
-    for (key1, _) in route_matcher.get_static_route() {
-        println!("Static route: {key1}");
+    for key in route_matcher.get_static_route().keys() {
+        println!("Static route: {key}");
     }
-    for (_, value1) in route_matcher.get_dynamic_route() {
-        for (key2, _) in value1 {
-            println!("Dynamic route: {key2}");
+    for value in route_matcher.get_dynamic_route().values() {
+        for (route_pattern, _) in value {
+            println!("Dynamic route: {route_pattern}");
         }
     }
-    for (_, value1) in route_matcher.get_regex_route() {
-        for (key2, _) in value1 {
-            println!("Regex route: {key2}");
+    for value in route_matcher.get_regex_route().values() {
+        for (route_pattern, _) in value {
+            println!("Regex route: {route_pattern}");
         }
     }
 }
