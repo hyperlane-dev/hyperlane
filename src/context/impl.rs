@@ -164,9 +164,13 @@ impl Context {
     ///
     /// - `OptionSocketAddr` - The socket address of the remote peer if available.
     pub async fn try_get_socket_addr(&self) -> OptionSocketAddr {
-        let stream_result: OptionArcRwLockStream = self.try_get_stream().await;
-        stream_result.as_ref()?;
-        stream_result.unwrap().read().await.peer_addr().ok()
+        self.try_get_stream()
+            .await
+            .as_ref()?
+            .read()
+            .await
+            .peer_addr()
+            .ok()
     }
 
     /// Retrieves the remote socket address or a default value if unavailable.
