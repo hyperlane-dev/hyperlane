@@ -27,13 +27,10 @@ impl Context {
     ///
     /// - `Context` - The newly created context.
     pub(crate) fn create_context(stream: &ArcRwLockStream, request: &Request) -> Context {
-        Context::from_internal_context({
-            let mut internal_ctx: ContextInner = ContextInner::default();
-            internal_ctx
-                .set_stream(Some(stream.clone()))
-                .set_request(request.clone());
-            internal_ctx
-        })
+        let mut internal_ctx: ContextInner = ContextInner::default();
+        internal_ctx.set_stream(Some(stream.clone()));
+        internal_ctx.set_request(request.clone());
+        Context::from_internal_context(internal_ctx)
     }
 
     /// Acquires a read lock on the inner context data.

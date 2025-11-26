@@ -488,7 +488,7 @@ impl RouteMatcher {
     /// Rebuilds the AC automaton for dynamic/regex route matching.
     /// Extracts static segments from dynamic and regex routes for fast filtering.
     fn rebuild_ac_automaton(&mut self) {
-        let mut patterns: Vec<String> = Vec::new();
+        let mut patterns: Vec<String> = Vec::with_capacity(DEFAULT_BUFFER_SIZE);
         let mut pattern_map: HashMapXxHash3_64<usize, (usize, usize, bool)> =
             hash_map_xx_hash3_64();
         for (segment_count, routes) in self.get_dynamic_route() {
