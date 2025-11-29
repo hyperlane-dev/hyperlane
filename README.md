@@ -256,8 +256,8 @@ async fn main() {
     server.route::<SseRoute>("/sse").await;
     server.route::<DynamicRoute>("/dynamic/{routing}").await;
     server.route::<DynamicRoute>("/regex/{file:^.*$}").await;
-    let server_control: ServerControlHook = server.run().await.unwrap_or_default();
-    server_control.wait().await;
+    let server_control_hook: ServerControlHook = server.run().await.unwrap_or_default();
+    server_control_hook.wait().await;
 }
 ```
 

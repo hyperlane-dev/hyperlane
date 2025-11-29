@@ -714,9 +714,9 @@ impl Server {
             let _ = shutdown_receiver.changed().await;
             accept_connections.abort();
         });
-        let mut server_lifecycle: ServerControlHook = ServerControlHook::default();
-        server_lifecycle.set_shutdown_hook(shutdown_hook);
-        server_lifecycle.set_wait_hook(wait_hook);
-        Ok(server_lifecycle)
+        let mut server_control_hook: ServerControlHook = ServerControlHook::default();
+        server_control_hook.set_shutdown_hook(shutdown_hook);
+        server_control_hook.set_wait_hook(wait_hook);
+        Ok(server_control_hook)
     }
 }
