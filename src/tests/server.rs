@@ -233,13 +233,13 @@ async fn test_server() {
         server.route::<SseRoute>("/sse").await;
         server.route::<DynamicRoute>("/dynamic/{routing}").await;
         server.route::<DynamicRoute>("/regex/{file:^.*$}").await;
-        let server_lifecycle: ServerControlHook = server.run().await.unwrap_or_default();
-        let server_lifecycle_clone: ServerControlHook = server_lifecycle.clone();
+        let server_control_1: ServerControlHook = server.run().await.unwrap_or_default();
+        let server_control_2: ServerControlHook = server_control_1.clone();
         tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-            server_lifecycle.shutdown().await;
+            server_control_1.shutdown().await;
         });
-        server_lifecycle_clone.wait().await;
+        server_control_2.wait().await;
     }
 
     main().await;
