@@ -28,8 +28,11 @@ impl Context {
     /// - `Context` - The newly created context.
     pub(crate) fn create_context(stream: &ArcRwLockStream, request: &Request) -> Context {
         let mut internal_ctx: ContextInner = ContextInner::default();
-        internal_ctx.set_stream(Some(stream.clone()));
-        internal_ctx.set_request(request.clone());
+        internal_ctx
+            .set_stream(Some(stream.clone()))
+            .set_request(request.clone())
+            .get_mut_response()
+            .set_version(request.get_version().clone());
         Context::from_internal_context(internal_ctx)
     }
 

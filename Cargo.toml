@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "10.14.0"
+version = "10.14.1"
 readme = "README.md"
 edition = "2024"
 authors = ["root@ltpp.vip"]
@@ -20,7 +20,7 @@ exclude = [
 ]
 
 [dependencies]
-http-type = "5.11.0"
+http-type = "5.11.1"
 lombok-macros = "1.13.13"
 serde_json = "1.0.145"
 serde = { version = "1.0.228", features = ["derive"] }
