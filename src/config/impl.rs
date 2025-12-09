@@ -9,6 +9,7 @@ impl Default for ServerConfigInner {
     /// # Returns
     ///
     /// - `Self` - A `ServerConfigInner` instance with default settings.
+    #[inline(always)]
     fn default() -> Self {
         Self {
             host: DEFAULT_HOST.to_owned(),
@@ -30,6 +31,7 @@ impl Default for ServerConfig {
     /// # Returns
     ///
     /// - `Self` - A `ServerConfig` instance with default settings.
+    #[inline(always)]
     fn default() -> Self {
         Self(arc_rwlock(ServerConfigInner::default()))
     }
@@ -51,6 +53,7 @@ impl PartialEq for ServerConfig {
     /// # Returns
     ///
     /// - `bool` - Indicating whether the configurations are equal.
+    #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         if Arc::ptr_eq(self.get_0(), other.get_0()) {
             return true;

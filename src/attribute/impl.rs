@@ -11,6 +11,7 @@ impl From<&str> for Attribute {
     /// # Returns
     ///
     /// - `Attribute` - The converted attribute key.
+    #[inline(always)]
     fn from(key: &str) -> Self {
         Attribute::External(key.to_string())
     }
@@ -27,6 +28,7 @@ impl From<String> for Attribute {
     /// # Returns
     ///
     /// - `Attribute` - The converted attribute key.
+    #[inline(always)]
     fn from(key: String) -> Self {
         Attribute::External(key)
     }
@@ -43,6 +45,7 @@ impl From<InternalAttribute> for Attribute {
     /// # Returns
     ///
     /// - `Attribute` - The converted attribute key.
+    #[inline(always)]
     fn from(key: InternalAttribute) -> Self {
         Attribute::Internal(key)
     }

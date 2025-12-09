@@ -9,7 +9,7 @@ use crate::*;
 /// # Returns
 ///
 /// - `ServerHookHandler` - A new `ServerHookHandler` instance.
-#[inline]
+#[inline(always)]
 pub fn server_hook_factory<R>() -> ServerHookHandler
 where
     R: ServerHook,
@@ -35,7 +35,7 @@ where
 /// # Panics
 ///
 /// - Panics if two or more `Hook` items of the same type define the same non-zero `order`.
-#[inline]
+#[inline(always)]
 pub fn assert_hook_unique_order(list: Vec<HookMacro>) {
     let mut seen: HashSet<(HookType, isize)> = HashSet::new();
     list.iter()

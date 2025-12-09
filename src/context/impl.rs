@@ -11,7 +11,7 @@ impl Context {
     /// # Returns
     ///
     /// - `Context` - The newly created context instance.
-    #[inline]
+    #[inline(always)]
     pub(crate) fn from_internal_context(ctx: ContextInner) -> Self {
         Self(arc_rwlock(ctx))
     }
@@ -26,6 +26,7 @@ impl Context {
     /// # Returns
     ///
     /// - `Context` - The newly created context.
+    #[inline(always)]
     pub(crate) fn create_context(stream: &ArcRwLockStream, request: &Request) -> Context {
         let mut internal_ctx: ContextInner = ContextInner::default();
         internal_ctx

@@ -13,7 +13,7 @@ impl Panic {
     /// # Returns
     ///
     /// - `Panic` - A new panic instance.
-    #[inline]
+    #[inline(always)]
     pub(crate) fn new(
         message: OptionString,
         location: OptionString,
@@ -37,6 +37,7 @@ impl Panic {
     /// # Returns
     ///
     /// - `OptionString` - The extracted message, or None if the payload is not a string type.
+    #[inline(always)]
     fn try_extract_panic_message(panic_payload: &dyn Any) -> OptionString {
         if let Some(s) = panic_payload.downcast_ref::<&str>() {
             Some(s.to_string())

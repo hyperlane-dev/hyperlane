@@ -1,5 +1,6 @@
 use crate::*;
 
+// Associate a plugin registry with the specified type.
 server_collect!(HookMacro);
 
 /// Provides a default implementation for RouteMatcher.
@@ -9,6 +10,7 @@ impl Default for RouteMatcher {
     /// # Returns
     ///
     /// - `RouteMatcher` - A new RouteMatcher with empty storage for static, dynamic, and regex route.
+    #[inline(always)]
     fn default() -> Self {
         Self {
             static_route: hash_map_xx_hash3_64(),
@@ -33,6 +35,7 @@ impl PartialEq for RoutePattern {
     /// # Returns
     ///
     /// - `bool`- `true` if the instances are equal, `false` otherwise.
+    #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         self.get_0() == other.get_0()
     }
@@ -52,6 +55,7 @@ impl Hash for RoutePattern {
     /// # Arguments
     ///
     /// - `&mut Hasher` - The hasher to use.
+    #[inline(always)]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.get_0().hash(state);
     }
@@ -70,6 +74,7 @@ impl PartialOrd for RoutePattern {
     /// # Returns
     ///
     /// - `Option<Ordering>`- The ordering of the two instances.
+    #[inline(always)]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -88,6 +93,7 @@ impl Ord for RoutePattern {
     /// # Returns
     ///
     /// - `Ordering`- The ordering of the two instances.
+    #[inline(always)]
     fn cmp(&self, other: &Self) -> Ordering {
         self.get_0().cmp(other.get_0())
     }
@@ -172,6 +178,7 @@ impl PartialOrd for RouteSegment {
     /// # Returns
     ///
     /// - `Option<Ordering>`- The ordering of the two instances.
+    #[inline(always)]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -190,6 +197,7 @@ impl Ord for RouteSegment {
     /// # Returns
     ///
     /// - `Ordering`- The ordering of the two instances.
+    #[inline(always)]
     fn cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
             (Self::Static(s1), Self::Static(s2)) => s1.cmp(s2),
@@ -218,6 +226,7 @@ impl PartialEq for RouteSegment {
     /// # Returns
     ///
     /// - `bool`- `true` if the instances are equal, `false` otherwise.
+    #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Static(l0), Self::Static(r0)) => l0 == r0,
@@ -237,6 +246,7 @@ impl Hash for RouteSegment {
     /// # Arguments
     ///
     /// - `&mut HHasher` - The hasher to use.
+    #[inline(always)]
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
             Self::Static(s) => {
@@ -404,7 +414,7 @@ impl RoutePattern {
     /// # Returns
     ///
     /// - `bool` - true if the pattern is static, false otherwise.
-    #[inline]
+    #[inline(always)]
     pub(crate) fn is_static(&self) -> bool {
         self.get_0()
             .iter()
@@ -416,7 +426,7 @@ impl RoutePattern {
     /// # Returns
     ///
     /// - `bool` - true if the pattern is dynamic, false otherwise.
-    #[inline]
+    #[inline(always)]
     pub(crate) fn is_dynamic(&self) -> bool {
         self.get_0()
             .iter()
@@ -432,7 +442,7 @@ impl RoutePattern {
     /// # Returns
     ///
     /// - `usize` - The number of segments.
-    #[inline]
+    #[inline(always)]
     pub(crate) fn segment_count(&self) -> usize {
         self.get_0().len()
     }
@@ -442,7 +452,7 @@ impl RoutePattern {
     /// # Returns
     ///
     /// - `bool` - true if the last segment is a regex, false otherwise.
-    #[inline]
+    #[inline(always)]
     pub(crate) fn has_tail_regex(&self) -> bool {
         matches!(self.get_0().last(), Some(RouteSegment::Regex(_, _)))
     }
@@ -458,6 +468,7 @@ impl RouteMatcher {
     /// # Returns
     ///
     /// - `RouteMatcher` - A new RouteMatcher instance with empty route stores.
+    #[inline(always)]
     pub(crate) fn new() -> Self {
         Self {
             static_route: hash_map_xx_hash3_64(),
@@ -477,6 +488,7 @@ impl RouteMatcher {
     /// # Returns
     ///
     /// - `usize` - The number of segments.
+    #[inline(always)]
     fn count_path_segments(path: &str) -> usize {
         let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
         if path.is_empty() {

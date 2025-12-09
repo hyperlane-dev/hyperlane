@@ -48,6 +48,7 @@ impl Default for ServerControlHook {
     /// # Returns
     ///
     /// - `Self` - A new `ServerControlHook` instance with default hooks.
+    #[inline(always)]
     fn default() -> Self {
         Self {
             wait_hook: Arc::new(|| Box::pin(async {})),
@@ -78,6 +79,7 @@ impl ServerControlHook {
 }
 
 impl PartialEq for HookHandler {
+    #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (HookHandler::Handler(handler_a), HookHandler::Handler(handler_b)) => {
@@ -107,7 +109,7 @@ impl HookType {
     /// # Returns
     ///
     /// - `Option<isize>` - `Some(order)` if the hook defines a priority, otherwise `None`.
-    #[inline]
+    #[inline(always)]
     pub fn try_get(&self) -> Option<isize> {
         match *self {
             HookType::RequestMiddleware(order)

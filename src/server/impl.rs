@@ -7,6 +7,7 @@ impl Default for ServerInner {
     /// # Returns
     ///
     /// - `Self` - A new instance with default configuration.
+    #[inline(always)]
     fn default() -> Self {
         Self {
             config: ServerConfigInner::default(),
@@ -73,6 +74,7 @@ impl PartialEq for Server {
     /// # Returns
     ///
     /// - `bool`- `true` if the instances are equal, `false` otherwise.
+    #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         if Arc::ptr_eq(self.get_0(), other.get_0()) {
             return true;
@@ -106,7 +108,7 @@ impl HandlerState {
     /// # Returns
     ///
     /// - `Self` - The newly created handler state.
-    #[inline]
+    #[inline(always)]
     pub(super) fn new(stream: ArcRwLockStream, ctx: Context, buffer: usize) -> Self {
         Self {
             stream,
@@ -366,7 +368,7 @@ impl Server {
     /// # Returns
     ///
     /// - `String` - The formatted address string.
-    #[inline]
+    #[inline(always)]
     pub fn format_host_port<H: ToString>(host: H, port: usize) -> String {
         format!("{}{COLON}{port}", host.to_string())
     }
