@@ -591,7 +591,7 @@ impl Server {
     /// - `&HandlerState` - The `HandlerState` for the current connection.
     /// - `&Request` - The initial request that established the keep-alive connection.
     async fn handle_http_requests(&self, state: &HandlerState, request: &Request) {
-        if self.request_hook(state, request).await {
+        if !self.request_hook(state, request).await {
             return;
         }
         let stream: &ArcRwLockStream = state.get_stream();

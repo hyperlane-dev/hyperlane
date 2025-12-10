@@ -1424,20 +1424,14 @@ impl Context {
     ///
     /// - `ResponseResult` - The outcome of the send operation.
     pub async fn send(&self) -> ResponseResult {
+        if self.is_terminated().await {
+            return Err(ResponseError::Terminated);
+        }
         let response_data: ResponseData = self.write().await.get_mut_response().build();
-        self.send_with_data(response_data).await
-    }
-
-    /// Sends the response and then closes the connection.
-    ///
-    /// After sending, the connection will be marked as closed.
-    ///
-    /// # Returns
-    ///
-    /// - `ResponseResult` - The outcome of the send operation.
-    pub async fn send_once(&self) -> ResponseResult {
-        let response_data: ResponseData = self.write().await.get_mut_response().build();
-        self.send_once_with_data(response_data).await
+        if let Some(stream) = self.try_get_stream().await {
+            return stream.send(response_data).await;
+        }
+        Err(ResponseError::NotFoundStream)
     }
 
     /// Sends only the response body to the client.
@@ -1450,60 +1444,6 @@ impl Context {
     pub async fn send_body(&self) -> ResponseResult {
         let response_body: ResponseBody = self.get_response_body().await;
         self.send_body_with_data(response_body).await
-    }
-
-    /// Sends only the response body and then closes the connection.
-    ///
-    /// After sending the body, the connection will be marked as closed.
-    ///
-    /// # Returns
-    ///
-    /// - `ResponseResult` - The outcome of the send operation.
-    pub async fn send_body_once(&self) -> ResponseResult {
-        let response_body: ResponseBody = self.get_response_body().await;
-        self.send_body_once_with_data(response_body).await
-    }
-
-    /// Sends the response headers and body to the client with additional data.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<[u8]>` - The additional data to send.
-    ///
-    /// # Returns
-    ///
-    /// - `ResponseResult` - The outcome of the send operation.
-    pub async fn send_with_data<D>(&self, data: D) -> ResponseResult
-    where
-        D: AsRef<[u8]>,
-    {
-        if self.is_terminated().await {
-            return Err(ResponseError::Terminated);
-        }
-        if let Some(stream) = self.try_get_stream().await {
-            return stream.send(data).await;
-        }
-        Err(ResponseError::NotFoundStream)
-    }
-
-    /// Sends the response and then closes the connection with additional data.
-    ///
-    /// After sending, the connection will be marked as closed.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<[u8]>` - The additional data to send.
-    ///
-    /// # Returns
-    ///
-    /// - `ResponseResult` - The outcome of the send operation.
-    pub async fn send_once_with_data<D>(&self, data: D) -> ResponseResult
-    where
-        D: AsRef<[u8]>,
-    {
-        let res: ResponseResult = self.send_with_data(data).await;
-        self.closed().await;
-        res
     }
 
     /// Sends only the response body to the client with additional data.
@@ -1530,26 +1470,6 @@ impl Context {
         Err(ResponseError::NotFoundStream)
     }
 
-    /// Sends only the response body and then closes the connection with additional data.
-    ///
-    /// After sending the body, the connection will be marked as closed.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<[u8]>` - The additional data to send as the body.
-    ///
-    /// # Returns
-    ///
-    /// - `ResponseResult` - The outcome of the send operation.
-    pub async fn send_body_once_with_data<D>(&self, data: D) -> ResponseResult
-    where
-        D: AsRef<[u8]>,
-    {
-        let res: ResponseResult = self.send_body_with_data(data).await;
-        self.closed().await;
-        res
-    }
-
     /// Sends a list of response bodies to the client with additional data.
     ///
     /// This is useful for streaming multiple data chunks or for responses where headers have already been sent.
@@ -1573,27 +1493,6 @@ impl Context {
             return stream.send_body_list(data_iter).await;
         }
         Err(ResponseError::NotFoundStream)
-    }
-
-    /// Sends a list of response bodies and then closes the connection with additional data.
-    ///
-    /// After sending the body list, the connection will be marked as closed.
-    ///
-    /// # Arguments
-    ///
-    /// - `I: IntoIterator<Item = D>, D: AsRef<[u8]>` - The additional data to send as a list of bodies.
-    ///
-    /// # Returns
-    ///
-    /// - `ResponseResult` - The outcome of the send operation.
-    pub async fn send_body_list_once_with_data<I, D>(&self, data_iter: I) -> ResponseResult
-    where
-        I: IntoIterator<Item = D>,
-        D: AsRef<[u8]>,
-    {
-        let res: ResponseResult = self.send_body_list_with_data(data_iter).await;
-        self.closed().await;
-        res
     }
 
     /// Flushes the underlying network stream, ensuring all buffered data is sent.
