@@ -43,16 +43,4 @@ pub struct RouteMatcher {
     #[get_mut(pub(super))]
     #[debug(skip)]
     pub(super) regex_route: ServerHookPatternRoute,
-    /// AC automaton for fast dynamic/regex route static segment matching.
-    /// Used to quickly filter candidate routes by matching static segments.
-    #[get]
-    #[set(pub(super))]
-    #[debug(skip)]
-    pub(super) ac_automaton: OptionRouteSearchEngine,
-    /// Static segment patterns extracted from dynamic/regex routes for AC automaton.
-    /// Maps pattern_idx to (segment_count, route_index, is_regex).
-    #[get]
-    #[set(pub(super))]
-    #[debug(skip)]
-    pub(super) ac_pattern_map: HashMapXxHash3_64<usize, (usize, usize, bool)>,
 }

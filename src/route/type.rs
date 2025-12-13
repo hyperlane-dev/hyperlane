@@ -8,10 +8,6 @@ pub type RouteParams = HashMapXxHash3_64<String, String>;
 ///
 /// This is used to represent a parsed route.
 pub type RouteSegmentList = Vec<RouteSegment>;
-/// A type alias for an optional AC automaton.
-///
-/// This is used to represent a parsed route.
-pub(crate) type OptionRouteSearchEngine = Option<RouteSearchEngine>;
 /// A type alias for a list of path components.
 ///
 /// This is often used for path components.

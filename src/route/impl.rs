@@ -16,8 +16,6 @@ impl Default for RouteMatcher {
             static_route: hash_map_xx_hash3_64(),
             dynamic_route: hash_map_xx_hash3_64(),
             regex_route: hash_map_xx_hash3_64(),
-            ac_automaton: None,
-            ac_pattern_map: hash_map_xx_hash3_64(),
         }
     }
 }
@@ -470,13 +468,7 @@ impl RouteMatcher {
     /// - `RouteMatcher` - A new RouteMatcher instance with empty route stores.
     #[inline(always)]
     pub(crate) fn new() -> Self {
-        Self {
-            static_route: hash_map_xx_hash3_64(),
-            dynamic_route: hash_map_xx_hash3_64(),
-            regex_route: hash_map_xx_hash3_64(),
-            ac_automaton: None,
-            ac_pattern_map: hash_map_xx_hash3_64(),
-        }
+        Self::default()
     }
 
     /// Counts the number of segments in a path.
@@ -495,45 +487,6 @@ impl RouteMatcher {
             return 0;
         }
         path.matches(DEFAULT_HTTP_PATH).count() + 1
-    }
-
-    /// Rebuilds the AC automaton for dynamic/regex route matching.
-    /// Extracts static segments from dynamic and regex routes for fast filtering.
-    fn rebuild_ac_automaton(&mut self) {
-        let mut patterns: Vec<String> = Vec::with_capacity(DEFAULT_BUFFER_SIZE);
-        let mut pattern_map: HashMapXxHash3_64<usize, (usize, usize, bool)> =
-            hash_map_xx_hash3_64();
-        for (segment_count, routes) in self.get_dynamic_route() {
-            for (route_idx, (pattern, _)) in routes.iter().enumerate() {
-                for segment in pattern.get_0() {
-                    if let RouteSegment::Static(static_seg) = segment {
-                        let pattern_idx: usize = patterns.len();
-                        patterns.push(static_seg.clone());
-                        pattern_map.insert(pattern_idx, (*segment_count, route_idx, false));
-                    }
-                }
-            }
-        }
-        for (segment_count, routes) in self.get_regex_route() {
-            for (route_idx, (pattern, _)) in routes.iter().enumerate() {
-                for segment in pattern.get_0() {
-                    if let RouteSegment::Static(static_seg) = segment {
-                        let pattern_idx: usize = patterns.len();
-                        patterns.push(static_seg.clone());
-                        pattern_map.insert(pattern_idx, (*segment_count, route_idx, true));
-                    }
-                }
-            }
-        }
-        self.set_ac_pattern_map(pattern_map);
-        if patterns.is_empty() {
-            self.set_ac_automaton(None);
-            return;
-        }
-        match RouteSearchEngine::new(&patterns) {
-            Ok(ac) => self.set_ac_automaton(Some(ac)),
-            Err(_) => self.set_ac_automaton(None),
-        };
     }
 
     /// Adds a new route and its handler to the matcher.
@@ -577,7 +530,6 @@ impl RouteMatcher {
             Ok(_) => return Err(RouteError::DuplicatePattern(pattern.to_owned())),
             Err(pos) => routes_for_count.insert(pos, (route_pattern, handler)),
         }
-        self.rebuild_ac_automaton();
         Ok(())
     }
 

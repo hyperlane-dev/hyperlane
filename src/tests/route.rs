@@ -103,24 +103,6 @@ async fn get_route() {
 }
 
 #[tokio::test]
-async fn ac_automaton_dynamic_routes() {
-    let server: Server = Server::new().await;
-    server.route::<TestRoute>("/api/users/{id}").await;
-    server.route::<TestRoute>("/api/posts/{id}").await;
-    server.route::<TestRoute>("/api/comments/{id}").await;
-    server.route::<TestRoute>("/static/files/{name}").await;
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
-    assert!(
-        route_matcher.get_ac_automaton().is_some(),
-        "AC automaton should be built for dynamic routes"
-    );
-    assert!(
-        !route_matcher.get_ac_pattern_map().is_empty(),
-        "AC pattern map should contain static segments"
-    );
-}
-
-#[tokio::test]
 async fn segment_count_optimization() {
     let server: Server = Server::new().await;
     server.route::<TestRoute>("/users/{id}").await;
@@ -182,7 +164,6 @@ async fn mixed_route_types() {
     assert_eq!(route_matcher.get_static_route().len(), 2);
     assert!(route_matcher.get_dynamic_route().contains_key(&2));
     assert!(route_matcher.get_regex_route().contains_key(&2));
-    assert!(route_matcher.get_ac_automaton().is_some());
 }
 
 #[tokio::test]
@@ -201,10 +182,6 @@ async fn large_dynamic_routes() {
     );
     let route_matcher: RouteMatcher = server.get_route_matcher().await;
     assert!(!route_matcher.get_dynamic_route().is_empty());
-    assert!(
-        route_matcher.get_ac_automaton().is_some(),
-        "AC automaton should be built for dynamic routes"
-    );
     let ctx: Context = Context::default();
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
@@ -238,10 +215,6 @@ async fn large_regex_routes() {
     );
     let route_matcher: RouteMatcher = server.get_route_matcher().await;
     assert!(!route_matcher.get_regex_route().is_empty());
-    assert!(
-        route_matcher.get_ac_automaton().is_some(),
-        "AC automaton should be built for regex routes"
-    );
     let ctx: Context = Context::default();
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
@@ -275,10 +248,6 @@ async fn large_tail_regex_routes() {
     );
     let route_matcher: RouteMatcher = server.get_route_matcher().await;
     assert!(!route_matcher.get_regex_route().is_empty());
-    assert!(
-        route_matcher.get_ac_automaton().is_some(),
-        "AC automaton should be built for tail regex routes"
-    );
     let ctx: Context = Context::default();
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
@@ -294,30 +263,4 @@ async fn large_tail_regex_routes() {
         "Average per tail regex route match: {:?}",
         match_duration / ROUTE_COUNT as u32
     );
-}
-
-#[tokio::test]
-async fn ac_automaton_with_static_segments() {
-    let server: Server = Server::new().await;
-    server.route::<TestRoute>("/users/{id}").await;
-    server.route::<TestRoute>("/posts/{slug}").await;
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
-    assert!(
-        route_matcher.get_ac_automaton().is_some(),
-        "AC automaton should be built for routes with static segments"
-    );
-    assert!(!route_matcher.get_ac_pattern_map().is_empty());
-}
-
-#[tokio::test]
-async fn ac_automaton_regex_routes() {
-    let server: Server = Server::new().await;
-    server.route::<TestRoute>("/api/{version:\\d+}/users").await;
-    server.route::<TestRoute>("/files/{path:.*}").await;
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
-    assert!(
-        route_matcher.get_ac_automaton().is_some(),
-        "AC automaton should be built for regex routes"
-    );
-    assert!(!route_matcher.get_ac_pattern_map().is_empty());
 }
