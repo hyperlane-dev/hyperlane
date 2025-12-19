@@ -1,7 +1,7 @@
 use crate::*;
 
 // Associate a plugin registry with the specified type.
-server_collect!(HookMacro);
+collect!(HookMacro);
 
 /// Provides a default implementation for RouteMatcher.
 impl Default for RouteMatcher {

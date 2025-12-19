@@ -30,7 +30,7 @@ pub use route::*;
 pub use server::*;
 
 pub use http_type::*;
-pub use inventory::{collect as server_collect, submit as server_submit};
+pub use inventory::*;
 
 pub(crate) use lifecycle::*;
 
