@@ -141,7 +141,7 @@ impl Context {
         self
     }
 
-    /// Checks if the connection has been terminated (aborted and closed).
+    /// Checks if the connection has been terminated (aborted or closed).
     ///
     /// # Returns
     ///
@@ -159,11 +159,11 @@ impl Context {
         self.read().await.get_stream().clone()
     }
 
-    /// Retrieves the underlying network stream, if available.
+    /// Retrieves the underlying network stream.
     ///
     /// # Returns
     ///
-    /// - `ArcRwLockStream` - The thread-safe, shareable network stream if it exists.
+    /// - `ArcRwLockStream` - The thread-safe, shareable network stream.
     ///
     /// # Panics
     ///
@@ -191,7 +191,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `SocketAddr` - The socket address of the remote peer, or default if unavailable.
+    /// - `SocketAddr` - The socket address of the remote peer.
     ///
     /// # Panics
     ///
@@ -211,11 +211,11 @@ impl Context {
             .map(|data| data.to_string())
     }
 
-    /// Retrieves the remote socket address as a string, or a default value if unavailable.
+    /// Retrieves the remote socket address as a string.
     ///
     /// # Returns
     ///
-    /// - `String` - The string representation of the socket address, or default if unavailable.
+    /// - `String` - The string representation of the socket address.
     ///
     /// # Panics
     ///
@@ -228,7 +228,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionSocketHost` - The IP address of the remote peer if available.
+    /// - `OptionSocketHost` - The IP address of the remote peer.
     pub async fn try_get_socket_host(&self) -> OptionSocketHost {
         self.try_get_socket_addr()
             .await
@@ -239,7 +239,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `SocketHost` - The IP address of the remote peer if available.
+    /// - `SocketHost` - The IP address of the remote peer.
     ///
     /// # Panics
     ///
@@ -263,7 +263,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `SocketPort` - The port number of the remote peer if available.
+    /// - `SocketPort` - The port number of the remote peer.
     ///
     /// # Panics
     ///
@@ -707,7 +707,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `UpgradeType` - Indicates if the request is for a WebSocket connection.
+    /// - `UpgradeType` - The upgrade type of the request.
     pub async fn get_request_upgrade_type(&self) -> UpgradeType {
         self.read().await.get_request().get_upgrade_type()
     }
@@ -1350,7 +1350,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `ResponseBody` - A clone of the response's body.
+    /// - `ResponseBody` - The response body.
     pub async fn get_response_body(&self) -> ResponseBody {
         self.read().await.get_response().get_body().clone()
     }
@@ -1359,7 +1359,7 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `B` - The body to set for the response.
+    /// - `B` - The body data to set for the response.
     ///
     /// # Returns
     ///
@@ -1409,16 +1409,16 @@ impl Context {
         self.read().await.get_response().get_body_json()
     }
 
-    /// Retrieves the reason phrase of the response's status code.
+    /// Retrieves the reason phrase of the response status code.
     ///
     /// # Returns
     ///
-    /// - `ResponseReasonPhrase` - The reason phrase associated with the response's status code.
+    /// - `ResponseReasonPhrase` - The reason phrase associated with the response status code.
     pub async fn get_response_reason_phrase(&self) -> ResponseReasonPhrase {
         self.read().await.get_response().get_reason_phrase().clone()
     }
 
-    /// Sets the reason phrase for the response's status code.
+    /// Sets the reason phrase for the response status code.
     ///
     /// # Arguments
     ///
@@ -1442,7 +1442,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// The status code of the response.
+    /// - `ResponseStatusCode` - The status code of the response.
     pub async fn get_response_status_code(&self) -> ResponseStatusCode {
         *self.read().await.get_response().get_status_code()
     }
@@ -1544,7 +1544,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `Option<V>` - The attribute's value if it exists and can be cast to the specified type.
+    /// - `Option<V>` - The attribute value if it exists and can be cast to the specified type.
     pub async fn try_get_attribute<K, V>(&self, key: K) -> Option<V>
     where
         K: AsRef<str>,
@@ -1566,7 +1566,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `V` - The attribute's value if it exists and can be cast to the specified type.
+    /// - `V` - The attribute value if it exists and can be cast to the specified type.
     ///
     /// # Panics
     ///
@@ -1639,7 +1639,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `Option<V>` - The attribute's value if it exists and can be cast to the specified type.
+    /// - `Option<V>` - The attribute value if it exists and can be cast to the specified type.
     async fn try_get_internal_attribute<V>(&self, key: InternalAttribute) -> Option<V>
     where
         V: AnySendSyncClone,
@@ -1660,7 +1660,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `V` - The attribute's value if it exists and can be cast to the specified type.
+    /// - `V` - The attribute value if it exists and can be cast to the specified type.
     ///
     /// # Panics
     ///
@@ -1805,7 +1805,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `ResponseResult` - The outcome of the send operation.
+    /// - `ResponseResult` - The result of the send operation.
     pub async fn send(&self) -> ResponseResult {
         if self.is_terminated().await {
             return Err(ResponseError::Terminated);
@@ -1819,11 +1819,11 @@ impl Context {
 
     /// Sends only the response body to the client.
     ///
-    /// This is useful for streaming data or for responses where headers have already been sent.
+    /// This method is useful for streaming data or for responses where headers have already been sent.
     ///
     /// # Returns
     ///
-    /// - `ResponseResult` - The outcome of the send operation.
+    /// - `ResponseResult` - The result of the send operation.
     pub async fn send_body(&self) -> ResponseResult {
         let response_body: ResponseBody = self.get_response_body().await;
         self.send_body_with_data(response_body).await
@@ -1831,7 +1831,7 @@ impl Context {
 
     /// Sends only the response body to the client with additional data.
     ///
-    /// This is useful for streaming data or for responses where headers have already been sent.
+    /// This method is useful for streaming data or for responses where headers have already been sent.
     ///
     /// # Arguments
     ///
@@ -1839,7 +1839,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `ResponseResult` - The outcome of the send operation.
+    /// - `ResponseResult` - The result of the send operation.
     pub async fn send_body_with_data<D>(&self, data: D) -> ResponseResult
     where
         D: AsRef<[u8]>,
@@ -1863,7 +1863,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `ResponseResult` - The outcome of the send operation.
+    /// - `ResponseResult` - The result of the send operation.
     pub async fn send_body_list_with_data<I, D>(&self, data_iter: I) -> ResponseResult
     where
         I: IntoIterator<Item = D>,
@@ -1882,7 +1882,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `ResponseResult` - The outcome of the flush operation.
+    /// - `ResponseResult` - The result of the flush operation.
     pub async fn flush(&self) -> ResponseResult {
         if let Some(stream) = self.try_get_stream().await {
             stream.flush().await;
