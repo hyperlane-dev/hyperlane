@@ -410,6 +410,24 @@ impl Context {
         self.read().await.get_request().get_body_json()
     }
 
+    /// Retrieves all request headers.
+    ///
+    /// # Returns
+    ///
+    /// - `RequestHeaders` - A clone of the request's header map.
+    pub async fn get_request_headers(&self) -> RequestHeaders {
+        self.read().await.get_request().get_headers().clone()
+    }
+
+    /// Retrieves the total number of request headers.
+    ///
+    /// # Returns
+    ///
+    /// - `usize` - The total number of headers in the request.
+    pub async fn get_request_headers_length(&self) -> usize {
+        self.read().await.get_request().get_headers_length()
+    }
+
     /// Attempts to retrieve a specific request header by its key.
     ///
     /// # Arguments
@@ -426,13 +444,20 @@ impl Context {
         self.read().await.get_request().try_get_header(key)
     }
 
-    /// Retrieves all request headers.
+    /// Retrieves a specific request header by its key, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The key of the header to retrieve.
     ///
     /// # Returns
     ///
-    /// - `RequestHeaders` - A clone of the request's header map.
-    pub async fn get_request_headers(&self) -> RequestHeaders {
-        self.read().await.get_request().get_headers().clone()
+    /// - `RequestHeadersValue` - The header values if exists.
+    pub async fn get_request_header<K>(&self, key: K) -> RequestHeadersValue
+    where
+        K: AsRef<str>,
+    {
+        self.read().await.get_request().get_header(key)
     }
 
     /// Attempts to retrieve the first value of a specific request header.
@@ -499,6 +524,22 @@ impl Context {
         self.read().await.get_request().get_header_back(key)
     }
 
+    /// Attempts to retrieve the number of values for a specific request header.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The key of the header.
+    ///
+    /// # Returns
+    ///
+    /// - `OptionUsize` - The number of values for the specified header if it exists.
+    pub async fn try_get_request_header_len<K>(&self, key: K) -> OptionUsize
+    where
+        K: AsRef<str>,
+    {
+        self.read().await.get_request().try_get_header_length(key)
+    }
+
     /// Retrieves the number of values for a specific request header.
     ///
     /// # Arguments
@@ -522,15 +563,6 @@ impl Context {
     /// - `usize` - The total count of all values in all headers.
     pub async fn get_request_headers_values_length(&self) -> usize {
         self.read().await.get_request().get_headers_values_length()
-    }
-
-    /// Retrieves the total number of request headers.
-    ///
-    /// # Returns
-    ///
-    /// - `usize` - The total number of headers in the request.
-    pub async fn get_request_headers_length(&self) -> usize {
-        self.read().await.get_request().get_headers_length()
     }
 
     /// Checks if a specific request header exists.
@@ -1079,6 +1111,22 @@ impl Context {
     /// - `usize` - The total number of headers in the response.
     pub async fn get_response_headers_length(&self) -> usize {
         self.read().await.get_response().get_headers_length()
+    }
+
+    /// Attempts to retrieve the number of values for a specific response header.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The key of the header.
+    ///
+    /// # Returns
+    ///
+    /// - `OptionUsize` - The number of values for the specified header if it exists.
+    pub async fn try_get_response_header_length<K>(&self, key: K) -> OptionUsize
+    where
+        K: AsRef<str>,
+    {
+        self.read().await.get_response().try_get_header_length(key)
     }
 
     /// Retrieves the number of values for a specific response header.
