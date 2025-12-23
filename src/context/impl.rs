@@ -164,6 +164,10 @@ impl Context {
     /// # Returns
     ///
     /// - `ArcRwLockStream` - The thread-safe, shareable network stream if it exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the network stream is not found.
     pub async fn get_stream(&self) -> ArcRwLockStream {
         self.try_get_stream().await.unwrap()
     }
@@ -188,6 +192,10 @@ impl Context {
     /// # Returns
     ///
     /// - `SocketAddr` - The socket address of the remote peer, or default if unavailable.
+    ///
+    /// # Panics
+    ///
+    /// - If the socket address is not found.
     pub async fn get_socket_addr(&self) -> SocketAddr {
         self.try_get_socket_addr().await.unwrap()
     }
@@ -208,6 +216,10 @@ impl Context {
     /// # Returns
     ///
     /// - `String` - The string representation of the socket address, or default if unavailable.
+    ///
+    /// # Panics
+    ///
+    /// - If the socket address is not found.
     pub async fn get_socket_addr_string(&self) -> String {
         self.get_socket_addr().await.to_string()
     }
@@ -228,6 +240,10 @@ impl Context {
     /// # Returns
     ///
     /// - `SocketHost` - The IP address of the remote peer if available.
+    ///
+    /// # Panics
+    ///
+    /// - If the socket address is not found.
     pub async fn get_socket_host(&self) -> SocketHost {
         self.try_get_socket_host().await.unwrap()
     }
@@ -248,6 +264,10 @@ impl Context {
     /// # Returns
     ///
     /// - `SocketPort` - The port number of the remote peer if available.
+    ///
+    /// # Panics
+    ///
+    /// - If the socket address is not found.
     pub async fn get_socket_port(&self) -> SocketPort {
         self.try_get_socket_port().await.unwrap()
     }
@@ -373,6 +393,10 @@ impl Context {
     /// # Returns
     ///
     /// - `RequestQuerysValue` - The query parameter value if exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the query parameter is not found.
     pub async fn get_request_query<K>(&self, key: K) -> RequestQuerysValue
     where
         K: AsRef<str>,
@@ -403,7 +427,23 @@ impl Context {
     /// # Returns
     ///
     /// - `ResultJsonError<J>` - The deserialized type `J` or a JSON error.
-    pub async fn get_request_body_json<J>(&self) -> ResultJsonError<J>
+    pub async fn try_get_request_body_json<J>(&self) -> ResultJsonError<J>
+    where
+        J: DeserializeOwned,
+    {
+        self.read().await.get_request().try_get_body_json()
+    }
+
+    /// Deserializes the request body from JSON into a specified type, panicking if not found.
+    ///
+    /// # Returns
+    ///
+    /// - `J` - The deserialized type `J`.
+    ///
+    /// # Panics
+    ///
+    /// - If deserialization fails.
+    pub async fn get_request_body_json<J>(&self) -> J
     where
         J: DeserializeOwned,
     {
@@ -453,6 +493,10 @@ impl Context {
     /// # Returns
     ///
     /// - `RequestHeadersValue` - The header values if exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the header is not found.
     pub async fn get_request_header<K>(&self, key: K) -> RequestHeadersValue
     where
         K: AsRef<str>,
@@ -485,6 +529,10 @@ impl Context {
     /// # Returns
     ///
     /// - `RequestHeadersValueItem` - The first value of the header if it exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the header is not found.
     pub async fn get_request_header_front<K>(&self, key: K) -> RequestHeadersValueItem
     where
         K: AsRef<str>,
@@ -517,6 +565,10 @@ impl Context {
     /// # Returns
     ///
     /// - `RequestHeadersValueItem` - The last value of the header if it exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the header is not found.
     pub async fn get_request_header_back<K>(&self, key: K) -> RequestHeadersValueItem
     where
         K: AsRef<str>,
@@ -549,6 +601,10 @@ impl Context {
     /// # Returns
     ///
     /// - `usize` - The number of values for the specified header.
+    ///
+    /// # Panics
+    ///
+    /// - If the header is not found.
     pub async fn get_request_header_len<K>(&self, key: K) -> usize
     where
         K: AsRef<str>,
@@ -636,6 +692,10 @@ impl Context {
     /// # Returns
     ///
     /// - `CookieValue` - The cookie value if exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the cookie is not found.
     pub async fn get_request_cookie<K>(&self, key: K) -> CookieValue
     where
         K: AsRef<str>,
@@ -977,6 +1037,10 @@ impl Context {
     /// # Returns
     ///
     /// - `ResponseHeadersValue` - The header values if the header exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the header is not found.
     pub async fn get_response_header<K>(&self, key: K) -> ResponseHeadersValue
     where
         K: AsRef<str>,
@@ -1028,6 +1092,10 @@ impl Context {
     /// # Returns
     ///
     /// - `ResponseHeadersValueItem` - The first value of the header if it exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the header is not found.
     pub async fn get_response_header_front<K>(&self, key: K) -> ResponseHeadersValueItem
     where
         K: AsRef<str>,
@@ -1060,6 +1128,10 @@ impl Context {
     /// # Returns
     ///
     /// - `ResponseHeadersValueItem` - The last value of the header if it exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the header is not found.
     pub async fn get_response_header_back<K>(&self, key: K) -> ResponseHeadersValueItem
     where
         K: AsRef<str>,
@@ -1138,6 +1210,10 @@ impl Context {
     /// # Returns
     ///
     /// - `usize` - The number of values for the specified header.
+    ///
+    /// # Panics
+    ///
+    /// - If the header is not found.
     pub async fn get_response_header_length<K>(&self, key: K) -> usize
     where
         K: AsRef<str>,
@@ -1259,6 +1335,10 @@ impl Context {
     /// # Returns
     ///
     /// - `CookieValue` - The cookie's value if it exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the cookie is not found.
     pub async fn get_response_cookie<K>(&self, key: K) -> CookieValue
     where
         K: AsRef<str>,
@@ -1306,7 +1386,23 @@ impl Context {
     /// # Returns
     ///
     /// - `ResultJsonError<J>` - The deserialized type `J` or a JSON error.
-    pub async fn get_response_body_json<J>(&self) -> ResultJsonError<J>
+    pub async fn try_get_response_body_json<J>(&self) -> ResultJsonError<J>
+    where
+        J: DeserializeOwned,
+    {
+        self.read().await.get_response().try_get_body_json()
+    }
+
+    /// Deserializes the response body from JSON into a specified type, panicking if not found.
+    ///
+    /// # Returns
+    ///
+    /// - `J` - The deserialized type `J`.
+    ///
+    /// # Panics
+    ///
+    /// - If deserialization fails.
+    pub async fn get_response_body_json<J>(&self) -> J
     where
         J: DeserializeOwned,
     {
@@ -1420,6 +1516,10 @@ impl Context {
     /// # Returns
     ///
     /// - `String` - The value of the route parameter if it exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the route parameter is not found.
     pub async fn get_route_param<T>(&self, name: T) -> String
     where
         T: AsRef<str>,
@@ -1467,6 +1567,10 @@ impl Context {
     /// # Returns
     ///
     /// - `V` - The attribute's value if it exists and can be cast to the specified type.
+    ///
+    /// # Panics
+    ///
+    /// - If the attribute is not found.
     pub async fn get_attribute<K, V>(&self, key: K) -> V
     where
         K: AsRef<str>,
@@ -1557,6 +1661,10 @@ impl Context {
     /// # Returns
     ///
     /// - `V` - The attribute's value if it exists and can be cast to the specified type.
+    ///
+    /// # Panics
+    ///
+    /// - If the attribute is not found.
     async fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V
     where
         V: AnySendSyncClone,
@@ -1600,6 +1708,10 @@ impl Context {
     /// # Returns
     ///
     /// - `Panic` - The panic information if a panic was caught.
+    ///
+    /// # Panics
+    ///
+    /// - If the panic information is not found.
     pub async fn get_panic(&self) -> Panic {
         self.get_internal_attribute(InternalAttribute::Panic).await
     }
@@ -1666,6 +1778,10 @@ impl Context {
     /// # Returns
     ///
     /// - `HookHandler<()>` - The hook function if it has been set.
+    ///
+    /// # Panics
+    ///
+    /// - If the hook function is not found.
     pub async fn get_hook<K>(&self, key: K) -> HookHandler<()>
     where
         K: ToString,
