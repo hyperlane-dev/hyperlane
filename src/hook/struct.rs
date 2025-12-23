@@ -31,7 +31,7 @@ pub struct HookMacro {
     /// Represents the asynchronous handler that is executed when
     /// the associated hook is triggered.
     #[debug(skip)]
-    pub handler: HookHandler,
+    pub handler: HookHandlerSpec,
     /// Represents the type of the hook that determines when the handler
     /// should be executed.
     pub hook_type: HookType,
@@ -53,7 +53,7 @@ impl HookMacro {
     /// - `Self` - The created HookMacro instance.
     pub fn panic_hook<P: ServerHook>(order: Option<isize>) -> Self {
         Self {
-            handler: HookHandler::Factory(server_hook_factory::<P>),
+            handler: HookHandlerSpec::Factory(server_hook_factory::<P>),
             hook_type: HookType::PanicHook(order),
         }
     }
@@ -73,7 +73,7 @@ impl HookMacro {
     /// - `Self` - The created HookMacro instance.
     pub fn request_middleware<M: ServerHook>(order: Option<isize>) -> Self {
         Self {
-            handler: HookHandler::Factory(server_hook_factory::<M>),
+            handler: HookHandlerSpec::Factory(server_hook_factory::<M>),
             hook_type: HookType::RequestMiddleware(order),
         }
     }
@@ -93,7 +93,7 @@ impl HookMacro {
     /// - `Self` - The created HookMacro instance.
     pub fn response_middleware<M: ServerHook>(order: Option<isize>) -> Self {
         Self {
-            handler: HookHandler::Factory(server_hook_factory::<M>),
+            handler: HookHandlerSpec::Factory(server_hook_factory::<M>),
             hook_type: HookType::ResponseMiddleware(order),
         }
     }
@@ -113,7 +113,7 @@ impl HookMacro {
     /// - `Self` - The created HookMacro instance.
     pub fn route<R: ServerHook>(path: &'static str) -> Self {
         Self {
-            handler: HookHandler::Factory(server_hook_factory::<R>),
+            handler: HookHandlerSpec::Factory(server_hook_factory::<R>),
             hook_type: HookType::Route(path),
         }
     }

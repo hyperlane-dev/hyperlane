@@ -550,7 +550,7 @@ impl RouteMatcher {
         &self,
         ctx: &Context,
         path: &str,
-    ) -> OptionalServerHookHandler {
+    ) -> OptionServerHookHandler {
         if let Some(handler) = self.get_static_route().get(path) {
             ctx.set_route_params(RouteParams::default()).await;
             return Some(handler.clone());

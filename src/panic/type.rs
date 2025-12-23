@@ -4,7 +4,7 @@ use crate::*;
 ///
 /// This is used in contexts where a panic might not have occurred, allowing for
 /// graceful handling of both panic and non-panic scenarios.
-pub type OptionalPanicInfo = Option<Panic>;
+pub type OptionPanic = Option<Panic>;
 /// A type alias for an optional reference to a panic location.
 ///
 /// The lifetimes `'a` and `'b` are tied to the `PanicHookInfo` from which the

@@ -2,7 +2,7 @@ use crate::*;
 
 /// Represents different handler types for hooks.
 #[derive(Clone)]
-pub enum HookHandler {
+pub enum HookHandlerSpec {
     /// Arc handler (used for request/response middleware and route)
     Handler(ServerHookHandler),
     /// Factory function that creates a handler when called

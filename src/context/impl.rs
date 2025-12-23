@@ -159,6 +159,15 @@ impl Context {
         self.read().await.get_stream().clone()
     }
 
+    /// Retrieves the underlying network stream, if available.
+    ///
+    /// # Returns
+    ///
+    /// - `ArcRwLockStream` - The thread-safe, shareable network stream if it exists.
+    pub async fn get_stream(&self) -> ArcRwLockStream {
+        self.try_get_stream().await.unwrap()
+    }
+
     /// Retrieves the remote socket address of the connection.
     ///
     /// # Returns
@@ -174,22 +183,13 @@ impl Context {
             .ok()
     }
 
-    /// Retrieves the remote socket address or a default value if unavailable.
+    /// Retrieves the remote socket address.
     ///
     /// # Returns
     ///
     /// - `SocketAddr` - The socket address of the remote peer, or default if unavailable.
     pub async fn get_socket_addr(&self) -> SocketAddr {
-        let stream_result: OptionArcRwLockStream = self.try_get_stream().await;
-        if stream_result.is_none() {
-            return DEFAULT_SOCKET_ADDR;
-        }
-        stream_result
-            .unwrap()
-            .read()
-            .await
-            .peer_addr()
-            .unwrap_or(DEFAULT_SOCKET_ADDR)
+        self.try_get_socket_addr().await.unwrap()
     }
 
     /// Retrieves the remote socket address as a string.
@@ -223,6 +223,15 @@ impl Context {
             .map(|socket_addr: SocketAddr| socket_addr.ip())
     }
 
+    /// Retrieves the IP address part of the remote socket address.
+    ///
+    /// # Returns
+    ///
+    /// - `SocketHost` - The IP address of the remote peer if available.
+    pub async fn get_socket_host(&self) -> SocketHost {
+        self.try_get_socket_host().await.unwrap()
+    }
+
     /// Retrieves the port number part of the remote socket address.
     ///
     /// # Returns
@@ -232,6 +241,15 @@ impl Context {
         self.try_get_socket_addr()
             .await
             .map(|socket_addr: SocketAddr| socket_addr.port())
+    }
+
+    /// Retrieves the port number part of the remote socket address.
+    ///
+    /// # Returns
+    ///
+    /// - `SocketPort` - The port number of the remote peer if available.
+    pub async fn get_socket_port(&self) -> SocketPort {
+        self.try_get_socket_port().await.unwrap()
     }
 
     /// Retrieves the current HTTP request.
@@ -330,7 +348,7 @@ impl Context {
         self.read().await.get_request().get_querys().clone()
     }
 
-    /// Retrieves a specific query parameter by its key.
+    /// Attempts to retrieve a specific query parameter by its key.
     ///
     /// # Arguments
     ///
@@ -344,6 +362,22 @@ impl Context {
         K: AsRef<str>,
     {
         self.read().await.get_request().try_get_query(key)
+    }
+
+    /// Retrieves a specific query parameter by its key, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The query parameter key.
+    ///
+    /// # Returns
+    ///
+    /// - `RequestQuerysValue` - The query parameter value if exists.
+    pub async fn get_request_query<K>(&self, key: K) -> RequestQuerysValue
+    where
+        K: AsRef<str>,
+    {
+        self.read().await.get_request().get_query(key)
     }
 
     /// Retrieves the body of the request.
@@ -376,9 +410,7 @@ impl Context {
         self.read().await.get_request().get_body_json()
     }
 
-    /// Retrieves a specific request header by its key.
-    ///
-    /// Gets a request header by key.
+    /// Attempts to retrieve a specific request header by its key.
     ///
     /// # Arguments
     ///
@@ -403,7 +435,7 @@ impl Context {
         self.read().await.get_request().get_headers().clone()
     }
 
-    /// Retrieves the first value of a specific request header.
+    /// Attempts to retrieve the first value of a specific request header.
     ///
     /// # Arguments
     ///
@@ -419,7 +451,23 @@ impl Context {
         self.read().await.get_request().try_get_header_front(key)
     }
 
-    /// Retrieves the last value of a specific request header.
+    /// Retrieves the first value of a specific request header, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The key of the header.
+    ///
+    /// # Returns
+    ///
+    /// - `RequestHeadersValueItem` - The first value of the header if it exists.
+    pub async fn get_request_header_front<K>(&self, key: K) -> RequestHeadersValueItem
+    where
+        K: AsRef<str>,
+    {
+        self.read().await.get_request().get_header_front(key)
+    }
+
+    /// Attempts to retrieve the last value of a specific request header.
     ///
     /// # Arguments
     ///
@@ -433,6 +481,22 @@ impl Context {
         K: AsRef<str>,
     {
         self.read().await.get_request().try_get_header_back(key)
+    }
+
+    /// Retrieves the last value of a specific request header, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The key of the header.
+    ///
+    /// # Returns
+    ///
+    /// - `RequestHeadersValueItem` - The last value of the header if it exists.
+    pub async fn get_request_header_back<K>(&self, key: K) -> RequestHeadersValueItem
+    where
+        K: AsRef<str>,
+    {
+        self.read().await.get_request().get_header_back(key)
     }
 
     /// Retrieves the number of values for a specific request header.
@@ -515,7 +579,7 @@ impl Context {
             .unwrap_or_default()
     }
 
-    /// Retrieves a specific cookie by its name from the request.
+    /// Attempts to retrieve a specific cookie by its name from the request.
     ///
     /// # Arguments
     ///
@@ -523,12 +587,28 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionCookiesValue` - The cookie value if exists.
-    pub async fn try_get_request_cookie<K>(&self, key: K) -> OptionCookiesValue
+    /// - `OptionCookieValue` - The cookie value if exists.
+    pub async fn try_get_request_cookie<K>(&self, key: K) -> OptionCookieValue
     where
         K: AsRef<str>,
     {
         self.get_request_cookies().await.get(key.as_ref()).cloned()
+    }
+
+    /// Retrieves a specific cookie by its name from the request, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The cookie name.
+    ///
+    /// # Returns
+    ///
+    /// - `CookieValue` - The cookie value if exists.
+    pub async fn get_request_cookie<K>(&self, key: K) -> CookieValue
+    where
+        K: AsRef<str>,
+    {
+        self.try_get_request_cookie(key).await.unwrap()
     }
 
     /// Retrieves the upgrade type of the request.
@@ -840,7 +920,7 @@ impl Context {
         self.read().await.get_response().get_headers().clone()
     }
 
-    /// Retrieves a specific response header by its key.
+    /// Attempts to retrieve a specific response header by its key.
     ///
     /// # Arguments
     ///
@@ -854,6 +934,22 @@ impl Context {
         K: AsRef<str>,
     {
         self.read().await.get_response().try_get_header(key)
+    }
+
+    /// Retrieves a specific response header by its key, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The key of the header to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// - `ResponseHeadersValue` - The header values if the header exists.
+    pub async fn get_response_header<K>(&self, key: K) -> ResponseHeadersValue
+    where
+        K: AsRef<str>,
+    {
+        self.read().await.get_response().get_header(key)
     }
 
     /// Sets a response header with a new value, removing any existing values.
@@ -875,7 +971,7 @@ impl Context {
         self
     }
 
-    /// Retrieves the first value of a specific response header.
+    /// Attempts to retrieve the first value of a specific response header.
     ///
     /// # Arguments
     ///
@@ -891,7 +987,23 @@ impl Context {
         self.read().await.get_response().try_get_header_front(key)
     }
 
-    /// Retrieves the last value of a specific response header.
+    /// Retrieves the first value of a specific response header, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The key of the header.
+    ///
+    /// # Returns
+    ///
+    /// - `ResponseHeadersValueItem` - The first value of the header if it exists.
+    pub async fn get_response_header_front<K>(&self, key: K) -> ResponseHeadersValueItem
+    where
+        K: AsRef<str>,
+    {
+        self.read().await.get_response().get_header_front(key)
+    }
+
+    /// Attempts to retrieve the last value of a specific response header.
     ///
     /// # Arguments
     ///
@@ -905,6 +1017,22 @@ impl Context {
         K: AsRef<str>,
     {
         self.read().await.get_response().try_get_header_back(key)
+    }
+
+    /// Retrieves the last value of a specific response header, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The key of the header.
+    ///
+    /// # Returns
+    ///
+    /// - `ResponseHeadersValueItem` - The last value of the header if it exists.
+    pub async fn get_response_header_back<K>(&self, key: K) -> ResponseHeadersValueItem
+    where
+        K: AsRef<str>,
+    {
+        self.read().await.get_response().get_header_back(key)
     }
 
     /// Checks if a specific response header exists.
@@ -1058,7 +1186,7 @@ impl Context {
             .unwrap_or_default()
     }
 
-    /// Retrieves a specific cookie by its name from the response.
+    /// Attempts to retrieve a specific cookie by its name from the response.
     ///
     /// # Arguments
     ///
@@ -1066,12 +1194,28 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionCookiesValue` - The cookie's value if it exists.
-    pub async fn try_get_response_cookie<K>(&self, key: K) -> OptionCookiesValue
+    /// - `OptionCookieValue` - The cookie's value if it exists.
+    pub async fn try_get_response_cookie<K>(&self, key: K) -> OptionCookieValue
     where
         K: AsRef<str>,
     {
         self.get_response_cookies().await.get(key.as_ref()).cloned()
+    }
+
+    /// Retrieves a specific cookie by its name from the response, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The name of the cookie to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// - `CookieValue` - The cookie's value if it exists.
+    pub async fn get_response_cookie<K>(&self, key: K) -> CookieValue
+    where
+        K: AsRef<str>,
+    {
+        self.try_get_response_cookie(key).await.unwrap()
     }
 
     /// Retrieves the body of the response.
@@ -1199,7 +1343,7 @@ impl Context {
         self
     }
 
-    /// Retrieves a specific route parameter by its name.
+    /// Attempts to retrieve a specific route parameter by its name.
     ///
     /// # Arguments
     ///
@@ -1219,6 +1363,22 @@ impl Context {
             .cloned()
     }
 
+    /// Retrieves a specific route parameter by its name, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The name of the route parameter to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// - `String` - The value of the route parameter if it exists.
+    pub async fn get_route_param<T>(&self, name: T) -> String
+    where
+        T: AsRef<str>,
+    {
+        self.try_get_route_param(name).await.unwrap()
+    }
+
     /// Retrieves all attributes stored in the context.
     ///
     /// # Returns
@@ -1228,7 +1388,7 @@ impl Context {
         self.read().await.get_attributes().clone()
     }
 
-    /// Retrieves a specific attribute by its key, casting it to the specified type.
+    /// Attempts to retrieve a specific attribute by its key, casting it to the specified type.
     ///
     /// # Arguments
     ///
@@ -1248,6 +1408,23 @@ impl Context {
             .get(&Attribute::External(key.as_ref().to_owned()).to_string())
             .and_then(|arc| arc.downcast_ref::<V>())
             .cloned()
+    }
+
+    /// Retrieves a specific attribute by its key, casting it to the specified type, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The key of the attribute to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// - `V` - The attribute's value if it exists and can be cast to the specified type.
+    pub async fn get_attribute<K, V>(&self, key: K) -> V
+    where
+        K: AsRef<str>,
+        V: AnySendSyncClone,
+    {
+        self.try_get_attribute(key).await.unwrap()
     }
 
     /// Sets an attribute in the context.
@@ -1323,6 +1500,22 @@ impl Context {
             .cloned()
     }
 
+    /// Retrieves an internal framework attribute.
+    ///
+    /// # Arguments
+    ///
+    /// - `InternalAttribute` - The internal attribute key to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// - `V` - The attribute's value if it exists and can be cast to the specified type.
+    async fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V
+    where
+        V: AnySendSyncClone,
+    {
+        self.try_get_internal_attribute(key).await.unwrap()
+    }
+
     /// Sets an internal framework attribute.
     ///
     /// # Arguments
@@ -1348,10 +1541,19 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionalPanicInfo` - The panic information if a panic was caught.
-    pub async fn try_get_panic(&self) -> OptionalPanicInfo {
+    /// - `OptionPanic` - The panic information if a panic was caught.
+    pub async fn try_get_panic(&self) -> OptionPanic {
         self.try_get_internal_attribute(InternalAttribute::Panic)
             .await
+    }
+
+    /// Retrieves panic information if a panic has occurred during handling.
+    ///
+    /// # Returns
+    ///
+    /// - `Panic` - The panic information if a panic was caught.
+    pub async fn get_panic(&self) -> Panic {
+        self.get_internal_attribute(InternalAttribute::Panic).await
     }
 
     /// Sets the panic information for the context.
@@ -1384,13 +1586,13 @@ impl Context {
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
-        let hook_fn: SharedHookHandler<()> =
+        let hook_fn: HookHandler<()> =
             Arc::new(move |ctx: Context| -> SendableAsyncTask<()> { Box::pin(hook(ctx)) });
         self.set_internal_attribute(InternalAttribute::Hook(key.to_string()), hook_fn)
             .await
     }
 
-    /// Retrieves a hook function if it has been set.
+    /// Attempts to retrieve a hook function if it has been set.
     ///
     /// # Arguments
     ///
@@ -1398,12 +1600,29 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionalHookHandler<()>` - The hook function if it has been set.
-    pub async fn try_get_hook<K>(&self, key: K) -> OptionalHookHandler<()>
+    /// - `OptionHookHandler<()>` - The hook function if it has been set.
+    pub async fn try_get_hook<K>(&self, key: K) -> OptionHookHandler<()>
     where
         K: ToString,
     {
         self.try_get_internal_attribute(InternalAttribute::Hook(key.to_string()))
+            .await
+    }
+
+    /// Retrieves a hook function if it has been set, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `K: ToString` - The key to identify the hook.
+    ///
+    /// # Returns
+    ///
+    /// - `HookHandler<()>` - The hook function if it has been set.
+    pub async fn get_hook<K>(&self, key: K) -> HookHandler<()>
+    where
+        K: ToString,
+    {
+        self.get_internal_attribute(InternalAttribute::Hook(key.to_string()))
             .await
     }
 

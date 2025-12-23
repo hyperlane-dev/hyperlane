@@ -130,12 +130,12 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `usize`- The port number to set.
+    /// - `u16`- The port number to set.
     ///
     /// # Returns
     ///
     /// - `&Self` - A reference to `Self` for method chaining.
-    pub async fn port(&self, port: usize) -> &Self {
+    pub async fn port(&self, port: u16) -> &Self {
         self.write().await.set_port(port);
         self
     }

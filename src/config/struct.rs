@@ -16,7 +16,7 @@ pub(crate) struct ServerConfigInner {
     #[get(pub(crate))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) port: usize,
+    pub(super) port: u16,
     /// The buffer size for HTTP connections.
     #[get(pub(crate))]
     #[get_mut(pub(super))]

@@ -185,45 +185,45 @@ impl Server {
     /// - `HookMacro`- The `HookMacro` instance containing the `HookType` and its handler.
     pub async fn handle_hook(&self, hook: HookMacro) {
         match (hook.hook_type, hook.handler) {
-            (HookType::PanicHook(_), HookHandler::Handler(handler)) => {
+            (HookType::PanicHook(_), HookHandlerSpec::Handler(handler)) => {
                 self.write().await.get_mut_panic_hook().push(handler);
             }
-            (HookType::PanicHook(_), HookHandler::Factory(factory)) => {
+            (HookType::PanicHook(_), HookHandlerSpec::Factory(factory)) => {
                 self.write().await.get_mut_panic_hook().push(factory());
             }
-            (HookType::RequestMiddleware(_), HookHandler::Handler(handler)) => {
+            (HookType::RequestMiddleware(_), HookHandlerSpec::Handler(handler)) => {
                 self.write()
                     .await
                     .get_mut_request_middleware()
                     .push(handler);
             }
-            (HookType::RequestMiddleware(_), HookHandler::Factory(factory)) => {
+            (HookType::RequestMiddleware(_), HookHandlerSpec::Factory(factory)) => {
                 self.write()
                     .await
                     .get_mut_request_middleware()
                     .push(factory());
             }
-            (HookType::Route(path), HookHandler::Handler(handler)) => {
+            (HookType::Route(path), HookHandlerSpec::Handler(handler)) => {
                 self.write()
                     .await
                     .get_mut_route_matcher()
                     .add(path, handler)
                     .unwrap();
             }
-            (HookType::Route(path), HookHandler::Factory(factory)) => {
+            (HookType::Route(path), HookHandlerSpec::Factory(factory)) => {
                 self.write()
                     .await
                     .get_mut_route_matcher()
                     .add(path, factory())
                     .unwrap();
             }
-            (HookType::ResponseMiddleware(_), HookHandler::Handler(handler)) => {
+            (HookType::ResponseMiddleware(_), HookHandlerSpec::Handler(handler)) => {
                 self.write()
                     .await
                     .get_mut_response_middleware()
                     .push(handler);
             }
-            (HookType::ResponseMiddleware(_), HookHandler::Factory(factory)) => {
+            (HookType::ResponseMiddleware(_), HookHandlerSpec::Factory(factory)) => {
                 self.write()
                     .await
                     .get_mut_response_middleware()
@@ -363,13 +363,13 @@ impl Server {
     /// # Arguments
     ///
     /// - `H: ToString` - The host address.
-    /// - `usize` - The port number.
+    /// - `u16` - The port number.
     ///
     /// # Returns
     ///
     /// - `String` - The formatted address string.
     #[inline(always)]
-    pub fn format_host_port<H: ToString>(host: H, port: usize) -> String {
+    pub fn format_host_port<H: ToString>(host: H, port: u16) -> String {
         format!("{}{COLON}{port}", host.to_string())
     }
 
@@ -474,7 +474,7 @@ impl Server {
     async fn create_tcp_listener(&self) -> ServerResult<TcpListener> {
         let config: ServerConfigInner = self.read().await.get_config().clone();
         let host: String = config.get_host().clone();
-        let port: usize = *config.get_port();
+        let port: u16 = *config.get_port();
         let addr: String = Self::format_host_port(host, port);
         TcpListener::bind(&addr)
             .await

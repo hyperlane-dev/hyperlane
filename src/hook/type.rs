@@ -4,17 +4,17 @@ use crate::*;
 ///
 /// This type is used for storing handlers in a shared context, allowing multiple
 /// parts of the application to safely access and execute the same handler.
-pub type SharedHookHandler<T> = Arc<dyn FnContextPinBoxSendSync<T>>;
+pub type HookHandler<T> = Arc<dyn FnContextPinBoxSendSync<T>>;
 /// A type alias for an optional hook handler.
 ///
 /// This is used when a handler may or may not be present, such as for optional
 /// middleware or hooks.
-pub type OptionalHookHandler<T> = Option<SharedHookHandler<T>>;
+pub type OptionHookHandler<T> = Option<HookHandler<T>>;
 /// A type alias for a hook handler chain.
 ///
 /// This type is used to represent a chain of middleware or hooks that can be
 /// executed sequentially.
-pub type HookHandlerChain<T> = Vec<SharedHookHandler<T>>;
+pub type HookHandlerChain<T> = Vec<HookHandler<T>>;
 /// A type alias for an asynchronous task.
 ///
 /// This is a common return type for asynchronous handlers, providing a type-erased
@@ -44,7 +44,7 @@ pub type ServerHookHandler = Arc<dyn Fn(&Context) -> SendableAsyncTask<()> + Sen
 /// This type allows storing optional handlers of different concrete types in
 /// the same collection. The handler takes a `&Context` and returns
 /// a pinned, boxed future that resolves to `()`.
-pub type OptionalServerHookHandler = Option<ServerHookHandler>;
+pub type OptionServerHookHandler = Option<ServerHookHandler>;
 /// Type alias for a list of server hooks.
 ///
 /// Used to store middleware handlers in the request/response processing pipeline.
