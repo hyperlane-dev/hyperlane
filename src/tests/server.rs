@@ -73,7 +73,9 @@ async fn test_server() {
             }
             if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
                 let accept_key: String = WebSocketFrame::generate_accept_key(key);
-                ctx.set_response_status_code(101)
+                ctx.set_response_version(HttpVersion::Http1_1)
+                    .await
+                    .set_response_status_code(101)
                     .await
                     .set_response_header(UPGRADE, WEBSOCKET)
                     .await
@@ -211,6 +213,8 @@ async fn test_server() {
 
         async fn handle(self, ctx: &Context) {
             let _ = ctx
+                .set_response_version(HttpVersion::Http1_1)
+                .await
                 .set_response_status_code(500)
                 .await
                 .clear_response_headers()
