@@ -19,7 +19,7 @@ async fn config_from_str() {
                 "max_ws_frame_size": 65536,
                 "max_ws_frames": 6000,
                 "http_read_timeout_ms": 6000,
-                "ws_read_timeout_ms": 6000
+                "ws_read_timeout_ms": 1800000
             },
             "nodelay": true,
             "linger": { "secs": 64, "nanos": 0 },
