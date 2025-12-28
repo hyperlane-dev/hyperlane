@@ -103,17 +103,21 @@ impl HandlerState {
     ///
     /// - `&'a ArcRwLockStream` - The network stream.
     /// - `&'a Context` - The request context.
-    /// - `usize` - The buffer size for reading HTTP requests.
+    /// - `RequestConfig` - The request config.
     ///
     /// # Returns
     ///
     /// - `Self` - The newly created handler state.
     #[inline(always)]
-    pub(super) fn new(stream: ArcRwLockStream, ctx: Context, buffer: usize) -> Self {
+    pub(super) fn new(
+        stream: ArcRwLockStream,
+        ctx: Context,
+        request_config: RequestConfig,
+    ) -> Self {
         Self {
             stream,
             ctx,
-            buffer,
+            request_config,
         }
     }
 }
@@ -373,6 +377,68 @@ impl Server {
         format!("{}{COLON}{port}", host.to_string())
     }
 
+    /// Flushes the standard output stream.
+    ///
+    /// # Returns
+    ///
+    /// - `io::Result<()>` - The result of the flush operation.
+    #[inline(always)]
+    pub fn try_flush_stdout() -> io::Result<()> {
+        stdout().flush()
+    }
+
+    /// Flushes the standard error stream.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the flush operation fails.
+    #[inline(always)]
+    pub fn flush_stdout() {
+        stdout().flush().unwrap();
+    }
+
+    /// Flushes the standard error stream.
+    ///
+    /// # Returns
+    ///
+    /// - `io::Result<()>` - The result of the flush operation.
+    #[inline(always)]
+    pub fn try_flush_stderr() -> io::Result<()> {
+        stderr().flush()
+    }
+
+    /// Flushes the standard error stream.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the flush operation fails.
+    #[inline(always)]
+    pub fn flush_stderr() {
+        stderr().flush().unwrap();
+    }
+
+    /// Flushes both the standard output and error streams.
+    ///
+    /// # Returns
+    ///
+    /// - `io::Result<()>` - The result of the flush operation.
+    #[inline(always)]
+    pub fn try_flush_stdout_and_stderr() -> io::Result<()> {
+        Self::try_flush_stdout()?;
+        Self::try_flush_stderr()
+    }
+
+    /// Flushes both the standard output and error streams.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if either flush operation fails.
+    #[inline(always)]
+    pub fn flush_stdout_and_stderr() {
+        Self::flush_stdout();
+        Self::flush_stderr();
+    }
+
     /// Handles a panic that has been captured and associated with a specific request `Context`.
     ///
     /// This function is invoked when a panic occurs within a task that has access to the request
@@ -395,6 +461,7 @@ impl Server {
                 && join_error.is_panic()
             {
                 eprintln!("Panic occurred in panic hook: {:?}", join_error);
+                let _ = Self::try_flush_stdout_and_stderr();
             }
             if ctx.get_aborted().await {
                 return;
@@ -412,6 +479,8 @@ impl Server {
     /// - `JoinError` - The `JoinError` returned from the panicked task.
     async fn handle_task_panic(&self, ctx: &Context, join_error: JoinError) {
         let panic: Panic = Panic::from_join_error(join_error);
+        ctx.set_response_status_code(HttpStatus::InternalServerError.code())
+            .await;
         self.handle_panic_with_context(ctx, &panic).await;
     }
 
@@ -469,9 +538,9 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// Returns a `ServerResult` containing the bound `TcpListener` on success,
-    /// or a `ServerError` on failure.
-    async fn create_tcp_listener(&self) -> ServerResult<TcpListener> {
+    /// - `Result<TcpListener, ServerError>` - A `Result` containing the bound `TcpListener` on success,
+    ///   or a `ServerError` on failure.
+    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {
         let config: ServerConfigInner = self.read().await.get_config().clone();
         let host: String = config.get_host().clone();
         let port: u16 = *config.get_port();
@@ -489,9 +558,9 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// - `ServerResult<()>` - A `ServerResult` which is typically `Ok(())` unless an unrecoverable
+    /// - `Result<(), ServerError>` - A `Result` which is typically `Ok(())` unless an unrecoverable
     ///   error occurs.
-    async fn accept_connections(&self, tcp_listener: &TcpListener) -> ServerResult<()> {
+    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
         while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
             self.configure_stream(&stream).await;
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
@@ -510,14 +579,11 @@ impl Server {
     async fn configure_stream(&self, stream: &TcpStream) {
         let server_inner: ServerStateReadGuard = self.read().await;
         let config: &ServerConfigInner = server_inner.get_config();
-        let linger_opt: &OptionDuration = config.get_linger();
-        let nodelay_opt: &OptionBool = config.get_nodelay();
-        let ttl_opt: &OptionU32 = config.get_ttl();
-        let _ = stream.set_linger(*linger_opt);
-        if let Some(nodelay) = nodelay_opt {
+        stream.set_linger(*config.get_linger()).unwrap();
+        if let Some(nodelay) = config.get_nodelay() {
             let _ = stream.set_nodelay(*nodelay);
         }
-        if let Some(ttl) = ttl_opt {
+        if let Some(ttl) = config.get_ttl() {
             let _ = stream.set_ttl(*ttl);
         }
     }
@@ -529,9 +595,9 @@ impl Server {
     /// - `ArcRwLockStream` - The thread-safe stream representing the client connection.
     async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
         let server: Server = self.clone();
-        let buffer: usize = *self.read().await.get_config().get_buffer();
+        let request_config: RequestConfig = *self.read().await.get_config().get_request_config();
         spawn(async move {
-            server.handle_connection(stream, buffer).await;
+            server.handle_connection(stream, request_config).await;
         });
     }
 
@@ -542,12 +608,18 @@ impl Server {
     /// # Arguments
     ///
     /// - `ArcRwLockStream` - The stream for the client connection.
-    /// - `usize` - The buffer size to use for reading the initial HTTP request.
-    async fn handle_connection(&self, stream: ArcRwLockStream, buffer: usize) {
-        if let Ok(request) = Request::http_from_stream(&stream, buffer).await {
-            let ctx: Context = Context::create_context(&stream, &request);
-            let handler: HandlerState = HandlerState::new(stream, ctx, buffer);
-            self.handle_http_requests(&handler, &request).await;
+    /// - `request_config` - The request config to use for reading the initial HTTP request.
+    async fn handle_connection(&self, stream: ArcRwLockStream, request_config: RequestConfig) {
+        match Request::http_from_stream(&stream, &request_config).await {
+            Ok(request) => {
+                let ctx: Context = Context::new(&stream, &request);
+                let handler: HandlerState = HandlerState::new(stream, ctx, request_config);
+                self.handle_http_requests(&handler, &request).await;
+            }
+            Err(err) => {
+                let ctx: Context = Context::new(&stream, &Request::default());
+                self.handle_http_requests_error(&ctx, &err).await;
+            }
         }
     }
 
@@ -579,6 +651,8 @@ impl Server {
             return lifecycle.keep_alive();
         }
         if let Some(panic) = ctx.try_get_panic().await {
+            ctx.set_response_status_code(HttpStatus::InternalServerError.code())
+                .await;
             self.handle_panic_with_context(ctx, &panic).await;
         }
         lifecycle.keep_alive()
@@ -595,12 +669,35 @@ impl Server {
             return;
         }
         let stream: &ArcRwLockStream = state.get_stream();
-        let buffer: usize = *state.get_buffer();
-        while let Ok(new_request) = &Request::http_from_stream(stream, buffer).await {
-            if !self.request_hook(state, new_request).await {
-                return;
+        let request_config: RequestConfig = *state.get_request_config();
+        loop {
+            match Request::http_from_stream(stream, &request_config).await {
+                Ok(new_request) => {
+                    if !self.request_hook(state, &new_request).await {
+                        return;
+                    }
+                }
+                Err(err) => {
+                    Self::flush_stdout_and_stderr();
+                    self.handle_http_requests_error(state.get_ctx(), &err).await;
+                    break;
+                }
             }
         }
+    }
+
+    /// Handles errors that occur while processing HTTP requests.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Context` - The request context.
+    /// - `&RequestError` - The error that occurred.
+    pub async fn handle_http_requests_error(&self, ctx: &Context, err: &RequestError) {
+        let mut panic: Panic = Panic::default();
+        panic.set_message(Some(err.to_string()));
+        ctx.set_response_status_code(err.get_http_status_code())
+            .await;
+        self.handle_panic_with_context(ctx, &panic).await;
     }
 
     /// Executes trait-based request middleware in sequence.
@@ -645,8 +742,13 @@ impl Server {
         path: &str,
         lifecycle: &mut RequestLifecycle,
     ) -> bool {
-        let route_matcher: RouteMatcher = self.read().await.get_route_matcher().clone();
-        if let Some(handler) = route_matcher.try_resolve_route(ctx, path).await {
+        if let Some(handler) = self
+            .read()
+            .await
+            .get_route_matcher()
+            .try_resolve_route(ctx, path)
+            .await
+        {
             self.handle_route_matcher_with_lifecycle(ctx, lifecycle, &handler)
                 .await;
             if lifecycle.is_aborted() {
@@ -688,10 +790,10 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// Returns a `ServerResult` containing a shutdown function on success.
+    /// Returns a `Result` containing a shutdown function on success.
     /// Calling this function will shut down the server by aborting its main task.
     /// Returns an error if the server fails to start.
-    pub async fn run(&self) -> ServerResult<ServerControlHook> {
+    pub async fn run(&self) -> Result<ServerControlHook, ServerError> {
         let tcp_listener: TcpListener = self.create_tcp_listener().await?;
         let server: Server = self.clone();
         let (wait_sender, wait_receiver) = channel(());

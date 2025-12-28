@@ -6,7 +6,21 @@ async fn config_from_str() {
         {
             "host": "0.0.0.0",
             "port": 80,           
-            "buffer": 4096,
+            "request_config": {
+                "buffer_size": 8192,
+                "max_request_line_length": 8192,
+                "max_path_length": 8192,
+                "max_query_length": 8192,
+                "max_header_line_length": 8192,
+                "max_header_count": 100,
+                "max_header_key_length": 8192,
+                "max_header_value_length": 8192,
+                "max_body_size": 2097152,
+                "max_ws_frame_size": 65536,
+                "max_ws_frames": 6000,
+                "http_read_timeout_ms": 6000,
+                "ws_read_timeout_ms": 6000
+            },
             "nodelay": true,
             "linger": { "secs": 64, "nanos": 0 },
             "ttl": 64
@@ -16,7 +30,7 @@ async fn config_from_str() {
     let new_config: ServerConfig = ServerConfig::new().await;
     new_config.host("0.0.0.0").await;
     new_config.port(80).await;
-    new_config.buffer(4096).await;
+    new_config.request_config(RequestConfig::default()).await;
     new_config.enable_nodelay().await;
     new_config.linger(Some(Duration::from_secs(64))).await;
     new_config.ttl(64).await;

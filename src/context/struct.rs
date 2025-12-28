@@ -20,7 +20,7 @@ pub(crate) struct ContextInner {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    stream: OptionArcRwLockStream,
+    stream: Option<ArcRwLockStream>,
     /// The incoming HTTP request.
     #[get(pub(super))]
     #[get_mut(pub(super))]

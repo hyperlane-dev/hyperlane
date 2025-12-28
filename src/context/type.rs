@@ -4,6 +4,7 @@ use crate::*;
 ///
 /// This provides exclusive, mutable access to the `ContextInner` data.
 pub(crate) type ContextWriteGuard<'a> = RwLockWriteGuard<'a, ContextInner>;
+
 /// A type alias for a read guard on the context data.
 ///
 /// This provides shared, immutable access to the `ContextInner` data.

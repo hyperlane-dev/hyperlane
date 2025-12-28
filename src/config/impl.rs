@@ -14,7 +14,7 @@ impl Default for ServerConfigInner {
         Self {
             host: DEFAULT_HOST.to_owned(),
             port: DEFAULT_WEB_PORT,
-            buffer: DEFAULT_BUFFER_SIZE,
+            request_config: RequestConfig::default(),
             nodelay: DEFAULT_NODELAY,
             linger: DEFAULT_LINGER,
             ttl: DEFAULT_TTI,
@@ -78,6 +78,7 @@ impl ServerConfig {
     /// # Returns
     ///
     /// - `Self` - A new `ServerConfig` instance.
+    #[inline(always)]
     pub async fn new() -> Self {
         Self::default()
     }
@@ -140,17 +141,17 @@ impl ServerConfig {
         self
     }
 
-    /// Sets the HTTP buffer size.
+    /// Sets the HTTP request config.
     ///
     /// # Arguments
     ///
-    /// - `usize`- The HTTP buffer size to set.
+    /// - `RequestConfig`- The HTTP request config to set.
     ///
     /// # Returns
     ///
     /// - `&Self` - A reference to `Self` for method chaining.
-    pub async fn buffer(&self, buffer: usize) -> &Self {
-        self.write().await.set_buffer(buffer);
+    pub async fn request_config(&self, request_config: RequestConfig) -> &Self {
+        self.write().await.set_request_config(request_config);
         self
     }
 
@@ -190,12 +191,12 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `OptionDuration`- The `Duration` value for `SO_LINGER`.
+    /// - `Option<Duration>`- The `Duration` value for `SO_LINGER`.
     ///
     /// # Returns
     ///
     /// - `&Self` - A reference to `Self` for method chaining.
-    pub async fn linger(&self, linger_opt: OptionDuration) -> &Self {
+    pub async fn linger(&self, linger_opt: Option<Duration>) -> &Self {
         self.write().await.set_linger(linger_opt);
         self
     }
@@ -246,7 +247,7 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// - `ConfigLoadResult` - A `ConfigLoadResult` which is a `Result` containing either the `ServerConfig` or a `serde_json::Error`.
+    /// - `Result<ServerConfig, serde_json::Error>` - A `Result<ServerConfig, serde_json::Error>` which is a `Result` containing either the `ServerConfig` or a `serde_json::Error`.
     ///   Creates a `ServerConfig` from a JSON string.
     ///
     /// # Arguments
@@ -255,8 +256,8 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// - `ConfigLoadResult` - A `ConfigLoadResult` which is a `Result` containing either the `ServerConfig` or a `serde_json::Error`.
-    pub fn from_json_str(config_str: &str) -> ConfigLoadResult {
+    /// - `Result<ServerConfig, serde_json::Error>` - A `Result<ServerConfig, serde_json::Error>` which is a `Result` containing either the `ServerConfig` or a `serde_json::Error`.
+    pub fn from_json_str(config_str: &str) -> Result<ServerConfig, serde_json::Error> {
         serde_json::from_str(config_str).map(|config: ServerConfigInner| Self(arc_rwlock(config)))
     }
 }

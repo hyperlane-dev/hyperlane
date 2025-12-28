@@ -51,9 +51,7 @@ async fn run_set_func() {
     let ctx: Context = Context::default();
     const KEY: &str = "string";
     const PARAM: &str = "test";
-    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| {
-        return msg.to_string();
-    };
+    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| msg.to_string();
     ctx.set_attribute(KEY, func).await;
     let get_key: &(dyn Fn(&str) -> String + Send + Sync) =
         ctx.try_get_attribute(KEY).await.unwrap();
