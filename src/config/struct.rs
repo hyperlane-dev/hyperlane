@@ -17,26 +17,26 @@ pub(crate) struct ServerConfigInner {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) port: u16,
-    /// The buffer size for HTTP connections.
+    /// The configuration for HTTP request.
     #[get(pub(crate))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) buffer: usize,
+    pub(super) request_config: RequestConfig,
     /// The `TCP_NODELAY` option for sockets.
     #[get(pub(crate))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) nodelay: OptionBool,
+    pub(super) nodelay: Option<bool>,
     /// The `SO_LINGER` option for sockets.
     #[get(pub(crate))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) linger: OptionDuration,
+    pub(super) linger: Option<Duration>,
     /// The `IP_TTL` option for sockets.
     #[get(pub(crate))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) ttl: OptionU32,
+    pub(super) ttl: Option<u32>,
 }
 
 /// Represents the thread-safe, shareable server configuration.

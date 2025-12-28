@@ -1,8 +1,8 @@
 use crate::*;
 
-/// Implementation of methods for `Context` structure.
-impl Context {
-    /// Creates a new `Context` from an internal context instance.
+/// Implementation of `From` trait for `Context`.
+impl From<ContextInner> for Context {
+    /// Converts a `ContextInner` into a `Context`.
     ///
     /// # Arguments
     ///
@@ -12,11 +12,14 @@ impl Context {
     ///
     /// - `Context` - The newly created context instance.
     #[inline(always)]
-    pub(crate) fn from_internal_context(ctx: ContextInner) -> Self {
+    fn from(ctx: ContextInner) -> Self {
         Self(arc_rwlock(ctx))
     }
+}
 
-    /// Creates a new `Context` for a given stream and request.
+/// Implementation of methods for `Context` structure.
+impl Context {
+    /// Creates a new `Context` with the provided network stream and HTTP request.
     ///
     /// # Arguments
     ///
@@ -27,14 +30,14 @@ impl Context {
     ///
     /// - `Context` - The newly created context.
     #[inline(always)]
-    pub(crate) fn create_context(stream: &ArcRwLockStream, request: &Request) -> Context {
+    pub(crate) fn new(stream: &ArcRwLockStream, request: &Request) -> Context {
         let mut internal_ctx: ContextInner = ContextInner::default();
         internal_ctx
             .set_stream(Some(stream.clone()))
             .set_request(request.clone())
             .get_mut_response()
             .set_version(request.get_version().clone());
-        Context::from_internal_context(internal_ctx)
+        internal_ctx.into()
     }
 
     /// Acquires a read lock on the inner context data.
@@ -154,8 +157,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionArcRwLockStream` - The thread-safe, shareable network stream if it exists.
-    pub async fn try_get_stream(&self) -> OptionArcRwLockStream {
+    /// - `Option<ArcRwLockStream>` - The thread-safe, shareable network stream if it exists.
+    pub async fn try_get_stream(&self) -> Option<ArcRwLockStream> {
         self.read().await.get_stream().clone()
     }
 
@@ -176,8 +179,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionSocketAddr` - The socket address of the remote peer if available.
-    pub async fn try_get_socket_addr(&self) -> OptionSocketAddr {
+    /// - `Option<SocketAddr>` - The socket address of the remote peer if available.
+    pub async fn try_get_socket_addr(&self) -> Option<SocketAddr> {
         self.try_get_stream()
             .await
             .as_ref()?
@@ -204,8 +207,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionString` - The string representation of the socket address if available.
-    pub async fn try_get_socket_addr_string(&self) -> OptionString {
+    /// - `Option<String>` - The string representation of the socket address if available.
+    pub async fn try_get_socket_addr_string(&self) -> Option<String> {
         self.try_get_socket_addr()
             .await
             .map(|data| data.to_string())
@@ -228,8 +231,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionSocketHost` - The IP address of the remote peer.
-    pub async fn try_get_socket_host(&self) -> OptionSocketHost {
+    /// - `Option<SocketHost>` - The IP address of the remote peer.
+    pub async fn try_get_socket_host(&self) -> Option<SocketHost> {
         self.try_get_socket_addr()
             .await
             .map(|socket_addr: SocketAddr| socket_addr.ip())
@@ -252,8 +255,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionSocketPort` - The port number of the remote peer if available.
-    pub async fn try_get_socket_port(&self) -> OptionSocketPort {
+    /// - `Option<SocketPort>` - The port number of the remote peer if available.
+    pub async fn try_get_socket_port(&self) -> Option<SocketPort> {
         self.try_get_socket_addr()
             .await
             .map(|socket_addr: SocketAddr| socket_addr.port())
@@ -376,8 +379,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionRequestQuerysValue` - The query parameter value if exists.
-    pub async fn try_get_request_query<K>(&self, key: K) -> OptionRequestQuerysValue
+    /// - `Option<RequestQuerysValue>` - The query parameter value if exists.
+    pub async fn try_get_request_query<K>(&self, key: K) -> Option<RequestQuerysValue>
     where
         K: AsRef<str>,
     {
@@ -426,8 +429,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `ResultJsonError<J>` - The deserialized type `J` or a JSON error.
-    pub async fn try_get_request_body_json<J>(&self) -> ResultJsonError<J>
+    /// - `Result<J, serde_json::Error>` - The deserialized type `J` or a JSON error.
+    pub async fn try_get_request_body_json<J>(&self) -> Result<J, serde_json::Error>
     where
         J: DeserializeOwned,
     {
@@ -476,8 +479,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionRequestHeadersValue` - The header values if exists.
-    pub async fn try_get_request_header<K>(&self, key: K) -> OptionRequestHeadersValue
+    /// - `Option<RequestHeadersValue>` - The header values if exists.
+    pub async fn try_get_request_header<K>(&self, key: K) -> Option<RequestHeadersValue>
     where
         K: AsRef<str>,
     {
@@ -512,8 +515,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionRequestHeadersValueItem` - The first value of the header if it exists.
-    pub async fn try_get_request_header_front<K>(&self, key: K) -> OptionRequestHeadersValueItem
+    /// - `Option<RequestHeadersValueItem>` - The first value of the header if it exists.
+    pub async fn try_get_request_header_front<K>(&self, key: K) -> Option<RequestHeadersValueItem>
     where
         K: AsRef<str>,
     {
@@ -548,8 +551,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionRequestHeadersValueItem` - The last value of the header if it exists.
-    pub async fn try_get_request_header_back<K>(&self, key: K) -> OptionRequestHeadersValueItem
+    /// - `Option<RequestHeadersValueItem>` - The last value of the header if it exists.
+    pub async fn try_get_request_header_back<K>(&self, key: K) -> Option<RequestHeadersValueItem>
     where
         K: AsRef<str>,
     {
@@ -584,8 +587,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionUsize` - The number of values for the specified header if it exists.
-    pub async fn try_get_request_header_len<K>(&self, key: K) -> OptionUsize
+    /// - `Option<usize>` - The number of values for the specified header if it exists.
+    pub async fn try_get_request_header_len<K>(&self, key: K) -> Option<usize>
     where
         K: AsRef<str>,
     {
@@ -675,8 +678,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionCookieValue` - The cookie value if exists.
-    pub async fn try_get_request_cookie<K>(&self, key: K) -> OptionCookieValue
+    /// - `Option<CookieValue>` - The cookie value if exists.
+    pub async fn try_get_request_cookie<K>(&self, key: K) -> Option<CookieValue>
     where
         K: AsRef<str>,
     {
@@ -1020,8 +1023,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionResponseHeadersValue` - The header values if the header exists.
-    pub async fn try_get_response_header<K>(&self, key: K) -> OptionResponseHeadersValue
+    /// - `Option<ResponseHeadersValue>` - The header values if the header exists.
+    pub async fn try_get_response_header<K>(&self, key: K) -> Option<ResponseHeadersValue>
     where
         K: AsRef<str>,
     {
@@ -1075,8 +1078,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionResponseHeadersValueItem` - The first value of the header if it exists.
-    pub async fn try_get_response_header_front<K>(&self, key: K) -> OptionResponseHeadersValueItem
+    /// - `Option<ResponseHeadersValueItem>` - The first value of the header if it exists.
+    pub async fn try_get_response_header_front<K>(&self, key: K) -> Option<ResponseHeadersValueItem>
     where
         K: AsRef<str>,
     {
@@ -1111,8 +1114,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionResponseHeadersValueItem` - The last value of the header if it exists.
-    pub async fn try_get_response_header_back<K>(&self, key: K) -> OptionResponseHeadersValueItem
+    /// - `Option<ResponseHeadersValueItem>` - The last value of the header if it exists.
+    pub async fn try_get_response_header_back<K>(&self, key: K) -> Option<ResponseHeadersValueItem>
     where
         K: AsRef<str>,
     {
@@ -1193,8 +1196,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionUsize` - The number of values for the specified header if it exists.
-    pub async fn try_get_response_header_length<K>(&self, key: K) -> OptionUsize
+    /// - `Option<usize>` - The number of values for the specified header if it exists.
+    pub async fn try_get_response_header_length<K>(&self, key: K) -> Option<usize>
     where
         K: AsRef<str>,
     {
@@ -1318,8 +1321,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionCookieValue` - The cookie's value if it exists.
-    pub async fn try_get_response_cookie<K>(&self, key: K) -> OptionCookieValue
+    /// - `Option<CookieValue>` - The cookie's value if it exists.
+    pub async fn try_get_response_cookie<K>(&self, key: K) -> Option<CookieValue>
     where
         K: AsRef<str>,
     {
@@ -1385,8 +1388,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `ResultJsonError<J>` - The deserialized type `J` or a JSON error.
-    pub async fn try_get_response_body_json<J>(&self) -> ResultJsonError<J>
+    /// - `Result<J, serde_json::Error>` - The deserialized type `J` or a JSON error.
+    pub async fn try_get_response_body_json<J>(&self) -> Result<J, serde_json::Error>
     where
         J: DeserializeOwned,
     {
@@ -1495,8 +1498,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionString` - The value of the route parameter if it exists.
-    pub async fn try_get_route_param<T>(&self, name: T) -> OptionString
+    /// - `Option<String>` - The value of the route parameter if it exists.
+    pub async fn try_get_route_param<T>(&self, name: T) -> Option<String>
     where
         T: AsRef<str>,
     {
@@ -1697,8 +1700,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionPanic` - The panic information if a panic was caught.
-    pub async fn try_get_panic(&self) -> OptionPanic {
+    /// - `Option<Panic>` - The panic information if a panic was caught.
+    pub async fn try_get_panic(&self) -> Option<Panic> {
         self.try_get_internal_attribute(InternalAttribute::Panic)
             .await
     }
@@ -1760,8 +1763,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionHookHandler<()>` - The hook function if it has been set.
-    pub async fn try_get_hook<K>(&self, key: K) -> OptionHookHandler<()>
+    /// - `Option<HookHandler<()>>` - The hook function if it has been set.
+    pub async fn try_get_hook<K>(&self, key: K) -> Option<HookHandler<()>>
     where
         K: ToString,
     {
@@ -1805,8 +1808,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `ResponseResult` - The result of the send operation.
-    pub async fn send(&self) -> ResponseResult {
+    /// - `Result<(), ResponseError>` - The result of the send operation.
+    pub async fn send(&self) -> Result<(), ResponseError> {
         if self.is_terminated().await {
             return Err(ResponseError::Terminated);
         }
@@ -1823,8 +1826,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `ResponseResult` - The result of the send operation.
-    pub async fn send_body(&self) -> ResponseResult {
+    /// - `Result<(), ResponseError>` - The result of the send operation.
+    pub async fn send_body(&self) -> Result<(), ResponseError> {
         let response_body: ResponseBody = self.get_response_body().await;
         self.send_body_with_data(response_body).await
     }
@@ -1839,8 +1842,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `ResponseResult` - The result of the send operation.
-    pub async fn send_body_with_data<D>(&self, data: D) -> ResponseResult
+    /// - `Result<(), ResponseError>` - The result of the send operation.
+    pub async fn send_body_with_data<D>(&self, data: D) -> Result<(), ResponseError>
     where
         D: AsRef<[u8]>,
     {
@@ -1863,8 +1866,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `ResponseResult` - The result of the send operation.
-    pub async fn send_body_list_with_data<I, D>(&self, data_iter: I) -> ResponseResult
+    /// - `Result<(), ResponseError>` - The result of the send operation.
+    pub async fn send_body_list_with_data<I, D>(&self, data_iter: I) -> Result<(), ResponseError>
     where
         I: IntoIterator<Item = D>,
         D: AsRef<[u8]>,
@@ -1882,8 +1885,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `ResponseResult` - The result of the flush operation.
-    pub async fn flush(&self) -> ResponseResult {
+    /// - `Result<(), ResponseError>` - The result of the flush operation.
+    pub async fn flush(&self) -> Result<(), ResponseError> {
         if let Some(stream) = self.try_get_stream().await {
             stream.flush().await;
             return Ok(());
@@ -1895,43 +1898,49 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `usize` - The read buffer size.
+    /// - `RequestConfig` - The request config.
     ///
     /// # Returns
     ///
-    /// - `RequestReaderHandleResult` - The parsed request or error.
-    pub async fn http_from_stream(&self, buffer: usize) -> RequestReaderHandleResult {
+    /// - `Result<Request, RequestError>` - The parsed request or error.
+    pub async fn http_from_stream(
+        &self,
+        request_config: RequestConfig,
+    ) -> Result<Request, RequestError> {
         if self.get_aborted().await {
-            return Err(RequestError::RequestAborted);
+            return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
         }
         if let Some(stream) = self.try_get_stream().await.as_ref() {
-            let request_res: RequestReaderHandleResult =
-                Request::http_from_stream(stream, buffer).await;
+            let request_res: Result<Request, RequestError> =
+                Request::http_from_stream(stream, &request_config).await;
             if let Ok(request) = request_res.as_ref() {
                 self.set_request(request).await;
             }
             return request_res;
         };
-        Err(RequestError::GetTcpStream)
+        Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
     }
 
     /// Reads a WebSocket frame from the underlying stream.
     ///
     /// # Arguments
     ///
-    /// - `usize` - The read buffer size.
+    /// - `RequestConfig` - The request config.
     ///
     /// # Returns
     ///
-    /// - `RequestReaderHandleResult` - The parsed frame or error.
-    pub async fn ws_from_stream(&self, buffer: usize) -> RequestReaderHandleResult {
+    /// - `Result<Request, RequestError>` - The parsed frame or error.
+    pub async fn ws_from_stream(
+        &self,
+        request_config: RequestConfig,
+    ) -> Result<Request, RequestError> {
         if self.get_aborted().await {
-            return Err(RequestError::RequestAborted);
+            return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
         }
         if let Some(stream) = self.try_get_stream().await.as_ref() {
             let mut last_request: Request = self.get_request().await;
-            let request_res: RequestReaderHandleResult =
-                Request::ws_from_stream(stream, buffer, &mut last_request).await;
+            let request_res: Result<Request, RequestError> =
+                last_request.ws_from_stream(stream, &request_config).await;
             match request_res.as_ref() {
                 Ok(request) => {
                     self.set_request(request).await;
@@ -1942,6 +1951,6 @@ impl Context {
             }
             return request_res;
         };
-        Err(RequestError::GetTcpStream)
+        Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
     }
 }

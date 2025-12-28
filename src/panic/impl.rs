@@ -6,18 +6,18 @@ impl Panic {
     ///
     /// # Arguments
     ///
-    /// - `OptionString` - The panic message.
-    /// - `OptionString` - The source code location of the panic.
-    /// - `OptionString` - The panic payload.
+    /// - `Option<String>` - The panic message.
+    /// - `Option<String>` - The source code location of the panic.
+    /// - `Option<String>` - The panic payload.
     ///
     /// # Returns
     ///
     /// - `Panic` - A new panic instance.
     #[inline(always)]
     pub(crate) fn new(
-        message: OptionString,
-        location: OptionString,
-        payload: OptionString,
+        message: Option<String>,
+        location: Option<String>,
+        payload: Option<String>,
     ) -> Self {
         Self {
             message,
@@ -36,9 +36,9 @@ impl Panic {
     ///
     /// # Returns
     ///
-    /// - `OptionString` - The extracted message, or None if the payload is not a string type.
+    /// - `Option<String>` - The extracted message, or None if the payload is not a string type.
     #[inline(always)]
-    fn try_extract_panic_message(panic_payload: &dyn Any) -> OptionString {
+    fn try_extract_panic_message(panic_payload: &dyn Any) -> Option<String> {
         if let Some(s) = panic_payload.downcast_ref::<&str>() {
             Some(s.to_string())
         } else {
@@ -60,7 +60,8 @@ impl Panic {
     /// - `Panic` - A new panic instance with message from error.
     pub(crate) fn from_join_error(join_error: JoinError) -> Self {
         let default_message: String = join_error.to_string();
-        let mut message: OptionString = if let Ok(panic_join_error) = join_error.try_into_panic() {
+        let mut message: Option<String> = if let Ok(panic_join_error) = join_error.try_into_panic()
+        {
             Self::try_extract_panic_message(&panic_join_error)
         } else {
             None

@@ -6,7 +6,7 @@ where
     F: Fn() -> Fut + Send + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
-    let result: TaskJoinResult<_> = spawn(future_factory()).await;
+    let result: Result<(), JoinError> = spawn(future_factory()).await;
     assert!(
         result.is_err(),
         "Expected panic, but task completed successfully"
@@ -17,7 +17,7 @@ where
     }
     let panic_payload: Box<dyn Any + Send> = join_err.into_panic();
     let panic_msg: &str = if let Some(s) = panic_payload.downcast_ref::<&str>() {
-        *s
+        s
     } else if let Some(s) = panic_payload.downcast_ref::<String>() {
         s.as_str()
     } else {
@@ -168,7 +168,7 @@ async fn mixed_route_types() {
 
 #[tokio::test]
 async fn large_dynamic_routes() {
-    const ROUTE_COUNT: usize = 1000;
+    const ROUTE_COUNT: u32 = 1000;
     let server: Server = Server::new().await;
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
@@ -195,13 +195,13 @@ async fn large_dynamic_routes() {
     );
     println!(
         "Average per dynamic route match: {:?}",
-        match_duration / ROUTE_COUNT as u32
+        match_duration / ROUTE_COUNT
     );
 }
 
 #[tokio::test]
 async fn large_regex_routes() {
-    const ROUTE_COUNT: usize = 1000;
+    const ROUTE_COUNT: u32 = 1000;
     let server: Server = Server::new().await;
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
@@ -228,13 +228,13 @@ async fn large_regex_routes() {
     );
     println!(
         "Average per regex route match: {:?}",
-        match_duration / ROUTE_COUNT as u32
+        match_duration / ROUTE_COUNT
     );
 }
 
 #[tokio::test]
 async fn large_tail_regex_routes() {
-    const ROUTE_COUNT: usize = 1000;
+    const ROUTE_COUNT: u32 = 1000;
     let server: Server = Server::new().await;
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
@@ -261,6 +261,6 @@ async fn large_tail_regex_routes() {
     );
     println!(
         "Average per tail regex route match: {:?}",
-        match_duration / ROUTE_COUNT as u32
+        match_duration / ROUTE_COUNT
     );
 }

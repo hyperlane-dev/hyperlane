@@ -8,14 +8,11 @@ use crate::*;
 #[derive(Clone, CustomDebug, DisplayDebug, Getter)]
 pub(crate) struct HandlerState {
     /// A reference to the underlying network stream for the connection.
-    /// This provides access to the raw TCP stream for reading and writing data.
     pub(super) stream: ArcRwLockStream,
     /// A reference to the context of the current request.
-    /// This contains request-specific information, such as headers, method, and URI.
     pub(super) ctx: Context,
-    /// The size of the buffer used for reading HTTP requests.
-    /// This is used to determine the maximum size of the request body.
-    pub(super) buffer: usize,
+    /// The request config for the current connection.
+    pub(super) request_config: RequestConfig,
 }
 
 /// Represents the internal, mutable state of the web server.

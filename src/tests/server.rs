@@ -45,7 +45,7 @@ async fn test_server() {
         }
 
         async fn handle(self, ctx: &Context) {
-            ctx.set_response_version(HttpVersion::HTTP1_1)
+            ctx.set_response_version(HttpVersion::Http1_1)
                 .await
                 .set_response_status_code(200)
                 .await
@@ -144,10 +144,20 @@ async fn test_server() {
         }
 
         async fn handle(self, ctx: &Context) {
-            while ctx.ws_from_stream(4096).await.is_ok() {
-                let request_body: Vec<u8> = ctx.get_request_body().await;
-                ctx.set_response_body(&request_body).await;
-                self.send_body_hook(ctx).await;
+            loop {
+                match ctx.ws_from_stream(RequestConfig::default()).await {
+                    Ok(_) => {
+                        let request_body: Vec<u8> = ctx.get_request_body().await;
+                        ctx.set_response_body(&request_body).await;
+                        self.send_body_hook(ctx).await;
+                        continue;
+                    }
+                    Err(err) => {
+                        ctx.set_response_body(&err.to_string()).await;
+                        self.send_body_hook(ctx).await;
+                        break;
+                    }
+                }
             }
         }
     }
@@ -220,7 +230,7 @@ async fn test_server() {
         let config: ServerConfig = ServerConfig::new().await;
         config.host("0.0.0.0").await;
         config.port(60000).await;
-        config.buffer(4096).await;
+        config.request_config(RequestConfig::default()).await;
         config.disable_linger().await;
         config.disable_nodelay().await;
         let server: Server = Server::from(config).await;

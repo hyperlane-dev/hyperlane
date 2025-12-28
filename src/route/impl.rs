@@ -278,7 +278,7 @@ impl RoutePattern {
     /// # Returns
     ///
     /// - `Result<RoutePattern, RouteError>` - The parsed RoutePattern on success, or RouteError on failure.
-    pub(crate) fn new(route: &str) -> RoutePatternResult {
+    pub(crate) fn new(route: &str) -> Result<RoutePattern, RouteError> {
         Ok(Self(Self::parse_route(route)?))
     }
 
@@ -292,8 +292,8 @@ impl RoutePattern {
     ///
     /// # Returns
     ///
-    /// - `Result<Vec<RouteSegment>, RouteError>` - Vector of RouteSegments on success, or RouteError on failure.
-    fn parse_route(route: &str) -> RouteParseResult {
+    /// - `Result<RouteSegmentList, RouteError>` - Vector of RouteSegments on success, or RouteError on failure.
+    fn parse_route(route: &str) -> Result<RouteSegmentList, RouteError> {
         if route.is_empty() {
             return Err(RouteError::EmptyPattern);
         }
@@ -338,8 +338,8 @@ impl RoutePattern {
     ///
     /// # Returns
     ///
-    /// - `OptionRouteParams` - Some with parameters if matched, None otherwise.
-    pub(crate) fn try_match_path(&self, path: &str) -> OptionRouteParams {
+    /// - `Option<RouteParams>` - Some with parameters if matched, None otherwise.
+    pub(crate) fn try_match_path(&self, path: &str) -> Option<RouteParams> {
         let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
         let route_segments_len: usize = self.get_0().len();
         let is_tail_regex: bool = matches!(self.get_0().last(), Some(RouteSegment::Regex(_, _)));
@@ -508,7 +508,7 @@ impl RouteMatcher {
         &mut self,
         pattern: &str,
         handler: ServerHookHandler,
-    ) -> RouteRegistrationResult {
+    ) -> Result<(), RouteError> {
         let route_pattern: RoutePattern = RoutePattern::new(pattern)?;
         if route_pattern.is_static() {
             if self.get_static_route().contains_key(pattern) {
@@ -545,12 +545,12 @@ impl RouteMatcher {
     ///
     /// # Returns
     ///
-    /// - `OptionalServerHookHandler` - The matched route handler if found, None otherwise.
+    /// - `Option<ServerHookHandler>` - The matched route handler if found, None otherwise.
     pub(crate) async fn try_resolve_route(
         &self,
         ctx: &Context,
         path: &str,
-    ) -> OptionServerHookHandler {
+    ) -> Option<ServerHookHandler> {
         if let Some(handler) = self.get_static_route().get(path) {
             ctx.set_route_params(RouteParams::default()).await;
             return Some(handler.clone());
