@@ -102,21 +102,15 @@ impl HandlerState {
     /// # Arguments
     ///
     /// - `&'a ArcRwLockStream` - The network stream.
-    /// - `&'a Context` - The request context.
     /// - `RequestConfig` - The request config.
     ///
     /// # Returns
     ///
     /// - `Self` - The newly created handler state.
     #[inline(always)]
-    pub(super) fn new(
-        stream: ArcRwLockStream,
-        ctx: Context,
-        request_config: RequestConfig,
-    ) -> Self {
+    pub(super) fn new(stream: ArcRwLockStream, request_config: RequestConfig) -> Self {
         Self {
             stream,
-            ctx,
             request_config,
         }
     }
@@ -533,7 +527,7 @@ impl Server {
         let addr: String = Self::format_host_port(host, port);
         TcpListener::bind(&addr)
             .await
-            .map_err(|err| ServerError::TcpBind(err.to_string()))
+            .map_err(|error| ServerError::TcpBind(error.to_string()))
     }
 
     /// Enters a loop to accept incoming TCP connections and spawn handlers for them.
@@ -598,13 +592,12 @@ impl Server {
     async fn handle_connection(&self, stream: ArcRwLockStream, request_config: RequestConfig) {
         match Request::http_from_stream(&stream, &request_config).await {
             Ok(request) => {
-                let ctx: Context = Context::new(&stream, &request);
-                let handler: HandlerState = HandlerState::new(stream, ctx, request_config);
+                let handler: HandlerState = HandlerState::new(stream, request_config);
                 self.handle_http_requests(&handler, &request).await;
             }
-            Err(err) => {
+            Err(error) => {
                 let ctx: Context = Context::new(&stream, &Request::default());
-                self.handle_http_requests_error(&ctx, &err).await;
+                self.handle_http_requests_error(&ctx, &error).await;
             }
         }
     }
@@ -624,8 +617,7 @@ impl Server {
     /// - `bool` - A boolean indicating whether the connection should be kept alive.
     async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {
         let route: &str = request.get_path();
-        let ctx: &Context = state.get_ctx();
-        ctx.set_request(request).await;
+        let ctx: &Context = &Context::new(state.get_stream(), request);
         let keep_alive: bool = request.is_enable_keep_alive();
         if self.handle_request_middleware(ctx).await {
             return ctx.is_keep_alive(keep_alive).await;
@@ -655,17 +647,18 @@ impl Server {
             return;
         }
         let stream: &ArcRwLockStream = state.get_stream();
-        let request_config: RequestConfig = *state.get_request_config();
+        let request_config: &RequestConfig = state.get_request_config();
         loop {
-            match Request::http_from_stream(stream, &request_config).await {
+            match Request::http_from_stream(stream, request_config).await {
                 Ok(new_request) => {
                     if !self.request_hook(state, &new_request).await {
                         return;
                     }
                 }
-                Err(err) => {
+                Err(error) => {
                     Self::flush_stdout_and_stderr();
-                    self.handle_http_requests_error(state.get_ctx(), &err).await;
+                    let ctx: Context = Context::new(state.get_stream(), &Request::default());
+                    self.handle_http_requests_error(&ctx, &error).await;
                     break;
                 }
             }
@@ -678,10 +671,10 @@ impl Server {
     ///
     /// - `&Context` - The request context.
     /// - `&RequestError` - The error that occurred.
-    pub async fn handle_http_requests_error(&self, ctx: &Context, err: &RequestError) {
+    pub async fn handle_http_requests_error(&self, ctx: &Context, error: &RequestError) {
         let mut panic: Panic = Panic::default();
-        panic.set_message(Some(err.to_string()));
-        ctx.set_response_status_code(err.get_http_status_code())
+        panic.set_message(Some(error.to_string()));
+        ctx.set_response_status_code(error.get_http_status_code())
             .await;
         self.handle_panic_with_context(ctx, &panic).await;
     }

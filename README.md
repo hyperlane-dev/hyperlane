@@ -176,8 +176,8 @@ impl ServerHook for WebsocketRoute {
                     self.send_body_hook(ctx).await;
                     continue;
                 }
-                Err(err) => {
-                    ctx.set_response_body(&err.to_string()).await;
+                Err(error) => {
+                    ctx.set_response_body(&error.to_string()).await;
                     self.send_body_hook(ctx).await;
                     break;
                 }

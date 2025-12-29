@@ -3,14 +3,12 @@ use crate::*;
 /// Represents the state associated with a single connection handler.
 ///
 /// This struct encapsulates the necessary context for processing a connection,
-/// including a reference to the network stream and the request context. It is created
+/// including a reference to the network stream and request configuration. It is created
 /// for each connection and passed to the relevant handlers.
 #[derive(Clone, CustomDebug, DisplayDebug, Getter)]
 pub(crate) struct HandlerState {
     /// A reference to the underlying network stream for the connection.
     pub(super) stream: ArcRwLockStream,
-    /// A reference to the context of the current request.
-    pub(super) ctx: Context,
     /// The request config for the current connection.
     pub(super) request_config: RequestConfig,
 }

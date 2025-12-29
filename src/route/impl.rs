@@ -311,10 +311,10 @@ impl RoutePattern {
                         Ok(regex) => {
                             segments.push(RouteSegment::Regex(name.to_owned(), regex));
                         }
-                        Err(err) => {
+                        Err(error) => {
                             return Err(RouteError::InvalidRegexPattern(format!(
                                 "Invalid regex pattern '{}{}{}",
-                                pattern, COLON, err
+                                pattern, COLON, error
                             )));
                         }
                     }
