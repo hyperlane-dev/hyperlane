@@ -14,7 +14,6 @@ mod config;
 mod context;
 mod error;
 mod hook;
-mod lifecycle;
 mod panic;
 mod route;
 mod server;
@@ -31,8 +30,6 @@ pub use server::*;
 
 pub use http_type::*;
 pub use inventory;
-
-pub(crate) use lifecycle::*;
 
 pub(crate) use std::{
     any::Any,

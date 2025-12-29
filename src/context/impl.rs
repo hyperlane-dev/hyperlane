@@ -153,6 +153,22 @@ impl Context {
         self.get_aborted().await || self.get_closed().await
     }
 
+    /// Checks if the connection should be kept alive.
+    ///
+    /// This method evaluates whether the connection should remain open based on
+    /// the closed state and the keep_alive parameter.
+    ///
+    /// # Arguments
+    ///
+    /// - `bool` - Whether keep-alive is enabled for the request.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the connection should be kept alive, otherwise false.
+    pub async fn is_keep_alive(&self, keep_alive: bool) -> bool {
+        !self.get_closed().await && keep_alive
+    }
+
     /// Retrieves the underlying network stream, if available.
     ///
     /// # Returns
@@ -1791,17 +1807,6 @@ impl Context {
     {
         self.get_internal_attribute(InternalAttribute::Hook(key.to_string()))
             .await
-    }
-
-    /// Updates the lifecycle status based on the current context state.
-    ///
-    /// # Arguments
-    ///
-    /// - `&mut RequestLifecycle` - The request lifecycle to update.
-    pub(crate) async fn update_lifecycle_status(&self, lifecycle: &mut RequestLifecycle) {
-        let keep_alive: bool = !self.get_closed().await && lifecycle.is_keep_alive();
-        let aborted: bool = self.get_aborted().await;
-        lifecycle.update_status(aborted, keep_alive);
     }
 
     /// Sends the response headers and body to the client.

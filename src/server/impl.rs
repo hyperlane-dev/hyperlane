@@ -484,7 +484,7 @@ impl Server {
         self.handle_panic_with_context(ctx, &panic).await;
     }
 
-    /// Executes a middleware handler and manages the request lifecycle.
+    /// Executes a middleware handler.
     ///
     /// This function executes middleware with spawn to catch panics properly.
     /// While this adds some overhead, it's necessary to ensure panic hooks
@@ -493,15 +493,8 @@ impl Server {
     /// # Arguments
     ///
     /// - `&Context` - The request context.
-    /// - `&mut RequestLifecycle` - A mutable reference to the current request lifecycle state.
     /// - `&ServerHookHandler` - The middleware handler to execute.
-    async fn handle_middleware_with_lifecycle(
-        &self,
-        ctx: &Context,
-        lifecycle: &mut RequestLifecycle,
-        handler: &ServerHookHandler,
-    ) {
-        ctx.update_lifecycle_status(lifecycle).await;
+    async fn handle_middleware(&self, ctx: &Context, handler: &ServerHookHandler) {
         if let Err(join_error) = spawn(handler(ctx)).await
             && join_error.is_panic()
         {
@@ -509,7 +502,7 @@ impl Server {
         }
     }
 
-    /// Executes a route handler and manages the request lifecycle.
+    /// Executes a route handler.
     ///
     /// This function executes the route handler with spawn to catch panics properly.
     /// While this adds some overhead, it's necessary to ensure panic hooks
@@ -518,15 +511,8 @@ impl Server {
     /// # Arguments
     ///
     /// - `&Context` - The request context.
-    /// - `&mut RequestLifecycle` - A mutable reference to the current request lifecycle state.
     /// - `&ServerHookHandler` - The route handler to execute.
-    async fn handle_route_matcher_with_lifecycle(
-        &self,
-        ctx: &Context,
-        lifecycle: &mut RequestLifecycle,
-        handler: &ServerHookHandler,
-    ) {
-        ctx.update_lifecycle_status(lifecycle).await;
+    async fn handle_route_matcher_handler(&self, ctx: &Context, handler: &ServerHookHandler) {
         if let Err(join_error) = spawn(handler(ctx)).await
             && join_error.is_panic()
         {
@@ -640,22 +626,22 @@ impl Server {
         let route: &str = request.get_path();
         let ctx: &Context = state.get_ctx();
         ctx.set_request(request).await;
-        let mut lifecycle: RequestLifecycle = RequestLifecycle::new(request.is_enable_keep_alive());
-        if self.handle_request_middleware(ctx, &mut lifecycle).await {
-            return lifecycle.keep_alive();
+        let keep_alive: bool = request.is_enable_keep_alive();
+        if self.handle_request_middleware(ctx).await {
+            return ctx.is_keep_alive(keep_alive).await;
         }
-        if self.handle_route_matcher(ctx, route, &mut lifecycle).await {
-            return lifecycle.keep_alive();
+        if self.handle_route_matcher(ctx, route).await {
+            return ctx.is_keep_alive(keep_alive).await;
         }
-        if self.handle_response_middleware(ctx, &mut lifecycle).await {
-            return lifecycle.keep_alive();
+        if self.handle_response_middleware(ctx).await {
+            return ctx.is_keep_alive(keep_alive).await;
         }
         if let Some(panic) = ctx.try_get_panic().await {
             ctx.set_response_status_code(HttpStatus::InternalServerError.code())
                 .await;
             self.handle_panic_with_context(ctx, &panic).await;
         }
-        lifecycle.keep_alive()
+        ctx.is_keep_alive(keep_alive).await
     }
 
     /// Handles subsequent HTTP requests on a persistent (keep-alive) connection.
@@ -705,20 +691,14 @@ impl Server {
     /// # Arguments
     ///
     /// - `&Context` - The request context.
-    /// - `&mut RequestLifecycle` - A mutable reference to the request lifecycle state.
     ///
     /// # Returns
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    pub(super) async fn handle_request_middleware(
-        &self,
-        ctx: &Context,
-        lifecycle: &mut RequestLifecycle,
-    ) -> bool {
+    pub(super) async fn handle_request_middleware(&self, ctx: &Context) -> bool {
         for handler in self.read().await.get_request_middleware().iter() {
-            self.handle_middleware_with_lifecycle(ctx, lifecycle, handler)
-                .await;
-            if lifecycle.is_aborted() {
+            self.handle_middleware(ctx, handler).await;
+            if ctx.get_aborted().await {
                 return true;
             }
         }
@@ -731,17 +711,11 @@ impl Server {
     ///
     /// - `&Context` - The request context.
     /// - `&str` - The request path to match.
-    /// - `&mut RequestLifecycle` - A mutable reference to the request lifecycle state.
     ///
     /// # Returns
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    pub(super) async fn handle_route_matcher(
-        &self,
-        ctx: &Context,
-        path: &str,
-        lifecycle: &mut RequestLifecycle,
-    ) -> bool {
+    pub(super) async fn handle_route_matcher(&self, ctx: &Context, path: &str) -> bool {
         if let Some(handler) = self
             .read()
             .await
@@ -749,9 +723,8 @@ impl Server {
             .try_resolve_route(ctx, path)
             .await
         {
-            self.handle_route_matcher_with_lifecycle(ctx, lifecycle, &handler)
-                .await;
-            if lifecycle.is_aborted() {
+            self.handle_route_matcher_handler(ctx, &handler).await;
+            if ctx.get_aborted().await {
                 return true;
             }
         }
@@ -763,20 +736,14 @@ impl Server {
     /// # Arguments
     ///
     /// - `&Context` - The request context.
-    /// - `&mut RequestLifecycle` - A mutable reference to the request lifecycle state.
     ///
     /// # Returns
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    pub(super) async fn handle_response_middleware(
-        &self,
-        ctx: &Context,
-        lifecycle: &mut RequestLifecycle,
-    ) -> bool {
+    pub(super) async fn handle_response_middleware(&self, ctx: &Context) -> bool {
         for handler in self.read().await.get_response_middleware().iter() {
-            self.handle_middleware_with_lifecycle(ctx, lifecycle, handler)
-                .await;
-            if lifecycle.is_aborted() {
+            self.handle_middleware(ctx, handler).await;
+            if ctx.get_aborted().await {
                 return true;
             }
         }

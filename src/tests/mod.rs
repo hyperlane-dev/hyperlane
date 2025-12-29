@@ -2,7 +2,6 @@ mod attribute;
 mod config;
 mod context;
 mod error;
-mod lifecycle;
 mod panic;
 mod route;
 mod send;
