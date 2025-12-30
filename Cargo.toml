@@ -12,11 +12,11 @@ categories = ["network-programming", "web-programming"]
 exclude = ["target", "Cargo.lock", "sh", ".github", "logs", "img", "**/*.log"]
 
 [dependencies]
+regex = "1.12.2"
+serde = "1.0.228"
+inventory = "0.3.21"
 http-type = "5.26.1"
 lombok-macros = "1.13.18"
-serde = { version = "1.0.228", features = ["derive"] }
-regex = "1.12.2"
-inventory = "0.3.21"
 
 [profile.dev]
 incremental = false
