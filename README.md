@@ -251,6 +251,7 @@ impl ServerHook for ServerPanicHook {
     }
 }
 
+#[tokio::main]
 async fn main() {
     let config: ServerConfig = ServerConfig::new().await;
     config.host("0.0.0.0").await;
