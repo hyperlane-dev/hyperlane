@@ -58,6 +58,66 @@ impl Context {
         self.get_0().write().await
     }
 
+    /// Reads an HTTP request from the underlying stream.
+    ///
+    /// # Arguments
+    ///
+    /// - `RequestConfig` - The request config.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Request, RequestError>` - The parsed request or error.
+    pub async fn http_from_stream(
+        &self,
+        request_config: RequestConfig,
+    ) -> Result<Request, RequestError> {
+        if self.get_aborted().await {
+            return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
+        }
+        if let Some(stream) = self.try_get_stream().await.as_ref() {
+            let request_res: Result<Request, RequestError> =
+                Request::http_from_stream(stream, &request_config).await;
+            if let Ok(request) = request_res.as_ref() {
+                self.set_request(request).await;
+            }
+            return request_res;
+        };
+        Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
+    }
+
+    /// Reads a WebSocket frame from the underlying stream.
+    ///
+    /// # Arguments
+    ///
+    /// - `RequestConfig` - The request config.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Request, RequestError>` - The parsed frame or error.
+    pub async fn ws_from_stream(
+        &self,
+        request_config: RequestConfig,
+    ) -> Result<Request, RequestError> {
+        if self.get_aborted().await {
+            return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
+        }
+        if let Some(stream) = self.try_get_stream().await.as_ref() {
+            let mut last_request: Request = self.get_request().await;
+            let request_res: Result<Request, RequestError> =
+                last_request.ws_from_stream(stream, &request_config).await;
+            match request_res.as_ref() {
+                Ok(request) => {
+                    self.set_request(request).await;
+                }
+                Err(_) => {
+                    self.set_request(&last_request).await;
+                }
+            }
+            return request_res;
+        };
+        Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
+    }
+
     /// Checks if the context has been marked as aborted.
     ///
     /// # Returns
@@ -148,7 +208,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `bool` - True if the connection is both aborted and closed, otherwise false.
+    /// - `bool` - True if the connection is either aborted or closed, otherwise false.
     pub async fn is_terminated(&self) -> bool {
         self.get_aborted().await || self.get_closed().await
     }
@@ -1809,32 +1869,51 @@ impl Context {
             .await
     }
 
-    /// Sends the response headers and body to the client.
+    /// Sends HTTP response data over the stream.
     ///
     /// # Returns
     ///
-    /// - `Result<(), ResponseError>` - The result of the send operation.
-    pub async fn send(&self) -> Result<(), ResponseError> {
+    /// - `Result<(), ResponseError>` - Result indicating success or failure.
+    pub async fn try_send(&self) -> Result<(), ResponseError> {
         if self.is_terminated().await {
             return Err(ResponseError::Terminated);
         }
         let response_data: ResponseData = self.write().await.get_mut_response().build();
         if let Some(stream) = self.try_get_stream().await {
-            return stream.send(response_data).await;
+            return stream.try_send(response_data).await;
         }
         Err(ResponseError::NotFoundStream)
     }
 
-    /// Sends only the response body to the client.
+    /// Sends HTTP response data over the stream.
     ///
-    /// This method is useful for streaming data or for responses where headers have already been sent.
+    /// # Panics
+    ///
+    /// Panics if the write operation fails.
+    pub async fn send(&self) {
+        self.try_send().await.unwrap();
+    }
+
+    /// Sends HTTP response body.
     ///
     /// # Returns
     ///
-    /// - `Result<(), ResponseError>` - The result of the send operation.
-    pub async fn send_body(&self) -> Result<(), ResponseError> {
+    /// - `Result<(), ResponseError>` - Result indicating success or failure.
+    pub async fn try_send_body(&self) -> Result<(), ResponseError> {
+        if self.is_terminated().await {
+            return Err(ResponseError::Terminated);
+        }
         let response_body: ResponseBody = self.get_response_body().await;
-        self.send_body_with_data(response_body).await
+        self.try_send_body_with_data(response_body).await
+    }
+
+    /// Sends HTTP response body.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the write operation fails.
+    pub async fn send_body(&self) {
+        self.try_send_body().await.unwrap();
     }
 
     /// Sends only the response body to the client with additional data.
@@ -1848,7 +1927,7 @@ impl Context {
     /// # Returns
     ///
     /// - `Result<(), ResponseError>` - The result of the send operation.
-    pub async fn send_body_with_data<D>(&self, data: D) -> Result<(), ResponseError>
+    pub async fn try_send_body_with_data<D>(&self, data: D) -> Result<(), ResponseError>
     where
         D: AsRef<[u8]>,
     {
@@ -1856,9 +1935,65 @@ impl Context {
             return Err(ResponseError::Terminated);
         }
         if let Some(stream) = self.try_get_stream().await {
-            return stream.send_body(data).await;
+            return stream.try_send_body(data).await;
         }
         Err(ResponseError::NotFoundStream)
+    }
+
+    /// Sends HTTP response body.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<[u8]>` - The response body data (must implement AsRef<[u8]>).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the write operation fails.
+    pub async fn send_body_with_data<D>(&self, data: D)
+    where
+        D: AsRef<[u8]>,
+    {
+        self.try_send_body_with_data(data).await.unwrap();
+    }
+
+    /// Sends multiple HTTP response bodies sequentially.
+    ///
+    /// # Arguments
+    ///
+    /// - `I: IntoIterator<Item = D>, D: AsRef<[u8]>` - The response body data list to send.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<(), ResponseError>` - Result indicating success or failure.
+    pub async fn try_send_body_list<I, D>(&self, data_iter: I) -> Result<(), ResponseError>
+    where
+        I: IntoIterator<Item = D>,
+        D: AsRef<[u8]>,
+    {
+        if self.is_terminated().await {
+            return Err(ResponseError::Terminated);
+        }
+        if let Some(stream) = self.try_get_stream().await {
+            return stream.try_send_body_list(data_iter).await;
+        }
+        Err(ResponseError::NotFoundStream)
+    }
+
+    /// Sends multiple HTTP response bodies sequentially.
+    ///
+    /// # Arguments
+    ///
+    /// - `I: IntoIterator<Item = D>, D: AsRef<[u8]>` - The response body data list to send.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any write operation fails.
+    pub async fn send_body_list<I, D>(&self, data_iter: I)
+    where
+        I: IntoIterator<Item = D>,
+        D: AsRef<[u8]>,
+    {
+        self.try_send_body_list(data_iter).await.unwrap();
     }
 
     /// Sends a list of response bodies to the client with additional data.
@@ -1872,7 +2007,10 @@ impl Context {
     /// # Returns
     ///
     /// - `Result<(), ResponseError>` - The result of the send operation.
-    pub async fn send_body_list_with_data<I, D>(&self, data_iter: I) -> Result<(), ResponseError>
+    pub async fn try_send_body_list_with_data<I, D>(
+        &self,
+        data_iter: I,
+    ) -> Result<(), ResponseError>
     where
         I: IntoIterator<Item = D>,
         D: AsRef<[u8]>,
@@ -1881,9 +2019,26 @@ impl Context {
             return Err(ResponseError::Terminated);
         }
         if let Some(stream) = self.try_get_stream().await {
-            return stream.send_body_list(data_iter).await;
+            return stream.try_send_body_list(data_iter).await;
         }
         Err(ResponseError::NotFoundStream)
+    }
+
+    /// Sends a list of response bodies to the client with additional data.
+    ///
+    /// # Arguments
+    ///
+    /// - `I: IntoIterator<Item = D>, D: AsRef<[u8]>` - The additional data to send as a list of bodies.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any write operation fails.
+    pub async fn send_body_list_with_data<I, D>(&self, data_iter: I)
+    where
+        I: IntoIterator<Item = D>,
+        D: AsRef<[u8]>,
+    {
+        self.try_send_body_list_with_data(data_iter).await.unwrap()
     }
 
     /// Flushes the underlying network stream, ensuring all buffered data is sent.
@@ -1891,71 +2046,22 @@ impl Context {
     /// # Returns
     ///
     /// - `Result<(), ResponseError>` - The result of the flush operation.
-    pub async fn flush(&self) -> Result<(), ResponseError> {
+    pub async fn try_flush(&self) -> Result<(), ResponseError> {
+        if self.is_terminated().await {
+            return Err(ResponseError::Terminated);
+        }
         if let Some(stream) = self.try_get_stream().await {
-            stream.flush().await;
-            return Ok(());
+            return stream.try_flush().await;
         }
         Err(ResponseError::NotFoundStream)
     }
 
-    /// Reads an HTTP request from the underlying stream.
+    /// Flushes all buffered data to the stream.
     ///
-    /// # Arguments
+    /// # Panics
     ///
-    /// - `RequestConfig` - The request config.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<Request, RequestError>` - The parsed request or error.
-    pub async fn http_from_stream(
-        &self,
-        request_config: RequestConfig,
-    ) -> Result<Request, RequestError> {
-        if self.get_aborted().await {
-            return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
-        }
-        if let Some(stream) = self.try_get_stream().await.as_ref() {
-            let request_res: Result<Request, RequestError> =
-                Request::http_from_stream(stream, &request_config).await;
-            if let Ok(request) = request_res.as_ref() {
-                self.set_request(request).await;
-            }
-            return request_res;
-        };
-        Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
-    }
-
-    /// Reads a WebSocket frame from the underlying stream.
-    ///
-    /// # Arguments
-    ///
-    /// - `RequestConfig` - The request config.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<Request, RequestError>` - The parsed frame or error.
-    pub async fn ws_from_stream(
-        &self,
-        request_config: RequestConfig,
-    ) -> Result<Request, RequestError> {
-        if self.get_aborted().await {
-            return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
-        }
-        if let Some(stream) = self.try_get_stream().await.as_ref() {
-            let mut last_request: Request = self.get_request().await;
-            let request_res: Result<Request, RequestError> =
-                last_request.ws_from_stream(stream, &request_config).await;
-            match request_res.as_ref() {
-                Ok(request) => {
-                    self.set_request(request).await;
-                }
-                Err(_) => {
-                    self.set_request(&last_request).await;
-                }
-            }
-            return request_res;
-        };
-        Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
+    /// Panics if the flush operation fails.
+    pub async fn flush(&self) {
+        self.try_flush().await.unwrap();
     }
 }
