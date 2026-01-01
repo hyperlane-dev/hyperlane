@@ -73,8 +73,7 @@ async fn test_server() {
             }
             if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
                 let accept_key: String = WebSocketFrame::generate_accept_key(key);
-                let _ = ctx
-                    .set_response_version(HttpVersion::Http1_1)
+                ctx.set_response_version(HttpVersion::Http1_1)
                     .await
                     .set_response_status_code(101)
                     .await
@@ -86,7 +85,7 @@ async fn test_server() {
                     .await
                     .set_response_body(&vec![])
                     .await
-                    .try_send()
+                    .send()
                     .await;
             }
         }
@@ -101,7 +100,7 @@ async fn test_server() {
             if ctx.get_request().await.is_ws() {
                 return;
             }
-            let _ = ctx.try_send().await;
+            let _ = ctx.send().await;
         }
     }
 
@@ -133,9 +132,9 @@ async fn test_server() {
             let body: ResponseBody = ctx.get_response_body().await;
             if ctx.get_request().await.is_ws() {
                 let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-                let _ = ctx.try_send_body_list_with_data(&frame_list).await;
+                let _ = ctx.send_body_list_with_data(&frame_list).await;
             } else {
-                let _ = ctx.try_send_body().await;
+                let _ = ctx.send_body().await;
             }
         }
     }
@@ -173,13 +172,13 @@ async fn test_server() {
             let _ = ctx
                 .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
                 .await
-                .try_send()
+                .send()
                 .await;
             for i in 0..10 {
                 let _ = ctx
                     .set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
                     .await
-                    .try_send_body()
+                    .send_body()
                     .await;
             }
             let _ = ctx.closed().await;
@@ -225,7 +224,7 @@ async fn test_server() {
                 .await
                 .set_response_body(&self.response_body)
                 .await
-                .try_send()
+                .send()
                 .await;
         }
     }
