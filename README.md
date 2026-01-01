@@ -122,7 +122,7 @@ impl ServerHook for ResponseMiddleware {
         if ctx.get_request().await.is_ws() {
             return;
         }
-        let _ = ctx.send().await;
+        ctx.send().await;
     }
 }
 
@@ -151,12 +151,12 @@ impl ServerHook for RootRoute {
 
 impl WebsocketRoute {
     async fn send_body_hook(&self, ctx: &Context) {
-        let body: ResponseBody = ctx.get_response_body().await;
         if ctx.get_request().await.is_ws() {
+            let body: ResponseBody = ctx.get_response_body().await;
             let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-            let _ = ctx.send_body_list_with_data(&frame_list).await;
+            ctx.send_body_list_with_data(&frame_list).await;
         } else {
-            let _ = ctx.send_body().await;
+            ctx.send_body().await;
         }
     }
 }
@@ -191,19 +191,17 @@ impl ServerHook for SseRoute {
     }
 
     async fn handle(self, ctx: &Context) {
-        let _ = ctx
-            .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+        ctx.set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
             .await
             .send()
             .await;
         for i in 0..10 {
-            let _ = ctx
-                .set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
+            ctx.set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
                 .await
                 .send_body()
                 .await;
         }
-        let _ = ctx.closed().await;
+        ctx.closed().await;
     }
 }
 
@@ -233,8 +231,7 @@ impl ServerHook for ServerPanicHook {
     }
 
     async fn handle(self, ctx: &Context) {
-        let _ = ctx
-            .set_response_version(HttpVersion::Http1_1)
+        ctx.set_response_version(HttpVersion::Http1_1)
             .await
             .set_response_status_code(500)
             .await
