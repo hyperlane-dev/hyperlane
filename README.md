@@ -40,6 +40,55 @@ git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
 ```rust
 use hyperlane::*;
 
+struct ServerPanic {
+    response_body: String,
+    content_type: String,
+}
+
+impl ServerHook for ServerPanic {
+    async fn new(ctx: &Context) -> Self {
+        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
+        let response_body: String = error.to_string();
+        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+        Self {
+            response_body,
+            content_type,
+        }
+    }
+
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_status_code(500)
+            .await
+            .clear_response_headers()
+            .await
+            .set_response_header(SERVER, HYPERLANE)
+            .await
+            .set_response_header(CONTENT_TYPE, &self.content_type)
+            .await
+            .set_response_body(&self.response_body)
+            .await
+            .send()
+            .await;
+    }
+}
+
+struct RequestError;
+
+impl ServerHook for RequestError {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .send()
+            .await;
+    }
+}
+
 struct SendBodyMiddleware {
     socket_addr: String,
 }
@@ -217,55 +266,6 @@ impl ServerHook for DynamicRoute {
     async fn handle(mut self, _ctx: &Context) {
         self.params.insert("key".to_owned(), "value".to_owned());
         panic!("Test panic {:?}", self.params);
-    }
-}
-
-struct RequestError;
-
-impl ServerHook for RequestError {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_version(HttpVersion::Http1_1)
-            .await
-            .send()
-            .await;
-    }
-}
-
-struct ServerPanic {
-    response_body: String,
-    content_type: String,
-}
-
-impl ServerHook for ServerPanic {
-    async fn new(ctx: &Context) -> Self {
-        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
-        let response_body: String = error.to_string();
-        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
-        Self {
-            response_body,
-            content_type,
-        }
-    }
-
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_version(HttpVersion::Http1_1)
-            .await
-            .set_response_status_code(500)
-            .await
-            .clear_response_headers()
-            .await
-            .set_response_header(SERVER, HYPERLANE)
-            .await
-            .set_response_header(CONTENT_TYPE, &self.content_type)
-            .await
-            .set_response_body(&self.response_body)
-            .await
-            .send()
-            .await;
     }
 }
 
