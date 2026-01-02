@@ -1,11 +1,11 @@
 use crate::*;
 
-/// Represents different handler types for hooks.
+/// Represents different hook types for hooks.
 #[derive(Clone)]
-pub enum HookHandlerSpec {
-    /// Arc handler (used for request/response middleware and route)
+pub enum HookHandlerType {
+    /// Arc hook (used for request/response middleware and route)
     Handler(ServerHookHandler),
-    /// Factory function that creates a handler when called
+    /// Factory function that creates a hook when called
     Factory(ServerHookHandlerFactory),
 }
 
@@ -19,17 +19,21 @@ pub enum HookHandlerSpec {
 pub enum HookType {
     /// Triggered when a panic occurs in the server.
     ///
-    /// - `Option<isize>`- Optional priority of the panic hook. `None` means default.
-    PanicHook(Option<isize>),
-    /// Executed before a request reaches its designated route handler.
+    /// - `Option<isize>`- Optional priority of the panic. `None` means default.
+    Panic(Option<isize>),
+    /// Triggered when a request error occurs during HTTP request processing.
+    ///
+    /// - `Option<isize>`- Optional priority of the request error. `None` means default.
+    RequestError(Option<isize>),
+    /// Executed before a request reaches its designated route hook.
     ///
     /// - `Option<isize>`- Optional priority of the request middleware.
     RequestMiddleware(Option<isize>),
-    /// Represents a route handler for a specific path.
+    /// Represents a route hook for a specific path.
     ///
     /// - `&'static str`- The route path handled by this hook.
     Route(&'static str),
-    /// Executed after a route handler but before the response is sent.
+    /// Executed after a route hook but before the response is sent.
     ///
     /// - `Option<isize>`- Optional priority of the response middleware.
     ResponseMiddleware(Option<isize>),

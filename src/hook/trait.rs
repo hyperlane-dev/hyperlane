@@ -16,7 +16,7 @@ pub trait FnContextPinBoxSendSync<T>: FnContextSendSync<SendableAsyncTask<T>> {}
 
 /// A trait for static, sendable, synchronous functions that return a future.
 ///
-/// This trait ensures that a handler function is safe to be sent across threads
+/// This trait ensures that a hook function is safe to be sent across threads
 /// and has a static lifetime, making it suitable for use in long-lived components
 /// of the application, such as the main router.
 pub trait FnContextSendSyncStatic<Fut, T>: FnContextSendSync<Fut> + 'static

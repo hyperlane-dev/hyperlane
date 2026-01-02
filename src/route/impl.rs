@@ -399,7 +399,7 @@ impl RoutePattern {
                     }
                     params.insert(param_name.clone(), segment_value);
                     if idx == route_segments_len - 1 {
-                        break;
+                        return Some(params);
                     }
                 }
             }
@@ -459,7 +459,7 @@ impl RoutePattern {
 /// Manages a collection of route, enabling efficient lookup and dispatch.
 ///
 /// This struct stores route categorized by type (static, dynamic, regex)
-/// to quickly find the appropriate handler for incoming requests.
+/// to quickly find the appropriate hook for incoming requests.
 impl RouteMatcher {
     /// Creates a new, empty RouteMatcher.
     ///
@@ -489,9 +489,9 @@ impl RouteMatcher {
         path.matches(DEFAULT_HTTP_PATH).count() + 1
     }
 
-    /// Adds a new route and its handler to the matcher.
+    /// Adds a new route and its hook to the matcher.
     ///
-    /// Adds a route handler to the matcher.
+    /// Adds a route hook to the matcher.
     ///
     /// This method categorizes the route as static, dynamic, or regex based on its pattern
     /// and stores it in the appropriate collection.
@@ -499,23 +499,19 @@ impl RouteMatcher {
     /// # Arguments
     ///
     /// - `&str` - The route pattern string.
-    /// - `ServerHookHandler` - The boxed route handler.
+    /// - `ServerHookHandler` - The boxed route hook.
     ///
     /// # Returns
     ///
     /// - `Result<(), RouteError>` - Ok on success, or RouteError if pattern is duplicate.
-    pub(crate) fn add(
-        &mut self,
-        pattern: &str,
-        handler: ServerHookHandler,
-    ) -> Result<(), RouteError> {
+    pub(crate) fn add(&mut self, pattern: &str, hook: ServerHookHandler) -> Result<(), RouteError> {
         let route_pattern: RoutePattern = RoutePattern::new(pattern)?;
         if route_pattern.is_static() {
             if self.get_static_route().contains_key(pattern) {
                 return Err(RouteError::DuplicatePattern(pattern.to_owned()));
             }
             self.get_mut_static_route()
-                .insert(pattern.to_string(), handler);
+                .insert(pattern.to_string(), hook);
             return Ok(());
         }
         let target_map: &mut ServerHookPatternRoute = if route_pattern.is_dynamic() {
@@ -528,15 +524,15 @@ impl RouteMatcher {
             target_map.entry(segment_count).or_default();
         match routes_for_count.binary_search_by(|(p, _)| p.cmp(&route_pattern)) {
             Ok(_) => return Err(RouteError::DuplicatePattern(pattern.to_owned())),
-            Err(pos) => routes_for_count.insert(pos, (route_pattern, handler)),
+            Err(pos) => routes_for_count.insert(pos, (route_pattern, hook)),
         }
         Ok(())
     }
 
-    /// Resolves and executes a route handler.
+    /// Resolves and executes a route hook.
     ///
     /// This method searches for a matching route and executes it if found.
-    /// Finds a matching route handler for the given path.
+    /// Finds a matching route hook for the given path.
     ///
     /// # Arguments
     ///
@@ -545,30 +541,30 @@ impl RouteMatcher {
     ///
     /// # Returns
     ///
-    /// - `Option<ServerHookHandler>` - The matched route handler if found, None otherwise.
+    /// - `Option<ServerHookHandler>` - The matched route hook if found, None otherwise.
     pub(crate) async fn try_resolve_route(
         &self,
         ctx: &Context,
         path: &str,
     ) -> Option<ServerHookHandler> {
-        if let Some(handler) = self.get_static_route().get(path) {
+        if let Some(hook) = self.get_static_route().get(path) {
             ctx.set_route_params(RouteParams::default()).await;
-            return Some(handler.clone());
+            return Some(hook.clone());
         }
         let path_segment_count: usize = Self::count_path_segments(path);
         if let Some(routes) = self.get_dynamic_route().get(&path_segment_count) {
-            for (pattern, handler) in routes {
+            for (pattern, hook) in routes {
                 if let Some(params) = pattern.try_match_path(path) {
                     ctx.set_route_params(params).await;
-                    return Some(handler.clone());
+                    return Some(hook.clone());
                 }
             }
         }
         if let Some(routes) = self.get_regex_route().get(&path_segment_count) {
-            for (pattern, handler) in routes {
+            for (pattern, hook) in routes {
                 if let Some(params) = pattern.try_match_path(path) {
                     ctx.set_route_params(params).await;
-                    return Some(handler.clone());
+                    return Some(hook.clone());
                 }
             }
         }
@@ -576,13 +572,13 @@ impl RouteMatcher {
             if segment_count == path_segment_count {
                 continue;
             }
-            for (pattern, handler) in routes {
+            for (pattern, hook) in routes {
                 if pattern.has_tail_regex()
                     && path_segment_count >= segment_count
                     && let Some(params) = pattern.try_match_path(path)
                 {
                     ctx.set_route_params(params).await;
-                    return Some(handler.clone());
+                    return Some(hook.clone());
                 }
             }
         }

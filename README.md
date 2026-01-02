@@ -178,7 +178,7 @@ impl ServerHook for WebsocketRoute {
                 Err(error) => {
                     ctx.set_response_body(&error.to_string()).await;
                     self.send_body_hook(ctx).await;
-                    break;
+                    return;
                 }
             }
         }
@@ -260,7 +260,7 @@ async fn main() {
     server.request_middleware::<SendBodyMiddleware>().await;
     server.request_middleware::<UpgradeMiddleware>().await;
     server.response_middleware::<ResponseMiddleware>().await;
-    server.panic_hook::<ServerPanicHook>().await;
+    server.panic::<ServerPanicHook>().await;
     server.route::<RootRoute>("/").await;
     server.route::<WebsocketRoute>("/websocket").await;
     server.route::<SseRoute>("/sse").await;

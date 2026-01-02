@@ -1,12 +1,12 @@
 use crate::*;
 
-/// A type alias for a shared hook handler.
+/// A type alias for a shared hook hook.
 ///
 /// This type is used for storing handlers in a shared context, allowing multiple
-/// parts of the application to safely access and execute the same handler.
+/// parts of the application to safely access and execute the same hook.
 pub type HookHandler<T> = Arc<dyn FnContextPinBoxSendSync<T>>;
 
-/// A type alias for a hook handler chain.
+/// A type alias for a hook hook chain.
 ///
 /// This type is used to represent a chain of middleware or hooks that can be
 /// executed sequentially.
@@ -28,16 +28,16 @@ pub type SendableAsyncTask<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 /// This is useful for creating and sharing asynchronous task factories.
 pub type SharedAsyncTaskFactory<T> = Arc<dyn FnPinBoxFutureSend<T>>;
 
-/// A type alias for a hook handler factory function.
+/// A type alias for a hook hook factory function.
 ///
 /// This function pointer type is used to create ServerHookHandler instances
 /// based on generic types. It allows delayed instantiation of hooks.
 pub type ServerHookHandlerFactory = fn() -> ServerHookHandler;
 
-/// Type alias for a shared server hook handler.
+/// Type alias for a shared server hook hook.
 ///
 /// This type allows storing handlers (route and middleware) of different concrete types
-/// in the same collection. The handler takes a `&Context` and returns
+/// in the same collection. The hook takes a `&Context` and returns
 /// a pinned, boxed future that resolves to `()`.
 pub type ServerHookHandler = Arc<dyn Fn(&Context) -> SendableAsyncTask<()> + Send + Sync>;
 

@@ -28,21 +28,21 @@ pub struct ServerControlHook {
 /// This struct encapsulates the necessary information to register a new hook.
 #[derive(Getter, Setter, Clone, CustomDebug, PartialEq, Eq)]
 pub struct HookMacro {
-    /// Represents the asynchronous handler that is executed when
+    /// Represents the asynchronous hook that is executed when
     /// the associated hook is triggered.
     #[debug(skip)]
-    pub handler: HookHandlerSpec,
-    /// Represents the type of the hook that determines when the handler
+    pub hook: HookHandlerType,
+    /// Represents the type of the hook that determines when the hook
     /// should be executed.
     pub hook_type: HookType,
 }
 
 impl HookMacro {
-    /// Creates a new HookMacro for a panic hook with a generic type.
+    /// Creates a new HookMacro for a panic with a generic type.
     ///
     /// # Type Parameters
     ///
-    /// - `P: ServerHook` - The panic hook type.
+    /// - `P: ServerHook` - The panic type.
     ///
     /// # Arguments
     ///
@@ -51,10 +51,30 @@ impl HookMacro {
     /// # Returns
     ///
     /// - `Self` - The created HookMacro instance.
-    pub fn panic_hook<P: ServerHook>(order: Option<isize>) -> Self {
+    pub fn panic<P: ServerHook>(order: Option<isize>) -> Self {
         Self {
-            handler: HookHandlerSpec::Factory(server_hook_factory::<P>),
-            hook_type: HookType::PanicHook(order),
+            hook: HookHandlerType::Factory(server_hook_factory::<P>),
+            hook_type: HookType::Panic(order),
+        }
+    }
+
+    /// Creates a new HookMacro for a request error with a generic type.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `P: ServerHook` - The request error type.
+    ///
+    /// # Arguments
+    ///
+    /// - `order` - Optional execution priority.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - The created HookMacro instance.
+    pub fn request_error<P: ServerHook>(order: Option<isize>) -> Self {
+        Self {
+            hook: HookHandlerType::Factory(server_hook_factory::<P>),
+            hook_type: HookType::RequestError(order),
         }
     }
 
@@ -73,7 +93,7 @@ impl HookMacro {
     /// - `Self` - The created HookMacro instance.
     pub fn request_middleware<M: ServerHook>(order: Option<isize>) -> Self {
         Self {
-            handler: HookHandlerSpec::Factory(server_hook_factory::<M>),
+            hook: HookHandlerType::Factory(server_hook_factory::<M>),
             hook_type: HookType::RequestMiddleware(order),
         }
     }
@@ -93,7 +113,7 @@ impl HookMacro {
     /// - `Self` - The created HookMacro instance.
     pub fn response_middleware<M: ServerHook>(order: Option<isize>) -> Self {
         Self {
-            handler: HookHandlerSpec::Factory(server_hook_factory::<M>),
+            hook: HookHandlerType::Factory(server_hook_factory::<M>),
             hook_type: HookType::ResponseMiddleware(order),
         }
     }
@@ -102,7 +122,7 @@ impl HookMacro {
     ///
     /// # Type Parameters
     ///
-    /// - `R: ServerHook` - The route handler type.
+    /// - `R: ServerHook` - The route hook type.
     ///
     /// # Arguments
     ///
@@ -113,7 +133,7 @@ impl HookMacro {
     /// - `Self` - The created HookMacro instance.
     pub fn route<R: ServerHook>(path: &'static str) -> Self {
         Self {
-            handler: HookHandlerSpec::Factory(server_hook_factory::<R>),
+            hook: HookHandlerType::Factory(server_hook_factory::<R>),
             hook_type: HookType::Route(path),
         }
     }

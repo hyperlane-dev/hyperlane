@@ -17,6 +17,47 @@ impl From<ContextInner> for Context {
     }
 }
 
+/// Implementation of `From` trait for converting `&ArcRwLockStream` into `Context`.
+impl From<&ArcRwLockStream> for Context {
+    /// Converts a reference to a network stream into a `Context` with default request.
+    ///
+    /// # Arguments
+    ///
+    /// - `&ArcRwLockStream` - The network stream reference to convert.
+    ///
+    /// # Returns
+    ///
+    /// - `Context` - The newly created context instance.
+    #[inline(always)]
+    fn from(stream: &ArcRwLockStream) -> Self {
+        let request: Request = Request::default();
+        let mut internal_ctx: ContextInner = ContextInner::default();
+        internal_ctx
+            .set_stream(Some(stream.clone()))
+            .set_request(request.clone())
+            .get_mut_response()
+            .set_version(request.get_version().clone());
+        internal_ctx.into()
+    }
+}
+
+/// Implementation of `From` trait for converting `ArcRwLockStream` into `Context`.
+impl From<ArcRwLockStream> for Context {
+    /// Converts a network stream into a `Context` with default request.
+    ///
+    /// # Arguments
+    ///
+    /// - `ArcRwLockStream` - The network stream to convert.
+    ///
+    /// # Returns
+    ///
+    /// - `Context` - The newly created context instance.
+    #[inline(always)]
+    fn from(stream: ArcRwLockStream) -> Self {
+        (&stream).into()
+    }
+}
+
 /// Implementation of methods for `Context` structure.
 impl Context {
     /// Creates a new `Context` with the provided network stream and HTTP request.

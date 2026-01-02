@@ -17,7 +17,7 @@ pub struct Panic {
     #[set(pub(crate))]
     pub(super) location: Option<String>,
     /// The payload of the panic, often a string literal.
-    /// The handler attempts to downcast it to a `&str` or `String`.
+    /// The hook attempts to downcast it to a `&str` or `String`.
     #[get(pub)]
     #[set(pub(crate))]
     pub(super) payload: Option<String>,

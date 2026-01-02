@@ -11,7 +11,8 @@ impl Default for ServerInner {
     fn default() -> Self {
         Self {
             config: ServerConfigInner::default(),
-            panic_hook: vec![],
+            panic: vec![],
+            request_error: vec![],
             route_matcher: RouteMatcher::new(),
             request_middleware: vec![],
             response_middleware: vec![],
@@ -35,13 +36,19 @@ impl PartialEq for ServerInner {
     fn eq(&self, other: &Self) -> bool {
         self.config == other.config
             && self.route_matcher == other.route_matcher
-            && self.panic_hook.len() == other.panic_hook.len()
+            && self.panic.len() == other.panic.len()
+            && self.request_error.len() == other.request_error.len()
             && self.request_middleware.len() == other.request_middleware.len()
             && self.response_middleware.len() == other.response_middleware.len()
             && self
-                .panic_hook
+                .panic
                 .iter()
-                .zip(other.panic_hook.iter())
+                .zip(other.panic.iter())
+                .all(|(a, b)| Arc::ptr_eq(a, b))
+            && self
+                .request_error
+                .iter()
+                .zip(other.request_error.iter())
                 .all(|(a, b)| Arc::ptr_eq(a, b))
             && self
                 .request_middleware
@@ -106,7 +113,7 @@ impl HandlerState {
     ///
     /// # Returns
     ///
-    /// - `Self` - The newly created handler state.
+    /// - `Self` - The newly created hook state.
     #[inline(always)]
     pub(super) fn new(stream: ArcRwLockStream, request_config: RequestConfig) -> Self {
         Self {
@@ -175,53 +182,53 @@ impl Server {
     /// Handle a given hook macro asynchronously.
     ///
     /// This function dispatches the provided `HookMacro` to the appropriate
-    /// internal handler based on its `HookType`. Supported hook types include
-    /// panic hooks, request/response middleware, and route.
+    /// internal hook based on its `HookType`. Supported hook types include
+    /// panic hooks, request error hooks, request/response middleware, and route.
     ///
     /// # Arguments
     ///
-    /// - `HookMacro`- The `HookMacro` instance containing the `HookType` and its handler.
+    /// - `HookMacro`- The `HookMacro` instance containing the `HookType` and its hook.
     pub async fn handle_hook(&self, hook: HookMacro) {
-        match (hook.hook_type, hook.handler) {
-            (HookType::PanicHook(_), HookHandlerSpec::Handler(handler)) => {
-                self.write().await.get_mut_panic_hook().push(handler);
+        match (hook.hook_type, hook.hook) {
+            (HookType::Panic(_), HookHandlerType::Handler(hook)) => {
+                self.write().await.get_mut_panic().push(hook);
             }
-            (HookType::PanicHook(_), HookHandlerSpec::Factory(factory)) => {
-                self.write().await.get_mut_panic_hook().push(factory());
+            (HookType::Panic(_), HookHandlerType::Factory(factory)) => {
+                self.write().await.get_mut_panic().push(factory());
             }
-            (HookType::RequestMiddleware(_), HookHandlerSpec::Handler(handler)) => {
-                self.write()
-                    .await
-                    .get_mut_request_middleware()
-                    .push(handler);
+            (HookType::RequestError(_), HookHandlerType::Handler(hook)) => {
+                self.write().await.get_mut_request_error().push(hook);
             }
-            (HookType::RequestMiddleware(_), HookHandlerSpec::Factory(factory)) => {
+            (HookType::RequestError(_), HookHandlerType::Factory(factory)) => {
+                self.write().await.get_mut_request_error().push(factory());
+            }
+            (HookType::RequestMiddleware(_), HookHandlerType::Handler(hook)) => {
+                self.write().await.get_mut_request_middleware().push(hook);
+            }
+            (HookType::RequestMiddleware(_), HookHandlerType::Factory(factory)) => {
                 self.write()
                     .await
                     .get_mut_request_middleware()
                     .push(factory());
             }
-            (HookType::Route(path), HookHandlerSpec::Handler(handler)) => {
+            (HookType::Route(path), HookHandlerType::Handler(hook)) => {
                 self.write()
                     .await
                     .get_mut_route_matcher()
-                    .add(path, handler)
+                    .add(path, hook)
                     .unwrap();
             }
-            (HookType::Route(path), HookHandlerSpec::Factory(factory)) => {
+            (HookType::Route(path), HookHandlerType::Factory(factory)) => {
                 self.write()
                     .await
                     .get_mut_route_matcher()
                     .add(path, factory())
                     .unwrap();
             }
-            (HookType::ResponseMiddleware(_), HookHandlerSpec::Handler(handler)) => {
-                self.write()
-                    .await
-                    .get_mut_response_middleware()
-                    .push(handler);
+            (HookType::ResponseMiddleware(_), HookHandlerType::Handler(hook)) => {
+                self.write().await.get_mut_response_middleware().push(hook);
             }
-            (HookType::ResponseMiddleware(_), HookHandlerSpec::Factory(factory)) => {
+            (HookType::ResponseMiddleware(_), HookHandlerType::Factory(factory)) => {
                 self.write()
                     .await
                     .get_mut_response_middleware()
@@ -259,37 +266,60 @@ impl Server {
         self
     }
 
-    /// Registers a panic hook handler to the processing pipeline.
+    /// Registers a panic handler to the processing pipeline.
     ///
-    /// This method allows registering panic hooks that implement the `ServerHook` trait,
+    /// This method allows registering panic handlers that implement the `ServerHook` trait,
     /// which will be executed when a panic occurs during request processing.
     ///
     /// # Type Parameters
     ///
-    /// - `ServerHook` - The panic hook type that implements `ServerHook`.
+    /// - `ServerHook` - The panic handler type that implements `ServerHook`.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn panic_hook<S>(&self) -> &Self
+    pub async fn panic<S>(&self) -> &Self
     where
         S: ServerHook,
     {
         self.write()
             .await
-            .get_mut_panic_hook()
+            .get_mut_panic()
             .push(server_hook_factory::<S>());
         self
     }
 
-    /// Registers a route handler for a specific path.
+    /// Registers a request error handler to the processing pipeline.
+    ///
+    /// This method allows registering request error handlers that implement the `ServerHook` trait,
+    /// which will be executed when a request error occurs during HTTP request processing.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `ServerHook` - The request error handler type that implements `ServerHook`.
+    ///
+    /// # Returns
+    ///
+    /// - `&Self` - Reference to self for method chaining.
+    pub async fn request_error<S>(&self) -> &Self
+    where
+        S: ServerHook,
+    {
+        self.write()
+            .await
+            .get_mut_request_error()
+            .push(server_hook_factory::<S>());
+        self
+    }
+
+    /// Registers a route hook for a specific path.
     ///
     /// This method allows registering route handlers that implement the `ServerHook` trait,
     /// providing type safety and better code organization.
     ///
     /// # Type Parameters
     ///
-    /// - `ServerHook` - The route handler type that implements `ServerHook`.
+    /// - `ServerHook` - The route hook type that implements `ServerHook`.
     ///
     /// # Arguments
     ///
@@ -436,11 +466,11 @@ impl Server {
     /// Handles a panic that has been captured and associated with a specific request `Context`.
     ///
     /// This function is invoked when a panic occurs within a task that has access to the request
-    /// context, such as a route handler or middleware. It ensures that the panic information is
+    /// context, such as a route hook or middleware. It ensures that the panic information is
     /// recorded in the `Context` and then passed to the server's configured panic hook for
     /// processing.
     ///
-    /// By associating the panic with the context, the handler can access request-specific details
+    /// By associating the panic with the context, the hook can access request-specific details
     /// to provide more meaningful error logging and responses.
     ///
     /// # Arguments
@@ -450,11 +480,11 @@ impl Server {
     async fn handle_panic_with_context(&self, ctx: &Context, panic: &Panic) {
         let panic_clone: Panic = panic.clone();
         ctx.cancel_aborted().await.set_panic(panic_clone).await;
-        for hook in self.read().await.get_panic_hook().iter() {
+        for hook in self.read().await.get_panic().iter() {
             if let Err(join_error) = spawn(hook(ctx)).await
                 && join_error.is_panic()
             {
-                eprintln!("Panic occurred in panic hook: {:?}", join_error);
+                eprintln!("Panic occurred in panic handler: {:?}", join_error);
                 let _ = Self::try_flush_stdout_and_stderr();
             }
             if ctx.get_aborted().await {
@@ -478,36 +508,14 @@ impl Server {
         self.handle_panic_with_context(ctx, &panic).await;
     }
 
-    /// Executes a middleware handler.
-    ///
-    /// This function executes middleware with spawn to catch panics properly.
-    /// While this adds some overhead, it's necessary to ensure panic hooks
-    /// can send error responses to clients.
+    /// Spawns a handler for a given context and hook.
     ///
     /// # Arguments
     ///
-    /// - `&Context` - The request context.
-    /// - `&ServerHookHandler` - The middleware handler to execute.
-    async fn handle_middleware(&self, ctx: &Context, handler: &ServerHookHandler) {
-        if let Err(join_error) = spawn(handler(ctx)).await
-            && join_error.is_panic()
-        {
-            self.handle_task_panic(ctx, join_error).await;
-        }
-    }
-
-    /// Executes a route handler.
-    ///
-    /// This function executes the route handler with spawn to catch panics properly.
-    /// While this adds some overhead, it's necessary to ensure panic hooks
-    /// can send error responses to clients.
-    ///
-    /// # Arguments
-    ///
-    /// - `&Context` - The request context.
-    /// - `&ServerHookHandler` - The route handler to execute.
-    async fn handle_route_matcher_handler(&self, ctx: &Context, handler: &ServerHookHandler) {
-        if let Err(join_error) = spawn(handler(ctx)).await
+    /// - `&Context` - The context of the request.
+    /// - `&ServerHookHandler` - The hook to execute.
+    async fn spawn_handler(&self, ctx: &Context, hook: &ServerHookHandler) {
+        if let Err(join_error) = spawn(hook(ctx)).await
             && join_error.is_panic()
         {
             self.handle_task_panic(ctx, join_error).await;
@@ -581,9 +589,30 @@ impl Server {
         });
     }
 
+    /// Handles errors that occur while processing HTTP requests.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Context` - The request context.
+    /// - `&RequestError` - The error that occurred.
+    pub async fn handle_http_requests_error(&self, ctx: &Context, error: &RequestError) {
+        ctx.cancel_aborted()
+            .await
+            .set_response_status_code(error.get_http_status_code())
+            .await
+            .set_response_body(&error.to_string())
+            .await;
+        for hook in self.read().await.get_request_error().iter() {
+            self.spawn_handler(ctx, &hook).await;
+            if ctx.get_aborted().await {
+                return;
+            }
+        }
+    }
+
     /// Handles a single client connection, determining whether it's an HTTP or WebSocket request.
     ///
-    /// It reads the initial request from the stream and dispatches it to the appropriate handler.
+    /// It reads the initial request from the stream and dispatches it to the appropriate hook.
     ///
     /// # Arguments
     ///
@@ -592,19 +621,19 @@ impl Server {
     async fn handle_connection(&self, stream: ArcRwLockStream, request_config: RequestConfig) {
         match Request::http_from_stream(&stream, &request_config).await {
             Ok(request) => {
-                let handler: HandlerState = HandlerState::new(stream, request_config);
-                self.handle_http_requests(&handler, &request).await;
+                let hook: HandlerState = HandlerState::new(stream, request_config);
+                self.handle_http_requests(&hook, &request).await;
             }
             Err(error) => {
-                let ctx: Context = Context::new(&stream, &Request::default());
-                self.handle_http_requests_error(&ctx, &error).await;
+                self.handle_http_requests_error(&stream.into(), &error)
+                    .await;
             }
         }
     }
 
     /// The core request handling pipeline.
     ///
-    /// This function orchestrates the execution of request middleware, the route handler,
+    /// This function orchestrates the execution of request middleware, the route hook,
     /// and response middleware. It supports both function-based and trait-based handlers.
     ///
     /// # Arguments
@@ -656,27 +685,12 @@ impl Server {
                     }
                 }
                 Err(error) => {
-                    Self::flush_stdout_and_stderr();
-                    let ctx: Context = Context::new(state.get_stream(), &Request::default());
-                    self.handle_http_requests_error(&ctx, &error).await;
-                    break;
+                    self.handle_http_requests_error(&state.get_stream().into(), &error)
+                        .await;
+                    return;
                 }
             }
         }
-    }
-
-    /// Handles errors that occur while processing HTTP requests.
-    ///
-    /// # Arguments
-    ///
-    /// - `&Context` - The request context.
-    /// - `&RequestError` - The error that occurred.
-    pub async fn handle_http_requests_error(&self, ctx: &Context, error: &RequestError) {
-        let mut panic: Panic = Panic::default();
-        panic.set_message(Some(error.to_string()));
-        ctx.set_response_status_code(error.get_http_status_code())
-            .await;
-        self.handle_panic_with_context(ctx, &panic).await;
     }
 
     /// Executes trait-based request middleware in sequence.
@@ -689,8 +703,8 @@ impl Server {
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
     pub(super) async fn handle_request_middleware(&self, ctx: &Context) -> bool {
-        for handler in self.read().await.get_request_middleware().iter() {
-            self.handle_middleware(ctx, handler).await;
+        for hook in self.read().await.get_request_middleware().iter() {
+            self.spawn_handler(ctx, hook).await;
             if ctx.get_aborted().await {
                 return true;
             }
@@ -698,7 +712,7 @@ impl Server {
         false
     }
 
-    /// Executes a trait-based route handler if one matches.
+    /// Executes a trait-based route hook if one matches.
     ///
     /// # Arguments
     ///
@@ -709,14 +723,14 @@ impl Server {
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
     pub(super) async fn handle_route_matcher(&self, ctx: &Context, path: &str) -> bool {
-        if let Some(handler) = self
+        if let Some(hook) = self
             .read()
             .await
             .get_route_matcher()
             .try_resolve_route(ctx, path)
             .await
         {
-            self.handle_route_matcher_handler(ctx, &handler).await;
+            self.spawn_handler(ctx, &hook).await;
             if ctx.get_aborted().await {
                 return true;
             }
@@ -734,8 +748,8 @@ impl Server {
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
     pub(super) async fn handle_response_middleware(&self, ctx: &Context) -> bool {
-        for handler in self.read().await.get_response_middleware().iter() {
-            self.handle_middleware(ctx, handler).await;
+        for hook in self.read().await.get_response_middleware().iter() {
+            self.spawn_handler(ctx, hook).await;
             if ctx.get_aborted().await {
                 return true;
             }

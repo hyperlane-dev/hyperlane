@@ -19,7 +19,7 @@ pub struct RoutePattern(
 /// 2.  `dynamic_route`- For paths with variable segments.
 /// 3.  `regex_route`- For complex matching based on regular expressions.
 ///
-/// When a request comes in, the matcher checks these categories in order to find the appropriate handler.
+/// When a request comes in, the matcher checks these categories in order to find the appropriate hook.
 #[derive(Clone, CustomDebug, Getter, GetterMut, DisplayDebug, Setter)]
 pub struct RouteMatcher {
     /// A hash map for storing and quickly retrieving handlers for static route.

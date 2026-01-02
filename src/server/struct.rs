@@ -1,6 +1,6 @@
 use crate::*;
 
-/// Represents the state associated with a single connection handler.
+/// Represents the state associated with a single connection hook.
 ///
 /// This struct encapsulates the necessary context for processing a connection,
 /// including a reference to the network stream and request configuration. It is created
@@ -31,13 +31,20 @@ pub(crate) struct ServerInner {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) route_matcher: RouteMatcher,
-    /// A collection of panic hook handlers that are invoked when a panic occurs during request processing.
+    /// A collection of request error handlers that are invoked when a request error occurs during HTTP request processing.
     /// This allows for graceful error recovery and customized error responses.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) panic_hook: ServerHookList,
+    pub(super) request_error: ServerHookList,
+    /// A collection of panic handlers that are invoked when a panic occurs during request processing.
+    /// This allows for graceful error recovery and customized error responses.
+    #[debug(skip)]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) panic: ServerHookList,
     /// A collection of request middleware handlers.
     #[debug(skip)]
     #[get(pub(super))]
