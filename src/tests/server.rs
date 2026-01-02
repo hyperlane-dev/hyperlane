@@ -248,8 +248,8 @@ impl ServerHook for ServerPanic {
 #[tokio::test]
 async fn main() {
     let server: Server = Server::new().await;
-    server.request_error::<RequestError>().await;
     server.panic::<ServerPanic>().await;
+    server.request_error::<RequestError>().await;
     server.request_middleware::<SendBodyMiddleware>().await;
     server.request_middleware::<UpgradeMiddleware>().await;
     server.response_middleware::<ResponseMiddleware>().await;
