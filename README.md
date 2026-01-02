@@ -40,25 +40,8 @@ git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
 ```rust
 use hyperlane::*;
 
-struct UpgradeMiddleware;
 struct SendBodyMiddleware {
     socket_addr: String,
-}
-struct ResponseMiddleware;
-struct RequestErrorHook;
-struct PanicHook {
-    response_body: String,
-    content_type: String,
-}
-struct RootRoute {
-    response_body: String,
-    cookie1: String,
-    cookie2: String,
-}
-struct SseRoute;
-struct WebsocketRoute;
-struct DynamicRoute {
-    params: RouteParams,
 }
 
 impl ServerHook for SendBodyMiddleware {
@@ -84,6 +67,8 @@ impl ServerHook for SendBodyMiddleware {
             .await;
     }
 }
+
+struct UpgradeMiddleware;
 
 impl ServerHook for UpgradeMiddleware {
     async fn new(_ctx: &Context) -> Self {
@@ -114,6 +99,8 @@ impl ServerHook for UpgradeMiddleware {
     }
 }
 
+struct ResponseMiddleware;
+
 impl ServerHook for ResponseMiddleware {
     async fn new(_ctx: &Context) -> Self {
         Self
@@ -125,6 +112,12 @@ impl ServerHook for ResponseMiddleware {
         }
         ctx.send().await;
     }
+}
+
+struct RootRoute {
+    response_body: String,
+    cookie1: String,
+    cookie2: String,
 }
 
 impl ServerHook for RootRoute {
@@ -149,6 +142,8 @@ impl ServerHook for RootRoute {
             .await;
     }
 }
+
+struct WebsocketRoute;
 
 impl WebsocketRoute {
     async fn send_body_hook(&self, ctx: &Context) {
@@ -186,6 +181,8 @@ impl ServerHook for WebsocketRoute {
     }
 }
 
+struct SseRoute;
+
 impl ServerHook for SseRoute {
     async fn new(_ctx: &Context) -> Self {
         Self
@@ -206,6 +203,10 @@ impl ServerHook for SseRoute {
     }
 }
 
+struct DynamicRoute {
+    params: RouteParams,
+}
+
 impl ServerHook for DynamicRoute {
     async fn new(ctx: &Context) -> Self {
         Self {
@@ -219,7 +220,9 @@ impl ServerHook for DynamicRoute {
     }
 }
 
-impl ServerHook for RequestErrorHook {
+struct RequestError;
+
+impl ServerHook for RequestError {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
@@ -232,12 +235,16 @@ impl ServerHook for RequestErrorHook {
     }
 }
 
-impl ServerHook for PanicHook {
+struct ServerPanic {
+    response_body: String,
+    content_type: String,
+}
+
+impl ServerHook for ServerPanic {
     async fn new(ctx: &Context) -> Self {
         let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
         let response_body: String = error.to_string();
-        let content_type: String =
-            ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
         Self {
             response_body,
             content_type,
@@ -264,15 +271,9 @@ impl ServerHook for PanicHook {
 
 #[tokio::main]
 async fn main() {
-    let config: ServerConfig = ServerConfig::new().await;
-    config.host("0.0.0.0").await;
-    config.port(60000).await;
-    config.request_config(RequestConfig::default()).await;
-    config.disable_linger().await;
-    config.disable_nodelay().await;
-    let server: Server = Server::from(config).await;
-    server.request_error::<RequestErrorHook>().await;
-    server.panic::<PanicHook>().await;
+    let server: Server = Server::new().await;
+    server.request_error::<RequestError>().await;
+    server.panic::<ServerPanic>().await;
     server.request_middleware::<SendBodyMiddleware>().await;
     server.request_middleware::<UpgradeMiddleware>().await;
     server.response_middleware::<ResponseMiddleware>().await;

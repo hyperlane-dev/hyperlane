@@ -17,6 +17,7 @@ mod hook;
 mod panic;
 mod route;
 mod server;
+#[cfg(test)]
 mod tests;
 
 pub use attribute::*;
