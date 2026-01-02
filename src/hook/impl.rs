@@ -78,22 +78,92 @@ impl ServerControlHook {
     }
 }
 
-impl PartialEq for HookHandlerType {
+/// Implements the `PartialEq` trait for `HookType`.
+///
+/// This allows for comparing two `HookType` instances for equality.
+/// Function pointers are compared using `std::ptr::fn_addr_eq` for reliable comparison.
+impl PartialEq for HookType {
+    /// Checks if two `HookType` instances are equal.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Self` - The other `HookType` instance to compare against.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if the instances are equal, `false` otherwise.
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (HookHandlerType::Handler(handler_a), HookHandlerType::Handler(handler_b)) => {
-                Arc::ptr_eq(handler_a, handler_b)
+            (HookType::Panic(order1, factory1), HookType::Panic(order2, factory2)) => {
+                order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2)
             }
-            (HookHandlerType::Factory(factory_a), HookHandlerType::Factory(factory_b)) => {
-                std::ptr::eq(factory_a as *const _, factory_b as *const _)
+            (
+                HookType::RequestError(order1, factory1),
+                HookType::RequestError(order2, factory2),
+            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
+            (
+                HookType::RequestMiddleware(order1, factory1),
+                HookType::RequestMiddleware(order2, factory2),
+            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
+            (HookType::Route(path1, factory1), HookType::Route(path2, factory2)) => {
+                path1 == path2 && std::ptr::fn_addr_eq(*factory1, *factory2)
             }
+            (
+                HookType::ResponseMiddleware(order1, factory1),
+                HookType::ResponseMiddleware(order2, factory2),
+            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
             _ => false,
         }
     }
 }
 
-impl Eq for HookHandlerType {}
+/// Implements the `Eq` trait for `HookType`.
+///
+/// This indicates that `HookType` has a total equality relation.
+impl Eq for HookType {}
+
+/// Implements the `Hash` trait for `HookType`.
+///
+/// This allows `HookType` to be used as a key in hash-based collections.
+/// Function pointers are hashed using their addresses.
+impl Hash for HookType {
+    /// Hashes the `HookType` instance.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut Hasher` - The hasher to use.
+    #[inline(always)]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            HookType::Panic(order, factory) => {
+                0u8.hash(state);
+                order.hash(state);
+                (factory as *const fn() -> ServerHookHandler).hash(state);
+            }
+            HookType::RequestError(order, factory) => {
+                1u8.hash(state);
+                order.hash(state);
+                (factory as *const fn() -> ServerHookHandler).hash(state);
+            }
+            HookType::RequestMiddleware(order, factory) => {
+                2u8.hash(state);
+                order.hash(state);
+                (factory as *const fn() -> ServerHookHandler).hash(state);
+            }
+            HookType::Route(path, factory) => {
+                3u8.hash(state);
+                path.hash(state);
+                (factory as *const fn() -> ServerHookHandler).hash(state);
+            }
+            HookType::ResponseMiddleware(order, factory) => {
+                4u8.hash(state);
+                order.hash(state);
+                (factory as *const fn() -> ServerHookHandler).hash(state);
+            }
+        }
+    }
+}
 
 /// Implementation block for `HookType`.
 ///
@@ -110,12 +180,23 @@ impl HookType {
     ///
     /// - `Option<isize>` - `Some(order)` if the hook defines a priority, otherwise `None`.
     #[inline(always)]
-    pub fn try_get(&self) -> Option<isize> {
+    pub fn try_get_order(&self) -> Option<isize> {
         match *self {
-            HookType::RequestMiddleware(order)
-            | HookType::ResponseMiddleware(order)
-            | HookType::Panic(order)
-            | HookType::RequestError(order) => order,
+            HookType::RequestMiddleware(order, _)
+            | HookType::ResponseMiddleware(order, _)
+            | HookType::Panic(order, _)
+            | HookType::RequestError(order, _) => order,
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_get_hook(&self) -> Option<ServerHookHandlerFactory> {
+        match *self {
+            HookType::RequestMiddleware(_, hook)
+            | HookType::ResponseMiddleware(_, hook)
+            | HookType::Panic(_, hook)
+            | HookType::RequestError(_, hook) => Some(hook),
             _ => None,
         }
     }

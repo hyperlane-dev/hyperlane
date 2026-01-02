@@ -30,23 +30,19 @@ where
 ///
 /// # Arguments
 ///
-/// - `Vec<HookMacro>`- A vector of `HookMacro` instances to be checked.
+/// - `Vec<HookType>`- A vector of `HookType` instances to be checked.
 ///
 /// # Panics
 ///
 /// - Panics if two or more `Hook` items of the same type define the same non-zero `order`.
 #[inline(always)]
-pub fn assert_hook_unique_order(list: Vec<HookMacro>) {
+pub fn assert_hook_unique_order(list: Vec<HookType>) {
     let mut seen: HashSet<(HookType, isize)> = HashSet::new();
-    list.iter()
-        .filter_map(|hook| {
-            hook.hook_type
-                .try_get()
-                .map(|order| (hook.hook_type, order))
-        })
-        .for_each(|(key, order)| {
-            if !seen.insert((key, order)) {
-                panic!("Duplicate hook detected: {} with order {}", key, order);
+    list.iter().for_each(|hook| {
+        if let Some(order) = hook.try_get_order() {
+            if !seen.insert((*hook, order)) {
+                panic!("Duplicate hook detected: {} with order {}", hook, order);
             }
-        });
+        }
+    });
 }

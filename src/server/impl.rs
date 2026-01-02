@@ -181,58 +181,36 @@ impl Server {
 
     /// Handle a given hook macro asynchronously.
     ///
-    /// This function dispatches the provided `HookMacro` to the appropriate
+    /// This function dispatches the provided `HookType` to the appropriate
     /// internal hook based on its `HookType`. Supported hook types include
     /// panic hooks, request error hooks, request/response middleware, and route.
     ///
     /// # Arguments
     ///
-    /// - `HookMacro`- The `HookMacro` instance containing the `HookType` and its hook.
-    pub async fn handle_hook(&self, hook: HookMacro) {
-        match (hook.hook_type, hook.hook) {
-            (HookType::Panic(_), HookHandlerType::Handler(hook)) => {
-                self.write().await.get_mut_panic().push(hook);
+    /// - `HookType`- The `HookType` instance containing the `HookType` and its hook.
+    pub async fn handle_hook(&self, hook: HookType) {
+        match hook {
+            HookType::Panic(_, hook) => {
+                self.write().await.get_mut_panic().push(hook());
             }
-            (HookType::Panic(_), HookHandlerType::Factory(factory)) => {
-                self.write().await.get_mut_panic().push(factory());
+            HookType::RequestError(_, hook) => {
+                self.write().await.get_mut_request_error().push(hook());
             }
-            (HookType::RequestError(_), HookHandlerType::Handler(hook)) => {
-                self.write().await.get_mut_request_error().push(hook);
+            HookType::RequestMiddleware(_, hook) => {
+                self.write().await.get_mut_request_middleware().push(hook());
             }
-            (HookType::RequestError(_), HookHandlerType::Factory(factory)) => {
-                self.write().await.get_mut_request_error().push(factory());
-            }
-            (HookType::RequestMiddleware(_), HookHandlerType::Handler(hook)) => {
-                self.write().await.get_mut_request_middleware().push(hook);
-            }
-            (HookType::RequestMiddleware(_), HookHandlerType::Factory(factory)) => {
-                self.write()
-                    .await
-                    .get_mut_request_middleware()
-                    .push(factory());
-            }
-            (HookType::Route(path), HookHandlerType::Handler(hook)) => {
+            HookType::Route(path, hook) => {
                 self.write()
                     .await
                     .get_mut_route_matcher()
-                    .add(path, hook)
+                    .add(path, hook())
                     .unwrap();
             }
-            (HookType::Route(path), HookHandlerType::Factory(factory)) => {
-                self.write()
-                    .await
-                    .get_mut_route_matcher()
-                    .add(path, factory())
-                    .unwrap();
-            }
-            (HookType::ResponseMiddleware(_), HookHandlerType::Handler(hook)) => {
-                self.write().await.get_mut_response_middleware().push(hook);
-            }
-            (HookType::ResponseMiddleware(_), HookHandlerType::Factory(factory)) => {
+            HookType::ResponseMiddleware(_, hook) => {
                 self.write()
                     .await
                     .get_mut_response_middleware()
-                    .push(factory());
+                    .push(hook());
             }
         };
     }
