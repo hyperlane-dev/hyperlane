@@ -1,6 +1,6 @@
 use crate::*;
 
-/// Represents different kinds of hooks in the server lifecycle.
+/// Represents different types of hooks in the server lifecycle.
 ///
 /// Each variant corresponds to a specific hook that can be registered
 /// and triggered at different stages of request handling or server events.
@@ -8,24 +8,29 @@ use crate::*;
 /// the default order (0 or unspecified).
 #[derive(Clone, Debug, Copy, DisplayDebug)]
 pub enum HookType {
-    /// Triggered when a panic occurs in the server.
+    /// Hook triggered when a panic occurs during request processing.
     ///
-    /// - `Option<isize>`- Optional priority of the panic. `None` means default.
+    /// - `Option<isize>` - Optional execution priority. Higher values execute first.
+    /// - `ServerHookHandlerFactory` - Factory function creating the panic handler.
     Panic(Option<isize>, ServerHookHandlerFactory),
-    /// Triggered when a request error occurs during HTTP request processing.
+    /// Hook triggered when a request error occurs during HTTP request processing.
     ///
-    /// - `Option<isize>`- Optional priority of the request error. `None` means default.
+    /// - `Option<isize>` - Optional execution priority. Higher values execute first.
+    /// - `ServerHookHandlerFactory` - Factory function creating the error handler.
     RequestError(Option<isize>, ServerHookHandlerFactory),
-    /// Executed before a request reaches its designated route hook.
+    /// Hook executed before a request reaches its designated route handler.
     ///
-    /// - `Option<isize>`- Optional priority of the request middleware.
+    /// - `Option<isize>` - Optional execution priority. Higher values execute first.
+    /// - `ServerHookHandlerFactory` - Factory function creating the middleware handler.
     RequestMiddleware(Option<isize>, ServerHookHandlerFactory),
-    /// Represents a route hook for a specific path.
+    /// Hook representing a route handler for a specific path.
     ///
-    /// - `&'static str`- The route path handled by this hook.
+    /// - `&'static str` - The route path pattern handled by this hook.
+    /// - `ServerHookHandlerFactory` - Factory function creating the route handler.
     Route(&'static str, ServerHookHandlerFactory),
-    /// Executed after a route hook but before the response is sent.
+    /// Hook executed after a route handler but before the response is sent.
     ///
-    /// - `Option<isize>`- Optional priority of the response middleware.
+    /// - `Option<isize>` - Optional execution priority. Higher values execute first.
+    /// - `ServerHookHandlerFactory` - Factory function creating the middleware handler.
     ResponseMiddleware(Option<isize>, ServerHookHandlerFactory),
 }

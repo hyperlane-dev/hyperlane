@@ -45,7 +45,8 @@ struct SendBodyMiddleware {
     socket_addr: String,
 }
 struct ResponseMiddleware;
-struct ServerPanicHook {
+struct RequestErrorHook;
+struct PanicHook {
     response_body: String,
     content_type: String,
 }
@@ -218,7 +219,20 @@ impl ServerHook for DynamicRoute {
     }
 }
 
-impl ServerHook for ServerPanicHook {
+impl ServerHook for RequestErrorHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .send()
+            .await;
+    }
+}
+
+impl ServerHook for PanicHook {
     async fn new(ctx: &Context) -> Self {
         let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
         let response_body: String = error.to_string();
@@ -257,10 +271,11 @@ async fn main() {
     config.disable_linger().await;
     config.disable_nodelay().await;
     let server: Server = Server::from(config).await;
+    server.request_error::<RequestErrorHook>().await;
+    server.panic::<PanicHook>().await;
     server.request_middleware::<SendBodyMiddleware>().await;
     server.request_middleware::<UpgradeMiddleware>().await;
     server.response_middleware::<ResponseMiddleware>().await;
-    server.panic::<ServerPanicHook>().await;
     server.route::<RootRoute>("/").await;
     server.route::<WebsocketRoute>("/websocket").await;
     server.route::<SseRoute>("/sse").await;

@@ -179,15 +179,20 @@ impl Server {
         self.read().await.get_route_matcher().clone()
     }
 
-    /// Handle a given hook macro asynchronously.
+    /// Registers a hook into the server's processing pipeline.
     ///
     /// This function dispatches the provided `HookType` to the appropriate
-    /// internal hook based on its `HookType`. Supported hook types include
-    /// panic hooks, request error hooks, request/response middleware, and route.
+    /// internal hook collection based on its variant. The hook will be executed
+    /// at the corresponding stage of request processing according to its type:
+    /// - `Panic`: Added to panic handlers for error recovery
+    /// - `RequestError`: Added to request error handlers
+    /// - `RequestMiddleware`: Added to pre-route middleware chain
+    /// - `Route`: Registered as a route handler for the specified path
+    /// - `ResponseMiddleware`: Added to post-route middleware chain
     ///
     /// # Arguments
     ///
-    /// - `HookType`- The `HookType` instance containing the `HookType` and its hook.
+    /// - `HookType` - The `HookType` instance containing the hook configuration and factory.
     pub async fn handle_hook(&self, hook: HookType) {
         match hook {
             HookType::Panic(_, hook) => {
@@ -581,7 +586,7 @@ impl Server {
             .set_response_body(&error.to_string())
             .await;
         for hook in self.read().await.get_request_error().iter() {
-            self.spawn_handler(ctx, &hook).await;
+            self.spawn_handler(ctx, hook).await;
             if ctx.get_aborted().await {
                 return;
             }

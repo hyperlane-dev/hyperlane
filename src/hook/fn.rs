@@ -22,27 +22,29 @@ where
     })
 }
 
-/// Verify that each `Hook` in the list with the same type and non-zero priority is unique.
+/// Verifies that hooks with the same type and execution priority are unique.
 ///
-/// This function iterates over all provided `Hook` items and ensures that no two
-/// `Hook` items of the same type define the same non-zero `order`. If a duplicate
-/// is found, the function will panic at runtime.
+/// This function validates that no two hooks of the same type have identical
+/// execution priorities (orders). Only hooks that define an explicit priority
+/// (non-None order) are checked for uniqueness. Hooks without a priority are
+/// ignored in duplicate detection.
 ///
 /// # Arguments
 ///
-/// - `Vec<HookType>`- A vector of `HookType` instances to be checked.
+/// - `Vec<HookType>` - A vector of `HookType` instances to validate for uniqueness.
 ///
 /// # Panics
 ///
-/// - Panics if two or more `Hook` items of the same type define the same non-zero `order`.
+/// - Panics if duplicate hooks are detected with the same type and priority,
+///   displaying the hook type and order in the error message.
 #[inline(always)]
 pub fn assert_hook_unique_order(list: Vec<HookType>) {
     let mut seen: HashSet<(HookType, isize)> = HashSet::new();
     list.iter().for_each(|hook| {
-        if let Some(order) = hook.try_get_order() {
-            if !seen.insert((*hook, order)) {
-                panic!("Duplicate hook detected: {} with order {}", hook, order);
-            }
+        if let Some(order) = hook.try_get_order()
+            && !seen.insert((*hook, order))
+        {
+            panic!("Duplicate hook detected: {} with order {}", hook, order);
         }
     });
 }

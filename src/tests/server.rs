@@ -248,11 +248,11 @@ async fn test_server() {
         config.disable_linger().await;
         config.disable_nodelay().await;
         let server: Server = Server::from(config).await;
+        server.request_error::<RequestErrorHook>().await;
+        server.panic::<PanicHook>().await;
         server.request_middleware::<SendBodyMiddleware>().await;
         server.request_middleware::<UpgradeMiddleware>().await;
         server.response_middleware::<ResponseMiddleware>().await;
-        server.request_error::<RequestErrorHook>().await;
-        server.panic::<PanicHook>().await;
         server.route::<RootRoute>("/").await;
         server.route::<WebsocketRoute>("/websocket").await;
         server.route::<SseRoute>("/sse").await;
