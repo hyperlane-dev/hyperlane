@@ -16,12 +16,12 @@ async fn server_inner_partial_eq() {
     assert_eq!(inner1, inner2);
 }
 
-struct TaskPanic {
+struct TaskPanicHook {
     response_body: String,
     content_type: String,
 }
 
-impl ServerHook for TaskPanic {
+impl ServerHook for TaskPanicHook {
     async fn new(ctx: &Context) -> Self {
         let error: PanicData = ctx.try_get_task_panic_data().await.unwrap_or_default();
         let response_body: String = error.to_string();
@@ -50,12 +50,12 @@ impl ServerHook for TaskPanic {
     }
 }
 
-struct RequestReadError {
+struct RequestErrorHook {
     response_status_code: ResponseStatusCode,
     response_body: String,
 }
 
-impl ServerHook for RequestReadError {
+impl ServerHook for RequestErrorHook {
     async fn new(ctx: &Context) -> Self {
         let request_error: RequestError =
             ctx.try_get_request_error_data().await.unwrap_or_default();
@@ -260,8 +260,8 @@ impl ServerHook for DynamicRoute {
 #[tokio::test]
 async fn main() {
     let server: Server = Server::new().await;
-    server.task_panic::<TaskPanic>().await;
-    server.request_error::<RequestReadError>().await;
+    server.task_panic::<TaskPanicHook>().await;
+    server.request_error::<RequestErrorHook>().await;
     server.request_middleware::<SendBodyMiddleware>().await;
     server.request_middleware::<UpgradeMiddleware>().await;
     server.response_middleware::<ResponseMiddleware>().await;
