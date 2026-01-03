@@ -1880,6 +1880,10 @@ impl Context {
     /// # Returns
     ///
     /// - `RequestError` - The request error information if an error was caught.
+    ///
+    /// # Panics
+    ///
+    /// - If the request error information is not found.
     pub async fn get_request_error_data(&self) -> RequestError {
         self.get_internal_attribute(InternalAttribute::RequestErrorData)
             .await
