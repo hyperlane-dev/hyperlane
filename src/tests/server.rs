@@ -57,7 +57,8 @@ struct ServerRequestError {
 
 impl ServerHook for ServerRequestError {
     async fn new(ctx: &Context) -> Self {
-        let request_error: RequestError = ctx.try_get_request_error().await.unwrap_or_default();
+        let request_error: RequestError =
+            ctx.try_get_request_read_error().await.unwrap_or_default();
         Self {
             response_status_code: request_error.get_http_status_code(),
             response_body: request_error.to_string(),

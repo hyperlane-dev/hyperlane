@@ -581,10 +581,10 @@ impl Server {
     ///
     /// - `&Context` - The request context.
     /// - `&RequestError` - The error that occurred.
-    pub async fn handle_http_requests_error(&self, ctx: &Context, error: &RequestError) {
+    pub async fn handle_request_read_error(&self, ctx: &Context, error: &RequestError) {
         ctx.cancel_aborted()
             .await
-            .set_request_error(error.clone())
+            .set_request_read_error(error.clone())
             .await;
         for hook in self.read().await.get_request_error().iter() {
             self.spawn_handler(ctx, hook, true).await;
@@ -609,8 +609,7 @@ impl Server {
                 self.handle_http_requests(&hook, &request).await;
             }
             Err(error) => {
-                self.handle_http_requests_error(&stream.into(), &error)
-                    .await;
+                self.handle_request_read_error(&stream.into(), &error).await;
             }
         }
     }
@@ -669,7 +668,7 @@ impl Server {
                     }
                 }
                 Err(error) => {
-                    self.handle_http_requests_error(&state.get_stream().into(), &error)
+                    self.handle_request_read_error(&state.get_stream().into(), &error)
                         .await;
                     return;
                 }
