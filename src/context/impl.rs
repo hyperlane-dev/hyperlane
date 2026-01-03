@@ -1813,39 +1813,39 @@ impl Context {
         self
     }
 
-    /// Sets the panic data for the context.
+    /// Stores panic data for the current task context.
     ///
     /// # Arguments
     ///
-    /// - `PanicData` - The panic data to store.
+    /// - `PanicData` - The panic data specific to the current task.
     ///
     /// # Returns
     ///
-    /// - `&Self` - A reference to the modified context.
+    /// - `&Self` - Reference to the modified context for method chaining.
     pub(crate) async fn set_task_panic(&self, panic_data: PanicData) -> &Self {
         self.set_internal_attribute(InternalAttribute::TaskPanicData, panic_data)
             .await
     }
 
-    /// Retrieves panic data if a panic has occurred during handling.
+    /// Retrieves panic data associated with the current task.
     ///
     /// # Returns
     ///
-    /// - `Option<PanicData>` - The panic data if a panic was caught.
+    /// - `Option<PanicData>` - Task panic data if a panic was caught during execution.
     pub async fn try_get_task_panic_data(&self) -> Option<PanicData> {
         self.try_get_internal_attribute(InternalAttribute::TaskPanicData)
             .await
     }
 
-    /// Retrieves panic data if a panic has occurred during handling.
+    /// Retrieves panic data associated with the current task.
     ///
     /// # Returns
     ///
-    /// - `PanicData` - The panic data if a panic was caught.
+    /// - `PanicData` - Task panic data if available.
     ///
     /// # Panics
     ///
-    /// - If the panic data is not found.
+    /// - If no task panic data is found.
     pub async fn get_task_panic_data(&self) -> PanicData {
         self.get_internal_attribute(InternalAttribute::TaskPanicData)
             .await
