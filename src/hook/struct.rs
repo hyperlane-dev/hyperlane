@@ -1,5 +1,8 @@
 use crate::*;
 
+/// Default server hook
+pub struct DefaultServerHook;
+
 /// Represents the hooks for managing the server's lifecycle, specifically for waiting and shutting down.
 ///
 /// This struct is returned by the `run` method and provides two key hooks:

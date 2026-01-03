@@ -201,3 +201,28 @@ impl HookType {
         }
     }
 }
+
+/// Implement `ServerHook` for `DefaultServerHook`
+///
+/// This implementation provides default no-op handlers for server hook operations.
+impl ServerHook for DefaultServerHook {
+    /// Creates a new `DefaultServerHook` instance.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Context`: The context object providing server configuration and state
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - A new instance of `DefaultServerHook`
+    async fn new(_: &Context) -> Self {
+        Self
+    }
+
+    /// Handles server hook operations with a no-op implementation.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Context`: The context object providing server configuration and state
+    async fn handle(self, _: &Context) {}
+}
