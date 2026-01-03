@@ -51,7 +51,7 @@ impl ServerHook for ServerPanic {
 }
 
 struct ServerRequestError {
-    status_code: ResponseStatusCode,
+    response_status_code: ResponseStatusCode,
     response_body: String,
 }
 
@@ -60,7 +60,7 @@ impl ServerHook for ServerRequestError {
         let request_error: RequestError =
             ctx.try_get_request_error_data().await.unwrap_or_default();
         Self {
-            status_code: request_error.get_http_status_code(),
+            response_status_code: request_error.get_http_status_code(),
             response_body: request_error.to_string(),
         }
     }
@@ -68,7 +68,7 @@ impl ServerHook for ServerRequestError {
     async fn handle(self, ctx: &Context) {
         ctx.set_response_version(HttpVersion::Http1_1)
             .await
-            .set_response_status_code(self.status_code)
+            .set_response_status_code(self.response_status_code)
             .await
             .set_response_body(self.response_body)
             .await
