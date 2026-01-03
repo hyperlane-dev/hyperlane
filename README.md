@@ -284,7 +284,7 @@ impl ServerHook for DynamicRoute {
 #[tokio::main]
 async fn main() {
     let server: Server = Server::new().await;
-    server.panic::<ServerPanic>().await;
+    server.task_panic::<ServerPanic>().await;
     server.request_error::<ServerRequestError>().await;
     server.request_middleware::<SendBodyMiddleware>().await;
     server.request_middleware::<UpgradeMiddleware>().await;

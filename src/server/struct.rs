@@ -38,13 +38,13 @@ pub(crate) struct ServerInner {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) request_error: ServerHookList,
-    /// A collection of panic handlers that are invoked when a panic occurs during request processing.
+    /// A collection of task panic handlers that are invoked when a panic occurs during request processing.
     /// This allows for graceful error recovery and customized error responses.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) panic: ServerHookList,
+    pub(super) task_panic: ServerHookList,
     /// A collection of request middleware handlers.
     #[debug(skip)]
     #[get(pub(super))]

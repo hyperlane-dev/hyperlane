@@ -11,7 +11,7 @@ impl Default for ServerInner {
     fn default() -> Self {
         Self {
             config: ServerConfigInner::default(),
-            panic: vec![],
+            task_panic: vec![],
             request_error: vec![],
             route_matcher: RouteMatcher::new(),
             request_middleware: vec![],
@@ -36,14 +36,14 @@ impl PartialEq for ServerInner {
     fn eq(&self, other: &Self) -> bool {
         self.config == other.config
             && self.route_matcher == other.route_matcher
-            && self.panic.len() == other.panic.len()
+            && self.task_panic.len() == other.task_panic.len()
             && self.request_error.len() == other.request_error.len()
             && self.request_middleware.len() == other.request_middleware.len()
             && self.response_middleware.len() == other.response_middleware.len()
             && self
-                .panic
+                .task_panic
                 .iter()
-                .zip(other.panic.iter())
+                .zip(other.task_panic.iter())
                 .all(|(a, b)| Arc::ptr_eq(a, b))
             && self
                 .request_error
@@ -196,7 +196,7 @@ impl Server {
     pub async fn handle_hook(&self, hook: HookType) {
         match hook {
             HookType::Panic(_, hook) => {
-                self.write().await.get_mut_panic().push(hook());
+                self.write().await.get_mut_task_panic().push(hook());
             }
             HookType::RequestError(_, hook) => {
                 self.write().await.get_mut_request_error().push(hook());
@@ -249,25 +249,25 @@ impl Server {
         self
     }
 
-    /// Registers a panic handler to the processing pipeline.
+    /// Registers a task panic handler to the processing pipeline.
     ///
-    /// This method allows registering panic handlers that implement the `ServerHook` trait,
+    /// This method allows registering task panic handlers that implement the `ServerHook` trait,
     /// which will be executed when a panic occurs during request processing.
     ///
     /// # Type Parameters
     ///
-    /// - `ServerHook` - The panic handler type that implements `ServerHook`.
+    /// - `ServerHook` - The task panic handler type that implements `ServerHook`.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn panic<S>(&self) -> &Self
+    pub async fn task_panic<S>(&self) -> &Self
     where
         S: ServerHook,
     {
         self.write()
             .await
-            .get_mut_panic()
+            .get_mut_task_panic()
             .push(server_hook_factory::<S>());
         self
     }
@@ -463,8 +463,8 @@ impl Server {
     async fn handle_panic_with_context(&self, ctx: &Context, panic: &PanicData) {
         let panic_clone: PanicData = panic.clone();
         ctx.cancel_aborted().await.set_panic(panic_clone).await;
-        for hook in self.read().await.get_panic().iter() {
-            Box::pin(self.spawn_handler(ctx, hook, false)).await;
+        for hook in self.read().await.get_task_panic().iter() {
+            Box::pin(self.task_handler(ctx, hook, false)).await;
             if ctx.get_aborted().await {
                 return;
             }
@@ -483,23 +483,21 @@ impl Server {
         let panic: PanicData = PanicData::from_join_error(join_error);
         ctx.set_response_status_code(HttpStatus::InternalServerError.code())
             .await;
-        // Use Box::pin to break the recursion in async functions
-        Box::pin(self.handle_panic_with_context(ctx, &panic)).await;
+        self.handle_panic_with_context(ctx, &panic).await;
     }
 
-    /// Spawns a handler for a given context and hook.
+    /// Spawns a task handler for a given context and hook.
     ///
     /// # Arguments
     ///
     /// - `&Context` - The context of the request.
     /// - `&ServerHookHandler` - The hook to execute.
-    /// -
-    async fn spawn_handler(&self, ctx: &Context, hook: &ServerHookHandler, progress: bool) {
+    /// - `bool` - Whether to handle panics that occur during execution.
+    async fn task_handler(&self, ctx: &Context, hook: &ServerHookHandler, progress: bool) {
         if let Err(join_error) = spawn(hook(ctx)).await
             && join_error.is_panic()
         {
             if progress {
-                // Use Box::pin to break the recursion in async functions
                 Box::pin(self.handle_task_panic(ctx, join_error)).await;
             } else {
                 eprintln!("Panic occurred in panic handler: {:?}", join_error);
@@ -587,7 +585,7 @@ impl Server {
             .set_request_read_error(error.clone())
             .await;
         for hook in self.read().await.get_request_error().iter() {
-            self.spawn_handler(ctx, hook, true).await;
+            self.task_handler(ctx, hook, true).await;
             if ctx.get_aborted().await {
                 return;
             }
@@ -687,7 +685,7 @@ impl Server {
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
     pub(super) async fn handle_request_middleware(&self, ctx: &Context) -> bool {
         for hook in self.read().await.get_request_middleware().iter() {
-            self.spawn_handler(ctx, hook, true).await;
+            self.task_handler(ctx, hook, true).await;
             if ctx.get_aborted().await {
                 return true;
             }
@@ -713,7 +711,7 @@ impl Server {
             .try_resolve_route(ctx, path)
             .await
         {
-            self.spawn_handler(ctx, &hook, true).await;
+            self.task_handler(ctx, &hook, true).await;
             if ctx.get_aborted().await {
                 return true;
             }
@@ -732,7 +730,7 @@ impl Server {
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
     pub(super) async fn handle_response_middleware(&self, ctx: &Context) -> bool {
         for hook in self.read().await.get_response_middleware().iter() {
-            self.spawn_handler(ctx, hook, true).await;
+            self.task_handler(ctx, hook, true).await;
             if ctx.get_aborted().await {
                 return true;
             }
