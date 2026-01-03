@@ -1860,8 +1860,8 @@ impl Context {
     /// # Returns
     ///
     /// - `&Self` - A reference to the modified context.
-    pub(crate) async fn set_request_error_data(&self, request_error_data: RequestError) -> &Self {
-        self.set_internal_attribute(InternalAttribute::RequestErrorData, request_error_data)
+    pub(crate) async fn set_request_error(&self, request_error: RequestError) -> &Self {
+        self.set_internal_attribute(InternalAttribute::RequestError, request_error)
             .await
     }
 
@@ -1870,8 +1870,8 @@ impl Context {
     /// # Returns
     ///
     /// - `Option<RequestError>` - The request error information if an error was caught.
-    pub async fn try_get_request_error_data(&self) -> Option<RequestError> {
-        self.try_get_internal_attribute(InternalAttribute::RequestErrorData)
+    pub async fn try_get_request_error(&self) -> Option<RequestError> {
+        self.try_get_internal_attribute(InternalAttribute::RequestError)
             .await
     }
 
@@ -1884,8 +1884,8 @@ impl Context {
     /// # Panics
     ///
     /// - If the request error information is not found.
-    pub async fn get_request_error_data(&self) -> RequestError {
-        self.get_internal_attribute(InternalAttribute::RequestErrorData)
+    pub async fn get_request_error(&self) -> RequestError {
+        self.get_internal_attribute(InternalAttribute::RequestError)
             .await
     }
 

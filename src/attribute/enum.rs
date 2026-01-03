@@ -20,7 +20,7 @@ pub(crate) enum InternalAttribute {
     /// The attribute key for panic handling.
     PanicData,
     /// The attribute key for request error handling.
-    RequestErrorData,
+    RequestError,
     /// The attribute key for hook functions with a custom identifier.
     Hook(String),
 }

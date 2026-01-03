@@ -584,7 +584,7 @@ impl Server {
     pub async fn handle_http_requests_error(&self, ctx: &Context, error: &RequestError) {
         ctx.cancel_aborted()
             .await
-            .set_request_error_data(error.clone())
+            .set_request_error(error.clone())
             .await;
         for hook in self.read().await.get_request_error().iter() {
             self.spawn_handler(ctx, hook, true).await;
