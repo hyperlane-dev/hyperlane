@@ -1813,13 +1813,17 @@ impl Context {
         self
     }
 
-    /// Retrieves panic information if a panic has occurred during handling.
+    /// Sets the panic information for the context.
+    ///
+    /// # Arguments
+    ///
+    /// - `PanicData` - The panic information to store.
     ///
     /// # Returns
     ///
-    /// - `Option<Panic>` - The panic information if a panic was caught.
-    pub async fn try_get_panic(&self) -> Option<Panic> {
-        self.try_get_internal_attribute(InternalAttribute::Panic)
+    /// - `&Self` - A reference to the modified context.
+    pub(crate) async fn set_panic(&self, panic_data: PanicData) -> &Self {
+        self.set_internal_attribute(InternalAttribute::PanicData, panic_data)
             .await
     }
 
@@ -1827,26 +1831,57 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `Panic` - The panic information if a panic was caught.
+    /// - `Option<PanicData>` - The panic information if a panic was caught.
+    pub async fn try_get_panic_data(&self) -> Option<PanicData> {
+        self.try_get_internal_attribute(InternalAttribute::PanicData)
+            .await
+    }
+
+    /// Retrieves panic information if a panic has occurred during handling.
+    ///
+    /// # Returns
+    ///
+    /// - `PanicData` - The panic information if a panic was caught.
     ///
     /// # Panics
     ///
     /// - If the panic information is not found.
-    pub async fn get_panic(&self) -> Panic {
-        self.get_internal_attribute(InternalAttribute::Panic).await
+    pub async fn get_panic_data(&self) -> PanicData {
+        self.get_internal_attribute(InternalAttribute::PanicData)
+            .await
     }
 
-    /// Sets the panic information for the context.
+    /// Sets the request error information for the context.
     ///
     /// # Arguments
     ///
-    /// - `Panic` - The panic information to store.
+    /// - `RequestError` - The request error information to store.
     ///
     /// # Returns
     ///
     /// - `&Self` - A reference to the modified context.
-    pub(crate) async fn set_panic(&self, panic: Panic) -> &Self {
-        self.set_internal_attribute(InternalAttribute::Panic, panic)
+    pub(crate) async fn set_request_error_data(&self, request_error_data: RequestError) -> &Self {
+        self.set_internal_attribute(InternalAttribute::RequestErrorData, request_error_data)
+            .await
+    }
+
+    /// Retrieves request error information if an error occurred during handling.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<RequestError>` - The request error information if an error was caught.
+    pub async fn try_get_request_error_data(&self) -> Option<RequestError> {
+        self.try_get_internal_attribute(InternalAttribute::RequestErrorData)
+            .await
+    }
+
+    /// Retrieves request error information if an error occurred during handling.
+    ///
+    /// # Returns
+    ///
+    /// - `RequestError` - The request error information if an error was caught.
+    pub async fn get_request_error_data(&self) -> RequestError {
+        self.get_internal_attribute(InternalAttribute::RequestErrorData)
             .await
     }
 

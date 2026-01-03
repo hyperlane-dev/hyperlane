@@ -459,17 +459,12 @@ impl Server {
     /// # Arguments
     ///
     /// - `&Context` - The context of the request during which the panic occurred.
-    /// - `&Panic` - The captured panic information.
-    async fn handle_panic_with_context(&self, ctx: &Context, panic: &Panic) {
-        let panic_clone: Panic = panic.clone();
+    /// - `&PanicData` - The captured panic information.
+    async fn handle_panic_with_context(&self, ctx: &Context, panic: &PanicData) {
+        let panic_clone: PanicData = panic.clone();
         ctx.cancel_aborted().await.set_panic(panic_clone).await;
         for hook in self.read().await.get_panic().iter() {
-            if let Err(join_error) = spawn(hook(ctx)).await
-                && join_error.is_panic()
-            {
-                eprintln!("Panic occurred in panic handler: {:?}", join_error);
-                let _ = Self::try_flush_stdout_and_stderr();
-            }
+            Box::pin(self.spawn_handler(ctx, hook, false)).await;
             if ctx.get_aborted().await {
                 return;
             }
@@ -485,10 +480,11 @@ impl Server {
     /// - `&Context` - The context associated with the task.
     /// - `JoinError` - The `JoinError` returned from the panicked task.
     async fn handle_task_panic(&self, ctx: &Context, join_error: JoinError) {
-        let panic: Panic = Panic::from_join_error(join_error);
+        let panic: PanicData = PanicData::from_join_error(join_error);
         ctx.set_response_status_code(HttpStatus::InternalServerError.code())
             .await;
-        self.handle_panic_with_context(ctx, &panic).await;
+        // Use Box::pin to break the recursion in async functions
+        Box::pin(self.handle_panic_with_context(ctx, &panic)).await;
     }
 
     /// Spawns a handler for a given context and hook.
@@ -497,11 +493,18 @@ impl Server {
     ///
     /// - `&Context` - The context of the request.
     /// - `&ServerHookHandler` - The hook to execute.
-    async fn spawn_handler(&self, ctx: &Context, hook: &ServerHookHandler) {
+    /// -
+    async fn spawn_handler(&self, ctx: &Context, hook: &ServerHookHandler, progress: bool) {
         if let Err(join_error) = spawn(hook(ctx)).await
             && join_error.is_panic()
         {
-            self.handle_task_panic(ctx, join_error).await;
+            if progress {
+                // Use Box::pin to break the recursion in async functions
+                Box::pin(self.handle_task_panic(ctx, join_error)).await;
+            } else {
+                eprintln!("Panic occurred in panic handler: {:?}", join_error);
+                let _ = Self::try_flush_stdout_and_stderr();
+            }
         }
     }
 
@@ -581,12 +584,10 @@ impl Server {
     pub async fn handle_http_requests_error(&self, ctx: &Context, error: &RequestError) {
         ctx.cancel_aborted()
             .await
-            .set_response_status_code(error.get_http_status_code())
-            .await
-            .set_response_body(&error.to_string())
+            .set_request_error_data(error.clone())
             .await;
         for hook in self.read().await.get_request_error().iter() {
-            self.spawn_handler(ctx, hook).await;
+            self.spawn_handler(ctx, hook, true).await;
             if ctx.get_aborted().await {
                 return;
             }
@@ -640,7 +641,7 @@ impl Server {
         if self.handle_response_middleware(ctx).await {
             return ctx.is_keep_alive(keep_alive).await;
         }
-        if let Some(panic) = ctx.try_get_panic().await {
+        if let Some(panic) = ctx.try_get_panic_data().await {
             ctx.set_response_status_code(HttpStatus::InternalServerError.code())
                 .await;
             self.handle_panic_with_context(ctx, &panic).await;
@@ -687,7 +688,7 @@ impl Server {
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
     pub(super) async fn handle_request_middleware(&self, ctx: &Context) -> bool {
         for hook in self.read().await.get_request_middleware().iter() {
-            self.spawn_handler(ctx, hook).await;
+            self.spawn_handler(ctx, hook, true).await;
             if ctx.get_aborted().await {
                 return true;
             }
@@ -713,7 +714,7 @@ impl Server {
             .try_resolve_route(ctx, path)
             .await
         {
-            self.spawn_handler(ctx, &hook).await;
+            self.spawn_handler(ctx, &hook, true).await;
             if ctx.get_aborted().await {
                 return true;
             }
@@ -732,7 +733,7 @@ impl Server {
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
     pub(super) async fn handle_response_middleware(&self, ctx: &Context) -> bool {
         for hook in self.read().await.get_response_middleware().iter() {
-            self.spawn_handler(ctx, hook).await;
+            self.spawn_handler(ctx, hook, true).await;
             if ctx.get_aborted().await {
                 return true;
             }

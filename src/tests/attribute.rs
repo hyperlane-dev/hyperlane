@@ -3,13 +3,13 @@ use crate::*;
 #[tokio::test]
 async fn get_panic_from_context() {
     let ctx: Context = Context::default();
-    let set_panic: Panic = Panic::new(
+    let set_panic: PanicData = PanicData::new(
         Some("test".to_string()),
         Some("test".to_string()),
         Some("test".to_string()),
     );
     ctx.set_panic(set_panic.clone()).await;
-    let get_panic: Panic = ctx.try_get_panic().await.unwrap();
+    let get_panic: PanicData = ctx.try_get_panic_data().await.unwrap();
     assert_eq!(set_panic, get_panic);
 }
 
@@ -35,7 +35,7 @@ async fn get_panic_from_join_error() {
         panic!("{}", message.to_string());
     });
     let join_error: JoinError = join_handle.await.unwrap_err();
-    let panic_struct: Panic = Panic::from_join_error(join_error);
+    let panic_struct: PanicData = PanicData::from_join_error(join_error);
     assert!(!panic_struct.get_message().is_none());
     assert!(
         panic_struct

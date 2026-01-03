@@ -1,8 +1,8 @@
 use crate::*;
 
-/// Implementation of methods for the `Panic` struct.
-impl Panic {
-    /// Creates a new `Panic` instance from its constituent parts.
+/// Implementation of methods for the `PanicData` struct.
+impl PanicData {
+    /// Creates a new `PanicData` instance from its constituent parts.
     ///
     /// # Arguments
     ///
@@ -12,7 +12,7 @@ impl Panic {
     ///
     /// # Returns
     ///
-    /// - `Panic` - A new panic instance.
+    /// - `PanicData` - A new panic instance.
     #[inline(always)]
     pub(crate) fn new(
         message: Option<String>,
@@ -32,7 +32,7 @@ impl Panic {
     ///
     /// # Arguments
     ///
-    /// - `&dyn Any` - The payload from a `PanicInfo` object.
+    /// - `&dyn Any` - The payload from a object.
     ///
     /// # Returns
     ///
@@ -46,7 +46,7 @@ impl Panic {
         }
     }
 
-    /// Creates a `Panic` instance from a `tokio::task::JoinError`.
+    /// Creates a `PanicData` instance from a `tokio::task::JoinError`.
     ///
     /// This is used to handle panics that occur within spawned asynchronous tasks,
     /// extracting the panic message from the `JoinError`.
@@ -57,7 +57,7 @@ impl Panic {
     ///
     /// # Returns
     ///
-    /// - `Panic` - A new panic instance with message from error.
+    /// - `PanicData` - A new panic instance with message from error.
     pub(crate) fn from_join_error(join_error: JoinError) -> Self {
         let default_message: String = join_error.to_string();
         let mut message: Option<String> = if let Ok(panic_join_error) = join_error.try_into_panic()
@@ -71,7 +71,7 @@ impl Panic {
         {
             message = Some(default_message);
         }
-        let panic: Panic = Panic::new(message, None, None);
+        let panic: PanicData = PanicData::new(message, None, None);
         panic
     }
 }
