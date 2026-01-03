@@ -12,7 +12,7 @@ impl Default for ServerInner {
         Self {
             config: ServerConfigInner::default(),
             task_panic: vec![],
-            request_error: vec![],
+            request_read_error: vec![],
             route_matcher: RouteMatcher::new(),
             request_middleware: vec![],
             response_middleware: vec![],
@@ -37,7 +37,7 @@ impl PartialEq for ServerInner {
         self.config == other.config
             && self.route_matcher == other.route_matcher
             && self.task_panic.len() == other.task_panic.len()
-            && self.request_error.len() == other.request_error.len()
+            && self.request_read_error.len() == other.request_read_error.len()
             && self.request_middleware.len() == other.request_middleware.len()
             && self.response_middleware.len() == other.response_middleware.len()
             && self
@@ -46,9 +46,9 @@ impl PartialEq for ServerInner {
                 .zip(other.task_panic.iter())
                 .all(|(a, b)| Arc::ptr_eq(a, b))
             && self
-                .request_error
+                .request_read_error
                 .iter()
-                .zip(other.request_error.iter())
+                .zip(other.request_read_error.iter())
                 .all(|(a, b)| Arc::ptr_eq(a, b))
             && self
                 .request_middleware
@@ -185,7 +185,7 @@ impl Server {
     /// internal hook collection based on its variant. The hook will be executed
     /// at the corresponding stage of request processing according to its type:
     /// - `Panic`: Added to panic handlers for error recovery
-    /// - `RequestError`: Added to request error handlers
+    /// - `RequestError`: Added to request read error handlers
     /// - `RequestMiddleware`: Added to pre-route middleware chain
     /// - `Route`: Registered as a route handler for the specified path
     /// - `ResponseMiddleware`: Added to post-route middleware chain
@@ -199,7 +199,7 @@ impl Server {
                 self.write().await.get_mut_task_panic().push(hook());
             }
             HookType::RequestError(_, hook) => {
-                self.write().await.get_mut_request_error().push(hook());
+                self.write().await.get_mut_request_read_error().push(hook());
             }
             HookType::RequestMiddleware(_, hook) => {
                 self.write().await.get_mut_request_middleware().push(hook());
@@ -272,25 +272,25 @@ impl Server {
         self
     }
 
-    /// Registers a request error handler to the processing pipeline.
+    /// Registers a request read error handler to the processing pipeline.
     ///
-    /// This method allows registering request error handlers that implement the `ServerHook` trait,
-    /// which will be executed when a request error occurs during HTTP request processing.
+    /// This method allows registering request read error handlers that implement the `ServerHook` trait,
+    /// which will be executed when a request read error occurs during HTTP request processing.
     ///
     /// # Type Parameters
     ///
-    /// - `ServerHook` - The request error handler type that implements `ServerHook`.
+    /// - `ServerHook` - The request read error handler type that implements `ServerHook`.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn request_error<S>(&self) -> &Self
+    pub async fn request_read_error<S>(&self) -> &Self
     where
         S: ServerHook,
     {
         self.write()
             .await
-            .get_mut_request_error()
+            .get_mut_request_read_error()
             .push(server_hook_factory::<S>());
         self
     }
@@ -582,9 +582,9 @@ impl Server {
     pub async fn handle_request_read_error(&self, ctx: &Context, error: &RequestError) {
         ctx.cancel_aborted()
             .await
-            .set_request_read_error(error.clone())
+            .set_request_read_error_data(error.clone())
             .await;
-        for hook in self.read().await.get_request_error().iter() {
+        for hook in self.read().await.get_request_read_error().iter() {
             self.task_handler(ctx, hook, true).await;
             if ctx.get_aborted().await {
                 return;

@@ -13,7 +13,7 @@ pub enum HookType {
     /// - `Option<isize>` - Optional execution priority. Higher values execute first.
     /// - `ServerHookHandlerFactory` - Factory function creating the panic handler.
     Panic(Option<isize>, ServerHookHandlerFactory),
-    /// Hook triggered when a request error occurs during HTTP request processing.
+    /// Hook triggered when a request read error occurs during HTTP request processing.
     ///
     /// - `Option<isize>` - Optional execution priority. Higher values execute first.
     /// - `ServerHookHandlerFactory` - Factory function creating the error handler.

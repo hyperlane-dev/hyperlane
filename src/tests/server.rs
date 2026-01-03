@@ -16,12 +16,12 @@ async fn server_inner_partial_eq() {
     assert_eq!(inner1, inner2);
 }
 
-struct ServerPanic {
+struct TaskPanic {
     response_body: String,
     content_type: String,
 }
 
-impl ServerHook for ServerPanic {
+impl ServerHook for TaskPanic {
     async fn new(ctx: &Context) -> Self {
         let error: PanicData = ctx.try_get_task_panic_data().await.unwrap_or_default();
         let response_body: String = error.to_string();
@@ -50,18 +50,20 @@ impl ServerHook for ServerPanic {
     }
 }
 
-struct ServerRequestError {
+struct RequestReadError {
     response_status_code: ResponseStatusCode,
     response_body: String,
 }
 
-impl ServerHook for ServerRequestError {
+impl ServerHook for RequestReadError {
     async fn new(ctx: &Context) -> Self {
-        let request_error: RequestError =
-            ctx.try_get_request_error_data().await.unwrap_or_default();
+        let request_read_error: RequestError = ctx
+            .try_get_request_read_error_data()
+            .await
+            .unwrap_or_default();
         Self {
-            response_status_code: request_error.get_http_status_code(),
-            response_body: request_error.to_string(),
+            response_status_code: request_read_error.get_http_status_code(),
+            response_body: request_read_error.to_string(),
         }
     }
 
@@ -180,6 +182,28 @@ impl ServerHook for RootRoute {
     }
 }
 
+struct SseRoute;
+
+impl ServerHook for SseRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+            .await
+            .send()
+            .await;
+        for i in 0..10 {
+            ctx.set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
+                .await
+                .send_body()
+                .await;
+        }
+        ctx.closed().await;
+    }
+}
+
 struct WebsocketRoute;
 
 impl WebsocketRoute {
@@ -218,28 +242,6 @@ impl ServerHook for WebsocketRoute {
     }
 }
 
-struct SseRoute;
-
-impl ServerHook for SseRoute {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
-            .await
-            .send()
-            .await;
-        for i in 0..10 {
-            ctx.set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
-                .await
-                .send_body()
-                .await;
-        }
-        ctx.closed().await;
-    }
-}
-
 struct DynamicRoute {
     params: RouteParams,
 }
@@ -260,14 +262,14 @@ impl ServerHook for DynamicRoute {
 #[tokio::test]
 async fn main() {
     let server: Server = Server::new().await;
-    server.task_panic::<ServerPanic>().await;
-    server.request_error::<ServerRequestError>().await;
+    server.task_panic::<TaskPanic>().await;
+    server.request_read_error::<RequestReadError>().await;
     server.request_middleware::<SendBodyMiddleware>().await;
     server.request_middleware::<UpgradeMiddleware>().await;
     server.response_middleware::<ResponseMiddleware>().await;
     server.route::<RootRoute>("/").await;
-    server.route::<WebsocketRoute>("/websocket").await;
     server.route::<SseRoute>("/sse").await;
+    server.route::<WebsocketRoute>("/websocket").await;
     server.route::<DynamicRoute>("/dynamic/{routing}").await;
     server.route::<DynamicRoute>("/regex/{file:^.*$}").await;
     let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();

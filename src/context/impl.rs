@@ -1851,41 +1851,44 @@ impl Context {
             .await
     }
 
-    /// Sets the request error information for the context.
+    /// Sets the request read error information for the context.
     ///
     /// # Arguments
     ///
-    /// - `RequestError` - The request error information to store.
+    /// - `RequestError` - The request read error information to store.
     ///
     /// # Returns
     ///
     /// - `&Self` - A reference to the modified context.
-    pub(crate) async fn set_request_read_error(&self, request_error: RequestError) -> &Self {
-        self.set_internal_attribute(InternalAttribute::RequestErrorData, request_error)
+    pub(crate) async fn set_request_read_error_data(
+        &self,
+        request_read_error: RequestError,
+    ) -> &Self {
+        self.set_internal_attribute(InternalAttribute::RequestReadErrorData, request_read_error)
             .await
     }
 
-    /// Retrieves request error information if an error occurred during handling.
+    /// Retrieves request read error information if an error occurred during handling.
     ///
     /// # Returns
     ///
-    /// - `Option<RequestError>` - The request error information if an error was caught.
-    pub async fn try_get_request_error_data(&self) -> Option<RequestError> {
-        self.try_get_internal_attribute(InternalAttribute::RequestErrorData)
+    /// - `Option<RequestError>` - The request read error information if an error was caught.
+    pub async fn try_get_request_read_error_data(&self) -> Option<RequestError> {
+        self.try_get_internal_attribute(InternalAttribute::RequestReadErrorData)
             .await
     }
 
-    /// Retrieves request error information if an error occurred during handling.
+    /// Retrieves request read error information if an error occurred during handling.
     ///
     /// # Returns
     ///
-    /// - `RequestError` - The request error information if an error was caught.
+    /// - `RequestError` - The request read error information if an error was caught.
     ///
     /// # Panics
     ///
-    /// - If the request error information is not found.
-    pub async fn get_request_error_data(&self) -> RequestError {
-        self.get_internal_attribute(InternalAttribute::RequestErrorData)
+    /// - If the request read error information is not found.
+    pub async fn get_request_read_error_data(&self) -> RequestError {
+        self.get_internal_attribute(InternalAttribute::RequestReadErrorData)
             .await
     }
 
