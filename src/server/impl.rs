@@ -462,7 +462,7 @@ impl Server {
     /// - `&PanicData` - The captured panic information.
     async fn handle_panic_with_context(&self, ctx: &Context, panic: &PanicData) {
         let panic_clone: PanicData = panic.clone();
-        ctx.cancel_aborted().await.set_panic(panic_clone).await;
+        ctx.cancel_aborted().await.set_task_panic(panic_clone).await;
         for hook in self.read().await.get_task_panic().iter() {
             Box::pin(self.task_handler(ctx, hook, false)).await;
             if ctx.get_aborted().await {
@@ -638,7 +638,7 @@ impl Server {
         if self.handle_response_middleware(ctx).await {
             return ctx.is_keep_alive(keep_alive).await;
         }
-        if let Some(panic) = ctx.try_get_panic_data().await {
+        if let Some(panic) = ctx.try_get_task_panic_data().await {
             ctx.set_response_status_code(HttpStatus::InternalServerError.code())
                 .await;
             self.handle_panic_with_context(ctx, &panic).await;

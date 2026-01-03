@@ -18,7 +18,7 @@ pub(crate) enum Attribute {
 #[derive(CustomDebug, Clone, PartialEq, Eq, Hash, DisplayDebug)]
 pub(crate) enum InternalAttribute {
     /// The attribute key for panic handling.
-    PanicData,
+    TaskPanicData,
     /// The attribute key for request error handling.
     RequestErrorData,
     /// The attribute key for hook functions with a custom identifier.

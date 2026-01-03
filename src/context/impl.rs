@@ -1822,8 +1822,8 @@ impl Context {
     /// # Returns
     ///
     /// - `&Self` - A reference to the modified context.
-    pub(crate) async fn set_panic(&self, panic_data: PanicData) -> &Self {
-        self.set_internal_attribute(InternalAttribute::PanicData, panic_data)
+    pub(crate) async fn set_task_panic(&self, panic_data: PanicData) -> &Self {
+        self.set_internal_attribute(InternalAttribute::TaskPanicData, panic_data)
             .await
     }
 
@@ -1832,8 +1832,8 @@ impl Context {
     /// # Returns
     ///
     /// - `Option<PanicData>` - The panic data if a panic was caught.
-    pub async fn try_get_panic_data(&self) -> Option<PanicData> {
-        self.try_get_internal_attribute(InternalAttribute::PanicData)
+    pub async fn try_get_task_panic_data(&self) -> Option<PanicData> {
+        self.try_get_internal_attribute(InternalAttribute::TaskPanicData)
             .await
     }
 
@@ -1846,8 +1846,8 @@ impl Context {
     /// # Panics
     ///
     /// - If the panic data is not found.
-    pub async fn get_panic_data(&self) -> PanicData {
-        self.get_internal_attribute(InternalAttribute::PanicData)
+    pub async fn get_task_panic_data(&self) -> PanicData {
+        self.get_internal_attribute(InternalAttribute::TaskPanicData)
             .await
     }
 

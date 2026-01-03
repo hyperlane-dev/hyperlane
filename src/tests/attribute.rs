@@ -8,8 +8,8 @@ async fn get_panic_from_context() {
         Some("test".to_string()),
         Some("test".to_string()),
     );
-    ctx.set_panic(set_panic.clone()).await;
-    let get_panic: PanicData = ctx.try_get_panic_data().await.unwrap();
+    ctx.set_task_panic(set_panic.clone()).await;
+    let get_panic: PanicData = ctx.try_get_task_panic_data().await.unwrap();
     assert_eq!(set_panic, get_panic);
 }
 
