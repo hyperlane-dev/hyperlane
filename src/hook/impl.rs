@@ -95,7 +95,7 @@ impl PartialEq for HookType {
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (HookType::Panic(order1, factory1), HookType::Panic(order2, factory2)) => {
+            (HookType::TaskPanic(order1, factory1), HookType::TaskPanic(order2, factory2)) => {
                 order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2)
             }
             (
@@ -136,7 +136,7 @@ impl Hash for HookType {
     #[inline(always)]
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
-            HookType::Panic(order, factory) => {
+            HookType::TaskPanic(order, factory) => {
                 0u8.hash(state);
                 order.hash(state);
                 (factory as *const fn() -> ServerHookHandler).hash(state);
@@ -184,7 +184,7 @@ impl HookType {
         match *self {
             HookType::RequestMiddleware(order, _)
             | HookType::ResponseMiddleware(order, _)
-            | HookType::Panic(order, _)
+            | HookType::TaskPanic(order, _)
             | HookType::RequestError(order, _) => order,
             _ => None,
         }
@@ -195,7 +195,7 @@ impl HookType {
         match *self {
             HookType::RequestMiddleware(_, hook)
             | HookType::ResponseMiddleware(_, hook)
-            | HookType::Panic(_, hook)
+            | HookType::TaskPanic(_, hook)
             | HookType::RequestError(_, hook) => Some(hook),
             _ => None,
         }

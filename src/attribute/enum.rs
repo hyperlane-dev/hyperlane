@@ -19,8 +19,8 @@ pub(crate) enum Attribute {
 pub(crate) enum InternalAttribute {
     /// The attribute key for task panic handling with detailed error information.
     TaskPanicData,
-    /// The attribute key for request read error handling.
-    RequestReadErrorData,
+    /// The attribute key for request error handling.
+    RequestErrorData,
     /// The attribute key for hook functions with a custom identifier.
     Hook(String),
 }

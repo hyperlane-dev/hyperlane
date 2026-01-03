@@ -31,13 +31,13 @@ pub(crate) struct ServerInner {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) route_matcher: RouteMatcher,
-    /// A collection of request read error handlers that are invoked when a request read error occurs during HTTP request processing.
+    /// A collection of request error handlers that are invoked when a request error occurs during HTTP request processing.
     /// This allows for graceful error recovery and customized error responses.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) request_read_error: ServerHookList,
+    pub(super) request_error: ServerHookList,
     /// A collection of task panic handlers that are invoked when a panic occurs during request processing.
     /// This allows for graceful error recovery and customized error responses.
     #[debug(skip)]

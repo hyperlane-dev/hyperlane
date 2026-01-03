@@ -57,13 +57,11 @@ struct RequestReadError {
 
 impl ServerHook for RequestReadError {
     async fn new(ctx: &Context) -> Self {
-        let request_read_error: RequestError = ctx
-            .try_get_request_read_error_data()
-            .await
-            .unwrap_or_default();
+        let request_error: RequestError =
+            ctx.try_get_request_error_data().await.unwrap_or_default();
         Self {
-            response_status_code: request_read_error.get_http_status_code(),
-            response_body: request_read_error.to_string(),
+            response_status_code: request_error.get_http_status_code(),
+            response_body: request_error.to_string(),
         }
     }
 
@@ -263,7 +261,7 @@ impl ServerHook for DynamicRoute {
 async fn main() {
     let server: Server = Server::new().await;
     server.task_panic::<TaskPanic>().await;
-    server.request_read_error::<RequestReadError>().await;
+    server.request_error::<RequestReadError>().await;
     server.request_middleware::<SendBodyMiddleware>().await;
     server.request_middleware::<UpgradeMiddleware>().await;
     server.response_middleware::<ResponseMiddleware>().await;
