@@ -16,7 +16,6 @@ impl Default for ServerConfigInner {
             port: DEFAULT_WEB_PORT,
             request_config: RequestConfig::default(),
             nodelay: DEFAULT_NODELAY,
-            linger: DEFAULT_LINGER,
             ttl: DEFAULT_TTI,
         }
     }
@@ -185,44 +184,6 @@ impl ServerConfig {
     /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn disable_nodelay(&self) -> &Self {
         self.nodelay(false).await
-    }
-
-    /// Sets the `SO_LINGER` option.
-    ///
-    /// # Arguments
-    ///
-    /// - `Option<Duration>`- The `Duration` value for `SO_LINGER`.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - A reference to `Self` for method chaining.
-    pub async fn linger(&self, linger_opt: Option<Duration>) -> &Self {
-        self.write().await.set_linger(linger_opt);
-        self
-    }
-
-    /// Enables the `SO_LINGER` option.
-    ///
-    /// # Arguments
-    ///
-    /// - `Duration`- The `Duration` value for `SO_LINGER`.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - A reference to `Self` for method chaining.
-    pub async fn enable_linger(&self, linger: Duration) -> &Self {
-        self.linger(Some(linger)).await;
-        self
-    }
-
-    /// Disables the `SO_LINGER` option.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - A reference to `Self` for method chaining.
-    pub async fn disable_linger(&self) -> &Self {
-        self.linger(None).await;
-        self
     }
 
     /// Sets the `IP_TTL` option.

@@ -21,18 +21,22 @@ async fn config_from_str() {
                 "http_read_timeout_ms": 6000,
                 "ws_read_timeout_ms": 1800000
             },
-            "nodelay": true,
-            "linger": { "secs": 64, "nanos": 0 },
+            "nodelay": true,            
             "ttl": 64
         }
     "#;
     let config: ServerConfig = ServerConfig::from_json_str(config_str).unwrap();
     let new_config: ServerConfig = ServerConfig::new().await;
-    new_config.host("0.0.0.0").await;
-    new_config.port(80).await;
-    new_config.request_config(RequestConfig::default()).await;
-    new_config.enable_nodelay().await;
-    new_config.linger(Some(Duration::from_secs(64))).await;
-    new_config.ttl(64).await;
+    new_config
+        .host("0.0.0.0")
+        .await
+        .port(80)
+        .await
+        .request_config(RequestConfig::default())
+        .await
+        .enable_nodelay()
+        .await
+        .ttl(64)
+        .await;
     assert_eq!(config, new_config);
 }

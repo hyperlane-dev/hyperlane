@@ -43,7 +43,6 @@ pub(crate) use std::{
     net::SocketAddr,
     pin::Pin,
     sync::Arc,
-    time::Duration,
 };
 
 pub(crate) use inventory::collect;
@@ -61,4 +60,4 @@ pub(crate) use tokio::{
 };
 
 #[cfg(test)]
-pub(crate) use std::time::Instant;
+pub(crate) use std::time::{Duration, Instant};

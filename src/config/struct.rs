@@ -27,11 +27,6 @@ pub(crate) struct ServerConfigInner {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) nodelay: Option<bool>,
-    /// The `SO_LINGER` option for sockets.
-    #[get(pub(crate))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) linger: Option<Duration>,
     /// The `IP_TTL` option for sockets.
     #[get(pub(crate))]
     #[get_mut(pub(super))]

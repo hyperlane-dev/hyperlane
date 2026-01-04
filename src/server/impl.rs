@@ -543,7 +543,7 @@ impl Server {
 
     /// Configures socket options for a newly accepted `TcpStream`.
     ///
-    /// This applies settings like `SO_LINGER`, `TCP_NODELAY`, and `IP_TTL` from the server's configuration.
+    /// This applies settings like `TCP_NODELAY`, and `IP_TTL` from the server's configuration.
     ///
     /// # Arguments
     ///
@@ -551,7 +551,6 @@ impl Server {
     async fn configure_stream(&self, stream: &TcpStream) {
         let server_inner: ServerStateReadGuard = self.read().await;
         let config: &ServerConfigInner = server_inner.get_config();
-        stream.set_linger(*config.get_linger()).unwrap();
         if let Some(nodelay) = config.get_nodelay() {
             let _ = stream.set_nodelay(*nodelay);
         }
