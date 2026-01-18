@@ -551,10 +551,10 @@ impl Server {
     async fn configure_stream(&self, stream: &TcpStream) {
         let server_inner: ServerStateReadGuard = self.read().await;
         let config: &ServerConfigInner = server_inner.get_config();
-        if let Some(nodelay) = config.get_nodelay() {
+        if let Some(nodelay) = config.try_get_nodelay() {
             let _ = stream.set_nodelay(*nodelay);
         }
-        if let Some(ttl) = config.get_ttl() {
+        if let Some(ttl) = config.try_get_ttl() {
             let _ = stream.set_ttl(*ttl);
         }
     }

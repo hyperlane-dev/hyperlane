@@ -276,7 +276,7 @@ impl Context {
     ///
     /// - `Option<ArcRwLockStream>` - The thread-safe, shareable network stream if it exists.
     pub async fn try_get_stream(&self) -> Option<ArcRwLockStream> {
-        self.read().await.get_stream().clone()
+        self.read().await.try_get_stream().clone()
     }
 
     /// Retrieves the underlying network stream.
@@ -1564,7 +1564,7 @@ impl Context {
     ///
     /// - `ResponseStatusCode` - The status code of the response.
     pub async fn get_response_status_code(&self) -> ResponseStatusCode {
-        *self.read().await.get_response().get_status_code()
+        self.read().await.get_response().get_status_code()
     }
 
     /// Sets the status code for the response.

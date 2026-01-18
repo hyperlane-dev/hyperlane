@@ -7,9 +7,9 @@ fn panic_new() {
         Some("location".to_string()),
         Some("payload".to_string()),
     );
-    assert_eq!(panic.get_message(), &Some("message".to_string()));
-    assert_eq!(panic.get_location(), &Some("location".to_string()));
-    assert_eq!(panic.get_payload(), &Some("payload".to_string()));
+    assert_eq!(panic.try_get_message(), &Some("message".to_string()));
+    assert_eq!(panic.try_get_location(), &Some("location".to_string()));
+    assert_eq!(panic.try_get_payload(), &Some("payload".to_string()));
 }
 
 #[tokio::test]
@@ -21,7 +21,7 @@ async fn from_join_error() {
     assert!(result.is_err());
     if let Err(join_error) = result {
         let is_panic: bool = PanicData::from_join_error(join_error)
-            .get_message()
+            .try_get_message()
             .clone()
             .unwrap_or_default()
             .contains("test panic");
