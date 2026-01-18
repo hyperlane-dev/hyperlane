@@ -1893,7 +1893,7 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `ToString` - The key to identify this hook.
+    /// - `AsRef<str>` - The key to identify this hook.
     /// - `FnContextSendSyncStatic<Fut, ()>, Fut: FutureSendStatic<()>` - The hook function to store.
     ///
     /// # Returns
@@ -1901,13 +1901,13 @@ impl Context {
     /// - `&Self` - A reference to the modified context.
     pub async fn set_hook<K, F, Fut>(&self, key: K, hook: F) -> &Self
     where
-        K: ToString,
+        K: AsRef<str>,
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
         let hook_fn: HookHandler<()> =
             Arc::new(move |ctx: Context| -> SendableAsyncTask<()> { Box::pin(hook(ctx)) });
-        self.set_internal_attribute(InternalAttribute::Hook(key.to_string()), hook_fn)
+        self.set_internal_attribute(InternalAttribute::Hook(key.as_ref().to_owned()), hook_fn)
             .await
     }
 
@@ -1915,16 +1915,16 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K: ToString` - The key to identify the hook.
+    /// - `AsRef<str>` - The key to identify the hook.
     ///
     /// # Returns
     ///
     /// - `Option<HookHandler<()>>` - The hook function if it has been set.
     pub async fn try_get_hook<K>(&self, key: K) -> Option<HookHandler<()>>
     where
-        K: ToString,
+        K: AsRef<str>,
     {
-        self.try_get_internal_attribute(InternalAttribute::Hook(key.to_string()))
+        self.try_get_internal_attribute(InternalAttribute::Hook(key.as_ref().to_owned()))
             .await
     }
 
@@ -1932,7 +1932,7 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K: ToString` - The key to identify the hook.
+    /// - `AsRef<str>` - The key to identify the hook.
     ///
     /// # Returns
     ///
@@ -1943,9 +1943,9 @@ impl Context {
     /// - If the hook function is not found.
     pub async fn get_hook<K>(&self, key: K) -> HookHandler<()>
     where
-        K: ToString,
+        K: AsRef<str>,
     {
-        self.get_internal_attribute(InternalAttribute::Hook(key.to_string()))
+        self.get_internal_attribute(InternalAttribute::Hook(key.as_ref().to_owned()))
             .await
     }
 

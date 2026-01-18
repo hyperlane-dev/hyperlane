@@ -10,7 +10,7 @@ pub(crate) struct ServerConfigInner {
     /// The host address the server will bind to.
     #[get(pub(crate))]
     #[get_mut(pub(super))]
-    #[set(pub(super))]
+    #[set(pub(super), type(AsRef<str>))]
     pub(super) host: String,
     /// The port number the server will listen on.
     #[get(pub(crate))]

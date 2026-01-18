@@ -224,13 +224,16 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `C: ToString` - The configuration.
+    /// - `AsRef<str>` - The configuration.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn config_str<C: ToString>(&self, config_str: C) -> &Self {
-        let config: ServerConfig = ServerConfig::from_json_str(&config_str.to_string()).unwrap();
+    pub async fn config_str<C>(&self, config_str: C) -> &Self
+    where
+        C: AsRef<str>,
+    {
+        let config: ServerConfig = ServerConfig::from_json_str(config_str.as_ref()).unwrap();
         self.write().await.set_config(config.get_inner().await);
         self
     }
@@ -311,14 +314,14 @@ impl Server {
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn route<S>(&self, path: impl ToString) -> &Self
+    pub async fn route<S>(&self, path: impl AsRef<str>) -> &Self
     where
         S: ServerHook,
     {
         self.write()
             .await
             .get_mut_route_matcher()
-            .add(&path.to_string(), server_hook_factory::<S>())
+            .add(path.as_ref(), server_hook_factory::<S>())
             .unwrap();
         self
     }
@@ -373,15 +376,18 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `H: ToString` - The host address.
+    /// - `AsRef<str>` - The host address.
     /// - `u16` - The port number.
     ///
     /// # Returns
     ///
     /// - `String` - The formatted address string.
     #[inline(always)]
-    pub fn format_host_port<H: ToString>(host: H, port: u16) -> String {
-        format!("{}{COLON}{port}", host.to_string())
+    pub fn format_host_port<H>(host: H, port: u16) -> String
+    where
+        H: AsRef<str>,
+    {
+        format!("{}{COLON}{port}", host.as_ref())
     }
 
     /// Flushes the standard output stream.

@@ -116,13 +116,16 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `H`- The host address to set.
+    /// - `AsRef<str>`- The host address to set.
     ///
     /// # Returns
     ///
     /// - `&Self` - A reference to `Self` for method chaining.
-    pub async fn host<H: ToString>(&self, host: H) -> &Self {
-        self.write().await.set_host(host.to_string());
+    pub async fn host<H>(&self, host: H) -> &Self
+    where
+        H: AsRef<str>,
+    {
+        self.write().await.set_host(host);
         self
     }
 
