@@ -470,10 +470,10 @@ impl Server {
     /// - `&PanicData` - The captured panic information.
     async fn handle_panic_with_context(&self, ctx: &Context, panic: &PanicData) {
         let panic_clone: PanicData = panic.clone();
-        ctx.cancel_aborted().set_task_panic(panic_clone);
+        ctx.cancel_aborted().await.set_task_panic(panic_clone).await;
         for hook in self.read().get_task_panic().iter() {
             Box::pin(self.task_handler(ctx, hook, false)).await;
-            if ctx.get_aborted() {
+            if ctx.get_aborted().await {
                 return;
             }
         }
@@ -489,7 +489,8 @@ impl Server {
     /// - `JoinError` - The `JoinError` returned from the panicked task.
     async fn handle_task_panic(&self, ctx: &Context, join_error: JoinError) {
         let panic: PanicData = PanicData::from_join_error(join_error);
-        ctx.set_response_status_code(HttpStatus::InternalServerError.code());
+        ctx.set_response_status_code(HttpStatus::InternalServerError.code())
+            .await;
         self.handle_panic_with_context(ctx, &panic).await;
     }
 
@@ -586,10 +587,13 @@ impl Server {
     /// - `&Context` - The request context.
     /// - `&RequestError` - The error that occurred.
     pub async fn handle_request_error(&self, ctx: &Context, error: &RequestError) {
-        ctx.cancel_aborted().set_request_error_data(error.clone());
+        ctx.cancel_aborted()
+            .await
+            .set_request_error_data(error.clone())
+            .await;
         for hook in self.read().get_request_error().iter() {
             self.task_handler(ctx, hook, true).await;
-            if ctx.get_aborted() {
+            if ctx.get_aborted().await {
                 return;
             }
         }
@@ -633,19 +637,20 @@ impl Server {
         let ctx: &Context = &Context::new(state.get_stream(), request);
         let keep_alive: bool = request.is_enable_keep_alive();
         if self.handle_request_middleware(ctx).await {
-            return ctx.is_keep_alive(keep_alive);
+            return ctx.is_keep_alive(keep_alive).await;
         }
         if self.handle_route_matcher(ctx, route).await {
-            return ctx.is_keep_alive(keep_alive);
+            return ctx.is_keep_alive(keep_alive).await;
         }
         if self.handle_response_middleware(ctx).await {
-            return ctx.is_keep_alive(keep_alive);
+            return ctx.is_keep_alive(keep_alive).await;
         }
-        if let Some(panic) = ctx.try_get_task_panic_data() {
-            ctx.set_response_status_code(HttpStatus::InternalServerError.code());
+        if let Some(panic) = ctx.try_get_task_panic_data().await {
+            ctx.set_response_status_code(HttpStatus::InternalServerError.code())
+                .await;
             self.handle_panic_with_context(ctx, &panic).await;
         }
-        ctx.is_keep_alive(keep_alive)
+        ctx.is_keep_alive(keep_alive).await
     }
 
     /// Handles subsequent HTTP requests on a persistent (keep-alive) connection.
@@ -688,7 +693,7 @@ impl Server {
     pub(super) async fn handle_request_middleware(&self, ctx: &Context) -> bool {
         for hook in self.read().get_request_middleware().iter() {
             self.task_handler(ctx, hook, true).await;
-            if ctx.get_aborted() {
+            if ctx.get_aborted().await {
                 return true;
             }
         }
@@ -706,9 +711,14 @@ impl Server {
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
     pub(super) async fn handle_route_matcher(&self, ctx: &Context, path: &str) -> bool {
-        if let Some(hook) = self.read().get_route_matcher().try_resolve_route(ctx, path) {
+        if let Some(hook) = self
+            .read()
+            .get_route_matcher()
+            .try_resolve_route(ctx, path)
+            .await
+        {
             self.task_handler(ctx, &hook, true).await;
-            if ctx.get_aborted() {
+            if ctx.get_aborted().await {
                 return true;
             }
         }
@@ -727,7 +737,7 @@ impl Server {
     pub(super) async fn handle_response_middleware(&self, ctx: &Context) -> bool {
         for hook in self.read().get_response_middleware().iter() {
             self.task_handler(ctx, hook, true).await;
-            if ctx.get_aborted() {
+            if ctx.get_aborted().await {
                 return true;
             }
         }

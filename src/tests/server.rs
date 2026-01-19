@@ -23,7 +23,7 @@ struct TaskPanicHook {
 
 impl ServerHook for TaskPanicHook {
     async fn new(ctx: &Context) -> Self {
-        let error: PanicData = ctx.try_get_task_panic_data().unwrap_or_default();
+        let error: PanicData = ctx.try_get_task_panic_data().await.unwrap_or_default();
         let response_body: String = error.to_string();
         let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
         Self {
@@ -35,15 +35,21 @@ impl ServerHook for TaskPanicHook {
     async fn handle(self, ctx: &Context) {
         let send_result: Result<(), ResponseError> = ctx
             .set_response_version(HttpVersion::Http1_1)
+            .await
             .set_response_status_code(500)
+            .await
             .clear_response_headers()
+            .await
             .set_response_header(SERVER, HYPERLANE)
+            .await
             .set_response_header(CONTENT_TYPE, &self.content_type)
+            .await
             .set_response_body(&self.response_body)
+            .await
             .try_send()
             .await;
         if send_result.is_err() {
-            ctx.aborted().closed();
+            ctx.aborted().await.closed().await;
         }
     }
 }
@@ -55,7 +61,8 @@ struct RequestErrorHook {
 
 impl ServerHook for RequestErrorHook {
     async fn new(ctx: &Context) -> Self {
-        let request_error: RequestError = ctx.try_get_request_error_data().unwrap_or_default();
+        let request_error: RequestError =
+            ctx.try_get_request_error_data().await.unwrap_or_default();
         Self {
             response_status_code: request_error.get_http_status_code(),
             response_body: request_error.to_string(),
@@ -65,12 +72,15 @@ impl ServerHook for RequestErrorHook {
     async fn handle(self, ctx: &Context) {
         let send_result: Result<(), ResponseError> = ctx
             .set_response_version(HttpVersion::Http1_1)
+            .await
             .set_response_status_code(self.response_status_code)
+            .await
             .set_response_body(self.response_body)
+            .await
             .try_send()
             .await;
         if send_result.is_err() {
-            ctx.aborted().closed();
+            ctx.aborted().await.closed().await;
         }
     }
 }
@@ -87,12 +97,19 @@ impl ServerHook for RequestMiddleware {
 
     async fn handle(self, ctx: &Context) {
         ctx.set_response_version(HttpVersion::Http1_1)
+            .await
             .set_response_status_code(200)
+            .await
             .set_response_header(SERVER, HYPERLANE)
+            .await
             .set_response_header(CONNECTION, KEEP_ALIVE)
+            .await
             .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
+            .await
             .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
-            .set_response_header("SocketAddr", &self.socket_addr);
+            .await
+            .set_response_header("SocketAddr", &self.socket_addr)
+            .await;
     }
 }
 
@@ -104,22 +121,28 @@ impl ServerHook for UpgradeMiddleware {
     }
 
     async fn handle(self, ctx: &Context) {
-        if !ctx.get_request().is_ws() {
+        if !ctx.get_request().await.is_ws() {
             return;
         }
-        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY) {
+        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
             let accept_key: String = WebSocketFrame::generate_accept_key(key);
             let send_result: Result<(), ResponseError> = ctx
                 .set_response_version(HttpVersion::Http1_1)
+                .await
                 .set_response_status_code(101)
+                .await
                 .set_response_header(UPGRADE, WEBSOCKET)
+                .await
                 .set_response_header(CONNECTION, UPGRADE)
+                .await
                 .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
-                .set_response_body(vec![])
+                .await
+                .set_response_body(&vec![])
+                .await
                 .try_send()
                 .await;
             if send_result.is_err() {
-                ctx.aborted().closed();
+                ctx.aborted().await.closed().await;
             }
         }
     }
@@ -133,12 +156,12 @@ impl ServerHook for ResponseMiddleware {
     }
 
     async fn handle(self, ctx: &Context) {
-        if ctx.get_request().is_ws() {
+        if ctx.get_request().await.is_ws() {
             return;
         }
         let send_result: Result<(), ResponseError> = ctx.try_send().await;
         if send_result.is_err() {
-            ctx.aborted().closed();
+            ctx.aborted().await.closed().await;
         }
     }
 }
@@ -151,7 +174,7 @@ struct RootRoute {
 
 impl ServerHook for RootRoute {
     async fn new(ctx: &Context) -> Self {
-        let path: RequestPath = ctx.get_request_path();
+        let path: RequestPath = ctx.get_request_path().await;
         let response_body: String = format!("Hello hyperlane => {}", path);
         let cookie1: String = CookieBuilder::new("key1", "value1").http_only().build();
         let cookie2: String = CookieBuilder::new("key2", "value2").http_only().build();
@@ -164,8 +187,11 @@ impl ServerHook for RootRoute {
 
     async fn handle(self, ctx: &Context) {
         ctx.add_response_header(SET_COOKIE, &self.cookie1)
+            .await
             .add_response_header(SET_COOKIE, &self.cookie2)
-            .set_response_body(&self.response_body);
+            .await
+            .set_response_body(&self.response_body)
+            .await;
     }
 }
 
@@ -179,22 +205,24 @@ impl ServerHook for SseRoute {
     async fn handle(self, ctx: &Context) {
         let send_result: Result<(), ResponseError> = ctx
             .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+            .await
             .try_send()
             .await;
         if send_result.is_err() {
-            ctx.aborted().closed();
+            ctx.aborted().await.closed().await;
         }
         for i in 0..10 {
             let send_result: Result<(), ResponseError> = ctx
-                .set_response_body(format!("data:{}{}", i, HTTP_DOUBLE_BR))
+                .set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
+                .await
                 .try_send_body()
                 .await;
             if send_result.is_err() {
-                ctx.aborted().closed();
+                ctx.aborted().await.closed().await;
                 return;
             }
         }
-        ctx.closed();
+        ctx.closed().await;
     }
 }
 
@@ -202,15 +230,15 @@ struct WebsocketRoute;
 
 impl WebsocketRoute {
     async fn send_body_hook(&self, ctx: &Context) {
-        let send_result: Result<(), ResponseError> = if ctx.get_request().is_ws() {
-            let body: ResponseBody = ctx.get_response_body();
+        let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {
+            let body: ResponseBody = ctx.get_response_body().await;
             let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
             ctx.try_send_body_list_with_data(&frame_list).await
         } else {
             ctx.try_send_body().await
         };
         if send_result.is_err() {
-            ctx.aborted().closed();
+            ctx.aborted().await.closed().await;
         }
     }
 }
@@ -224,13 +252,13 @@ impl ServerHook for WebsocketRoute {
         loop {
             match ctx.ws_from_stream(RequestConfig::default()).await {
                 Ok(_) => {
-                    let request_body: Vec<u8> = ctx.get_request_body();
-                    ctx.set_response_body(&request_body);
+                    let request_body: Vec<u8> = ctx.get_request_body().await;
+                    ctx.set_response_body(&request_body).await;
                     self.send_body_hook(ctx).await;
                     continue;
                 }
                 Err(error) => {
-                    ctx.set_response_body(error.to_string());
+                    ctx.set_response_body(&error.to_string()).await;
                     self.send_body_hook(ctx).await;
                     return;
                 }
@@ -246,7 +274,7 @@ struct DynamicRoute {
 impl ServerHook for DynamicRoute {
     async fn new(ctx: &Context) -> Self {
         Self {
-            params: ctx.get_route_params(),
+            params: ctx.get_route_params().await,
         }
     }
 
