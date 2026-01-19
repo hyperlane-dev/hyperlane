@@ -421,17 +421,17 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `F` - A closure that takes the `Request` and returns a future.
+    /// - `Fn(&Request) -> Fut, Fut: FutureSendStatic<R>` - A closure that takes the `&Request` and returns a future.
     ///
     /// # Returns
     ///
     /// - `R` - The result of the provided closure's future.
     pub async fn with_request<F, Fut, R>(&self, func: F) -> R
     where
-        F: Fn(Request) -> Fut,
+        F: Fn(&Request) -> Fut,
         Fut: FutureSendStatic<R>,
     {
-        func(self.read().await.get_request().clone()).await
+        func(self.read().await.get_request()).await
     }
 
     /// Retrieves the string representation of the current request.
@@ -1078,17 +1078,17 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `F` - A closure that takes the `Response` and returns a future.
+    /// - `F: Fn(&Response) -> Fut, Fut: FutureSendStatic<R>` - A closure that takes the `&Response` and returns a future.
     ///
     /// # Returns
     ///
     /// - `R` - The result of the provided closure's future.
     pub async fn with_response<F, Fut, R>(&self, func: F) -> R
     where
-        F: Fn(Response) -> Fut,
+        F: Fn(&Response) -> Fut,
         Fut: FutureSendStatic<R>,
     {
-        func(self.read().await.get_response().clone()).await
+        func(self.read().await.get_response()).await
     }
 
     /// Retrieves the string representation of the current response.

@@ -156,8 +156,8 @@ fn mixed_route_types() {
     assert!(route_matcher.get_regex_route().contains_key(&2));
 }
 
-#[test]
-fn large_dynamic_routes() {
+#[tokio::test]
+async fn large_dynamic_routes() {
     const ROUTE_COUNT: u32 = 1000;
     let server: Server = Server::new();
     let start_insert: Instant = Instant::now();
@@ -176,7 +176,7 @@ fn large_dynamic_routes() {
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/123");
-        let _ = route_matcher.try_resolve_route(&ctx, &path);
+        let _ = route_matcher.try_resolve_route(&ctx, &path).await;
     }
     let match_duration: Duration = start_match.elapsed();
     println!(
@@ -189,8 +189,8 @@ fn large_dynamic_routes() {
     );
 }
 
-#[test]
-fn large_regex_routes() {
+#[tokio::test]
+async fn large_regex_routes() {
     const ROUTE_COUNT: u32 = 1000;
     let server: Server = Server::new();
     let start_insert: Instant = Instant::now();
@@ -209,7 +209,7 @@ fn large_regex_routes() {
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/123");
-        let _ = route_matcher.try_resolve_route(&ctx, &path);
+        let _ = route_matcher.try_resolve_route(&ctx, &path).await;
     }
     let match_duration: Duration = start_match.elapsed();
     println!(
@@ -222,8 +222,8 @@ fn large_regex_routes() {
     );
 }
 
-#[test]
-fn large_tail_regex_routes() {
+#[tokio::test]
+async fn large_tail_regex_routes() {
     const ROUTE_COUNT: u32 = 1000;
     let server: Server = Server::new();
     let start_insert: Instant = Instant::now();
@@ -242,7 +242,7 @@ fn large_tail_regex_routes() {
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/some/nested/path");
-        let _ = route_matcher.try_resolve_route(&ctx, &path);
+        let _ = route_matcher.try_resolve_route(&ctx, &path).await;
     }
     let match_duration: Duration = start_match.elapsed();
     println!(
