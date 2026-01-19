@@ -229,7 +229,7 @@ impl Server {
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn config_str<C>(&self, config_str: C) -> &Self
+    pub async fn config_from_json_str<C>(&self, config_str: C) -> &Self
     where
         C: AsRef<str>,
     {
@@ -555,8 +555,7 @@ impl Server {
     ///
     /// - `&TcpStream` - A reference to the `TcpStream` to configure.
     async fn configure_stream(&self, stream: &TcpStream) {
-        let server_inner: ServerStateReadGuard = self.read().await;
-        let config: &ServerConfigInner = server_inner.get_config();
+        let config: ServerConfigInner = self.read().await.get_config().clone();
         if let Some(nodelay) = config.try_get_nodelay() {
             let _ = stream.set_nodelay(*nodelay);
         }

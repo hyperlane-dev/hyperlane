@@ -421,7 +421,7 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `F` - A closure that takes the `Request` and returns a future.
+    /// - `Fn(Request) -> Fut, FutureSendStatic<R>` - A closure that takes the `Request` and returns a future.
     ///
     /// # Returns
     ///
@@ -1078,7 +1078,7 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `F` - A closure that takes the `Response` and returns a future.
+    /// - `F: Fn(Response) -> Fut, Fut: FutureSendStatic<R>,` - A closure that takes the `Response` and returns a future.
     ///
     /// # Returns
     ///
