@@ -23,11 +23,7 @@ async fn server_send_sync() {
 
 #[tokio::test]
 async fn server_clone_across_threads() {
-    let server: Server = Server::new()
-        .await
-        .route::<TestSendRoute>("/test")
-        .await
-        .clone();
+    let server: Server = Server::new().route::<TestSendRoute>("/test").clone();
     let server_clone: Server = server.clone();
     let handle: JoinHandle<&'static str> = spawn(async move {
         let _server_in_thread: Server = server_clone;
@@ -39,13 +35,7 @@ async fn server_clone_across_threads() {
 
 #[tokio::test]
 async fn server_share_across_threads() {
-    let server: Arc<Server> = Arc::new(
-        Server::new()
-            .await
-            .route::<TestSendRoute>("/test")
-            .await
-            .clone(),
-    );
+    let server: Arc<Server> = Arc::new(Server::new().route::<TestSendRoute>("/test").clone());
     let server1: Arc<Server> = server.clone();
     let server2: Arc<Server> = server.clone();
     let handle1: JoinHandle<&'static str> = spawn(async move {

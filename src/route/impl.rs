@@ -542,20 +542,16 @@ impl RouteMatcher {
     /// # Returns
     ///
     /// - `Option<ServerHookHandler>` - The matched route hook if found, None otherwise.
-    pub(crate) async fn try_resolve_route(
-        &self,
-        ctx: &Context,
-        path: &str,
-    ) -> Option<ServerHookHandler> {
+    pub(crate) fn try_resolve_route(&self, ctx: &Context, path: &str) -> Option<ServerHookHandler> {
         if let Some(hook) = self.get_static_route().get(path) {
-            ctx.set_route_params(RouteParams::default()).await;
+            ctx.set_route_params(RouteParams::default());
             return Some(hook.clone());
         }
         let path_segment_count: usize = Self::count_path_segments(path);
         if let Some(routes) = self.get_dynamic_route().get(&path_segment_count) {
             for (pattern, hook) in routes {
                 if let Some(params) = pattern.try_match_path(path) {
-                    ctx.set_route_params(params).await;
+                    ctx.set_route_params(params);
                     return Some(hook.clone());
                 }
             }
@@ -563,7 +559,7 @@ impl RouteMatcher {
         if let Some(routes) = self.get_regex_route().get(&path_segment_count) {
             for (pattern, hook) in routes {
                 if let Some(params) = pattern.try_match_path(path) {
-                    ctx.set_route_params(params).await;
+                    ctx.set_route_params(params);
                     return Some(hook.clone());
                 }
             }
@@ -577,7 +573,7 @@ impl RouteMatcher {
                     && path_segment_count >= segment_count
                     && let Some(params) = pattern.try_match_path(path)
                 {
-                    ctx.set_route_params(params).await;
+                    ctx.set_route_params(params);
                     return Some(hook.clone());
                 }
             }

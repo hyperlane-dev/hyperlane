@@ -78,7 +78,7 @@ impl ServerConfig {
     ///
     /// - `Self` - A new `ServerConfig` instance.
     #[inline(always)]
-    pub async fn new() -> Self {
+    pub fn new() -> Self {
         Self::default()
     }
 
@@ -87,8 +87,9 @@ impl ServerConfig {
     /// # Returns
     ///
     /// - `ConfigReadGuard` - A `ConfigReadGuard` for the inner configuration.
-    async fn read(&self) -> ConfigReadGuard<'_> {
-        self.get_0().read().await
+    #[inline(always)]
+    fn read(&self) -> ConfigReadGuard<'_> {
+        self.get_0().try_read().unwrap()
     }
 
     /// Acquires a write lock on the server configuration.
@@ -96,8 +97,9 @@ impl ServerConfig {
     /// # Returns
     ///
     /// - `ConfigWriteGuard` - A `ConfigWriteGuard` for the inner configuration.
-    async fn write(&self) -> ConfigWriteGuard<'_> {
-        self.get_0().write().await
+    #[inline(always)]
+    fn write(&self) -> ConfigWriteGuard<'_> {
+        self.get_0().try_write().unwrap()
     }
 
     /// Retrieves a clone of the inner server configuration.
@@ -108,8 +110,9 @@ impl ServerConfig {
     /// # Returns
     ///
     /// - `ServerConfigInner` - A `ServerConfigInner` instance containing the current server configuration.
-    pub(crate) async fn get_inner(&self) -> ServerConfigInner {
-        self.read().await.clone()
+    #[inline(always)]
+    pub(crate) fn get_inner(&self) -> ServerConfigInner {
+        self.read().clone()
     }
 
     /// Sets the host address for the server.
@@ -121,11 +124,12 @@ impl ServerConfig {
     /// # Returns
     ///
     /// - `&Self` - A reference to `Self` for method chaining.
-    pub async fn host<H>(&self, host: H) -> &Self
+    #[inline(always)]
+    pub fn host<H>(&self, host: H) -> &Self
     where
         H: AsRef<str>,
     {
-        self.write().await.set_host(host);
+        self.write().set_host(host);
         self
     }
 
@@ -138,8 +142,9 @@ impl ServerConfig {
     /// # Returns
     ///
     /// - `&Self` - A reference to `Self` for method chaining.
-    pub async fn port(&self, port: u16) -> &Self {
-        self.write().await.set_port(port);
+    #[inline(always)]
+    pub fn port(&self, port: u16) -> &Self {
+        self.write().set_port(port);
         self
     }
 
@@ -152,8 +157,9 @@ impl ServerConfig {
     /// # Returns
     ///
     /// - `&Self` - A reference to `Self` for method chaining.
-    pub async fn request_config(&self, request_config: RequestConfig) -> &Self {
-        self.write().await.set_request_config(request_config);
+    #[inline(always)]
+    pub fn request_config(&self, request_config: RequestConfig) -> &Self {
+        self.write().set_request_config(request_config);
         self
     }
 
@@ -166,8 +172,9 @@ impl ServerConfig {
     /// # Returns
     ///
     /// - `&Self` - A reference to `Self` for method chaining.
-    pub async fn nodelay(&self, nodelay: bool) -> &Self {
-        self.write().await.set_nodelay(Some(nodelay));
+    #[inline(always)]
+    pub fn nodelay(&self, nodelay: bool) -> &Self {
+        self.write().set_nodelay(Some(nodelay));
         self
     }
 
@@ -176,8 +183,9 @@ impl ServerConfig {
     /// # Returns
     ///
     /// - `&Self` - A reference to `Self` for method chaining.
-    pub async fn enable_nodelay(&self) -> &Self {
-        self.nodelay(true).await
+    #[inline(always)]
+    pub fn enable_nodelay(&self) -> &Self {
+        self.nodelay(true)
     }
 
     /// Disables the `TCP_NODELAY` option.
@@ -185,8 +193,9 @@ impl ServerConfig {
     /// # Returns
     ///
     /// - `&Self` - A reference to `Self` for method chaining.
-    pub async fn disable_nodelay(&self) -> &Self {
-        self.nodelay(false).await
+    #[inline(always)]
+    pub fn disable_nodelay(&self) -> &Self {
+        self.nodelay(false)
     }
 
     /// Sets the `IP_TTL` option.
@@ -198,8 +207,9 @@ impl ServerConfig {
     /// # Returns
     ///
     /// - `&Self` - A reference to `Self` for method chaining.
-    pub async fn ttl(&self, ttl: u32) -> &Self {
-        self.write().await.set_ttl(Some(ttl));
+    #[inline(always)]
+    pub fn ttl(&self, ttl: u32) -> &Self {
+        self.write().set_ttl(Some(ttl));
         self
     }
 

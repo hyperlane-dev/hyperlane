@@ -2,30 +2,6 @@ use crate::*;
 
 /// Implementation of methods for the `PanicData` struct.
 impl PanicData {
-    /// Creates a new `PanicData` instance from its constituent parts.
-    ///
-    /// # Arguments
-    ///
-    /// - `Option<String>` - The panic message.
-    /// - `Option<String>` - The source code location of the panic.
-    /// - `Option<String>` - The panic payload.
-    ///
-    /// # Returns
-    ///
-    /// - `PanicData` - A new panic instance.
-    #[inline(always)]
-    pub(crate) fn new(
-        message: Option<String>,
-        location: Option<String>,
-        payload: Option<String>,
-    ) -> Self {
-        Self {
-            message,
-            location,
-            payload,
-        }
-    }
-
     /// Attempts to extract a string from a dynamic `&dyn Any` panic payload.
     ///
     /// This function handles payloads that are either `&str` or `String`.

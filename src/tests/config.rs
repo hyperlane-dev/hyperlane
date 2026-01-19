@@ -26,17 +26,12 @@ async fn config_from_str() {
         }
     "#;
     let config: ServerConfig = ServerConfig::from_json_str(config_str).unwrap();
-    let new_config: ServerConfig = ServerConfig::new().await;
+    let new_config: ServerConfig = ServerConfig::new();
     new_config
         .host("0.0.0.0")
-        .await
         .port(80)
-        .await
         .request_config(RequestConfig::default())
-        .await
         .enable_nodelay()
-        .await
-        .ttl(64)
-        .await;
+        .ttl(64);
     assert_eq!(config, new_config);
 }
