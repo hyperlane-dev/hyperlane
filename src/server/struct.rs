@@ -65,4 +65,4 @@ pub(crate) struct ServerInner {
 /// It allows multiple parts of the application to safely share and modify the server's
 /// configuration and state across different threads and asynchronous tasks.
 #[derive(Clone, Getter, CustomDebug, DisplayDebug, Default)]
-pub struct Server(#[get(pub(super))] pub(super) ArcRwLock<ServerInner>);
+pub struct Server(#[get(pub(super))] pub(super) SharedServerState);
