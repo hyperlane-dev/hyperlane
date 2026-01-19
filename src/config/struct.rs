@@ -13,7 +13,7 @@ pub(crate) struct ServerConfigInner {
     #[set(pub(super), type(AsRef<str>))]
     pub(super) host: String,
     /// The port number the server will listen on.
-    #[get(pub(crate))]
+    #[get(pub(crate), type(copy))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) port: u16,
