@@ -271,6 +271,7 @@ impl ServerHook for SseRoute {
             .await;
         if send_result.is_err() {
             ctx.aborted().await.closed().await;
+            return;
         }
         for i in 0..10 {
             let send_result: Result<(), ResponseError> = ctx
