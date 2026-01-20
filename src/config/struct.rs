@@ -6,7 +6,7 @@ use crate::*;
 /// including network parameters and buffer sizes. It is not intended to be used directly
 /// by end-users, but rather through the `ServerConfig` wrapper.
 #[derive(Clone, Data, CustomDebug, DisplayDebug, PartialEq, Eq, Deserialize, Serialize)]
-pub(crate) struct ServerConfigInner {
+pub(crate) struct ServerConfigData {
     /// The host address the server will bind to.
     #[get(pub(crate))]
     #[get_mut(pub(super))]
@@ -17,11 +17,6 @@ pub(crate) struct ServerConfigInner {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) port: u16,
-    /// The configuration for HTTP request.
-    #[get(pub(crate))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) request_config: RequestConfig,
     /// The `TCP_NODELAY` option for sockets.
     #[get(pub(crate))]
     #[get_mut(pub(super))]
@@ -36,7 +31,7 @@ pub(crate) struct ServerConfigInner {
 
 /// Represents the thread-safe, shareable server configuration.
 ///
-/// This structure wraps `ServerConfigInner` in an `Arc<RwLock<ServerConfigInner>>`
+/// This structure wraps `ServerConfigData` in an `Arc<RwLock<ServerConfigData>>`
 /// to allow for safe concurrent access and modification of the server settings.
 #[derive(Clone, Getter, CustomDebug, DisplayDebug)]
-pub struct ServerConfig(#[get(pub(super))] pub(super) SharedServerConfig);
+pub struct ServerConfig(#[get(pub(super))] pub(super) ArcRwLock<ServerConfigData>);

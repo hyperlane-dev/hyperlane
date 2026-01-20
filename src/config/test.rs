@@ -1,7 +1,7 @@
 use crate::*;
 
 #[tokio::test]
-async fn config_from_str() {
+async fn server_config_from_json() {
     let config_str: &'static str = r#"
         {
             "host": "0.0.0.0",
@@ -25,14 +25,12 @@ async fn config_from_str() {
             "ttl": 64
         }
     "#;
-    let config: ServerConfig = ServerConfig::from_json_str(config_str).unwrap();
+    let config: ServerConfig = ServerConfig::from_json(config_str).unwrap();
     let new_config: ServerConfig = ServerConfig::new().await;
     new_config
         .host("0.0.0.0")
         .await
         .port(80)
-        .await
-        .request_config(RequestConfig::default())
         .await
         .enable_nodelay()
         .await

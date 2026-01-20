@@ -5,7 +5,7 @@ use crate::*;
 /// This structure holds all the data associated with a single request-response cycle,
 /// including the stream, request, response, and any custom attributes.
 #[derive(Clone, Data, Default, CustomDebug, DisplayDebug)]
-pub(crate) struct ContextInner {
+pub(crate) struct ContextData {
     /// A flag indicating whether the request handling has been aborted.
     #[get(pub(super))]
     #[get_mut(pub(super))]
@@ -45,7 +45,7 @@ pub(crate) struct ContextInner {
 
 /// The main application context, providing thread-safe access to request and response data.
 ///
-/// This is a wrapper around `ContextInner` that uses an `Arc<RwLock<>>` to allow
+/// This is a wrapper around `ContextData` that uses an `Arc<RwLock<>>` to allow
 /// for shared, mutable access across asynchronous tasks.
 #[derive(Clone, Default, Getter, CustomDebug, DisplayDebug)]
-pub struct Context(#[get(pub(super))] pub(super) ArcRwLock<ContextInner>);
+pub struct Context(#[get(pub(super))] pub(super) ArcRwLock<ContextData>);

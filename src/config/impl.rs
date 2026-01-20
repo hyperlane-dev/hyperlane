@@ -1,20 +1,19 @@
 use crate::*;
 
-/// Implements the `Default` trait for `ServerConfigInner`.
+/// Implements the `Default` trait for `ServerConfigData`.
 ///
 /// This provides a default configuration for the server with predefined values.
-impl Default for ServerConfigInner {
-    /// Creates a default `ServerConfigInner`.
+impl Default for ServerConfigData {
+    /// Creates a default `ServerConfigData`.
     ///
     /// # Returns
     ///
-    /// - `Self` - A `ServerConfigInner` instance with default settings.
+    /// - `Self` - A `ServerConfigData` instance with default settings.
     #[inline(always)]
     fn default() -> Self {
         Self {
             host: DEFAULT_HOST.to_owned(),
             port: DEFAULT_WEB_PORT,
-            request_config: RequestConfig::default(),
             nodelay: DEFAULT_NODELAY,
             ttl: DEFAULT_TTI,
         }
@@ -23,7 +22,7 @@ impl Default for ServerConfigInner {
 
 /// Implements the `Default` trait for `ServerConfig`.
 ///
-/// This wraps the default `ServerConfigInner` in an `Arc<RwLock>`.
+/// This wraps the default `ServerConfigData` in an `Arc<RwLock>`.
 impl Default for ServerConfig {
     /// Creates a default `ServerConfig`.
     ///
@@ -32,7 +31,7 @@ impl Default for ServerConfig {
     /// - `Self` - A `ServerConfig` instance with default settings.
     #[inline(always)]
     fn default() -> Self {
-        Self(arc_rwlock(ServerConfigInner::default()))
+        Self(arc_rwlock(ServerConfigData::default()))
     }
 }
 
@@ -43,7 +42,7 @@ impl PartialEq for ServerConfig {
     /// Checks if two `ServerConfig` instances are equal.
     ///
     /// It first checks for pointer equality for performance. If the pointers are not equal,
-    /// it compares the inner `ServerConfigInner` values.
+    /// it compares the inner `ServerConfigData` values.
     ///
     /// # Arguments
     ///
@@ -70,6 +69,23 @@ impl PartialEq for ServerConfig {
 /// This indicates that `ServerConfig` has a total equality relation.
 impl Eq for ServerConfig {}
 
+/// Implementation of `From` trait for `ServerConfig`.
+impl From<ServerConfigData> for ServerConfig {
+    /// Creates a `ServerConfig` from a `ServerConfigData`.
+    ///
+    /// # Arguments
+    ///
+    /// - `ServerConfigData` - The configuration.
+    ///
+    /// # Returns
+    ///
+    /// - `ServerConfig` - A `ServerConfig` instance.
+    #[inline(always)]
+    fn from(ctx: ServerConfigData) -> Self {
+        Self(arc_rwlock(ctx))
+    }
+}
+
 /// Implementation block for `ServerConfig`.
 impl ServerConfig {
     /// Creates a new `ServerConfig` with default values.
@@ -77,7 +93,6 @@ impl ServerConfig {
     /// # Returns
     ///
     /// - `Self` - A new `ServerConfig` instance.
-    #[inline(always)]
     pub async fn new() -> Self {
         Self::default()
     }
@@ -103,12 +118,12 @@ impl ServerConfig {
     /// Retrieves a clone of the inner server configuration.
     ///
     /// This function provides a snapshot of the current configuration by acquiring a read lock
-    /// and cloning the inner `ServerConfigInner`.
+    /// and cloning the inner `ServerConfigData`.
     ///
     /// # Returns
     ///
-    /// - `ServerConfigInner` - A `ServerConfigInner` instance containing the current server configuration.
-    pub(crate) async fn get_inner(&self) -> ServerConfigInner {
+    /// - `ServerConfigData` - A `ServerConfigData` instance containing the current server configuration.
+    pub(crate) async fn get_data(&self) -> ServerConfigData {
         self.read().await.clone()
     }
 
@@ -140,20 +155,6 @@ impl ServerConfig {
     /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn port(&self, port: u16) -> &Self {
         self.write().await.set_port(port);
-        self
-    }
-
-    /// Sets the HTTP request config.
-    ///
-    /// # Arguments
-    ///
-    /// - `RequestConfig`- The HTTP request config to set.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - A reference to `Self` for method chaining.
-    pub async fn request_config(&self, request_config: RequestConfig) -> &Self {
-        self.write().await.set_request_config(request_config);
         self
     }
 
@@ -216,12 +217,15 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `config_str` - The JSON string to parse.
+    /// - `AsRef<str>` - The configuration.
     ///
     /// # Returns
     ///
     /// - `Result<ServerConfig, serde_json::Error>` - A `Result<ServerConfig, serde_json::Error>` which is a `Result` containing either the `ServerConfig` or a `serde_json::Error`.
-    pub fn from_json_str(config_str: &str) -> Result<ServerConfig, serde_json::Error> {
-        serde_json::from_str(config_str).map(|config: ServerConfigInner| Self(arc_rwlock(config)))
+    pub fn from_json<C>(json: C) -> Result<ServerConfig, serde_json::Error>
+    where
+        C: AsRef<str>,
+    {
+        serde_json::from_str(json.as_ref()).map(|data: ServerConfigData| Self::from(data))
     }
 }

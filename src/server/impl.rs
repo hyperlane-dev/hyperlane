@@ -1,8 +1,8 @@
 use crate::*;
 
-/// Provides a default implementation for ServerInner.
-impl Default for ServerInner {
-    /// Creates a new ServerInner instance with default values.
+/// Provides a default implementation for ServerData.
+impl Default for ServerData {
+    /// Creates a new ServerData instance with default values.
     ///
     /// # Returns
     ///
@@ -10,7 +10,8 @@ impl Default for ServerInner {
     #[inline(always)]
     fn default() -> Self {
         Self {
-            config: ServerConfigInner::default(),
+            server_config: ServerConfigData::default(),
+            request_config: RequestConfigData::default(),
             task_panic: vec![],
             request_error: vec![],
             route_matcher: RouteMatcher::new(),
@@ -20,53 +21,54 @@ impl Default for ServerInner {
     }
 }
 
-/// Implements the `PartialEq` trait for `ServerInner`.
+/// Implements the `PartialEq` trait for `ServerData`.
 ///
-/// This allows for comparing two `ServerInner` instances for equality.
-impl PartialEq for ServerInner {
-    /// Checks if two `ServerInner` instances are equal.
+/// This allows for comparing two `ServerData` instances for equality.
+impl PartialEq for ServerData {
+    /// Checks if two `ServerData` instances are equal.
     ///
     /// # Arguments
     ///
-    /// - `&Self`- The other `ServerInner` instance to compare against.
+    /// - `&Self`- The other `ServerData` instance to compare against.
     ///
     /// # Returns
     ///
     /// - `bool`- `true` if the instances are equal, `false` otherwise.
     fn eq(&self, other: &Self) -> bool {
-        self.config == other.config
-            && self.route_matcher == other.route_matcher
-            && self.task_panic.len() == other.task_panic.len()
-            && self.request_error.len() == other.request_error.len()
-            && self.request_middleware.len() == other.request_middleware.len()
-            && self.response_middleware.len() == other.response_middleware.len()
+        self.get_server_config() == other.get_server_config()
+            && self.get_request_config() == other.get_request_config()
+            && self.get_route_matcher() == other.get_route_matcher()
+            && self.get_task_panic().len() == other.get_task_panic().len()
+            && self.get_request_error().len() == other.get_request_error().len()
+            && self.get_request_middleware().len() == other.get_request_middleware().len()
+            && self.get_response_middleware().len() == other.get_response_middleware().len()
             && self
-                .task_panic
+                .get_task_panic()
                 .iter()
-                .zip(other.task_panic.iter())
+                .zip(other.get_task_panic().iter())
                 .all(|(a, b)| Arc::ptr_eq(a, b))
             && self
-                .request_error
+                .get_request_error()
                 .iter()
-                .zip(other.request_error.iter())
+                .zip(other.get_request_error().iter())
                 .all(|(a, b)| Arc::ptr_eq(a, b))
             && self
-                .request_middleware
+                .get_request_middleware()
                 .iter()
-                .zip(other.request_middleware.iter())
+                .zip(other.get_request_middleware().iter())
                 .all(|(a, b)| Arc::ptr_eq(a, b))
             && self
-                .response_middleware
+                .get_response_middleware()
                 .iter()
-                .zip(other.response_middleware.iter())
+                .zip(other.get_response_middleware().iter())
                 .all(|(a, b)| Arc::ptr_eq(a, b))
     }
 }
 
-/// Implements the `Eq` trait for `ServerInner`.
+/// Implements the `Eq` trait for `ServerData`.
 ///
-/// This indicates that `ServerInner` has a total equality relation.
-impl Eq for ServerInner {}
+/// This indicates that `ServerData` has a total equality relation.
+impl Eq for ServerData {}
 
 /// Implements the `PartialEq` trait for `Server`.
 ///
@@ -115,7 +117,7 @@ impl HandlerState {
     ///
     /// - `Self` - The newly created hook state.
     #[inline(always)]
-    pub(super) fn new(stream: ArcRwLockStream, request_config: RequestConfig) -> Self {
+    pub(super) fn new(stream: ArcRwLockStream, request_config: RequestConfigData) -> Self {
         Self {
             stream,
             request_config,
@@ -125,7 +127,7 @@ impl HandlerState {
 
 /// Represents the server, providing methods to configure and run it.
 ///
-/// This struct wraps the `ServerInner` configuration and routing logic,
+/// This struct wraps the `ServerData` configuration and routing logic,
 /// offering a high-level API for setting up the HTTP and WebSocket server.
 impl Server {
     /// Creates a new Server instance with default settings.
@@ -134,30 +136,15 @@ impl Server {
     ///
     /// - `Self` - A new Server instance.
     pub async fn new() -> Self {
-        let server: ServerInner = ServerInner::default();
+        let server: ServerData = ServerData::default();
         Self(arc_rwlock(server))
-    }
-
-    /// Creates a new Server instance from a configuration.
-    ///
-    /// # Arguments
-    ///
-    /// - `ServerConfig` - The server configuration.
-    ///
-    /// # Returns
-    ///
-    /// - `Self` - A new Server instance.
-    pub async fn from(config: ServerConfig) -> Self {
-        let server: Self = Self::new().await;
-        server.config(config).await;
-        server
     }
 
     /// Acquires a read lock on the inner server data.
     ///
     /// # Returns
     ///
-    /// - `ServerStateReadGuard` - The read guard for ServerInner.
+    /// - `ServerStateReadGuard` - The read guard for ServerData.
     pub(super) async fn read(&self) -> ServerStateReadGuard<'_> {
         self.get_0().read().await
     }
@@ -166,7 +153,7 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// - `ServerStateWriteGuard` - The write guard for ServerInner.
+    /// - `ServerStateWriteGuard` - The write guard for ServerData.
     async fn write(&self) -> ServerStateWriteGuard<'_> {
         self.get_0().write().await
     }
@@ -229,12 +216,14 @@ impl Server {
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn config_from_json_str<C>(&self, config_str: C) -> &Self
+    pub async fn config_from_json<C>(&self, json: C) -> &Self
     where
         C: AsRef<str>,
     {
-        let config: ServerConfig = ServerConfig::from_json_str(config_str.as_ref()).unwrap();
-        self.write().await.set_config(config.get_inner().await);
+        let config: ServerConfig = ServerConfig::from_json(json).unwrap();
+        self.write()
+            .await
+            .set_server_config(config.get_data().await);
         self
     }
 
@@ -247,8 +236,26 @@ impl Server {
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn config(&self, config: ServerConfig) -> &Self {
-        self.write().await.set_config(config.get_inner().await);
+    pub async fn server_config(&self, config: ServerConfig) -> &Self {
+        self.write()
+            .await
+            .set_server_config(config.get_data().await);
+        self
+    }
+
+    /// Sets the HTTP request config.
+    ///
+    /// # Arguments
+    ///
+    /// - `RequestConfig`- The HTTP request config to set.
+    ///
+    /// # Returns
+    ///
+    /// - `&Self` - Reference to self for method chaining.
+    pub async fn request_config(&self, request_config: RequestConfig) -> &Self {
+        self.write()
+            .await
+            .set_request_config(request_config.get_data().await);
         self
     }
 
@@ -519,7 +526,7 @@ impl Server {
     /// - `Result<TcpListener, ServerError>` - A `Result` containing the bound `TcpListener` on success,
     ///   or a `ServerError` on failure.
     async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {
-        let config: ServerConfigInner = self.read().await.get_config().clone();
+        let config: ServerConfigData = self.read().await.get_server_config().clone();
         let host: &String = config.get_host();
         let port: u16 = config.get_port();
         let addr: String = Self::get_bind_addr(host, port);
@@ -555,7 +562,7 @@ impl Server {
     ///
     /// - `&TcpStream` - A reference to the `TcpStream` to configure.
     async fn configure_stream(&self, stream: &TcpStream) {
-        let config: ServerConfigInner = self.read().await.get_config().clone();
+        let config: ServerConfigData = self.read().await.get_server_config().clone();
         if let Some(nodelay) = config.try_get_nodelay() {
             let _ = stream.set_nodelay(*nodelay);
         }
@@ -571,7 +578,7 @@ impl Server {
     /// - `ArcRwLockStream` - The thread-safe stream representing the client connection.
     async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
         let server: Server = self.clone();
-        let request_config: RequestConfig = *self.read().await.get_config().get_request_config();
+        let request_config: RequestConfigData = *self.read().await.get_request_config();
         spawn(async move {
             server.handle_connection(stream, request_config).await;
         });
@@ -604,7 +611,7 @@ impl Server {
     ///
     /// - `ArcRwLockStream` - The stream for the client connection.
     /// - `request_config` - The request config to use for reading the initial HTTP request.
-    async fn handle_connection(&self, stream: ArcRwLockStream, request_config: RequestConfig) {
+    async fn handle_connection(&self, stream: ArcRwLockStream, request_config: RequestConfigData) {
         match Request::http_from_stream(&stream, &request_config).await {
             Ok(request) => {
                 let hook: HandlerState = HandlerState::new(stream, request_config);
@@ -661,7 +668,7 @@ impl Server {
             return;
         }
         let stream: &ArcRwLockStream = state.get_stream();
-        let request_config: &RequestConfig = state.get_request_config();
+        let request_config: &RequestConfigData = state.get_request_config();
         loop {
             match Request::http_from_stream(stream, request_config).await {
                 Ok(new_request) => {

@@ -1,18 +1,18 @@
 use crate::*;
 
 /// Implementation of `From` trait for `Context`.
-impl From<ContextInner> for Context {
-    /// Converts a `ContextInner` into a `Context`.
+impl From<ContextData> for Context {
+    /// Converts a `ContextData` into a `Context`.
     ///
     /// # Arguments
     ///
-    /// - `ContextInner` - The wrapped context data.
+    /// - `ContextData` - The wrapped context data.
     ///
     /// # Returns
     ///
     /// - `Context` - The newly created context instance.
     #[inline(always)]
-    fn from(ctx: ContextInner) -> Self {
+    fn from(ctx: ContextData) -> Self {
         Self(arc_rwlock(ctx))
     }
 }
@@ -31,7 +31,7 @@ impl From<&ArcRwLockStream> for Context {
     #[inline(always)]
     fn from(stream: &ArcRwLockStream) -> Self {
         let request: Request = Request::default();
-        let mut internal_ctx: ContextInner = ContextInner::default();
+        let mut internal_ctx: ContextData = ContextData::default();
         internal_ctx
             .set_stream(Some(stream.clone()))
             .set_request(request.clone())
@@ -58,6 +58,58 @@ impl From<ArcRwLockStream> for Context {
     }
 }
 
+/// Implementation of `PartialEq` trait for `ContextData`.
+impl PartialEq for ContextData {
+    /// Compares two `ContextData` instances for equality.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Self` - The first `ContextData` instance.
+    /// - `&Self` - The second `ContextData` instance.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the instances are equal, otherwise false.
+    #[inline(always)]
+    fn eq(&self, other: &Self) -> bool {
+        self.get_aborted() == other.get_aborted()
+            && self.get_closed() == other.get_closed()
+            && self.get_request() == other.get_request()
+            && self.get_response() == other.get_response()
+            && self.get_route_params() == other.get_route_params()
+            && self.get_attributes().len() == other.get_attributes().len()
+            && self.try_get_stream().is_some() == other.try_get_stream().is_some()
+    }
+}
+
+/// Implementation of `Eq` trait for `ContextData`.
+impl Eq for ContextData {}
+
+/// Implementation of `PartialEq` trait for `Context`.
+impl PartialEq for Context {
+    /// Compares two `Context` instances for equality.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Self` - The first `Context` instance.
+    /// - `&Self` - The second `Context` instance.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the instances are equal, otherwise false.
+    #[inline(always)]
+    fn eq(&self, other: &Self) -> bool {
+        if Arc::ptr_eq(self.get_0(), other.get_0()) {
+            return true;
+        }
+        if let (Ok(s), Ok(o)) = (self.get_0().try_read(), other.get_0().try_read()) {
+            *s == *o
+        } else {
+            false
+        }
+    }
+}
+
 /// Implementation of methods for `Context` structure.
 impl Context {
     /// Creates a new `Context` with the provided network stream and HTTP request.
@@ -72,7 +124,7 @@ impl Context {
     /// - `Context` - The newly created context.
     #[inline(always)]
     pub(crate) fn new(stream: &ArcRwLockStream, request: &Request) -> Context {
-        let mut internal_ctx: ContextInner = ContextInner::default();
+        let mut internal_ctx: ContextData = ContextData::default();
         internal_ctx
             .set_stream(Some(stream.clone()))
             .set_request(request.clone())
@@ -103,21 +155,21 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `RequestConfig` - The request config.
+    /// - `&RequestConfigData` - The request config.
     ///
     /// # Returns
     ///
     /// - `Result<Request, RequestError>` - The parsed request or error.
     pub async fn http_from_stream(
         &self,
-        request_config: RequestConfig,
+        config: &RequestConfigData,
     ) -> Result<Request, RequestError> {
         if self.get_aborted().await {
             return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
         }
         if let Some(stream) = self.try_get_stream().await.as_ref() {
             let request_res: Result<Request, RequestError> =
-                Request::http_from_stream(stream, &request_config).await;
+                Request::http_from_stream(stream, config).await;
             if let Ok(request) = request_res.as_ref() {
                 self.set_request(request).await;
             }
@@ -130,22 +182,22 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `RequestConfig` - The request config.
+    /// - `&RequestConfigData` - The request config.
     ///
     /// # Returns
     ///
     /// - `Result<Request, RequestError>` - The parsed frame or error.
     pub async fn ws_from_stream(
         &self,
-        request_config: RequestConfig,
+        config: &RequestConfigData,
     ) -> Result<Request, RequestError> {
         if self.get_aborted().await {
             return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
         }
         if let Some(stream) = self.try_get_stream().await.as_ref() {
-            let mut last_request: Request = self.get_request().await;
+            let last_request: Request = self.get_request().await;
             let request_res: Result<Request, RequestError> =
-                last_request.ws_from_stream(stream, &request_config).await;
+                last_request.ws_from_stream(stream, config).await;
             match request_res.as_ref() {
                 Ok(request) => {
                     self.set_request(request).await;

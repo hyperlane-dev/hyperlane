@@ -10,7 +10,7 @@ pub(crate) struct HandlerState {
     /// A reference to the underlying network stream for the connection.
     pub(super) stream: ArcRwLockStream,
     /// The request config for the current connection.
-    pub(super) request_config: RequestConfig,
+    pub(super) request_config: RequestConfigData,
 }
 
 /// Represents the internal, mutable state of the web server.
@@ -20,12 +20,17 @@ pub(crate) struct HandlerState {
 /// It is not intended to be used directly by end-users, but rather wrapped within the `Server` struct
 /// for thread-safe access.
 #[derive(Data, Clone, CustomDebug, DisplayDebug)]
-pub(crate) struct ServerInner {
+pub(crate) struct ServerData {
     /// Stores the server's configuration settings, such as address, port, and timeouts.
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) config: ServerConfigInner,
+    pub(super) server_config: ServerConfigData,
+    /// The configuration for HTTP request.
+    #[get(pub(crate))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) request_config: RequestConfigData,
     /// The routing component responsible for matching incoming requests to their registered handlers.
     #[get(pub(super))]
     #[get_mut(pub(super))]
@@ -61,7 +66,7 @@ pub(crate) struct ServerInner {
 
 /// The primary server structure that provides a thread-safe interface to the server's state.
 ///
-/// This struct acts as a public-facing wrapper around an `Arc<RwLock<ServerInner>>`.
+/// This struct acts as a public-facing wrapper around an `Arc<RwLock<ServerData>>`.
 /// It allows multiple parts of the application to safely share and modify the server's
 /// configuration and state across different threads and asynchronous tasks.
 #[derive(Clone, Getter, CustomDebug, DisplayDebug, Default)]
