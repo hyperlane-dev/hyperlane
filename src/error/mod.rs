@@ -1,5 +1,5 @@
-pub(crate) mod r#enum;
+mod r#enum;
 #[cfg(test)]
-pub(crate) mod test;
+mod test;
 
 pub use r#enum::*;

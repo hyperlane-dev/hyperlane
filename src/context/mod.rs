@@ -1,8 +1,8 @@
-pub(crate) mod r#impl;
-pub(crate) mod r#struct;
+mod r#impl;
+mod r#struct;
 #[cfg(test)]
-pub(crate) mod test;
-pub(crate) mod r#type;
+mod test;
+mod r#type;
 
 pub use r#struct::*;
 
