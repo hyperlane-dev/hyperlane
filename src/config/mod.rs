@@ -6,4 +6,4 @@ pub(crate) mod r#type;
 
 pub use r#struct::*;
 
-pub(super) use r#type::*;
+pub(crate) use r#type::*;

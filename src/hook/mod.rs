@@ -5,8 +5,4 @@ pub(crate) mod r#struct;
 pub(crate) mod r#trait;
 pub(crate) mod r#type;
 
-pub use r#enum::*;
-pub use r#fn::*;
-pub use r#struct::*;
-pub use r#trait::*;
-pub use r#type::*;
+pub use {r#enum::*, r#fn::*, r#struct::*, r#trait::*, r#type::*};
