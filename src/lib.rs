@@ -37,16 +37,18 @@ use std::{
     sync::Arc,
 };
 
-use inventory::collect;
-use lombok_macros::*;
-use regex::Regex;
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use tokio::{
-    net::{TcpListener, TcpStream},
-    spawn,
-    sync::{
-        RwLockReadGuard, RwLockWriteGuard,
-        watch::{Receiver, Sender, channel},
+use {
+    inventory::collect,
+    lombok_macros::*,
+    regex::Regex,
+    serde::{Deserialize, Serialize, de::DeserializeOwned},
+    tokio::{
+        net::{TcpListener, TcpStream},
+        spawn,
+        sync::{
+            RwLockReadGuard, RwLockWriteGuard,
+            watch::{Receiver, Sender, channel},
+        },
+        task::{JoinError, JoinHandle},
     },
-    task::{JoinError, JoinHandle},
 };
