@@ -2,17 +2,17 @@ use crate::*;
 
 #[tokio::test]
 async fn server_config_from_json() {
-    let config_str: &'static str = r#"
-        {
-            "host": "0.0.0.0",
-            "port": 80,
-            "nodelay": true,
-            "ttl": 64
-        }
+    let server_config_json: &'static str = r#"
+    {
+        "host": "0.0.0.0",
+        "port": 80,
+        "nodelay": true,
+        "ttl": 64
+    }
     "#;
-    let config: ServerConfig = ServerConfig::from_json(config_str).unwrap();
-    let new_config: ServerConfig = ServerConfig::new().await;
-    new_config
+    let server_config: ServerConfig = ServerConfig::from_json(server_config_json).unwrap();
+    let new_server_config: ServerConfig = ServerConfig::new().await;
+    new_server_config
         .host("0.0.0.0")
         .await
         .port(80)
@@ -21,5 +21,5 @@ async fn server_config_from_json() {
         .await
         .ttl(64)
         .await;
-    assert_eq!(config, new_config);
+    assert_eq!(server_config, new_server_config);
 }
