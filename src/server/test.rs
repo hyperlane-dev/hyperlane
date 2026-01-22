@@ -291,7 +291,7 @@ impl ServerHook for SseRoute {
 struct WebsocketRoute;
 
 impl WebsocketRoute {
-    async fn send_body_hook(&self, ctx: &Context) {
+    async fn try_send_body_hook(&self, ctx: &Context) -> Result<(), ResponseError> {
         let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {
             let body: ResponseBody = ctx.get_response_body().await;
             let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
@@ -302,6 +302,7 @@ impl WebsocketRoute {
         if send_result.is_err() {
             ctx.aborted().await.closed().await;
         }
+        send_result
     }
 }
 
@@ -316,12 +317,13 @@ impl ServerHook for WebsocketRoute {
                 Ok(_) => {
                     let request_body: Vec<u8> = ctx.get_request_body().await;
                     ctx.set_response_body(&request_body).await;
-                    self.send_body_hook(ctx).await;
-                    continue;
+                    if self.try_send_body_hook(ctx).await.is_err() {
+                        return;
+                    }
                 }
                 Err(error) => {
                     ctx.set_response_body(&error.to_string()).await;
-                    self.send_body_hook(ctx).await;
+                    let _ = self.try_send_body_hook(ctx).await;
                     return;
                 }
             }
