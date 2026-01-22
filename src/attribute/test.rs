@@ -56,6 +56,14 @@ async fn run_set_func() {
     let get_key: &(dyn Fn(&str) -> String + Send + Sync) =
         ctx.try_get_attribute(KEY).await.unwrap();
     assert_eq!(get_key(PARAM), func(PARAM));
+    let func: &(dyn Fn(&str) + Send + Sync) = &|msg: &str| {
+        assert_eq!(msg, PARAM);
+    };
+    ctx.set_attribute(KEY, func).await;
+    let hyperlane = ctx
+        .get_attribute::<&(dyn Fn(&str) + Send + Sync)>(KEY)
+        .await;
+    hyperlane(PARAM);
 }
 
 #[tokio::test]

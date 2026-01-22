@@ -1224,8 +1224,8 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `K` - The key of the header to set.
-    /// - `V` - The new value for the header.
+    /// - `AsRef<str>` - The key of the header to set.
+    /// - `AsRef<str>` - The new value for the header.
     ///
     /// # Returns
     ///
@@ -1717,9 +1717,8 @@ impl Context {
     /// # Returns
     ///
     /// - `Option<V>` - The attribute value if it exists and can be cast to the specified type.
-    pub async fn try_get_attribute<K, V>(&self, key: K) -> Option<V>
+    pub async fn try_get_attribute<V>(&self, key: impl AsRef<str>) -> Option<V>
     where
-        K: AsRef<str>,
         V: AnySendSyncClone,
     {
         self.read()
@@ -1738,14 +1737,13 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `V` - The attribute value if it exists and can be cast to the specified type.
+    /// - `AnySendSyncClone` - The attribute value if it exists and can be cast to the specified type.
     ///
     /// # Panics
     ///
     /// - If the attribute is not found.
-    pub async fn get_attribute<K, V>(&self, key: K) -> V
+    pub async fn get_attribute<V>(&self, key: impl AsRef<str>) -> V
     where
-        K: AsRef<str>,
         V: AnySendSyncClone,
     {
         self.try_get_attribute(key).await.unwrap()
@@ -1832,7 +1830,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `V` - The attribute value if it exists and can be cast to the specified type.
+    /// - `AnySendSyncClone` - The attribute value if it exists and can be cast to the specified type.
     ///
     /// # Panics
     ///
