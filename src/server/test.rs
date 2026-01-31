@@ -182,7 +182,7 @@ impl ServerHook for UpgradeMiddleware {
     }
 
     async fn handle(self, ctx: &Context) {
-        if !ctx.get_request().await.is_ws() {
+        if !ctx.get_request_is_ws_upgrade_type().await {
             return;
         }
         if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
@@ -217,7 +217,7 @@ impl ServerHook for ResponseMiddleware {
     }
 
     async fn handle(self, ctx: &Context) {
-        if ctx.get_request().await.is_ws() {
+        if ctx.get_request_is_ws_upgrade_type().await {
             return;
         }
         let send_result: Result<(), ResponseError> = ctx.try_send().await;
@@ -292,7 +292,7 @@ struct WebsocketRoute;
 
 impl WebsocketRoute {
     async fn try_send_body_hook(&self, ctx: &Context) -> Result<(), ResponseError> {
-        let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {
+        let send_result: Result<(), ResponseError> = if ctx.get_request_is_ws_upgrade_type().await {
             let body: ResponseBody = ctx.get_response_body().await;
             let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
             ctx.try_send_body_list_with_data(&frame_list).await

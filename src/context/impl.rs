@@ -889,8 +889,8 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if this is a WebSocket upgrade request.
-    pub async fn get_request_is_ws(&self) -> bool {
-        self.read().await.get_request().is_ws()
+    pub async fn get_request_is_ws_upgrade_type(&self) -> bool {
+        self.read().await.get_request().is_ws_upgrade_type()
     }
 
     /// Checks if the request is an HTTP/2 cleartext (h2c) upgrade.
@@ -898,8 +898,8 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if this is an h2c upgrade request.
-    pub async fn get_request_is_h2c(&self) -> bool {
-        self.read().await.get_request().is_h2c()
+    pub async fn get_request_is_h2c_upgrade_type(&self) -> bool {
+        self.read().await.get_request().is_h2c_upgrade_type()
     }
 
     /// Checks if the request is a TLS upgrade.
@@ -907,8 +907,8 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if this is a TLS upgrade request.
-    pub async fn get_request_is_tls(&self) -> bool {
-        self.read().await.get_request().is_tls()
+    pub async fn get_request_is_tls_upgrade_type(&self) -> bool {
+        self.read().await.get_request().is_tls_upgrade_type()
     }
 
     /// Checks if the request has an unknown upgrade type.
@@ -916,8 +916,8 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the upgrade type is unknown.
-    pub async fn get_request_is_unknown_upgrade(&self) -> bool {
-        self.read().await.get_request().is_unknown_upgrade()
+    pub async fn get_request_is_unknown_upgrade_type(&self) -> bool {
+        self.read().await.get_request().is_unknown_upgrade_type()
     }
 
     /// Checks if the request HTTP version is HTTP/1.1 or higher.
@@ -925,8 +925,11 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the version is HTTP/1.1 or higher.
-    pub async fn get_request_is_http1_1_or_higher(&self) -> bool {
-        self.read().await.get_request().is_http1_1_or_higher()
+    pub async fn get_request_is_http1_1_or_higher_version(&self) -> bool {
+        self.read()
+            .await
+            .get_request()
+            .is_http1_1_or_higher_version()
     }
 
     /// Checks if the request HTTP version is HTTP/0.9.
@@ -934,8 +937,8 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the version is HTTP/0.9.
-    pub async fn get_request_is_http0_9(&self) -> bool {
-        self.read().await.get_request().is_http0_9()
+    pub async fn get_request_is_http0_9_version(&self) -> bool {
+        self.read().await.get_request().is_http0_9_version()
     }
 
     /// Checks if the request HTTP version is HTTP/1.0.
@@ -943,8 +946,8 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the version is HTTP/1.0.
-    pub async fn get_request_is_http1_0(&self) -> bool {
-        self.read().await.get_request().is_http1_0()
+    pub async fn get_request_is_http1_0_version(&self) -> bool {
+        self.read().await.get_request().is_http1_0_version()
     }
 
     /// Checks if the request HTTP version is HTTP/1.1.
@@ -952,8 +955,8 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the version is HTTP/1.1.
-    pub async fn get_request_is_http1_1(&self) -> bool {
-        self.read().await.get_request().is_http1_1()
+    pub async fn get_request_is_http1_1_version(&self) -> bool {
+        self.read().await.get_request().is_http1_1_version()
     }
 
     /// Checks if the request HTTP version is HTTP/2.
@@ -961,8 +964,8 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the version is HTTP/2.
-    pub async fn get_request_is_http2(&self) -> bool {
-        self.read().await.get_request().is_http2()
+    pub async fn get_request_is_http2_version(&self) -> bool {
+        self.read().await.get_request().is_http2_version()
     }
 
     /// Checks if the request HTTP version is HTTP/3.
@@ -970,8 +973,8 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the version is HTTP/3.
-    pub async fn get_request_is_http3(&self) -> bool {
-        self.read().await.get_request().is_http3()
+    pub async fn get_request_is_http3_version(&self) -> bool {
+        self.read().await.get_request().is_http3_version()
     }
 
     /// Checks if the request has an unknown HTTP version.
@@ -988,8 +991,8 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the version belongs to HTTP family.
-    pub async fn get_request_is_http(&self) -> bool {
-        self.read().await.get_request().is_http()
+    pub async fn get_request_is_http_version(&self) -> bool {
+        self.read().await.get_request().is_http_version()
     }
 
     /// Checks if the request method is GET.
@@ -997,8 +1000,8 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the method is GET.
-    pub async fn get_request_is_get(&self) -> bool {
-        self.read().await.get_request().is_get()
+    pub async fn get_request_is_get_method(&self) -> bool {
+        self.read().await.get_request().is_get_method()
     }
 
     /// Checks if the request method is POST.
@@ -1006,8 +1009,8 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the method is POST.
-    pub async fn get_request_is_post(&self) -> bool {
-        self.read().await.get_request().is_post()
+    pub async fn get_request_is_post_method(&self) -> bool {
+        self.read().await.get_request().is_post_method()
     }
 
     /// Checks if the request method is PUT.
@@ -1015,8 +1018,8 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the method is PUT.
-    pub async fn get_request_is_put(&self) -> bool {
-        self.read().await.get_request().is_put()
+    pub async fn get_request_is_put_method(&self) -> bool {
+        self.read().await.get_request().is_put_method()
     }
 
     /// Checks if the request method is DELETE.
@@ -1024,8 +1027,8 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the method is DELETE.
-    pub async fn get_request_is_delete(&self) -> bool {
-        self.read().await.get_request().is_delete()
+    pub async fn get_request_is_delete_method(&self) -> bool {
+        self.read().await.get_request().is_delete_method()
     }
 
     /// Checks if the request method is PATCH.
@@ -1033,8 +1036,8 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the method is PATCH.
-    pub async fn get_request_is_patch(&self) -> bool {
-        self.read().await.get_request().is_patch()
+    pub async fn get_request_is_patch_method(&self) -> bool {
+        self.read().await.get_request().is_patch_method()
     }
 
     /// Checks if the request method is HEAD.
@@ -1042,8 +1045,8 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the method is HEAD.
-    pub async fn get_request_is_head(&self) -> bool {
-        self.read().await.get_request().is_head()
+    pub async fn get_request_is_head_method(&self) -> bool {
+        self.read().await.get_request().is_head_method()
     }
 
     /// Checks if the request method is OPTIONS.
@@ -1051,8 +1054,8 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the method is OPTIONS.
-    pub async fn get_request_is_options(&self) -> bool {
-        self.read().await.get_request().is_options()
+    pub async fn get_request_is_options_method(&self) -> bool {
+        self.read().await.get_request().is_options_method()
     }
 
     /// Checks if the request method is CONNECT.
@@ -1060,8 +1063,8 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the method is CONNECT.
-    pub async fn get_request_is_connect(&self) -> bool {
-        self.read().await.get_request().is_connect()
+    pub async fn get_request_is_connect_method(&self) -> bool {
+        self.read().await.get_request().is_connect_method()
     }
 
     /// Checks if the request method is TRACE.
@@ -1069,8 +1072,8 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the method is TRACE.
-    pub async fn get_request_is_trace(&self) -> bool {
-        self.read().await.get_request().is_trace()
+    pub async fn get_request_is_trace_method(&self) -> bool {
+        self.read().await.get_request().is_trace_method()
     }
 
     /// Checks if the request method is unknown.
