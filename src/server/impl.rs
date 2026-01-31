@@ -513,7 +513,7 @@ impl Server {
             if progress {
                 Box::pin(self.handle_task_panic(ctx, join_error)).await;
             } else {
-                eprintln!("Panic occurred in panic handler: {:?}", join_error);
+                eprintln!("{}", join_error);
                 let _ = Self::try_flush_stdout_and_stderr();
             }
         }
