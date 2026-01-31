@@ -486,13 +486,22 @@ impl Context {
         func(self.read().await.get_request().clone()).await
     }
 
-    /// Retrieves the string representation of the current request.
+    /// Retrieves the JSON representation of the current request as a vector of bytes.
     ///
     /// # Returns
     ///
-    /// - `String` - The full request as a string.
-    pub async fn get_request_string(&self) -> String {
-        self.read().await.get_request().get_string()
+    /// - `Vec<u8>` - The JSON representation of the request.
+    pub async fn get_request_json_vec(&self) -> Vec<u8> {
+        self.read().await.get_request().json_vec()
+    }
+
+    /// Retrieves the JSON representation of the current request as a string.
+    ///
+    /// # Returns
+    ///
+    /// - `String` - The JSON representation of the request.
+    pub async fn get_request_json_string(&self) -> String {
+        self.read().await.get_request().json_string()
     }
 
     /// Retrieves the HTTP version of the request.
@@ -884,42 +893,6 @@ impl Context {
         self.read().await.get_request().get_upgrade_type()
     }
 
-    /// Checks if the request is a WebSocket upgrade request.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if this is a WebSocket upgrade request.
-    pub async fn get_request_is_ws_upgrade_type(&self) -> bool {
-        self.read().await.get_request().is_ws_upgrade_type()
-    }
-
-    /// Checks if the request is an HTTP/2 cleartext (h2c) upgrade.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if this is an h2c upgrade request.
-    pub async fn get_request_is_h2c_upgrade_type(&self) -> bool {
-        self.read().await.get_request().is_h2c_upgrade_type()
-    }
-
-    /// Checks if the request is a TLS upgrade.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if this is a TLS upgrade request.
-    pub async fn get_request_is_tls_upgrade_type(&self) -> bool {
-        self.read().await.get_request().is_tls_upgrade_type()
-    }
-
-    /// Checks if the request has an unknown upgrade type.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the upgrade type is unknown.
-    pub async fn get_request_is_unknown_upgrade_type(&self) -> bool {
-        self.read().await.get_request().is_unknown_upgrade_type()
-    }
-
     /// Checks if the request HTTP version is HTTP/0.9.
     ///
     /// # Returns
@@ -984,6 +957,42 @@ impl Context {
     /// - `bool` - True if the version belongs to HTTP family.
     pub async fn get_request_is_http_version(&self) -> bool {
         self.read().await.get_request().is_http_version()
+    }
+
+    /// Checks if the request is a WebSocket upgrade request.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if this is a WebSocket upgrade request.
+    pub async fn get_request_is_ws_upgrade_type(&self) -> bool {
+        self.read().await.get_request().is_ws_upgrade_type()
+    }
+
+    /// Checks if the request is an HTTP/2 cleartext (h2c) upgrade.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if this is an h2c upgrade request.
+    pub async fn get_request_is_h2c_upgrade_type(&self) -> bool {
+        self.read().await.get_request().is_h2c_upgrade_type()
+    }
+
+    /// Checks if the request is a TLS upgrade.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if this is a TLS upgrade request.
+    pub async fn get_request_is_tls_upgrade_type(&self) -> bool {
+        self.read().await.get_request().is_tls_upgrade_type()
+    }
+
+    /// Checks if the request has an unknown upgrade type.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the upgrade type is unknown.
+    pub async fn get_request_is_unknown_upgrade_type(&self) -> bool {
+        self.read().await.get_request().is_unknown_upgrade_type()
     }
 
     /// Checks if the request has an unknown HTTP version.
@@ -1146,13 +1155,22 @@ impl Context {
         func(self.read().await.get_response().clone()).await
     }
 
-    /// Retrieves the string representation of the current response.
+    /// Retrieves the JSON representation of the current response.
     ///
     /// # Returns
     ///
-    /// - `String` - The full response as a string.
-    pub async fn get_response_string(&self) -> String {
-        self.read().await.get_response().get_string()
+    /// - `Vec<u8>` - The JSON representation of the response.
+    pub async fn get_response_json_vec(&self) -> Vec<u8> {
+        self.read().await.get_response().json_vec()
+    }
+
+    /// Retrieves the JSON representation of the current response as a string.
+    ///
+    /// # Returns
+    ///
+    /// - `String` - The JSON representation of the response.
+    pub async fn get_response_json_string(&self) -> String {
+        self.read().await.get_response().json_string()
     }
 
     /// Retrieves the HTTP version of the response.

@@ -39,9 +39,11 @@ async fn context_request_and_response() {
     let request: Request = Request::default();
     ctx.set_request(&request).await;
     let fetched_request: Request = ctx.get_request().await;
-    assert_eq!(request.get_string(), fetched_request.get_string());
+    assert_eq!(request.json_vec(), fetched_request.json_vec());
+    assert_eq!(request.json_string(), fetched_request.json_string());
     let response: Response = Response::default();
     ctx.set_response(&response).await;
     let fetched_response: Response = ctx.get_response().await;
-    assert_eq!(response.get_string(), fetched_response.get_string());
+    assert_eq!(response.json_vec(), fetched_response.json_vec());
+    assert_eq!(response.json_string(), fetched_response.json_string());
 }
