@@ -486,20 +486,57 @@ impl Context {
         func(self.read().await.get_request().clone()).await
     }
 
-    /// Retrieves the JSON representation of the current request as a vector of bytes.
+    /// Serializes the request to a JSON byte vector.
+    ///
+    /// This method attempts to serialize the entire request structure into a JSON
+    /// formatted byte vector representation.
     ///
     /// # Returns
     ///
-    /// - `Vec<u8>` - The JSON representation of the request.
+    /// - `Result<Vec<u8>, serde_json::Error>` - The serialized JSON bytes on success,
+    ///   or a serialization error on failure.
+    pub async fn try_get_request_json_vec(&self) -> Result<Vec<u8>, serde_json::Error> {
+        self.read().await.get_request().try_json_vec()
+    }
+
+    /// Serializes the request to a JSON string.
+    ///
+    /// This method attempts to serialize the entire request structure into a JSON
+    /// formatted string representation.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<String, serde_json::Error>` - The serialized JSON string on success,
+    ///   or a serialization error on failure.
     pub async fn get_request_json_vec(&self) -> Vec<u8> {
         self.read().await.get_request().json_vec()
     }
 
-    /// Retrieves the JSON representation of the current request as a string.
+    /// Serializes the request to a JSON string.
+    ///
+    /// This method attempts to serialize the entire request structure into a JSON
+    /// formatted string representation.
     ///
     /// # Returns
     ///
-    /// - `String` - The JSON representation of the request.
+    /// - `Result<String, serde_json::Error>` - The serialized JSON string on success,
+    ///   or a serialization error on failure.
+    pub async fn try_get_request_json_string(&self) -> Result<String, serde_json::Error> {
+        self.read().await.get_request().try_json_string()
+    }
+
+    /// Serializes the request to a JSON string.
+    ///
+    /// This method serializes the entire request structure into a JSON formatted
+    /// string representation.
+    ///
+    /// # Returns
+    ///
+    /// - `String` - The serialized JSON string.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the serialization fails.
     pub async fn get_request_json_string(&self) -> String {
         self.read().await.get_request().json_string()
     }
@@ -1155,20 +1192,60 @@ impl Context {
         func(self.read().await.get_response().clone()).await
     }
 
-    /// Retrieves the JSON representation of the current response.
+    /// Serializes the response to a JSON byte vector.
+    ///
+    /// This method attempts to serialize the entire response structure into a JSON
+    /// formatted byte vector representation.
     ///
     /// # Returns
     ///
-    /// - `Vec<u8>` - The JSON representation of the response.
+    /// - `Result<Vec<u8>, serde_json::Error>` - The serialized JSON bytes on success,
+    ///   or a serialization error on failure.
+    pub async fn try_get_response_json_vec(&self) -> Result<Vec<u8>, serde_json::Error> {
+        self.read().await.get_response().try_json_vec()
+    }
+
+    /// Serializes the response to a JSON byte vector.
+    ///
+    /// This method serializes the entire response structure into a JSON formatted
+    /// byte vector representation.
+    ///
+    /// # Returns
+    ///
+    /// - `Vec<u8>` - The serialized JSON bytes.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the serialization fails.
     pub async fn get_response_json_vec(&self) -> Vec<u8> {
         self.read().await.get_response().json_vec()
     }
 
-    /// Retrieves the JSON representation of the current response as a string.
+    /// Serializes the response to a JSON string.
+    ///
+    /// This method attempts to serialize the entire response structure into a JSON
+    /// formatted string representation.
     ///
     /// # Returns
     ///
-    /// - `String` - The JSON representation of the response.
+    /// - `Result<String, serde_json::Error>` - The serialized JSON string on success,
+    ///   or a serialization error on failure.
+    pub async fn try_get_response_json_string(&self) -> Result<String, serde_json::Error> {
+        self.read().await.get_response().try_json_string()
+    }
+
+    /// Serializes the response to a JSON string.
+    ///
+    /// This method serializes the entire response structure into a JSON formatted
+    /// string representation.
+    ///
+    /// # Returns
+    ///
+    /// - `String` - The serialized JSON string.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the serialization fails.
     pub async fn get_response_json_string(&self) -> String {
         self.read().await.get_response().json_string()
     }
