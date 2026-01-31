@@ -5,10 +5,6 @@ use crate::*;
 pub struct DefaultServerHook;
 
 /// Represents the hooks for managing the server's lifecycle, specifically for waiting and shutting down.
-///
-/// This struct is returned by the `run` method and provides two key hooks:
-/// - `wait_hook`- A future that resolves when the server has stopped accepting new connections.
-/// - `shutdown_hook`- A function that can be called to gracefully shut down the server.
 #[derive(Clone, CustomDebug, DisplayDebug, Getter, Setter)]
 pub struct ServerControlHook {
     /// A hook that returns a future, which completes when the server's main task finishes.

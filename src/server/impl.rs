@@ -530,9 +530,7 @@ impl Server {
         let host: &String = config.get_host();
         let port: u16 = config.get_port();
         let addr: String = Self::get_bind_addr(host, port);
-        TcpListener::bind(&addr)
-            .await
-            .map_err(|error| ServerError::TcpBind(error.to_string()))
+        Ok(TcpListener::bind(&addr).await?)
     }
 
     /// Enters a loop to accept incoming TCP connections and spawn handlers for them.
