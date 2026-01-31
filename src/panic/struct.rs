@@ -5,7 +5,9 @@ use crate::*;
 /// This struct captures essential details about a panic, such as the message,
 /// source code location, and payload. It is used by the server's panic handling
 /// mechanism and passed to the configured panic hook for custom processing.
-#[derive(CustomDebug, Default, PartialEq, Eq, Clone, Getter, DisplayDebug, Setter)]
+#[derive(
+    CustomDebug, Default, PartialEq, Eq, Clone, Getter, DisplayDebug, Setter, Deserialize, Serialize,
+)]
 pub struct PanicData {
     /// The message associated with the panic.
     /// This is `None` if the panic payload is not a string.

@@ -920,18 +920,6 @@ impl Context {
         self.read().await.get_request().is_unknown_upgrade_type()
     }
 
-    /// Checks if the request HTTP version is HTTP/1.1 or higher.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the version is HTTP/1.1 or higher.
-    pub async fn get_request_is_http1_1_or_higher_version(&self) -> bool {
-        self.read()
-            .await
-            .get_request()
-            .is_http1_1_or_higher_version()
-    }
-
     /// Checks if the request HTTP version is HTTP/0.9.
     ///
     /// # Returns
@@ -959,6 +947,18 @@ impl Context {
         self.read().await.get_request().is_http1_1_version()
     }
 
+    /// Checks if the request HTTP version is HTTP/1.1 or higher.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the version is HTTP/1.1 or higher.
+    pub async fn get_request_is_http1_1_or_higher_version(&self) -> bool {
+        self.read()
+            .await
+            .get_request()
+            .is_http1_1_or_higher_version()
+    }
+
     /// Checks if the request HTTP version is HTTP/2.
     ///
     /// # Returns
@@ -977,15 +977,6 @@ impl Context {
         self.read().await.get_request().is_http3_version()
     }
 
-    /// Checks if the request has an unknown HTTP version.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the version is unknown.
-    pub async fn get_request_is_unknown_version(&self) -> bool {
-        self.read().await.get_request().is_unknown_version()
-    }
-
     /// Checks if the request uses HTTP protocol.
     ///
     /// # Returns
@@ -993,6 +984,15 @@ impl Context {
     /// - `bool` - True if the version belongs to HTTP family.
     pub async fn get_request_is_http_version(&self) -> bool {
         self.read().await.get_request().is_http_version()
+    }
+
+    /// Checks if the request has an unknown HTTP version.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the version is unknown.
+    pub async fn get_request_is_unknown_version(&self) -> bool {
+        self.read().await.get_request().is_unknown_version()
     }
 
     /// Checks if the request method is GET.

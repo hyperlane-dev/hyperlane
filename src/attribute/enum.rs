@@ -4,7 +4,7 @@ use crate::*;
 ///
 /// Attributes can be either external, defined by a user-provided string,
 /// or internal, representing framework-specific functionality.
-#[derive(CustomDebug, Clone, PartialEq, Eq, Hash, DisplayDebug)]
+#[derive(CustomDebug, Clone, PartialEq, Eq, Hash, DisplayDebug, Deserialize, Serialize)]
 pub(crate) enum Attribute {
     /// An external attribute identified by a string.
     External(String),
@@ -15,7 +15,7 @@ pub(crate) enum Attribute {
 /// Defines keys for internal attributes used by the framework.
 ///
 /// These keys correspond to specific, built-in functionalities.
-#[derive(CustomDebug, Clone, PartialEq, Eq, Hash, DisplayDebug)]
+#[derive(CustomDebug, Clone, PartialEq, Eq, Hash, DisplayDebug, Deserialize, Serialize)]
 pub(crate) enum InternalAttribute {
     /// The attribute key for task panic handling with detailed error information.
     TaskPanicData,

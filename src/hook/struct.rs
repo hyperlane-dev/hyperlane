@@ -1,7 +1,9 @@
 use crate::*;
 
 /// Default server hook
-#[derive(Clone, Copy, Debug, DisplayDebug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Debug, DisplayDebug, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize,
+)]
 pub struct DefaultServerHook;
 
 /// Represents the hooks for managing the server's lifecycle, specifically for waiting and shutting down.
