@@ -930,117 +930,6 @@ impl Context {
         self.read().await.get_request().get_upgrade_type()
     }
 
-    /// Checks if the request HTTP version is HTTP/0.9.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the version is HTTP/0.9.
-    pub async fn get_request_is_http0_9_version(&self) -> bool {
-        self.read().await.get_request().is_http0_9_version()
-    }
-
-    /// Checks if the request HTTP version is HTTP/1.0.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the version is HTTP/1.0.
-    pub async fn get_request_is_http1_0_version(&self) -> bool {
-        self.read().await.get_request().is_http1_0_version()
-    }
-
-    /// Checks if the request HTTP version is HTTP/1.1.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the version is HTTP/1.1.
-    pub async fn get_request_is_http1_1_version(&self) -> bool {
-        self.read().await.get_request().is_http1_1_version()
-    }
-
-    /// Checks if the request HTTP version is HTTP/1.1 or higher.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the version is HTTP/1.1 or higher.
-    pub async fn get_request_is_http1_1_or_higher_version(&self) -> bool {
-        self.read()
-            .await
-            .get_request()
-            .is_http1_1_or_higher_version()
-    }
-
-    /// Checks if the request HTTP version is HTTP/2.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the version is HTTP/2.
-    pub async fn get_request_is_http2_version(&self) -> bool {
-        self.read().await.get_request().is_http2_version()
-    }
-
-    /// Checks if the request HTTP version is HTTP/3.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the version is HTTP/3.
-    pub async fn get_request_is_http3_version(&self) -> bool {
-        self.read().await.get_request().is_http3_version()
-    }
-
-    /// Checks if the request uses HTTP protocol.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the version belongs to HTTP family.
-    pub async fn get_request_is_http_version(&self) -> bool {
-        self.read().await.get_request().is_http_version()
-    }
-
-    /// Checks if the request is a WebSocket upgrade request.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if this is a WebSocket upgrade request.
-    pub async fn get_request_is_ws_upgrade_type(&self) -> bool {
-        self.read().await.get_request().is_ws_upgrade_type()
-    }
-
-    /// Checks if the request is an HTTP/2 cleartext (h2c) upgrade.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if this is an h2c upgrade request.
-    pub async fn get_request_is_h2c_upgrade_type(&self) -> bool {
-        self.read().await.get_request().is_h2c_upgrade_type()
-    }
-
-    /// Checks if the request is a TLS upgrade.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if this is a TLS upgrade request.
-    pub async fn get_request_is_tls_upgrade_type(&self) -> bool {
-        self.read().await.get_request().is_tls_upgrade_type()
-    }
-
-    /// Checks if the request has an unknown upgrade type.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the upgrade type is unknown.
-    pub async fn get_request_is_unknown_upgrade_type(&self) -> bool {
-        self.read().await.get_request().is_unknown_upgrade_type()
-    }
-
-    /// Checks if the request has an unknown HTTP version.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the version is unknown.
-    pub async fn get_request_is_unknown_version(&self) -> bool {
-        self.read().await.get_request().is_unknown_version()
-    }
-
     /// Checks if the request method is GET.
     ///
     /// # Returns
@@ -1129,6 +1018,117 @@ impl Context {
     /// - `bool` - True if the method is unknown.
     pub async fn get_request_is_unknown_method(&self) -> bool {
         self.read().await.get_request().is_unknown_method()
+    }
+
+    /// Checks if the request HTTP version is HTTP/0.9.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the version is HTTP/0.9.
+    pub async fn get_request_is_http0_9_version(&self) -> bool {
+        self.read().await.get_request().is_http0_9_version()
+    }
+
+    /// Checks if the request HTTP version is HTTP/1.0.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the version is HTTP/1.0.
+    pub async fn get_request_is_http1_0_version(&self) -> bool {
+        self.read().await.get_request().is_http1_0_version()
+    }
+
+    /// Checks if the request HTTP version is HTTP/1.1.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the version is HTTP/1.1.
+    pub async fn get_request_is_http1_1_version(&self) -> bool {
+        self.read().await.get_request().is_http1_1_version()
+    }
+
+    /// Checks if the request HTTP version is HTTP/2.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the version is HTTP/2.
+    pub async fn get_request_is_http2_version(&self) -> bool {
+        self.read().await.get_request().is_http2_version()
+    }
+
+    /// Checks if the request HTTP version is HTTP/3.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the version is HTTP/3.
+    pub async fn get_request_is_http3_version(&self) -> bool {
+        self.read().await.get_request().is_http3_version()
+    }
+
+    /// Checks if the request uses HTTP protocol.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the version belongs to HTTP family.
+    pub async fn get_request_is_http_version(&self) -> bool {
+        self.read().await.get_request().is_http_version()
+    }
+
+    /// Checks if the request HTTP version is HTTP/1.1 or higher.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the version is HTTP/1.1 or higher.
+    pub async fn get_request_is_http1_1_or_higher_version(&self) -> bool {
+        self.read()
+            .await
+            .get_request()
+            .is_http1_1_or_higher_version()
+    }
+
+    /// Checks if the request has an unknown HTTP version.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the version is unknown.
+    pub async fn get_request_is_unknown_version(&self) -> bool {
+        self.read().await.get_request().is_unknown_version()
+    }
+
+    /// Checks if the request is a WebSocket upgrade request.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if this is a WebSocket upgrade request.
+    pub async fn get_request_is_ws_upgrade_type(&self) -> bool {
+        self.read().await.get_request().is_ws_upgrade_type()
+    }
+
+    /// Checks if the request is an HTTP/2 cleartext (h2c) upgrade.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if this is an h2c upgrade request.
+    pub async fn get_request_is_h2c_upgrade_type(&self) -> bool {
+        self.read().await.get_request().is_h2c_upgrade_type()
+    }
+
+    /// Checks if the request is a TLS upgrade.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if this is a TLS upgrade request.
+    pub async fn get_request_is_tls_upgrade_type(&self) -> bool {
+        self.read().await.get_request().is_tls_upgrade_type()
+    }
+
+    /// Checks if the request has an unknown upgrade type.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the upgrade type is unknown.
+    pub async fn get_request_is_unknown_upgrade_type(&self) -> bool {
+        self.read().await.get_request().is_unknown_upgrade_type()
     }
 
     /// Checks if the connection should be kept alive based on request headers.
