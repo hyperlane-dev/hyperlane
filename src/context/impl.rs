@@ -1065,15 +1065,6 @@ impl Context {
         self.read().await.get_request().is_http3_version()
     }
 
-    /// Checks if the request uses HTTP protocol.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the version belongs to HTTP family.
-    pub async fn get_request_is_http_version(&self) -> bool {
-        self.read().await.get_request().is_http_version()
-    }
-
     /// Checks if the request HTTP version is HTTP/1.1 or higher.
     ///
     /// # Returns
@@ -1084,6 +1075,15 @@ impl Context {
             .await
             .get_request()
             .is_http1_1_or_higher_version()
+    }
+
+    /// Checks if the request uses HTTP protocol.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the version belongs to HTTP family.
+    pub async fn get_request_is_http_version(&self) -> bool {
+        self.read().await.get_request().is_http_version()
     }
 
     /// Checks if the request has an unknown HTTP version.
