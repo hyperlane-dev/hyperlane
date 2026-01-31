@@ -192,7 +192,7 @@ impl ServerHook for UpgradeMiddleware {
                 .await
                 .set_response_status_code(101)
                 .await
-                .set_response_header(UPGRADE, WEBSOCKET_LOWERCASE)
+                .set_response_header(UPGRADE, WEBSOCKET)
                 .await
                 .set_response_header(CONNECTION, UPGRADE)
                 .await
