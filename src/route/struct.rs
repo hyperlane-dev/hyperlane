@@ -5,7 +5,7 @@ use crate::*;
 /// This struct wraps a vector of `RouteSegment`s, which are the individual components
 /// of a URL path. It is used internally by the `RouteMatcher` to perform efficient
 /// route matching against incoming requests.
-#[derive(Debug, Clone, Getter, DisplayDebug)]
+#[derive(Clone, Debug, DisplayDebug, Getter)]
 pub struct RoutePattern(
     /// The collection of segments that make up the route pattern.
     #[get]
@@ -20,7 +20,7 @@ pub struct RoutePattern(
 /// 3.  `regex_route`- For complex matching based on regular expressions.
 ///
 /// When a request comes in, the matcher checks these categories in order to find the appropriate hook.
-#[derive(Clone, CustomDebug, Getter, GetterMut, DisplayDebug, Setter)]
+#[derive(Clone, CustomDebug, DisplayDebug, Getter, GetterMut, Setter)]
 pub struct RouteMatcher {
     /// A hash map for storing and quickly retrieving handlers for static route.
     /// These are route without any variable path segments.

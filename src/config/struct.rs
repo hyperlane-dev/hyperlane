@@ -5,7 +5,7 @@ use crate::*;
 /// This structure holds all the settings for the HTTP and WebSocket server,
 /// including network parameters and buffer sizes. It is not intended to be used directly
 /// by end-users, but rather through the `ServerConfig` wrapper.
-#[derive(Clone, Data, CustomDebug, DisplayDebug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, CustomDebug, Data, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
 pub(crate) struct ServerConfigData {
     /// The host address the server will bind to.
     #[get(pub(crate))]
@@ -33,5 +33,5 @@ pub(crate) struct ServerConfigData {
 ///
 /// This structure wraps `ServerConfigData` in an `Arc<RwLock<ServerConfigData>>`
 /// to allow for safe concurrent access and modification of the server settings.
-#[derive(Clone, Getter, CustomDebug, DisplayDebug)]
+#[derive(Clone, CustomDebug, DisplayDebug, Getter)]
 pub struct ServerConfig(#[get(pub(super))] pub(super) ArcRwLock<ServerConfigData>);

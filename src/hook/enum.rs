@@ -6,7 +6,7 @@ use crate::*;
 /// and triggered at different stages of request handling or server events.
 /// Hooks with an `Option<isize>` allow specifying a priority order; `None` indicates
 /// the default order (0 or unspecified).
-#[derive(Clone, Debug, Copy, DisplayDebug)]
+#[derive(Clone, Copy, Debug, DisplayDebug)]
 pub enum HookType {
     /// Hook triggered when a task panic occurs during request processing.
     ///

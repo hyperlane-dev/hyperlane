@@ -1221,6 +1221,57 @@ impl Context {
         self.read().await.get_response().json_vec()
     }
 
+    /// Serializes the response to a JSON byte vector with filtered fields.
+    ///
+    /// This method attempts to serialize the response structure into a JSON formatted
+    /// byte vector representation, keeping only the fields that satisfy the predicate.
+    ///
+    /// # Arguments
+    ///
+    /// - `F: FnMut(&(&String, &mut Value)) -> bool` - A function that takes a reference to a map entry (&(key, value)),
+    ///   returns `true` to keep the field, `false` to remove it.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Vec<u8>, serde_json::Error>` - The serialized JSON bytes on success,
+    ///   or a serialization error on failure.
+    pub async fn try_get_response_json_vec_filter<F>(
+        &self,
+        predicate: F,
+    ) -> Result<Vec<u8>, serde_json::Error>
+    where
+        F: FnMut(&(&String, &mut Value)) -> bool,
+    {
+        self.read()
+            .await
+            .get_response()
+            .try_json_vec_filter(predicate)
+    }
+
+    /// Serializes the response to a JSON byte vector with filtered fields.
+    ///
+    /// This method serializes the response structure into a JSON formatted byte vector
+    /// representation, keeping only the fields that satisfy the predicate.
+    ///
+    /// # Arguments
+    ///
+    /// - `FnMut(&(&String, &mut Value)) -> bool` - A function that takes a reference to a map entry (&(key, value)),
+    ///   returns `true` to keep the field, `false` to remove it.
+    ///
+    /// # Returns
+    ///
+    /// - `Vec<u8>` - The serialized JSON bytes.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the serialization fails.
+    pub async fn get_response_json_vec_filter<F>(&self, predicate: F) -> Vec<u8>
+    where
+        F: FnMut(&(&String, &mut Value)) -> bool,
+    {
+        self.read().await.get_response().json_vec_filter(predicate)
+    }
+
     /// Serializes the response to a JSON string.
     ///
     /// This method attempts to serialize the entire response structure into a JSON
@@ -1248,6 +1299,60 @@ impl Context {
     /// This function will panic if the serialization fails.
     pub async fn get_response_json_string(&self) -> String {
         self.read().await.get_response().json_string()
+    }
+
+    /// Serializes the response to a JSON string with filtered fields.
+    ///
+    /// This method attempts to serialize the response structure into a JSON formatted
+    /// string representation, keeping only the fields that satisfy the predicate.
+    ///
+    /// # Arguments
+    ///
+    /// - `FnMut(&(&String, &mut Value)) -> bool` - A function that takes a reference to a map entry (&(key, value)),
+    ///   returns `true` to keep the field, `false` to remove it.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<String, serde_json::Error>` - The serialized JSON string on success,
+    ///   or a serialization error on failure.
+    pub async fn try_get_response_json_string_filter<F>(
+        &self,
+        predicate: F,
+    ) -> Result<String, serde_json::Error>
+    where
+        F: FnMut(&(&String, &mut Value)) -> bool,
+    {
+        self.read()
+            .await
+            .get_response()
+            .try_json_string_filter(predicate)
+    }
+
+    /// Serializes the response to a JSON string with filtered fields.
+    ///
+    /// This method serializes the response structure into a JSON formatted string
+    /// representation, keeping only the fields that satisfy the predicate.
+    ///
+    /// # Arguments
+    ///
+    /// - `FnMut(&(&String, &mut Value)) -> bool` - A function that takes a reference to a map entry (&(key, value)),
+    ///   returns `true` to keep the field, `false` to remove it.
+    ///
+    /// # Returns
+    ///
+    /// - `String` - The serialized JSON string.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the serialization fails.
+    pub async fn get_response_json_string_filter<F>(&self, predicate: F) -> String
+    where
+        F: FnMut(&(&String, &mut Value)) -> bool,
+    {
+        self.read()
+            .await
+            .get_response()
+            .json_string_filter(predicate)
     }
 
     /// Retrieves the HTTP version of the response.

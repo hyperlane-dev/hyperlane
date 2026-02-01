@@ -19,7 +19,7 @@ pub(crate) struct HandlerState {
 /// including configuration, routing, middleware, and various hooks for extending functionality.
 /// It is not intended to be used directly by end-users, but rather wrapped within the `Server` struct
 /// for thread-safe access.
-#[derive(Data, Clone, CustomDebug, DisplayDebug)]
+#[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub(crate) struct ServerData {
     /// Stores the server's configuration settings, such as address, port, and timeouts.
     #[get(pub(super))]
@@ -69,5 +69,5 @@ pub(crate) struct ServerData {
 /// This struct acts as a public-facing wrapper around an `Arc<RwLock<ServerData>>`.
 /// It allows multiple parts of the application to safely share and modify the server's
 /// configuration and state across different threads and asynchronous tasks.
-#[derive(Clone, Getter, CustomDebug, DisplayDebug, Default)]
+#[derive(Clone, CustomDebug, Default, DisplayDebug, Getter)]
 pub struct Server(#[get(pub(super))] pub(super) SharedServerState);

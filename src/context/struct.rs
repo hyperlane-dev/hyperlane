@@ -4,7 +4,7 @@ use crate::*;
 ///
 /// This structure holds all the data associated with a single request-response cycle,
 /// including the stream, request, response, and any custom attributes.
-#[derive(Clone, Data, Default, CustomDebug, DisplayDebug)]
+#[derive(Clone, CustomDebug, Data, Default, DisplayDebug)]
 pub(crate) struct ContextData {
     /// A flag indicating whether the request handling has been aborted.
     #[get(pub(super))]
@@ -47,5 +47,5 @@ pub(crate) struct ContextData {
 ///
 /// This is a wrapper around `ContextData` that uses an `Arc<RwLock<>>` to allow
 /// for shared, mutable access across asynchronous tasks.
-#[derive(Clone, Default, Getter, CustomDebug, DisplayDebug)]
+#[derive(Clone, CustomDebug, Default, DisplayDebug, Getter)]
 pub struct Context(#[get(pub(super))] pub(super) ArcRwLock<ContextData>);

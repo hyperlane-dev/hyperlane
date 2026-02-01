@@ -1,7 +1,7 @@
 use crate::*;
 
 /// Represents errors that can occur at the server level.
-#[derive(CustomDebug, DisplayDebug, PartialEq, Eq, Clone, Deserialize, Serialize)]
+#[derive(Clone, CustomDebug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
 pub enum ServerError {
     /// An error occurred while trying to bind to a TCP socket.
     TcpBind(String),
@@ -16,7 +16,7 @@ pub enum ServerError {
 }
 
 /// Represents errors related to route definitions and matching.
-#[derive(CustomDebug, DisplayDebug, PartialEq, Eq, Clone, Deserialize, Serialize)]
+#[derive(Clone, CustomDebug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
 pub enum RouteError {
     /// The route pattern cannot be empty.
     EmptyPattern,
