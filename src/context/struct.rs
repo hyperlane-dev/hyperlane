@@ -7,12 +7,12 @@ use crate::*;
 #[derive(Clone, CustomDebug, Data, Default, DisplayDebug)]
 pub(crate) struct ContextData {
     /// A flag indicating whether the request handling has been aborted.
-    #[get(pub(super))]
+    #[get(pub(super), type(copy))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
     aborted: bool,
     /// A flag indicating whether the connection has been closed.
-    #[get(pub(super))]
+    #[get(pub(super), type(copy))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
     closed: bool,

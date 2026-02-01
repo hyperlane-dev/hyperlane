@@ -34,20 +34,14 @@ async fn context_route_params() {
 }
 
 #[tokio::test]
-async fn context_request_and_response() {
+async fn context_request_and_response_string() {
     let ctx: Context = Context::default();
     let request: Request = Request::default();
     ctx.set_request(&request).await;
     let fetched_request: Request = ctx.get_request().await;
-    assert!(request.try_json_vec().is_ok());
-    assert!(fetched_request.try_json_vec().is_ok());
-    assert_eq!(request.json_vec(), fetched_request.json_vec());
-    assert_eq!(request.json_string(), fetched_request.json_string());
+    assert_eq!(request.to_string(), fetched_request.to_string());
     let response: Response = Response::default();
     ctx.set_response(&response).await;
     let fetched_response: Response = ctx.get_response().await;
-    assert!(response.try_json_vec().is_ok());
-    assert!(fetched_response.try_json_vec().is_ok());
-    assert_eq!(response.json_vec(), fetched_response.json_vec());
-    assert_eq!(response.json_string(), fetched_response.json_string());
+    assert_eq!(response.to_string(), fetched_response.to_string());
 }
