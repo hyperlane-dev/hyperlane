@@ -2,7 +2,7 @@ use crate::*;
 
 /// Default server hook
 #[derive(
-    Clone, Copy, Debug, Deserialize, DisplayDebug, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize,
+    Clone, Copy, Debug, Deserialize, DisplayDebug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize,
 )]
 pub struct DefaultServerHook;
 
