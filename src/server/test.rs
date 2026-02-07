@@ -267,6 +267,8 @@ impl ServerHook for SseRoute {
         let send_result: Result<(), ResponseError> = ctx
             .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
             .await
+            .set_response_body(&vec![])
+            .await
             .try_send()
             .await;
         if send_result.is_err() {
