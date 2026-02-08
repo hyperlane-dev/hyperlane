@@ -316,7 +316,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `path` - The route path pattern.
+    /// - `AsRef<str>` - The route path pattern.
     ///
     /// # Returns
     ///
