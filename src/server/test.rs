@@ -315,7 +315,7 @@ impl ServerHook for WebsocketRoute {
 
     async fn handle(self, ctx: &Context) {
         loop {
-            match ctx.ws_from_stream(&RequestConfigData::default()).await {
+            match ctx.ws_from_stream().await {
                 Ok(_) => {
                     let request_body: Vec<u8> = ctx.get_request_body().await;
                     ctx.set_response_body(&request_body).await;

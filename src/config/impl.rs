@@ -22,7 +22,7 @@ impl Default for ServerConfigData {
 
 /// Implements the `Default` trait for `ServerConfig`.
 ///
-/// This wraps the default `ServerConfigData` in an `Arc<RwLock>`.
+/// This wraps the default `ServerConfigData` in an `ArcRwLock`.
 impl Default for ServerConfig {
     /// Creates a default `ServerConfig`.
     ///

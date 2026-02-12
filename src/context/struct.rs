@@ -41,11 +41,16 @@ pub(crate) struct ContextData {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     attributes: ThreadSafeAttributeStore,
+    /// The server data for accessing server-wide configuration and state.
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    server_data: ServerData,
 }
 
 /// The main application context, providing thread-safe access to request and response data.
 ///
-/// This is a wrapper around `ContextData` that uses an `Arc<RwLock<>>` to allow
+/// This is a wrapper around `ContextData` that uses an `ArcRwLock<ContextData>` to allow
 /// for shared, mutable access across asynchronous tasks.
 #[derive(Clone, CustomDebug, Default, DisplayDebug, Getter)]
 pub struct Context(#[get(pub(super))] pub(super) ArcRwLock<ContextData>);

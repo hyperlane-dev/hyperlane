@@ -17,6 +17,43 @@ impl From<ContextData> for Context {
     }
 }
 
+/// Implementation of `From` trait for `ContextData` from `ServerData`.
+impl From<ServerData> for ContextData {
+    /// Converts a `ServerData` into a `ContextData` with default request and response.
+    ///
+    /// # Arguments
+    ///
+    /// - `ServerData` - The server data to convert.
+    ///
+    /// # Returns
+    ///
+    /// - `ContextData` - The newly created context data instance.
+    #[inline(always)]
+    fn from(server_data: ServerData) -> Self {
+        let mut internal_ctx: ContextData = ContextData::default();
+        internal_ctx.set_server_data(server_data);
+        internal_ctx
+    }
+}
+
+/// Implementation of `From` trait for `Context` from `ServerData`.
+impl From<ServerData> for Context {
+    /// Converts a `ServerData` into a `Context` with default request and response.
+    ///
+    /// # Arguments
+    ///
+    /// - `ServerData` - The server data to convert.
+    ///
+    /// # Returns
+    ///
+    /// - `Context` - The newly created context instance.
+    #[inline(always)]
+    fn from(server_data: ServerData) -> Self {
+        let ctx_data: ContextData = server_data.into();
+        ctx_data.into()
+    }
+}
+
 /// Implementation of `From` trait for converting `&ArcRwLockStream` into `Context`.
 impl From<&ArcRwLockStream> for Context {
     /// Converts a reference to a network stream into a `Context` with default request.
@@ -79,6 +116,7 @@ impl PartialEq for ContextData {
             && self.get_route_params() == other.get_route_params()
             && self.get_attributes().len() == other.get_attributes().len()
             && self.try_get_stream().is_some() == other.try_get_stream().is_some()
+            && self.get_server_data() == other.get_server_data()
     }
 }
 
@@ -112,22 +150,28 @@ impl PartialEq for Context {
 
 /// Implementation of methods for `Context` structure.
 impl Context {
-    /// Creates a new `Context` with the provided network stream and HTTP request.
+    /// Creates a new `Context` with the provided network stream, HTTP request and server data.
     ///
     /// # Arguments
     ///
     /// - `&ArcRwLockStream` - The network stream.
     /// - `&Request` - The HTTP request.
+    /// - `ServerData` - The server data.
     ///
     /// # Returns
     ///
     /// - `Context` - The newly created context.
     #[inline(always)]
-    pub(crate) fn new(stream: &ArcRwLockStream, request: &Request) -> Context {
+    pub(crate) fn new(
+        stream: &ArcRwLockStream,
+        request: &Request,
+        server_data: ServerData,
+    ) -> Context {
         let mut internal_ctx: ContextData = ContextData::default();
         internal_ctx
             .set_stream(Some(stream.clone()))
             .set_request(request.clone())
+            .set_server_data(server_data)
             .get_mut_response()
             .set_version(request.get_version().clone());
         internal_ctx.into()
@@ -153,23 +197,19 @@ impl Context {
 
     /// Reads an HTTP request from the underlying stream.
     ///
-    /// # Arguments
-    ///
-    /// - `&RequestConfigData` - The request config.
-    ///
     /// # Returns
     ///
     /// - `Result<Request, RequestError>` - The parsed request or error.
-    pub async fn http_from_stream(
-        &self,
-        config: &RequestConfigData,
-    ) -> Result<Request, RequestError> {
+    pub async fn http_from_stream(&self) -> Result<Request, RequestError> {
         if self.get_aborted().await {
             return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
         }
         if let Some(stream) = self.try_get_stream().await.as_ref() {
-            let request_res: Result<Request, RequestError> =
-                Request::http_from_stream(stream, config).await;
+            let request_res: Result<Request, RequestError> = Request::http_from_stream(
+                stream,
+                self.read().await.get_server_data().get_request_config(),
+            )
+            .await;
             if let Ok(request) = request_res.as_ref() {
                 self.set_request(request).await;
             }
@@ -187,17 +227,18 @@ impl Context {
     /// # Returns
     ///
     /// - `Result<Request, RequestError>` - The parsed frame or error.
-    pub async fn ws_from_stream(
-        &self,
-        config: &RequestConfigData,
-    ) -> Result<Request, RequestError> {
+    pub async fn ws_from_stream(&self) -> Result<Request, RequestError> {
         if self.get_aborted().await {
             return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
         }
         if let Some(stream) = self.try_get_stream().await.as_ref() {
             let last_request: Request = self.get_request().await;
-            let request_res: Result<Request, RequestError> =
-                last_request.ws_from_stream(stream, config).await;
+            let request_res: Result<Request, RequestError> = last_request
+                .ws_from_stream(
+                    stream,
+                    self.read().await.get_server_data().get_request_config(),
+                )
+                .await;
             match request_res.as_ref() {
                 Ok(request) => {
                     self.set_request(request).await;
@@ -209,6 +250,19 @@ impl Context {
             return request_res;
         };
         Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
+    }
+
+    /// Retrieves the server data.
+    ///
+    /// # Returns
+    ///
+    /// - `ServerData` - The server data.
+    ///
+    /// # Returns
+    ///
+    /// - `ServerData` - The server data.
+    pub async fn get_server_data(&self) -> ServerData {
+        self.read().await.get_server_data().clone()
     }
 
     /// Checks if the context has been marked as aborted.

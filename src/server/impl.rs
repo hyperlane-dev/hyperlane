@@ -145,7 +145,7 @@ impl Server {
     /// # Returns
     ///
     /// - `ServerStateReadGuard` - The read guard for ServerData.
-    pub(super) async fn read(&self) -> ServerStateReadGuard<'_> {
+    async fn read(&self) -> ServerStateReadGuard<'_> {
         self.get_0().read().await
     }
 
@@ -636,7 +636,7 @@ impl Server {
     /// - `bool` - A boolean indicating whether the connection should be kept alive.
     async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {
         let route: &str = request.get_path();
-        let ctx: &Context = &Context::new(state.get_stream(), request);
+        let ctx: &Context = &Context::new(state.get_stream(), request, self.read().await.clone());
         let keep_alive: bool = request.is_enable_keep_alive();
         if self.handle_request_middleware(ctx).await {
             return ctx.is_keep_alive(keep_alive).await;
