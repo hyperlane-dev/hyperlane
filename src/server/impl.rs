@@ -71,6 +71,52 @@ impl PartialEq for Server {
 /// This indicates that `Server` has a total equality relation.
 impl Eq for Server {}
 
+/// Converts a `ServerConfig` into a `Server` instance.
+///
+/// This allows creating a `Server` directly from its configuration,
+/// using default values for other fields.
+impl From<ServerConfig> for Server {
+    /// Creates a new `Server` instance from the given `ServerConfig`.
+    ///
+    /// # Arguments
+    ///
+    /// - `ServerConfig` - The server configuration to use.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - A new `Server` instance with the provided configuration.
+    #[inline(always)]
+    fn from(server_config: ServerConfig) -> Self {
+        Self {
+            server_config,
+            ..Default::default()
+        }
+    }
+}
+
+/// Converts a `RequestConfig` into a `Server` instance.
+///
+/// This allows creating a `Server` directly from its request configuration,
+/// using default values for other fields.
+impl From<RequestConfig> for Server {
+    /// Creates a new `Server` instance from the given `RequestConfig`.
+    ///
+    /// # Arguments
+    ///
+    /// - `RequestConfig` - The request configuration to use.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - A new `Server` instance with the provided request configuration.
+    #[inline(always)]
+    fn from(request_config: RequestConfig) -> Self {
+        Self {
+            request_config,
+            ..Default::default()
+        }
+    }
+}
+
 /// Represents the server, providing methods to configure and run it.
 ///
 /// This struct wraps the `Server` configuration and routing logic,

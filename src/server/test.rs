@@ -10,6 +10,32 @@ async fn server_partial_eq() {
 }
 
 #[tokio::test]
+async fn server_from_server_config() {
+    let mut server_config: ServerConfig = ServerConfig::default();
+    server_config.set_nodelay(Some(true));
+    let server: Server = server_config.clone().into();
+    assert_eq!(server.get_request_config(), &RequestConfig::default());
+    assert_eq!(server.get_server_config(), &server_config);
+    assert!(server.get_task_panic().is_empty());
+    assert!(server.get_request_error().is_empty());
+    assert!(server.get_request_middleware().is_empty());
+    assert!(server.get_response_middleware().is_empty());
+}
+
+#[tokio::test]
+async fn server_from_request_config() {
+    let mut request_config: RequestConfig = RequestConfig::default();
+    request_config.set_buffer_size(KB_1);
+    let server: Server = request_config.into();
+    assert_eq!(server.get_request_config(), &request_config);
+    assert_eq!(server.get_server_config(), &ServerConfig::default());
+    assert!(server.get_task_panic().is_empty());
+    assert!(server.get_request_error().is_empty());
+    assert!(server.get_request_middleware().is_empty());
+    assert!(server.get_response_middleware().is_empty());
+}
+
+#[tokio::test]
 async fn server_inner_partial_eq() {
     let inner1: Server = Server::default();
     let inner2: Server = Server::default();
