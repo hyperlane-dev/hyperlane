@@ -15,10 +15,11 @@ where
     R: ServerHook,
 {
     Arc::new(move |ctx: &mut Context| -> SendableAsyncTask<Context> {
-        let mut ctx: Context = take(ctx);
+        let mut take_ctx: Context = take(ctx);
+        ctx.set_stream(take_ctx.try_get_stream().clone());
         Box::pin(async move {
-            R::new(&mut ctx).await.handle(&mut ctx).await;
-            ctx
+            R::new(&mut take_ctx).await.handle(&mut take_ctx).await;
+            take_ctx
         })
     })
 }

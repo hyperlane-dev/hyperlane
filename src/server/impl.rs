@@ -415,14 +415,14 @@ impl Server {
     /// - `&mut Context` - The context of the request during which the panic occurred.
     /// - `&PanicData` - The captured panic information.
     async fn handle_panic_with_context(&self, ctx: &mut Context, panic: &PanicData) {
-        let panic_clone: PanicData = panic.clone();
-        ctx.set_aborted(false).set_task_panic(panic_clone);
+        ctx.set_task_panic(panic.clone());
         for hook in self.get_task_panic().iter() {
             Box::pin(self.task_handler(ctx, hook, false)).await;
             if ctx.get_aborted() {
                 return;
             }
         }
+        ctx.set_aborted(true);
     }
 
     /// Handles a panic that occurred within a spawned Tokio task.
@@ -531,13 +531,14 @@ impl Server {
     /// - `&mut Context` - The request context.
     /// - `&RequestError` - The error that occurred.
     pub async fn handle_request_error(&self, ctx: &mut Context, error: &RequestError) {
-        ctx.set_aborted(false).set_request_error_data(error.clone());
+        ctx.set_request_error_data(error.clone());
         for hook in self.get_request_error().iter() {
             self.task_handler(ctx, hook, true).await;
             if ctx.get_aborted() {
                 return;
             }
         }
+        ctx.set_aborted(true);
     }
 
     /// Handles a single client connection, determining whether it's an HTTP or WebSocket request.

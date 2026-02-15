@@ -260,7 +260,7 @@ impl ServerHook for SseRoute {
         }
         for i in 0..10 {
             ctx.get_mut_response()
-                .set_body(format!("data:{}{}", i, HTTP_DOUBLE_BR));
+                .set_body(format!("data:{i}{HTTP_DOUBLE_BR}"));
             if ctx.try_send_body().await.is_err() {
                 ctx.set_aborted(true).set_closed(true);
                 return;
