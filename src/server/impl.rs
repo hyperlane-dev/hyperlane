@@ -157,6 +157,34 @@ impl From<&mut Server> for usize {
     }
 }
 
+/// Implementation of `AsRef` trait for `Server`.
+impl AsRef<Server> for Server {
+    /// Converts `&Server` to `&Server` via memory address conversion.
+    ///
+    /// # Returns
+    ///
+    /// - `&Server` - A reference to the `Server` instance.
+    #[inline(always)]
+    fn as_ref(&self) -> &Server {
+        let addr: usize = (self as &Server).into();
+        addr.into()
+    }
+}
+
+/// Implementation of `AsMut` trait for `Server`.
+impl AsMut<Server> for Server {
+    /// Converts `&mut Server` to `&mut Server` via memory address conversion.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Server` - A mutable reference to the `Server` instance.
+    #[inline(always)]
+    fn as_mut(&mut self) -> &mut Server {
+        let addr: usize = (self as &mut Server).into();
+        addr.into()
+    }
+}
+
 /// Converts a `ServerConfig` into a `Server` instance.
 ///
 /// This allows creating a `Server` directly from its configuration,

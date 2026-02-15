@@ -1,42 +1,9 @@
 use crate::*;
 
-#[cfg(test)]
-async fn assert_panic_message_contains<F, Fut>(future_factory: F, expected_msg: &str)
-where
-    F: Fn() -> Fut + Send + 'static,
-    Fut: Future<Output = ()> + Send + 'static,
-{
-    let result: Result<(), JoinError> = spawn(future_factory()).await;
-    assert!(
-        result.is_err(),
-        "Expected panic, but task completed successfully"
-    );
-    let join_err: JoinError = result.unwrap_err();
-    if !join_err.is_panic() {
-        panic!("Task failed but was not a panic");
-    }
-    let panic_payload: Box<dyn Any + Send> = join_err.into_panic();
-    let panic_msg: &str = if let Some(s) = panic_payload.downcast_ref::<&str>() {
-        s
-    } else if let Some(s) = panic_payload.downcast_ref::<String>() {
-        s.as_str()
-    } else {
-        "Unknown panic type"
-    };
-    assert!(
-        panic_msg.contains(expected_msg),
-        "Expected panic message to contain: '{}', but got: '{}'",
-        expected_msg,
-        panic_msg
-    );
-}
-
-#[cfg(test)]
 struct TestRoute {
     data: String,
 }
 
-#[cfg(test)]
 impl ServerHook for TestRoute {
     async fn new(_ctx: &mut Context) -> Self {
         Self {
@@ -49,32 +16,22 @@ impl ServerHook for TestRoute {
     }
 }
 
-#[tokio::test]
-async fn empty_route() {
-    assert_panic_message_contains(
-        || async {
-            let _server: &Server = Server::default().route::<TestRoute>(EMPTY_STR);
-        },
-        &RouteError::EmptyPattern.to_string(),
-    )
-    .await;
+#[test]
+#[should_panic(expected = "EmptyPattern")]
+fn empty_route() {
+    let _server: &Server = Server::default().route::<TestRoute>(EMPTY_STR);
 }
 
-#[tokio::test]
-async fn duplicate_route() {
-    assert_panic_message_contains(
-        || async {
-            let _server: &Server = Server::default()
-                .route::<TestRoute>(ROOT_PATH)
-                .route::<TestRoute>(ROOT_PATH);
-        },
-        &RouteError::DuplicatePattern(ROOT_PATH.to_string()).to_string(),
-    )
-    .await;
+#[test]
+#[should_panic(expected = "DuplicatePattern")]
+fn duplicate_route() {
+    let _server: &Server = Server::default()
+        .route::<TestRoute>(ROOT_PATH)
+        .route::<TestRoute>(ROOT_PATH);
 }
 
-#[tokio::test]
-async fn get_route() {
+#[test]
+fn get_route() {
     let mut server: Server = Server::default();
     server
         .route::<TestRoute>(ROOT_PATH)
@@ -96,8 +53,8 @@ async fn get_route() {
     }
 }
 
-#[tokio::test]
-async fn segment_count_optimization() {
+#[test]
+fn segment_count_optimization() {
     let mut server: Server = Server::default();
     server.route::<TestRoute>("/users/{id}");
     server.route::<TestRoute>("/users/{id}/posts");
@@ -121,8 +78,8 @@ async fn segment_count_optimization() {
     assert_eq!(route_matcher.get_dynamic_route().get(&4).unwrap().len(), 2);
 }
 
-#[tokio::test]
-async fn regex_route_segment_count() {
+#[test]
+fn regex_route_segment_count() {
     let mut server: Server = Server::default();
     server.route::<TestRoute>("/files/{path:.*}");
     server.route::<TestRoute>("/api/{version:\\d+}/users");
@@ -142,8 +99,8 @@ async fn regex_route_segment_count() {
     );
 }
 
-#[tokio::test]
-async fn mixed_route_types() {
+#[test]
+fn mixed_route_types() {
     let mut server: Server = Server::default();
     server.route::<TestRoute>("/");
     server.route::<TestRoute>("/about");
@@ -156,8 +113,8 @@ async fn mixed_route_types() {
     assert!(route_matcher.get_regex_route().contains_key(&2));
 }
 
-#[tokio::test]
-async fn large_dynamic_routes() {
+#[test]
+fn large_dynamic_routes() {
     const ROUTE_COUNT: u32 = 1000;
     let mut server: Server = Server::default();
     let start_insert: Instant = Instant::now();
@@ -189,8 +146,8 @@ async fn large_dynamic_routes() {
     );
 }
 
-#[tokio::test]
-async fn large_regex_routes() {
+#[test]
+fn large_regex_routes() {
     const ROUTE_COUNT: u32 = 1000;
     let mut server: Server = Server::default();
     let start_insert: Instant = Instant::now();
@@ -222,8 +179,8 @@ async fn large_regex_routes() {
     );
 }
 
-#[tokio::test]
-async fn large_tail_regex_routes() {
+#[test]
+fn large_tail_regex_routes() {
     const ROUTE_COUNT: u32 = 1000;
     let mut server: Server = Server::default();
     let start_insert: Instant = Instant::now();

@@ -1,6 +1,15 @@
 use crate::*;
 
 #[test]
+fn server_partial_eq() {
+    let server1: Server = Server::default();
+    let server2: Server = Server::default();
+    assert_eq!(server1, server2);
+    let server1_clone: Server = server1.clone();
+    assert_eq!(server1, server1_clone);
+}
+
+#[test]
 fn server_from_usize() {
     let mut server: Server = Server::default();
     server.set_request_config(RequestConfig::default());
@@ -33,6 +42,39 @@ fn server_mut_from_usize() {
 }
 
 #[test]
+fn server_from_server_config() {
+    let mut server_config: ServerConfig = ServerConfig::default();
+    server_config.set_nodelay(Some(true));
+    let server: Server = server_config.clone().into();
+    assert_eq!(server.get_request_config(), &RequestConfig::default());
+    assert_eq!(server.get_server_config(), &server_config);
+    assert!(server.get_task_panic().is_empty());
+    assert!(server.get_request_error().is_empty());
+    assert!(server.get_request_middleware().is_empty());
+    assert!(server.get_response_middleware().is_empty());
+}
+
+#[test]
+fn server_from_request_config() {
+    let mut request_config: RequestConfig = RequestConfig::default();
+    request_config.set_buffer_size(KB_1);
+    let server: Server = request_config.into();
+    assert_eq!(server.get_request_config(), &request_config);
+    assert_eq!(server.get_server_config(), &ServerConfig::default());
+    assert!(server.get_task_panic().is_empty());
+    assert!(server.get_request_error().is_empty());
+    assert!(server.get_request_middleware().is_empty());
+    assert!(server.get_response_middleware().is_empty());
+}
+
+#[test]
+fn server_inner_partial_eq() {
+    let inner1: Server = Server::default();
+    let inner2: Server = Server::default();
+    assert_eq!(inner1, inner2);
+}
+
+#[test]
 fn server_ref_into_usize() {
     let server: Server = Server::default();
     let server_address: usize = (&server).into();
@@ -46,46 +88,23 @@ fn server_mut_into_usize() {
     assert!(server_address > 0);
 }
 
-#[tokio::test]
-async fn server_partial_eq() {
-    let server1: Server = Server::default();
-    let server2: Server = Server::default();
-    assert_eq!(server1, server2);
-    let server1_clone: Server = server1.clone();
-    assert_eq!(server1, server1_clone);
+#[test]
+fn server_as_ref() {
+    let mut server: Server = Server::default();
+    server.set_server_config(ServerConfig::default());
+    let server_ref: &Server = server.as_ref();
+    assert_eq!(server.get_server_config(), server_ref.get_server_config());
+    assert_eq!(server.get_request_config(), server_ref.get_request_config());
 }
 
-#[tokio::test]
-async fn server_from_server_config() {
-    let mut server_config: ServerConfig = ServerConfig::default();
-    server_config.set_nodelay(Some(true));
-    let server: Server = server_config.clone().into();
-    assert_eq!(server.get_request_config(), &RequestConfig::default());
-    assert_eq!(server.get_server_config(), &server_config);
-    assert!(server.get_task_panic().is_empty());
-    assert!(server.get_request_error().is_empty());
-    assert!(server.get_request_middleware().is_empty());
-    assert!(server.get_response_middleware().is_empty());
-}
-
-#[tokio::test]
-async fn server_from_request_config() {
-    let mut request_config: RequestConfig = RequestConfig::default();
-    request_config.set_buffer_size(KB_1);
-    let server: Server = request_config.into();
-    assert_eq!(server.get_request_config(), &request_config);
-    assert_eq!(server.get_server_config(), &ServerConfig::default());
-    assert!(server.get_task_panic().is_empty());
-    assert!(server.get_request_error().is_empty());
-    assert!(server.get_request_middleware().is_empty());
-    assert!(server.get_response_middleware().is_empty());
-}
-
-#[tokio::test]
-async fn server_inner_partial_eq() {
-    let inner1: Server = Server::default();
-    let inner2: Server = Server::default();
-    assert_eq!(inner1, inner2);
+#[test]
+fn server_as_mut() {
+    let mut server: Server = Server::default();
+    let server_mut: &mut Server = server.as_mut();
+    let mut config: ServerConfig = ServerConfig::default();
+    config.set_nodelay(Some(true));
+    server_mut.set_server_config(config);
+    assert!(server.get_server_config().try_get_nodelay().is_some());
 }
 
 struct TestSendRoute;
@@ -98,8 +117,8 @@ impl ServerHook for TestSendRoute {
     async fn handle(self, _ctx: &mut Context) {}
 }
 
-#[tokio::test]
-async fn server_send_sync() {
+#[test]
+fn server_send_sync() {
     fn assert_send<T: Send>() {}
     fn assert_sync<T: Sync>() {}
     fn assert_send_sync<T: Send + Sync>() {}

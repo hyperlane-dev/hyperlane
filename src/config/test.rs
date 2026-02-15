@@ -1,7 +1,7 @@
 use crate::*;
 
-#[tokio::test]
-async fn server_config_from_json() {
+#[test]
+fn server_config_from_json() {
     let server_config_json: &'static str = r#"
     {
         "address": "0.0.0.0:80",

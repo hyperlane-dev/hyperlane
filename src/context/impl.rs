@@ -191,6 +191,34 @@ impl From<&mut Context> for usize {
     }
 }
 
+/// Implementation of `AsRef` trait for `Context`.
+impl AsRef<Context> for Context {
+    /// Converts `&Context` to `&Context` via memory address conversion.
+    ///
+    /// # Returns
+    ///
+    /// - `&Context` - A reference to the `Context` instance.
+    #[inline(always)]
+    fn as_ref(&self) -> &Context {
+        let addr: usize = (self as &Context).into();
+        addr.into()
+    }
+}
+
+/// Implementation of `AsMut` trait for `Context`.
+impl AsMut<Context> for Context {
+    /// Converts `&mut Context` to `&mut Context` via memory address conversion.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Context` - A mutable reference to the `Context` instance.
+    #[inline(always)]
+    fn as_mut(&mut self) -> &mut Context {
+        let addr: usize = (self as &mut Context).into();
+        addr.into()
+    }
+}
+
 /// Implementation of methods for `Context` structure.
 impl Context {
     /// Creates a new `Context` with the provided network stream, HTTP request and server.
