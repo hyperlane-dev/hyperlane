@@ -38,7 +38,7 @@ where
     R: ServerHook,
 {
     Arc::new(move |ctx: &mut Context| -> FutureBox<()> {
-        let ctx_address: usize = ctx.get_address();
+        let ctx_address: usize = ctx.into();
         Box::pin(async move {
             let ctx: &mut Context = ctx_address.into();
             R::new(ctx).await.handle(ctx).await;

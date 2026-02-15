@@ -1,5 +1,51 @@
 use crate::*;
 
+#[test]
+fn server_from_usize() {
+    let mut server: Server = Server::default();
+    server.set_request_config(RequestConfig::default());
+    let server_address: usize = (&server).into();
+    let server_from_addr: Server = server_address.into();
+    assert_eq!(
+        server.get_request_config(),
+        server_from_addr.get_request_config()
+    );
+}
+
+#[test]
+fn server_ref_from_usize() {
+    let mut server: Server = Server::default();
+    server.set_server_config(ServerConfig::default());
+    let server_address: usize = (&server).into();
+    let server_ref: &Server = server_address.into();
+    assert_eq!(server.get_server_config(), server_ref.get_server_config());
+}
+
+#[test]
+fn server_mut_from_usize() {
+    let mut server: Server = Server::default();
+    let server_address: usize = (&mut server).into();
+    let server_mut: &mut Server = server_address.into();
+    let mut config: ServerConfig = ServerConfig::default();
+    config.set_nodelay(Some(true));
+    server_mut.set_server_config(config);
+    assert!(server_mut.get_server_config().try_get_nodelay().is_some());
+}
+
+#[test]
+fn server_ref_into_usize() {
+    let server: Server = Server::default();
+    let server_address: usize = (&server).into();
+    assert!(server_address > 0);
+}
+
+#[test]
+fn server_mut_into_usize() {
+    let mut server: Server = Server::default();
+    let server_address: usize = (&mut server).into();
+    assert!(server_address > 0);
+}
+
 #[tokio::test]
 async fn server_partial_eq() {
     let server1: Server = Server::default();
@@ -338,7 +384,7 @@ impl ServerHook for GetAllRoutes {
     }
 
     async fn handle(self, ctx: &mut Context) {
-        let route_matcher: RouteMatcher = ctx.get_server().get_route_matcher().clone();
+        let route_matcher: &RouteMatcher = ctx.get_server().get_route_matcher();
         let mut response_body: String = String::new();
         for key in route_matcher.get_static_route().keys() {
             response_body.push_str(&format!("Static route: {key}\n"));

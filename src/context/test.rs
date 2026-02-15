@@ -1,5 +1,46 @@
 use crate::*;
 
+#[test]
+fn context_from_usize() {
+    let mut ctx: Context = Context::default();
+    ctx.set_aborted(true);
+    let ctx_address: usize = (&ctx).into();
+    let ctx_from_addr: Context = ctx_address.into();
+    assert_eq!(ctx.get_aborted(), ctx_from_addr.get_aborted());
+}
+
+#[test]
+fn context_ref_from_usize() {
+    let mut ctx: Context = Context::default();
+    ctx.set_closed(true);
+    let ctx_address: usize = (&ctx).into();
+    let ctx_ref: &Context = ctx_address.into();
+    assert_eq!(ctx.get_closed(), ctx_ref.get_closed());
+}
+
+#[test]
+fn context_mut_from_usize() {
+    let mut ctx: Context = Context::default();
+    let ctx_address: usize = (&mut ctx).into();
+    let ctx_mut: &mut Context = ctx_address.into();
+    ctx_mut.set_aborted(true);
+    assert!(ctx_mut.get_aborted());
+}
+
+#[test]
+fn context_ref_into_usize() {
+    let ctx: Context = Context::default();
+    let ctx_address: usize = (&ctx).into();
+    assert!(ctx_address > 0);
+}
+
+#[test]
+fn context_mut_into_usize() {
+    let mut ctx: Context = Context::default();
+    let ctx_address: usize = (&mut ctx).into();
+    assert!(ctx_address > 0);
+}
+
 #[tokio::test]
 async fn context_aborted_and_closed() {
     let mut ctx: Context = Context::default();

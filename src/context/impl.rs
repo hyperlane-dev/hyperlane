@@ -105,6 +105,41 @@ impl From<ArcRwLockStream> for Context {
     }
 }
 
+/// Implementation of `From` trait for converting `usize` address into `Context`.
+impl From<usize> for Context {
+    /// Converts a memory address into an owned `Context` by cloning from the reference.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - The memory address of the `Context` instance.
+    ///
+    /// # Returns
+    ///
+    /// - `Context` - A cloned `Context` instance from the given address.
+    #[inline(always)]
+    fn from(addr: usize) -> Self {
+        let ctx: &Context = addr.into();
+        ctx.clone()
+    }
+}
+
+/// Implementation of `From` trait for converting `usize` address into `&Context`.
+impl From<usize> for &'static Context {
+    /// Converts a memory address into a reference to `Context`.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - The memory address of the `Context` instance.
+    ///
+    /// # Returns
+    ///
+    /// - `&'static Context` - A reference to the `Context` at the given address.
+    #[inline(always)]
+    fn from(addr: usize) -> &'static Context {
+        unsafe { &*(addr as *const Context) }
+    }
+}
+
 /// Implementation of `From` trait for converting `usize` address into `&mut Context`.
 impl From<usize> for &'static mut Context {
     /// Converts a memory address into a mutable reference to `Context`.
@@ -119,6 +154,40 @@ impl From<usize> for &'static mut Context {
     #[inline(always)]
     fn from(addr: usize) -> &'static mut Context {
         unsafe { &mut *(addr as *mut Context) }
+    }
+}
+
+/// Implementation of `From` trait for converting `&Context` into `usize` address.
+impl From<&Context> for usize {
+    /// Converts a reference to `Context` into its memory address.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Context` - The reference to the `Context` instance.
+    ///
+    /// # Returns
+    ///
+    /// - `usize` - The memory address of the `Context` instance.
+    #[inline(always)]
+    fn from(ctx: &Context) -> Self {
+        ctx as *const Context as usize
+    }
+}
+
+/// Implementation of `From` trait for converting `&mut Context` into `usize` address.
+impl From<&mut Context> for usize {
+    /// Converts a mutable reference to `Context` into its memory address.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut Context` - The mutable reference to the `Context` instance.
+    ///
+    /// # Returns
+    ///
+    /// - `usize` - The memory address of the `Context` instance.
+    #[inline(always)]
+    fn from(ctx: &mut Context) -> Self {
+        ctx as *mut Context as usize
     }
 }
 
@@ -148,16 +217,6 @@ impl Context {
             .get_mut_response()
             .set_version(request.get_version().clone());
         ctx
-    }
-
-    /// Returns the address of the context.
-    ///
-    /// # Returns
-    ///
-    /// - `usize` - The address of the context.
-    #[inline(always)]
-    pub fn get_address(&mut self) -> usize {
-        self as *mut Context as usize
     }
 
     /// Reads an HTTP request from the underlying stream.

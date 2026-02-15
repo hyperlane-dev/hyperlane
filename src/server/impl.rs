@@ -71,6 +71,24 @@ impl PartialEq for Server {
 /// This indicates that `Server` has a total equality relation.
 impl Eq for Server {}
 
+/// Implementation of `From` trait for converting `usize` address into `Server`.
+impl From<usize> for Server {
+    /// Converts a memory address into an owned `Server` by cloning from the reference.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - The memory address of the `Server` instance.
+    ///
+    /// # Returns
+    ///
+    /// - `Server` - A cloned `Server` instance from the given address.
+    #[inline(always)]
+    fn from(addr: usize) -> Self {
+        let server: &Server = addr.into();
+        server.clone()
+    }
+}
+
 /// Implementation of `From` trait for converting `usize` address into `&Server`.
 impl From<usize> for &'static Server {
     /// Converts a memory address into a reference to `Server`.
@@ -85,6 +103,57 @@ impl From<usize> for &'static Server {
     #[inline(always)]
     fn from(addr: usize) -> &'static Server {
         unsafe { &*(addr as *const Server) }
+    }
+}
+
+/// Implementation of `From` trait for converting `usize` address into `&mut Server`.
+impl From<usize> for &'static mut Server {
+    /// Converts a memory address into a mutable reference to `Server`.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - The memory address of the `Server` instance.
+    ///
+    /// # Returns
+    ///
+    /// - `&'static mut Server` - A mutable reference to the `Server` at the given address.
+    #[inline(always)]
+    fn from(addr: usize) -> &'static mut Server {
+        unsafe { &mut *(addr as *mut Server) }
+    }
+}
+
+/// Implementation of `From` trait for converting `&Server` into `usize` address.
+impl From<&Server> for usize {
+    /// Converts a reference to `Server` into its memory address.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Server` - The reference to the `Server` instance.
+    ///
+    /// # Returns
+    ///
+    /// - `usize` - The memory address of the `Server` instance.
+    #[inline(always)]
+    fn from(server: &Server) -> Self {
+        server as *const Server as usize
+    }
+}
+
+/// Implementation of `From` trait for converting `&mut Server` into `usize` address.
+impl From<&mut Server> for usize {
+    /// Converts a mutable reference to `Server` into its memory address.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut Server` - The mutable reference to the `Server` instance.
+    ///
+    /// # Returns
+    ///
+    /// - `usize` - The memory address of the `Server` instance.
+    #[inline(always)]
+    fn from(server: &mut Server) -> Self {
+        server as *mut Server as usize
     }
 }
 
@@ -139,16 +208,6 @@ impl From<RequestConfig> for Server {
 /// This struct wraps the `Server` configuration and routing logic,
 /// offering a high-level API for setting up the HTTP and WebSocket server.
 impl Server {
-    /// Returns the address of the server.
-    ///
-    /// # Returns
-    ///
-    /// - `usize` - The address of the server.
-    #[inline(always)]
-    pub fn get_address(&self) -> usize {
-        self as *const Server as usize
-    }
-
     /// Registers a hook into the server's processing pipeline.
     ///
     /// This function dispatches the provided `HookType` to the appropriate
@@ -542,7 +601,7 @@ impl Server {
     ///
     /// - `ArcRwLockStream` - The thread-safe stream representing the client connection.
     async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
-        let server_address: usize = self.get_address();
+        let server_address: usize = self.into();
         spawn(async move {
             let server: &'static Server = server_address.into();
             server.handle_connection(stream).await;
@@ -578,7 +637,8 @@ impl Server {
     async fn handle_connection(&self, stream: ArcRwLockStream) {
         match Request::http_from_stream(&stream, self.get_request_config()).await {
             Ok(request) => {
-                let hook: HandlerState = HandlerState::new(stream, self.get_address().into());
+                let server_address: usize = self.into();
+                let hook: HandlerState = HandlerState::new(stream, server_address.into());
                 self.handle_http_requests(&hook, &request).await;
             }
             Err(error) => {
