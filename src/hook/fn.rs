@@ -14,10 +14,11 @@ pub fn server_hook_factory<R>() -> ServerHookHandler
 where
     R: ServerHook,
 {
-    Arc::new(move |ctx: &Context| -> SendableAsyncTask<()> {
-        let ctx: Context = ctx.clone();
+    Arc::new(move |ctx: &mut Context| -> SendableAsyncTask<Context> {
+        let mut ctx: Context = take(ctx);
         Box::pin(async move {
-            R::new(&ctx).await.handle(&ctx).await;
+            R::new(&mut ctx).await.handle(&mut ctx).await;
+            ctx
         })
     })
 }

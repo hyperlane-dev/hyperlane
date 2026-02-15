@@ -1,56 +1,21 @@
 use crate::*;
 
-/// Implementation of `From` trait for `Context`.
-impl From<ContextData> for Context {
-    /// Converts a `ContextData` into a `Context`.
+/// Implementation of `From` trait for `Context` from `Server`.
+impl From<Server> for Context {
+    /// Converts a `Server` into a `Context` with default request and response.
     ///
     /// # Arguments
     ///
-    /// - `ContextData` - The wrapped context data.
+    /// - `Server` - The server to convert.
     ///
     /// # Returns
     ///
     /// - `Context` - The newly created context instance.
     #[inline(always)]
-    fn from(ctx: ContextData) -> Self {
-        Self(arc_rwlock(ctx))
-    }
-}
-
-/// Implementation of `From` trait for `ContextData` from `ServerData`.
-impl From<ServerData> for ContextData {
-    /// Converts a `ServerData` into a `ContextData` with default request and response.
-    ///
-    /// # Arguments
-    ///
-    /// - `ServerData` - The server data to convert.
-    ///
-    /// # Returns
-    ///
-    /// - `ContextData` - The newly created context data instance.
-    #[inline(always)]
-    fn from(server_data: ServerData) -> Self {
-        let mut internal_ctx: ContextData = ContextData::default();
-        internal_ctx.set_server_data(server_data);
-        internal_ctx
-    }
-}
-
-/// Implementation of `From` trait for `Context` from `ServerData`.
-impl From<ServerData> for Context {
-    /// Converts a `ServerData` into a `Context` with default request and response.
-    ///
-    /// # Arguments
-    ///
-    /// - `ServerData` - The server data to convert.
-    ///
-    /// # Returns
-    ///
-    /// - `Context` - The newly created context instance.
-    #[inline(always)]
-    fn from(server_data: ServerData) -> Self {
-        let ctx_data: ContextData = server_data.into();
-        ctx_data.into()
+    fn from(server: Server) -> Self {
+        let mut ctx: Context = Context::default();
+        ctx.set_server(Arc::new(server));
+        ctx
     }
 }
 
@@ -67,14 +32,9 @@ impl From<&ArcRwLockStream> for Context {
     /// - `Context` - The newly created context instance.
     #[inline(always)]
     fn from(stream: &ArcRwLockStream) -> Self {
-        let request: Request = Request::default();
-        let mut internal_ctx: ContextData = ContextData::default();
-        internal_ctx
-            .set_stream(Some(stream.clone()))
-            .set_request(request.clone())
-            .get_mut_response()
-            .set_version(request.get_version().clone());
-        internal_ctx.into()
+        let mut ctx: Context = Context::default();
+        ctx.set_stream(Some(stream.clone()));
+        ctx
     }
 }
 
@@ -95,34 +55,6 @@ impl From<ArcRwLockStream> for Context {
     }
 }
 
-/// Implementation of `PartialEq` trait for `ContextData`.
-impl PartialEq for ContextData {
-    /// Compares two `ContextData` instances for equality.
-    ///
-    /// # Arguments
-    ///
-    /// - `&Self` - The first `ContextData` instance.
-    /// - `&Self` - The second `ContextData` instance.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the instances are equal, otherwise false.
-    #[inline(always)]
-    fn eq(&self, other: &Self) -> bool {
-        self.get_aborted() == other.get_aborted()
-            && self.get_closed() == other.get_closed()
-            && self.get_request() == other.get_request()
-            && self.get_response() == other.get_response()
-            && self.get_route_params() == other.get_route_params()
-            && self.get_attributes().len() == other.get_attributes().len()
-            && self.try_get_stream().is_some() == other.try_get_stream().is_some()
-            && self.get_server_data() == other.get_server_data()
-    }
-}
-
-/// Implementation of `Eq` trait for `ContextData`.
-impl Eq for ContextData {}
-
 /// Implementation of `PartialEq` trait for `Context`.
 impl PartialEq for Context {
     /// Compares two `Context` instances for equality.
@@ -137,62 +69,42 @@ impl PartialEq for Context {
     /// - `bool` - True if the instances are equal, otherwise false.
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
-        if Arc::ptr_eq(self.get_0(), other.get_0()) {
-            return true;
-        }
-        if let (Ok(s), Ok(o)) = (self.get_0().try_read(), other.get_0().try_read()) {
-            *s == *o
-        } else {
-            false
-        }
+        self.get_aborted() == other.get_aborted()
+            && self.get_closed() == other.get_closed()
+            && self.get_request() == other.get_request()
+            && self.get_response() == other.get_response()
+            && self.get_route_params() == other.get_route_params()
+            && self.get_attributes().len() == other.get_attributes().len()
+            && self.try_get_stream().is_some() == other.try_get_stream().is_some()
+            && self.get_server() == other.get_server()
     }
 }
 
+/// Implementation of `Eq` trait for `Context`.
+impl Eq for Context {}
+
 /// Implementation of methods for `Context` structure.
 impl Context {
-    /// Creates a new `Context` with the provided network stream, HTTP request and server data.
+    /// Creates a new `Context` with the provided network stream, HTTP request and server.
     ///
     /// # Arguments
     ///
     /// - `&ArcRwLockStream` - The network stream.
     /// - `&Request` - The HTTP request.
-    /// - `ServerData` - The server data.
+    /// - `&ArcServer` - The server.
     ///
     /// # Returns
     ///
     /// - `Context` - The newly created context.
     #[inline(always)]
-    pub(crate) fn new(
-        stream: &ArcRwLockStream,
-        request: &Request,
-        server_data: ServerData,
-    ) -> Context {
-        let mut internal_ctx: ContextData = ContextData::default();
-        internal_ctx
-            .set_stream(Some(stream.clone()))
+    pub(crate) fn new(stream: &ArcRwLockStream, request: &Request, server: &ArcServer) -> Context {
+        let mut ctx: Context = Context::default();
+        ctx.set_stream(Some(stream.clone()))
             .set_request(request.clone())
-            .set_server_data(server_data)
+            .set_server(server.clone())
             .get_mut_response()
             .set_version(request.get_version().clone());
-        internal_ctx.into()
-    }
-
-    /// Acquires a read lock on the inner context data.
-    ///
-    /// # Returns
-    ///
-    /// - `ContextReadGuard` - The read guard for the inner context.
-    async fn read(&self) -> ContextReadGuard<'_> {
-        self.get_0().read().await
-    }
-
-    /// Acquires a write lock on the inner context data.
-    ///
-    /// # Returns
-    ///
-    /// - `ContextWriteGuard` - The write guard for the inner context.
-    async fn write(&self) -> ContextWriteGuard<'_> {
-        self.get_0().write().await
+        ctx
     }
 
     /// Reads an HTTP request from the underlying stream.
@@ -200,18 +112,15 @@ impl Context {
     /// # Returns
     ///
     /// - `Result<Request, RequestError>` - The parsed request or error.
-    pub async fn http_from_stream(&self) -> Result<Request, RequestError> {
-        if self.get_aborted().await {
+    pub async fn http_from_stream(&mut self) -> Result<Request, RequestError> {
+        if self.get_aborted() {
             return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
         }
-        if let Some(stream) = self.try_get_stream().await.as_ref() {
-            let request_res: Result<Request, RequestError> = Request::http_from_stream(
-                stream,
-                self.read().await.get_server_data().get_request_config(),
-            )
-            .await;
+        if let Some(stream) = self.try_get_stream().as_ref() {
+            let request_res: Result<Request, RequestError> =
+                Request::http_from_stream(stream, self.get_server().get_request_config()).await;
             if let Ok(request) = request_res.as_ref() {
-                self.set_request(request).await;
+                self.set_request(request.clone());
             }
             return request_res;
         };
@@ -220,31 +129,24 @@ impl Context {
 
     /// Reads a WebSocket frame from the underlying stream.
     ///
-    /// # Arguments
-    ///
-    /// - `&RequestConfigData` - The request config.
-    ///
     /// # Returns
     ///
     /// - `Result<Request, RequestError>` - The parsed frame or error.
-    pub async fn ws_from_stream(&self) -> Result<Request, RequestError> {
-        if self.get_aborted().await {
+    pub async fn ws_from_stream(&mut self) -> Result<Request, RequestError> {
+        if self.get_aborted() {
             return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
         }
-        if let Some(stream) = self.try_get_stream().await.as_ref() {
-            let last_request: Request = self.get_request().await;
+        if let Some(stream) = self.try_get_stream().as_ref() {
+            let last_request: &Request = self.get_request();
             let request_res: Result<Request, RequestError> = last_request
-                .ws_from_stream(
-                    stream,
-                    self.read().await.get_server_data().get_request_config(),
-                )
+                .ws_from_stream(stream, self.get_server().get_request_config())
                 .await;
             match request_res.as_ref() {
                 Ok(request) => {
-                    self.set_request(request).await;
+                    self.set_request(request.clone());
                 }
                 Err(_) => {
-                    self.set_request(&last_request).await;
+                    self.set_request(last_request.clone());
                 }
             }
             return request_res;
@@ -252,112 +154,14 @@ impl Context {
         Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
     }
 
-    /// Retrieves the server data.
-    ///
-    /// # Returns
-    ///
-    /// - `ServerData` - The server data.
-    ///
-    /// # Returns
-    ///
-    /// - `ServerData` - The server data.
-    pub async fn get_server_data(&self) -> ServerData {
-        self.read().await.get_server_data().clone()
-    }
-
-    /// Checks if the context has been marked as aborted.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the context is aborted, otherwise false.
-    pub async fn get_aborted(&self) -> bool {
-        self.read().await.get_aborted()
-    }
-
-    /// Sets the aborted flag for the context.
-    ///
-    /// # Arguments
-    ///
-    /// - `bool` - The aborted state to set.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn set_aborted(&self, aborted: bool) -> &Self {
-        self.write().await.set_aborted(aborted);
-        self
-    }
-
-    /// Marks the context as aborted.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to the modified context.
-    pub async fn aborted(&self) -> &Self {
-        self.set_aborted(true).await;
-        self
-    }
-
-    /// Cancels the aborted state of the context.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to the modified context.
-    pub async fn cancel_aborted(&self) -> &Self {
-        self.set_aborted(false).await;
-        self
-    }
-
-    /// Checks if the connection is marked as closed.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the connection is closed, otherwise false.
-    pub async fn get_closed(&self) -> bool {
-        self.read().await.get_closed()
-    }
-
-    /// Sets the closed flag for the connection.
-    ///
-    /// # Arguments
-    ///
-    /// - `bool` - The new value for the closed flag.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to the modified context.
-    pub async fn set_closed(&self, closed: bool) -> &Self {
-        self.write().await.set_closed(closed);
-        self
-    }
-
-    /// Marks the connection as closed.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to the modified context.
-    pub async fn closed(&self) -> &Self {
-        self.set_closed(true).await;
-        self
-    }
-
-    /// Cancels the closed state of the connection.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to the modified context.
-    pub async fn cancel_closed(&self) -> &Self {
-        self.set_closed(false).await;
-        self
-    }
-
     /// Checks if the connection has been terminated (aborted or closed).
     ///
     /// # Returns
     ///
     /// - `bool` - True if the connection is either aborted or closed, otherwise false.
-    pub async fn is_terminated(&self) -> bool {
-        self.get_aborted().await || self.get_closed().await
+    #[inline(always)]
+    pub fn is_terminated(&self) -> bool {
+        self.get_aborted() || self.get_closed()
     }
 
     /// Checks if the connection should be kept alive.
@@ -372,30 +176,9 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - True if the connection should be kept alive, otherwise false.
-    pub async fn is_keep_alive(&self, keep_alive: bool) -> bool {
-        !self.get_closed().await && keep_alive
-    }
-
-    /// Retrieves the underlying network stream, if available.
-    ///
-    /// # Returns
-    ///
-    /// - `Option<ArcRwLockStream>` - The thread-safe, shareable network stream if it exists.
-    pub async fn try_get_stream(&self) -> Option<ArcRwLockStream> {
-        self.read().await.try_get_stream().clone()
-    }
-
-    /// Retrieves the underlying network stream.
-    ///
-    /// # Returns
-    ///
-    /// - `ArcRwLockStream` - The thread-safe, shareable network stream.
-    ///
-    /// # Panics
-    ///
-    /// - If the network stream is not found.
-    pub async fn get_stream(&self) -> ArcRwLockStream {
-        self.try_get_stream().await.unwrap()
+    #[inline(always)]
+    pub(crate) fn is_keep_alive(&self, keep_alive: bool) -> bool {
+        !self.get_closed() && keep_alive
     }
 
     /// Retrieves the remote socket address of the connection.
@@ -405,7 +188,6 @@ impl Context {
     /// - `Option<SocketAddr>` - The socket address of the remote peer if available.
     pub async fn try_get_socket_addr(&self) -> Option<SocketAddr> {
         self.try_get_stream()
-            .await
             .as_ref()?
             .read()
             .await
@@ -498,1170 +280,6 @@ impl Context {
         self.try_get_socket_port().await.unwrap()
     }
 
-    /// Retrieves the current HTTP request.
-    ///
-    /// # Returns
-    ///
-    /// - `Request` - A clone of the current request.
-    pub async fn get_request(&self) -> Request {
-        self.read().await.get_request().clone()
-    }
-
-    /// Sets the current HTTP request for the context.
-    ///
-    /// # Arguments
-    ///
-    /// - `&Request` - The request to set in the context.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to the modified context.
-    pub(crate) async fn set_request(&self, request_data: &Request) -> &Self {
-        self.write().await.set_request(request_data.clone());
-        self
-    }
-
-    /// Retrieves the HTTP version of the request.
-    ///
-    /// # Returns
-    ///
-    /// - `RequestVersion` - The HTTP version of the request.
-    pub async fn get_request_version(&self) -> RequestVersion {
-        self.read().await.get_request().get_version().clone()
-    }
-
-    /// Retrieves the HTTP method of the request.
-    ///
-    /// # Returns
-    ///
-    /// - `RequestMethod` - The HTTP method of the request.
-    pub async fn get_request_method(&self) -> RequestMethod {
-        self.read().await.get_request().get_method().clone()
-    }
-
-    /// Retrieves the host from the request headers.
-    ///
-    /// # Returns
-    ///
-    /// - `RequestHost` - The host part of the request's URI.
-    pub async fn get_request_host(&self) -> RequestHost {
-        self.read().await.get_request().get_host().clone()
-    }
-
-    /// Retrieves the path of the request.
-    ///
-    /// # Returns
-    ///
-    /// - `RequestPath` - The path part of the request's URI.
-    pub async fn get_request_path(&self) -> RequestPath {
-        self.read().await.get_request().get_path().clone()
-    }
-
-    /// Retrieves the query parameters of the request.
-    ///
-    /// # Returns
-    ///
-    /// - `RequestQuerys` - A map containing the query parameters.
-    pub async fn get_request_querys(&self) -> RequestQuerys {
-        self.read().await.get_request().get_querys().clone()
-    }
-
-    /// Attempts to retrieve a specific query parameter by its key.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The query parameter key.
-    ///
-    /// # Returns
-    ///
-    /// - `Option<RequestQuerysValue>` - The query parameter value if exists.
-    pub async fn try_get_request_query<K>(&self, key: K) -> Option<RequestQuerysValue>
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().try_get_query(key)
-    }
-
-    /// Retrieves a specific query parameter by its key, panicking if not found.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The query parameter key.
-    ///
-    /// # Returns
-    ///
-    /// - `RequestQuerysValue` - The query parameter value if exists.
-    ///
-    /// # Panics
-    ///
-    /// - If the query parameter is not found.
-    pub async fn get_request_query<K>(&self, key: K) -> RequestQuerysValue
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().get_query(key)
-    }
-
-    /// Retrieves the body of the request.
-    ///
-    /// # Returns
-    ///
-    /// - `RequestBody` - A clone of the request's body.
-    pub async fn get_request_body(&self) -> RequestBody {
-        self.read().await.get_request().get_body().clone()
-    }
-
-    /// Retrieves the request body as a string.
-    ///
-    /// # Returns
-    ///
-    /// - `String` - The request body converted to a string.
-    pub async fn get_request_body_string(&self) -> String {
-        self.read().await.get_request().get_body_string()
-    }
-
-    /// Deserializes the request body from JSON into a specified type.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<J, serde_json::Error>` - The deserialized type `J` or a JSON error.
-    pub async fn try_get_request_body_json<J>(&self) -> Result<J, serde_json::Error>
-    where
-        J: DeserializeOwned,
-    {
-        self.read().await.get_request().try_get_body_json()
-    }
-
-    /// Deserializes the request body from JSON into a specified type, panicking if not found.
-    ///
-    /// # Returns
-    ///
-    /// - `J` - The deserialized type `J`.
-    ///
-    /// # Panics
-    ///
-    /// - If deserialization fails.
-    pub async fn get_request_body_json<J>(&self) -> J
-    where
-        J: DeserializeOwned,
-    {
-        self.read().await.get_request().get_body_json()
-    }
-
-    /// Retrieves all request headers.
-    ///
-    /// # Returns
-    ///
-    /// - `RequestHeaders` - A clone of the request's header map.
-    pub async fn get_request_headers(&self) -> RequestHeaders {
-        self.read().await.get_request().get_headers().clone()
-    }
-
-    /// Retrieves the total number of request headers.
-    ///
-    /// # Returns
-    ///
-    /// - `usize` - The total number of headers in the request.
-    pub async fn get_request_headers_size(&self) -> usize {
-        self.read().await.get_request().get_headers_size()
-    }
-
-    /// Attempts to retrieve a specific request header by its key.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The header key.
-    ///
-    /// # Returns
-    ///
-    /// - `Option<RequestHeadersValue>` - The header values if exists.
-    pub async fn try_get_request_header<K>(&self, key: K) -> Option<RequestHeadersValue>
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().try_get_header(key)
-    }
-
-    /// Retrieves a specific request header by its key, panicking if not found.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key of the header to retrieve.
-    ///
-    /// # Returns
-    ///
-    /// - `RequestHeadersValue` - The header values if exists.
-    ///
-    /// # Panics
-    ///
-    /// - If the header is not found.
-    pub async fn get_request_header<K>(&self, key: K) -> RequestHeadersValue
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().get_header(key)
-    }
-
-    /// Attempts to retrieve the first value of a specific request header.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key of the header.
-    ///
-    /// # Returns
-    ///
-    /// - `Option<RequestHeadersValueItem>` - The first value of the header if it exists.
-    pub async fn try_get_request_header_front<K>(&self, key: K) -> Option<RequestHeadersValueItem>
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().try_get_header_front(key)
-    }
-
-    /// Retrieves the first value of a specific request header, panicking if not found.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key of the header.
-    ///
-    /// # Returns
-    ///
-    /// - `RequestHeadersValueItem` - The first value of the header if it exists.
-    ///
-    /// # Panics
-    ///
-    /// - If the header is not found.
-    pub async fn get_request_header_front<K>(&self, key: K) -> RequestHeadersValueItem
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().get_header_front(key)
-    }
-
-    /// Attempts to retrieve the last value of a specific request header.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key of the header.
-    ///
-    /// # Returns
-    ///
-    /// - `Option<RequestHeadersValueItem>` - The last value of the header if it exists.
-    pub async fn try_get_request_header_back<K>(&self, key: K) -> Option<RequestHeadersValueItem>
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().try_get_header_back(key)
-    }
-
-    /// Retrieves the last value of a specific request header, panicking if not found.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key of the header.
-    ///
-    /// # Returns
-    ///
-    /// - `RequestHeadersValueItem` - The last value of the header if it exists.
-    ///
-    /// # Panics
-    ///
-    /// - If the header is not found.
-    pub async fn get_request_header_back<K>(&self, key: K) -> RequestHeadersValueItem
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().get_header_back(key)
-    }
-
-    /// Attempts to retrieve the number of values for a specific request header.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key of the header.
-    ///
-    /// # Returns
-    ///
-    /// - `Option<usize>` - The number of values for the specified header if it exists.
-    pub async fn try_get_request_header_len<K>(&self, key: K) -> Option<usize>
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().try_get_header_size(key)
-    }
-
-    /// Retrieves the number of values for a specific request header.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key of the header.
-    ///
-    /// # Returns
-    ///
-    /// - `usize` - The number of values for the specified header.
-    ///
-    /// # Panics
-    ///
-    /// - If the header is not found.
-    pub async fn get_request_header_len<K>(&self, key: K) -> usize
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().get_header_size(key)
-    }
-
-    /// Retrieves the total number of values across all request headers.
-    ///
-    /// # Returns
-    ///
-    /// - `usize` - The total count of all values in all headers.
-    pub async fn get_request_headers_values_size(&self) -> usize {
-        self.read().await.get_request().get_headers_values_size()
-    }
-
-    /// Checks if a specific request header exists.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key of the header to check.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the header exists, otherwise false.
-    pub async fn get_request_has_header<K>(&self, key: K) -> bool
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().has_header(key)
-    }
-
-    /// Checks if a request header has a specific value.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The header key.
-    /// - `AsRef<str>` - The value to check.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if header contains the value.
-    pub async fn get_request_has_header_value<K, V>(&self, key: K, value: V) -> bool
-    where
-        K: AsRef<str>,
-        V: AsRef<str>,
-    {
-        self.read().await.get_request().has_header_value(key, value)
-    }
-
-    /// Parses and retrieves all cookies from the request headers.
-    ///
-    /// # Returns
-    ///
-    /// - `Cookies` - A map of cookies parsed from the request's Cookie header.
-    pub async fn get_request_cookies(&self) -> Cookies {
-        self.try_get_request_header_back(COOKIE)
-            .await
-            .map(|data| Cookie::parse(&data))
-            .unwrap_or_default()
-    }
-
-    /// Attempts to retrieve a specific cookie by its name from the request.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The cookie name.
-    ///
-    /// # Returns
-    ///
-    /// - `Option<CookieValue>` - The cookie value if exists.
-    pub async fn try_get_request_cookie<K>(&self, key: K) -> Option<CookieValue>
-    where
-        K: AsRef<str>,
-    {
-        self.get_request_cookies().await.get(key.as_ref()).cloned()
-    }
-
-    /// Retrieves a specific cookie by its name from the request, panicking if not found.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The cookie name.
-    ///
-    /// # Returns
-    ///
-    /// - `CookieValue` - The cookie value if exists.
-    ///
-    /// # Panics
-    ///
-    /// - If the cookie is not found.
-    pub async fn get_request_cookie<K>(&self, key: K) -> CookieValue
-    where
-        K: AsRef<str>,
-    {
-        self.try_get_request_cookie(key).await.unwrap()
-    }
-
-    /// Retrieves the upgrade type of the request.
-    ///
-    /// # Returns
-    ///
-    /// - `UpgradeType` - The upgrade type of the request.
-    pub async fn get_request_upgrade_type(&self) -> UpgradeType {
-        self.read().await.get_request().get_upgrade_type()
-    }
-
-    /// Checks if the request method is GET.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the method is GET.
-    pub async fn get_request_is_get_method(&self) -> bool {
-        self.read().await.get_request().is_get_method()
-    }
-
-    /// Checks if the request method is POST.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the method is POST.
-    pub async fn get_request_is_post_method(&self) -> bool {
-        self.read().await.get_request().is_post_method()
-    }
-
-    /// Checks if the request method is PUT.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the method is PUT.
-    pub async fn get_request_is_put_method(&self) -> bool {
-        self.read().await.get_request().is_put_method()
-    }
-
-    /// Checks if the request method is DELETE.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the method is DELETE.
-    pub async fn get_request_is_delete_method(&self) -> bool {
-        self.read().await.get_request().is_delete_method()
-    }
-
-    /// Checks if the request method is PATCH.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the method is PATCH.
-    pub async fn get_request_is_patch_method(&self) -> bool {
-        self.read().await.get_request().is_patch_method()
-    }
-
-    /// Checks if the request method is HEAD.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the method is HEAD.
-    pub async fn get_request_is_head_method(&self) -> bool {
-        self.read().await.get_request().is_head_method()
-    }
-
-    /// Checks if the request method is OPTIONS.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the method is OPTIONS.
-    pub async fn get_request_is_options_method(&self) -> bool {
-        self.read().await.get_request().is_options_method()
-    }
-
-    /// Checks if the request method is CONNECT.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the method is CONNECT.
-    pub async fn get_request_is_connect_method(&self) -> bool {
-        self.read().await.get_request().is_connect_method()
-    }
-
-    /// Checks if the request method is TRACE.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the method is TRACE.
-    pub async fn get_request_is_trace_method(&self) -> bool {
-        self.read().await.get_request().is_trace_method()
-    }
-
-    /// Checks if the request method is unknown.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the method is unknown.
-    pub async fn get_request_is_unknown_method(&self) -> bool {
-        self.read().await.get_request().is_unknown_method()
-    }
-
-    /// Checks if the request HTTP version is HTTP/0.9.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the version is HTTP/0.9.
-    pub async fn get_request_is_http0_9_version(&self) -> bool {
-        self.read().await.get_request().is_http0_9_version()
-    }
-
-    /// Checks if the request HTTP version is HTTP/1.0.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the version is HTTP/1.0.
-    pub async fn get_request_is_http1_0_version(&self) -> bool {
-        self.read().await.get_request().is_http1_0_version()
-    }
-
-    /// Checks if the request HTTP version is HTTP/1.1.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the version is HTTP/1.1.
-    pub async fn get_request_is_http1_1_version(&self) -> bool {
-        self.read().await.get_request().is_http1_1_version()
-    }
-
-    /// Checks if the request HTTP version is HTTP/2.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the version is HTTP/2.
-    pub async fn get_request_is_http2_version(&self) -> bool {
-        self.read().await.get_request().is_http2_version()
-    }
-
-    /// Checks if the request HTTP version is HTTP/3.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the version is HTTP/3.
-    pub async fn get_request_is_http3_version(&self) -> bool {
-        self.read().await.get_request().is_http3_version()
-    }
-
-    /// Checks if the request HTTP version is HTTP/1.1 or higher.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the version is HTTP/1.1 or higher.
-    pub async fn get_request_is_http1_1_or_higher_version(&self) -> bool {
-        self.read()
-            .await
-            .get_request()
-            .is_http1_1_or_higher_version()
-    }
-
-    /// Checks if the request uses HTTP protocol.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the version belongs to HTTP family.
-    pub async fn get_request_is_http_version(&self) -> bool {
-        self.read().await.get_request().is_http_version()
-    }
-
-    /// Checks if the request has an unknown HTTP version.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the version is unknown.
-    pub async fn get_request_is_unknown_version(&self) -> bool {
-        self.read().await.get_request().is_unknown_version()
-    }
-
-    /// Checks if the request is a WebSocket upgrade request.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if this is a WebSocket upgrade request.
-    pub async fn get_request_is_ws_upgrade_type(&self) -> bool {
-        self.read().await.get_request().is_ws_upgrade_type()
-    }
-
-    /// Checks if the request is an HTTP/2 cleartext (h2c) upgrade.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if this is an h2c upgrade request.
-    pub async fn get_request_is_h2c_upgrade_type(&self) -> bool {
-        self.read().await.get_request().is_h2c_upgrade_type()
-    }
-
-    /// Checks if the request is a TLS upgrade.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if this is a TLS upgrade request.
-    pub async fn get_request_is_tls_upgrade_type(&self) -> bool {
-        self.read().await.get_request().is_tls_upgrade_type()
-    }
-
-    /// Checks if the request has an unknown upgrade type.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the upgrade type is unknown.
-    pub async fn get_request_is_unknown_upgrade_type(&self) -> bool {
-        self.read().await.get_request().is_unknown_upgrade_type()
-    }
-
-    /// Checks if the connection should be kept alive based on request headers.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the Connection header suggests keeping the connection alive, otherwise false.
-    pub async fn get_request_is_enable_keep_alive(&self) -> bool {
-        self.read().await.get_request().is_enable_keep_alive()
-    }
-
-    /// Checks if keep-alive should be disabled for the request.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if keep-alive should be disabled.
-    pub async fn get_request_is_disable_keep_alive(&self) -> bool {
-        self.read().await.get_request().is_disable_keep_alive()
-    }
-
-    /// Retrieves the current HTTP response.
-    ///
-    /// # Returns
-    ///
-    /// - `Response` - A clone of the current response.
-    pub async fn get_response(&self) -> Response {
-        self.read().await.get_response().clone()
-    }
-
-    /// Sets the HTTP response for the context.
-    ///
-    /// # Arguments
-    ///
-    /// - `Borrow<Response>` - The response to set in the context.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to the modified context.
-    pub async fn set_response<T>(&self, response: T) -> &Self
-    where
-        T: Borrow<Response>,
-    {
-        self.write().await.set_response(response.borrow().clone());
-        self
-    }
-
-    /// Retrieves the HTTP version of the response.
-    ///
-    /// # Returns
-    ///
-    /// - `ResponseVersion` - The HTTP version of the response.
-    pub async fn get_response_version(&self) -> ResponseVersion {
-        self.read().await.get_response().get_version().clone()
-    }
-
-    /// Sets the HTTP version for the response.
-    ///
-    /// # Arguments
-    ///
-    /// - `ResponseVersion` - The HTTP version to set for the response.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to the modified context.
-    pub async fn set_response_version(&self, version: ResponseVersion) -> &Self {
-        self.write().await.get_mut_response().set_version(version);
-        self
-    }
-
-    /// Retrieves all response headers.
-    ///
-    /// # Returns
-    ///
-    /// - `ResponseHeaders` - A clone of the response's header map.
-    pub async fn get_response_headers(&self) -> ResponseHeaders {
-        self.read().await.get_response().get_headers().clone()
-    }
-
-    /// Attempts to retrieve a specific response header by its key.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key of the header to retrieve.
-    ///
-    /// # Returns
-    ///
-    /// - `Option<ResponseHeadersValue>` - The header values if the header exists.
-    pub async fn try_get_response_header<K>(&self, key: K) -> Option<ResponseHeadersValue>
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_response().try_get_header(key)
-    }
-
-    /// Retrieves a specific response header by its key, panicking if not found.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key of the header to retrieve.
-    ///
-    /// # Returns
-    ///
-    /// - `ResponseHeadersValue` - The header values if the header exists.
-    ///
-    /// # Panics
-    ///
-    /// - If the header is not found.
-    pub async fn get_response_header<K>(&self, key: K) -> ResponseHeadersValue
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_response().get_header(key)
-    }
-
-    /// Sets a response header with a new value, removing any existing values.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key of the header to set.
-    /// - `AsRef<str>` - The new value for the header.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to the modified context.
-    pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self
-    where
-        K: AsRef<str>,
-        V: AsRef<str>,
-    {
-        self.write().await.get_mut_response().set_header(key, value);
-        self
-    }
-
-    /// Attempts to retrieve the first value of a specific response header.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key of the header.
-    ///
-    /// # Returns
-    ///
-    /// - `Option<ResponseHeadersValueItem>` - The first value of the header if it exists.
-    pub async fn try_get_response_header_front<K>(&self, key: K) -> Option<ResponseHeadersValueItem>
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_response().try_get_header_front(key)
-    }
-
-    /// Retrieves the first value of a specific response header, panicking if not found.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key of the header.
-    ///
-    /// # Returns
-    ///
-    /// - `ResponseHeadersValueItem` - The first value of the header if it exists.
-    ///
-    /// # Panics
-    ///
-    /// - If the header is not found.
-    pub async fn get_response_header_front<K>(&self, key: K) -> ResponseHeadersValueItem
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_response().get_header_front(key)
-    }
-
-    /// Attempts to retrieve the last value of a specific response header.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key of the header.
-    ///
-    /// # Returns
-    ///
-    /// - `Option<ResponseHeadersValueItem>` - The last value of the header if it exists.
-    pub async fn try_get_response_header_back<K>(&self, key: K) -> Option<ResponseHeadersValueItem>
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_response().try_get_header_back(key)
-    }
-
-    /// Retrieves the last value of a specific response header, panicking if not found.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key of the header.
-    ///
-    /// # Returns
-    ///
-    /// - `ResponseHeadersValueItem` - The last value of the header if it exists.
-    ///
-    /// # Panics
-    ///
-    /// - If the header is not found.
-    pub async fn get_response_header_back<K>(&self, key: K) -> ResponseHeadersValueItem
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_response().get_header_back(key)
-    }
-
-    /// Checks if a specific response header exists.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key of the header to check.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the header exists, otherwise false.
-    pub async fn get_response_has_header<K>(&self, key: K) -> bool
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_response().has_header(key)
-    }
-
-    /// Checks if a response header has a specific value.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key of the header.
-    /// - `AsRef<str>` - The value to check for.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the header contains the specified value, otherwise false.
-    pub async fn get_response_header_value<K, V>(&self, key: K, value: V) -> bool
-    where
-        K: AsRef<str>,
-        V: AsRef<str>,
-    {
-        self.read()
-            .await
-            .get_response()
-            .has_header_value(key, value)
-    }
-
-    /// Retrieves the total number of response headers.
-    ///
-    /// # Returns
-    ///
-    /// - `usize` - The total number of headers in the response.
-    pub async fn get_response_headers_size(&self) -> usize {
-        self.read().await.get_response().get_headers_size()
-    }
-
-    /// Attempts to retrieve the number of values for a specific response header.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key of the header.
-    ///
-    /// # Returns
-    ///
-    /// - `Option<usize>` - The number of values for the specified header if it exists.
-    pub async fn try_get_response_header_size<K>(&self, key: K) -> Option<usize>
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_response().try_get_header_size(key)
-    }
-
-    /// Retrieves the number of values for a specific response header.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key of the header.
-    ///
-    /// # Returns
-    ///
-    /// - `usize` - The number of values for the specified header.
-    ///
-    /// # Panics
-    ///
-    /// - If the header is not found.
-    pub async fn get_response_header_size<K>(&self, key: K) -> usize
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_response().get_header_size(key)
-    }
-
-    /// Retrieves the total number of values across all response headers.
-    ///
-    /// # Returns
-    ///
-    /// - `usize` - The total count of all values in all headers.
-    pub async fn get_response_headers_values_size(&self) -> usize {
-        self.read().await.get_response().get_headers_values_size()
-    }
-
-    /// Adds a response header, adding it if it doesn't exist or appending to it if it does.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The header key.
-    /// - `AsRef<str>` - The header value.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn add_response_header<K, V>(&self, key: K, value: V) -> &Self
-    where
-        K: AsRef<str>,
-        V: AsRef<str>,
-    {
-        self.write().await.get_mut_response().add_header(key, value);
-        self
-    }
-
-    /// Removes a response header and all its values.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key of the header to remove.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to the modified context.
-    pub async fn remove_response_header<K>(&self, key: K) -> &Self
-    where
-        K: AsRef<str>,
-    {
-        self.write().await.get_mut_response().remove_header(key);
-        self
-    }
-
-    /// Removes a specific value from a response header.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The header key.
-    /// - `AsRef<str>` - The value to remove.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn remove_response_header_value<K, V>(&self, key: K, value: V) -> &Self
-    where
-        K: AsRef<str>,
-        V: AsRef<str>,
-    {
-        self.write()
-            .await
-            .get_mut_response()
-            .remove_header_value(key, value);
-        self
-    }
-
-    /// Clears all headers from the response.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to the modified context.
-    pub async fn clear_response_headers(&self) -> &Self {
-        self.write().await.get_mut_response().clear_headers();
-        self
-    }
-
-    /// Parses and retrieves all cookies from the response headers.
-    ///
-    /// # Returns
-    ///
-    /// - `Cookies` - A map of cookies parsed from the response's Cookie header.
-    pub async fn get_response_cookies(&self) -> Cookies {
-        self.try_get_response_header_back(COOKIE)
-            .await
-            .map(|data| Cookie::parse(&data))
-            .unwrap_or_default()
-    }
-
-    /// Attempts to retrieve a specific cookie by its name from the response.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The name of the cookie to retrieve.
-    ///
-    /// # Returns
-    ///
-    /// - `Option<CookieValue>` - The cookie's value if it exists.
-    pub async fn try_get_response_cookie<K>(&self, key: K) -> Option<CookieValue>
-    where
-        K: AsRef<str>,
-    {
-        self.get_response_cookies().await.get(key.as_ref()).cloned()
-    }
-
-    /// Retrieves a specific cookie by its name from the response, panicking if not found.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The name of the cookie to retrieve.
-    ///
-    /// # Returns
-    ///
-    /// - `CookieValue` - The cookie's value if it exists.
-    ///
-    /// # Panics
-    ///
-    /// - If the cookie is not found.
-    pub async fn get_response_cookie<K>(&self, key: K) -> CookieValue
-    where
-        K: AsRef<str>,
-    {
-        self.try_get_response_cookie(key).await.unwrap()
-    }
-
-    /// Retrieves the body of the response.
-    ///
-    /// # Returns
-    ///
-    /// - `ResponseBody` - The response body.
-    pub async fn get_response_body(&self) -> ResponseBody {
-        self.read().await.get_response().get_body().clone()
-    }
-
-    /// Sets the body of the response.
-    ///
-    /// # Arguments
-    ///
-    /// - `B` - The body data to set for the response.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to the modified context.
-    pub async fn set_response_body<B>(&self, body: B) -> &Self
-    where
-        B: AsRef<[u8]>,
-    {
-        self.write().await.get_mut_response().set_body(body);
-        self
-    }
-
-    /// Retrieves the response body as a string.
-    ///
-    /// # Returns
-    ///
-    /// - `String` - The response body converted to a string.
-    pub async fn get_response_body_string(&self) -> String {
-        self.read().await.get_response().get_body_string()
-    }
-
-    /// Deserializes the response body from JSON into a specified type.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<J, serde_json::Error>` - The deserialized type `J` or a JSON error.
-    pub async fn try_get_response_body_json<J>(&self) -> Result<J, serde_json::Error>
-    where
-        J: DeserializeOwned,
-    {
-        self.read().await.get_response().try_get_body_json()
-    }
-
-    /// Deserializes the response body from JSON into a specified type, panicking if not found.
-    ///
-    /// # Returns
-    ///
-    /// - `J` - The deserialized type `J`.
-    ///
-    /// # Panics
-    ///
-    /// - If deserialization fails.
-    pub async fn get_response_body_json<J>(&self) -> J
-    where
-        J: DeserializeOwned,
-    {
-        self.read().await.get_response().get_body_json()
-    }
-
-    /// Retrieves the reason phrase of the response status code.
-    ///
-    /// # Returns
-    ///
-    /// - `ResponseReasonPhrase` - The reason phrase associated with the response status code.
-    pub async fn get_response_reason_phrase(&self) -> ResponseReasonPhrase {
-        self.read().await.get_response().get_reason_phrase().clone()
-    }
-
-    /// Sets the reason phrase for the response status code.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The reason phrase to set.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - Reference to the modified context.
-    pub async fn set_response_reason_phrase<P>(&self, reason_phrase: P) -> &Self
-    where
-        P: AsRef<str>,
-    {
-        self.write()
-            .await
-            .get_mut_response()
-            .set_reason_phrase(reason_phrase);
-        self
-    }
-
-    /// Retrieves the status code of the response.
-    ///
-    /// # Returns
-    ///
-    /// - `ResponseStatusCode` - The status code of the response.
-    pub async fn get_response_status_code(&self) -> ResponseStatusCode {
-        self.read().await.get_response().get_status_code()
-    }
-
-    /// Sets the status code for the response.
-    ///
-    /// # Arguments
-    ///
-    /// - `ResponseStatusCode` - The status code to set for the response.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - A reference to the modified context.
-    pub async fn set_response_status_code(&self, status_code: ResponseStatusCode) -> &Self {
-        self.write()
-            .await
-            .get_mut_response()
-            .set_status_code(status_code);
-        self
-    }
-
-    /// Retrieves the parameters extracted from the route path.
-    ///
-    /// # Returns
-    ///
-    /// - `RouteParams` - A map containing the route parameters.
-    pub async fn get_route_params(&self) -> RouteParams {
-        self.read().await.get_route_params().clone()
-    }
-
-    /// Sets the route parameters for the context.
-    ///
-    /// # Arguments
-    ///
-    /// - `RouteParams` - The route parameters to set.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - A reference to the modified `Context`.
-    pub(crate) async fn set_route_params(&self, params: RouteParams) -> &Self {
-        self.write().await.set_route_params(params);
-        self
-    }
-
     /// Attempts to retrieve a specific route parameter by its name.
     ///
     /// # Arguments
@@ -1671,15 +289,12 @@ impl Context {
     /// # Returns
     ///
     /// - `Option<String>` - The value of the route parameter if it exists.
-    pub async fn try_get_route_param<T>(&self, name: T) -> Option<String>
+    #[inline(always)]
+    pub fn try_get_route_param<T>(&self, name: T) -> Option<String>
     where
         T: AsRef<str>,
     {
-        self.read()
-            .await
-            .get_route_params()
-            .get(name.as_ref())
-            .cloned()
+        self.get_route_params().get(name.as_ref()).cloned()
     }
 
     /// Retrieves a specific route parameter by its name, panicking if not found.
@@ -1695,20 +310,12 @@ impl Context {
     /// # Panics
     ///
     /// - If the route parameter is not found.
-    pub async fn get_route_param<T>(&self, name: T) -> String
+    #[inline(always)]
+    pub fn get_route_param<T>(&self, name: T) -> String
     where
         T: AsRef<str>,
     {
-        self.try_get_route_param(name).await.unwrap()
-    }
-
-    /// Retrieves all attributes stored in the context.
-    ///
-    /// # Returns
-    ///
-    /// - `ThreadSafeAttributeStore` - A map containing all attributes.
-    pub async fn get_attributes(&self) -> ThreadSafeAttributeStore {
-        self.read().await.get_attributes().clone()
+        self.try_get_route_param(name).unwrap()
     }
 
     /// Attempts to retrieve a specific attribute by its key, casting it to the specified type.
@@ -1720,13 +327,12 @@ impl Context {
     /// # Returns
     ///
     /// - `Option<V>` - The attribute value if it exists and can be cast to the specified type.
-    pub async fn try_get_attribute<V>(&self, key: impl AsRef<str>) -> Option<V>
+    #[inline(always)]
+    pub fn try_get_attribute<V>(&self, key: impl AsRef<str>) -> Option<V>
     where
         V: AnySendSyncClone,
     {
-        self.read()
-            .await
-            .get_attributes()
+        self.get_attributes()
             .get(&Attribute::External(key.as_ref().to_owned()).to_string())
             .and_then(|arc| arc.downcast_ref::<V>())
             .cloned()
@@ -1745,11 +351,12 @@ impl Context {
     /// # Panics
     ///
     /// - If the attribute is not found.
-    pub async fn get_attribute<V>(&self, key: impl AsRef<str>) -> V
+    #[inline(always)]
+    pub fn get_attribute<V>(&self, key: impl AsRef<str>) -> V
     where
         V: AnySendSyncClone,
     {
-        self.try_get_attribute(key).await.unwrap()
+        self.try_get_attribute(key).unwrap()
     }
 
     /// Sets an attribute in the context.
@@ -1761,13 +368,14 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `&Self` - A reference to the modified context.
-    pub async fn set_attribute<K, V>(&self, key: K, value: V) -> &Self
+    /// - `&mut Self` - A reference to the modified context.
+    #[inline(always)]
+    pub fn set_attribute<K, V>(&mut self, key: K, value: V) -> &mut Self
     where
         K: AsRef<str>,
         V: AnySendSyncClone,
     {
-        self.write().await.get_mut_attributes().insert(
+        self.get_mut_attributes().insert(
             Attribute::External(key.as_ref().to_owned()).to_string(),
             Arc::new(value),
         );
@@ -1782,14 +390,13 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `&Self` - A reference to the modified context.
-    pub async fn remove_attribute<K>(&self, key: K) -> &Self
+    /// - `&mut Self` - A reference to the modified context.
+    #[inline(always)]
+    pub fn remove_attribute<K>(&mut self, key: K) -> &mut Self
     where
         K: AsRef<str>,
     {
-        self.write()
-            .await
-            .get_mut_attributes()
+        self.get_mut_attributes()
             .remove(&Attribute::External(key.as_ref().to_owned()).to_string());
         self
     }
@@ -1798,9 +405,10 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `&Self` - A reference to the modified context.
-    pub async fn clear_attribute(&self) -> &Self {
-        self.write().await.get_mut_attributes().clear();
+    /// - `&mut Self` - A reference to the modified context.
+    #[inline(always)]
+    pub fn clear_attribute(&mut self) -> &mut Self {
+        self.get_mut_attributes().clear();
         self
     }
 
@@ -1813,13 +421,12 @@ impl Context {
     /// # Returns
     ///
     /// - `Option<V>` - The attribute value if it exists and can be cast to the specified type.
-    async fn try_get_internal_attribute<V>(&self, key: InternalAttribute) -> Option<V>
+    #[inline(always)]
+    fn try_get_internal_attribute<V>(&self, key: InternalAttribute) -> Option<V>
     where
         V: AnySendSyncClone,
     {
-        self.read()
-            .await
-            .get_attributes()
+        self.get_attributes()
             .get(&Attribute::Internal(key).to_string())
             .and_then(|arc| arc.downcast_ref::<V>())
             .cloned()
@@ -1838,11 +445,12 @@ impl Context {
     /// # Panics
     ///
     /// - If the attribute is not found.
-    async fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V
+    #[inline(always)]
+    fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V
     where
         V: AnySendSyncClone,
     {
-        self.try_get_internal_attribute(key).await.unwrap()
+        self.try_get_internal_attribute(key).unwrap()
     }
 
     /// Sets an internal framework attribute.
@@ -1854,14 +462,13 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `&Self` - A reference to the modified context.
-    async fn set_internal_attribute<V>(&self, key: InternalAttribute, value: V) -> &Self
+    /// - `&mut Self` - A reference to the modified context.
+    #[inline(always)]
+    fn set_internal_attribute<V>(&mut self, key: InternalAttribute, value: V) -> &mut Self
     where
         V: AnySendSyncClone,
     {
-        self.write()
-            .await
-            .get_mut_attributes()
+        self.get_mut_attributes()
             .insert(Attribute::Internal(key).to_string(), Arc::new(value));
         self
     }
@@ -1874,10 +481,10 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `&Self` - Reference to the modified context for method chaining.
-    pub(crate) async fn set_task_panic(&self, panic_data: PanicData) -> &Self {
+    /// - `&mut Self` - Reference to the modified context for method chaining.
+    #[inline(always)]
+    pub(crate) fn set_task_panic(&mut self, panic_data: PanicData) -> &mut Self {
         self.set_internal_attribute(InternalAttribute::TaskPanicData, panic_data)
-            .await
     }
 
     /// Retrieves panic data associated with the current task.
@@ -1885,9 +492,9 @@ impl Context {
     /// # Returns
     ///
     /// - `Option<PanicData>` - Task panic data if a panic was caught during execution.
-    pub async fn try_get_task_panic_data(&self) -> Option<PanicData> {
+    #[inline(always)]
+    pub fn try_get_task_panic_data(&self) -> Option<PanicData> {
         self.try_get_internal_attribute(InternalAttribute::TaskPanicData)
-            .await
     }
 
     /// Retrieves panic data associated with the current task.
@@ -1899,9 +506,9 @@ impl Context {
     /// # Panics
     ///
     /// - If no task panic data is found.
-    pub async fn get_task_panic_data(&self) -> PanicData {
+    #[inline(always)]
+    pub fn get_task_panic_data(&self) -> PanicData {
         self.get_internal_attribute(InternalAttribute::TaskPanicData)
-            .await
     }
 
     /// Sets the request error information for the context.
@@ -1912,10 +519,10 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `&Self` - A reference to the modified context.
-    pub(crate) async fn set_request_error_data(&self, request_error: RequestError) -> &Self {
+    /// - `&mut Self` - A reference to the modified context.
+    #[inline(always)]
+    pub(crate) fn set_request_error_data(&mut self, request_error: RequestError) -> &mut Self {
         self.set_internal_attribute(InternalAttribute::RequestErrorData, request_error)
-            .await
     }
 
     /// Retrieves request error information if an error occurred during handling.
@@ -1923,9 +530,9 @@ impl Context {
     /// # Returns
     ///
     /// - `Option<RequestError>` - The request error information if an error was caught.
-    pub async fn try_get_request_error_data(&self) -> Option<RequestError> {
+    #[inline(always)]
+    pub fn try_get_request_error_data(&self) -> Option<RequestError> {
         self.try_get_internal_attribute(InternalAttribute::RequestErrorData)
-            .await
     }
 
     /// Retrieves request error information if an error occurred during handling.
@@ -1937,69 +544,9 @@ impl Context {
     /// # Panics
     ///
     /// - If the request error information is not found.
-    pub async fn get_request_error_data(&self) -> RequestError {
+    #[inline(always)]
+    pub fn get_request_error_data(&self) -> RequestError {
         self.get_internal_attribute(InternalAttribute::RequestErrorData)
-            .await
-    }
-
-    /// Sets a hook function for the context with a custom key.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key to identify this hook.
-    /// - `FnContextSendSyncStatic<Fut, ()>, Fut: FutureSendStatic<()>` - The hook function to store.
-    ///
-    /// # Returns
-    ///
-    /// - `&Self` - A reference to the modified context.
-    pub async fn set_hook<K, F, Fut>(&self, key: K, hook: F) -> &Self
-    where
-        K: AsRef<str>,
-        F: FnContextSendSyncStatic<Fut, ()>,
-        Fut: FutureSendStatic<()>,
-    {
-        let hook_fn: HookHandler<()> =
-            Arc::new(move |ctx: Context| -> SendableAsyncTask<()> { Box::pin(hook(ctx)) });
-        self.set_internal_attribute(InternalAttribute::Hook(key.as_ref().to_owned()), hook_fn)
-            .await
-    }
-
-    /// Attempts to retrieve a hook function if it has been set.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key to identify the hook.
-    ///
-    /// # Returns
-    ///
-    /// - `Option<HookHandler<()>>` - The hook function if it has been set.
-    pub async fn try_get_hook<K>(&self, key: K) -> Option<HookHandler<()>>
-    where
-        K: AsRef<str>,
-    {
-        self.try_get_internal_attribute(InternalAttribute::Hook(key.as_ref().to_owned()))
-            .await
-    }
-
-    /// Retrieves a hook function if it has been set, panicking if not found.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The key to identify the hook.
-    ///
-    /// # Returns
-    ///
-    /// - `HookHandler<()>` - The hook function if it has been set.
-    ///
-    /// # Panics
-    ///
-    /// - If the hook function is not found.
-    pub async fn get_hook<K>(&self, key: K) -> HookHandler<()>
-    where
-        K: AsRef<str>,
-    {
-        self.get_internal_attribute(InternalAttribute::Hook(key.as_ref().to_owned()))
-            .await
     }
 
     /// Sends HTTP response data over the stream.
@@ -2007,12 +554,12 @@ impl Context {
     /// # Returns
     ///
     /// - `Result<(), ResponseError>` - Result indicating success or failure.
-    pub async fn try_send(&self) -> Result<(), ResponseError> {
-        if self.is_terminated().await {
+    pub async fn try_send(&mut self) -> Result<(), ResponseError> {
+        if self.is_terminated() {
             return Err(ResponseError::Terminated);
         }
-        let response_data: ResponseData = self.write().await.get_mut_response().build();
-        if let Some(stream) = self.try_get_stream().await {
+        let response_data: ResponseData = self.get_mut_response().build();
+        if let Some(stream) = self.try_get_stream() {
             return stream.try_send(response_data).await;
         }
         Err(ResponseError::NotFoundStream)
@@ -2023,7 +570,7 @@ impl Context {
     /// # Panics
     ///
     /// Panics if the write operation fails.
-    pub async fn send(&self) {
+    pub async fn send(&mut self) {
         self.try_send().await.unwrap();
     }
 
@@ -2033,11 +580,11 @@ impl Context {
     ///
     /// - `Result<(), ResponseError>` - Result indicating success or failure.
     pub async fn try_send_body(&self) -> Result<(), ResponseError> {
-        if self.is_terminated().await {
+        if self.is_terminated() {
             return Err(ResponseError::Terminated);
         }
-        let response_body: ResponseBody = self.get_response_body().await;
-        self.try_send_body_with_data(response_body).await
+        self.try_send_body_with_data(self.get_response().get_body())
+            .await
     }
 
     /// Sends HTTP response body.
@@ -2064,10 +611,10 @@ impl Context {
     where
         D: AsRef<[u8]>,
     {
-        if self.is_terminated().await {
+        if self.is_terminated() {
             return Err(ResponseError::Terminated);
         }
-        if let Some(stream) = self.try_get_stream().await {
+        if let Some(stream) = self.try_get_stream() {
             return stream.try_send_body(data).await;
         }
         Err(ResponseError::NotFoundStream)
@@ -2103,10 +650,10 @@ impl Context {
         I: IntoIterator<Item = D>,
         D: AsRef<[u8]>,
     {
-        if self.is_terminated().await {
+        if self.is_terminated() {
             return Err(ResponseError::Terminated);
         }
-        if let Some(stream) = self.try_get_stream().await {
+        if let Some(stream) = self.try_get_stream() {
             return stream.try_send_body_list(data_iter).await;
         }
         Err(ResponseError::NotFoundStream)
@@ -2148,10 +695,10 @@ impl Context {
         I: IntoIterator<Item = D>,
         D: AsRef<[u8]>,
     {
-        if self.is_terminated().await {
+        if self.is_terminated() {
             return Err(ResponseError::Terminated);
         }
-        if let Some(stream) = self.try_get_stream().await {
+        if let Some(stream) = self.try_get_stream() {
             return stream.try_send_body_list(data_iter).await;
         }
         Err(ResponseError::NotFoundStream)
@@ -2180,10 +727,10 @@ impl Context {
     ///
     /// - `Result<(), ResponseError>` - The result of the flush operation.
     pub async fn try_flush(&self) -> Result<(), ResponseError> {
-        if self.is_terminated().await {
+        if self.is_terminated() {
             return Err(ResponseError::Terminated);
         }
-        if let Some(stream) = self.try_get_stream().await {
+        if let Some(stream) = self.try_get_stream() {
             return stream.try_flush().await;
         }
         Err(ResponseError::NotFoundStream)

@@ -26,12 +26,12 @@ pub use {http_type::*, inventory};
 use std::time::{Duration, Instant};
 use std::{
     any::Any,
-    borrow::Borrow,
     cmp::Ordering,
     collections::{HashMap, HashSet},
     future::Future,
     hash::{Hash, Hasher},
     io::{self, Write, stderr, stdout},
+    mem::take,
     net::SocketAddr,
     pin::Pin,
     sync::Arc,
@@ -41,14 +41,11 @@ use {
     inventory::collect,
     lombok_macros::*,
     regex::Regex,
-    serde::{Deserialize, Serialize, de::DeserializeOwned},
+    serde::{Deserialize, Serialize},
     tokio::{
         net::{TcpListener, TcpStream},
         spawn,
-        sync::{
-            RwLockReadGuard, RwLockWriteGuard,
-            watch::{Receiver, Sender, channel},
-        },
+        sync::watch::{Receiver, Sender, channel},
         task::{JoinError, JoinHandle},
     },
 };

@@ -38,13 +38,13 @@ struct TestRoute {
 
 #[cfg(test)]
 impl ServerHook for TestRoute {
-    async fn new(_ctx: &Context) -> Self {
+    async fn new(_ctx: &mut Context) -> Self {
         Self {
             data: String::new(),
         }
     }
 
-    async fn handle(mut self, _ctx: &Context) {
+    async fn handle(mut self, _ctx: &mut Context) {
         self.data = String::from("test");
     }
 }
@@ -53,7 +53,7 @@ impl ServerHook for TestRoute {
 async fn empty_route() {
     assert_panic_message_contains(
         || async {
-            let _server: &Server = Server::new().await.route::<TestRoute>(EMPTY_STR).await;
+            let _server: &Server = Server::default().route::<TestRoute>(EMPTY_STR);
         },
         &RouteError::EmptyPattern.to_string(),
     )
@@ -64,12 +64,9 @@ async fn empty_route() {
 async fn duplicate_route() {
     assert_panic_message_contains(
         || async {
-            let _server: &Server = Server::new()
-                .await
+            let _server: &Server = Server::default()
                 .route::<TestRoute>(ROOT_PATH)
-                .await
-                .route::<TestRoute>(ROOT_PATH)
-                .await;
+                .route::<TestRoute>(ROOT_PATH);
         },
         &RouteError::DuplicatePattern(ROOT_PATH.to_string()).to_string(),
     )
@@ -78,15 +75,12 @@ async fn duplicate_route() {
 
 #[tokio::test]
 async fn get_route() {
-    let server: Server = Server::new().await;
+    let mut server: Server = Server::default();
     server
         .route::<TestRoute>(ROOT_PATH)
-        .await
         .route::<TestRoute>("/dynamic/{routing}")
-        .await
-        .route::<TestRoute>("/regex/{file:^.*$}")
-        .await;
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+        .route::<TestRoute>("/regex/{file:^.*$}");
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     for key in route_matcher.get_static_route().keys() {
         println!("Static route: {key}");
     }
@@ -104,14 +98,12 @@ async fn get_route() {
 
 #[tokio::test]
 async fn segment_count_optimization() {
-    let server: Server = Server::new().await;
-    server.route::<TestRoute>("/users/{id}").await;
-    server.route::<TestRoute>("/users/{id}/posts").await;
-    server
-        .route::<TestRoute>("/users/{id}/posts/{post_id}")
-        .await;
-    server.route::<TestRoute>("/api/v1/users/{id}").await;
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    let mut server: Server = Server::default();
+    server.route::<TestRoute>("/users/{id}");
+    server.route::<TestRoute>("/users/{id}/posts");
+    server.route::<TestRoute>("/users/{id}/posts/{post_id}");
+    server.route::<TestRoute>("/api/v1/users/{id}");
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert!(
         route_matcher.get_dynamic_route().contains_key(&2),
         "Should have 2-segment routes"
@@ -131,13 +123,11 @@ async fn segment_count_optimization() {
 
 #[tokio::test]
 async fn regex_route_segment_count() {
-    let server: Server = Server::new().await;
-    server.route::<TestRoute>("/files/{path:.*}").await;
-    server.route::<TestRoute>("/api/{version:\\d+}/users").await;
-    server
-        .route::<TestRoute>("/api/{version:\\d+}/posts/{id:\\d+}")
-        .await;
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    let mut server: Server = Server::default();
+    server.route::<TestRoute>("/files/{path:.*}");
+    server.route::<TestRoute>("/api/{version:\\d+}/users");
+    server.route::<TestRoute>("/api/{version:\\d+}/posts/{id:\\d+}");
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert!(
         route_matcher.get_regex_route().contains_key(&2),
         "Should have 2-segment regex routes"
@@ -154,13 +144,13 @@ async fn regex_route_segment_count() {
 
 #[tokio::test]
 async fn mixed_route_types() {
-    let server: Server = Server::new().await;
-    server.route::<TestRoute>("/").await;
-    server.route::<TestRoute>("/about").await;
-    server.route::<TestRoute>("/users/{id}").await;
-    server.route::<TestRoute>("/posts/{slug}").await;
-    server.route::<TestRoute>("/files/{path:.*}").await;
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    let mut server: Server = Server::default();
+    server.route::<TestRoute>("/");
+    server.route::<TestRoute>("/about");
+    server.route::<TestRoute>("/users/{id}");
+    server.route::<TestRoute>("/posts/{slug}");
+    server.route::<TestRoute>("/files/{path:.*}");
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert_eq!(route_matcher.get_static_route().len(), 2);
     assert!(route_matcher.get_dynamic_route().contains_key(&2));
     assert!(route_matcher.get_regex_route().contains_key(&2));
@@ -169,24 +159,24 @@ async fn mixed_route_types() {
 #[tokio::test]
 async fn large_dynamic_routes() {
     const ROUTE_COUNT: u32 = 1000;
-    let server: Server = Server::new().await;
+    let mut server: Server = Server::default();
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/{{id}}");
-        server.route::<TestRoute>(&path).await;
+        server.route::<TestRoute>(&path);
     }
     let insert_duration: Duration = start_insert.elapsed();
     println!(
         "Inserted {} dynamic routes in: {:?}",
         ROUTE_COUNT, insert_duration
     );
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert!(!route_matcher.get_dynamic_route().is_empty());
-    let ctx: Context = Context::default();
+    let mut ctx: Context = Context::default();
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/123");
-        let _ = route_matcher.try_resolve_route(&ctx, &path).await;
+        let _ = route_matcher.try_resolve_route(&mut ctx, &path);
     }
     let match_duration: Duration = start_match.elapsed();
     println!(
@@ -202,24 +192,24 @@ async fn large_dynamic_routes() {
 #[tokio::test]
 async fn large_regex_routes() {
     const ROUTE_COUNT: u32 = 1000;
-    let server: Server = Server::new().await;
+    let mut server: Server = Server::default();
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/{{id:[0-9]+}}");
-        server.route::<TestRoute>(&path).await;
+        server.route::<TestRoute>(&path);
     }
     let insert_duration: Duration = start_insert.elapsed();
     println!(
         "Inserted {} regex routes in: {:?}",
         ROUTE_COUNT, insert_duration
     );
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert!(!route_matcher.get_regex_route().is_empty());
-    let ctx: Context = Context::default();
+    let mut ctx: Context = Context::default();
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/123");
-        let _ = route_matcher.try_resolve_route(&ctx, &path).await;
+        let _ = route_matcher.try_resolve_route(&mut ctx, &path);
     }
     let match_duration: Duration = start_match.elapsed();
     println!(
@@ -235,24 +225,24 @@ async fn large_regex_routes() {
 #[tokio::test]
 async fn large_tail_regex_routes() {
     const ROUTE_COUNT: u32 = 1000;
-    let server: Server = Server::new().await;
+    let mut server: Server = Server::default();
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/{{path:.*}}");
-        server.route::<TestRoute>(&path).await;
+        server.route::<TestRoute>(&path);
     }
     let insert_duration: Duration = start_insert.elapsed();
     println!(
         "Inserted {} tail regex routes in: {:?}",
         ROUTE_COUNT, insert_duration
     );
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert!(!route_matcher.get_regex_route().is_empty());
-    let ctx: Context = Context::default();
+    let mut ctx: Context = Context::default();
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/some/nested/path");
-        let _ = route_matcher.try_resolve_route(&ctx, &path).await;
+        let _ = route_matcher.try_resolve_route(&mut ctx, &path);
     }
     let match_duration: Duration = start_match.elapsed();
     println!(

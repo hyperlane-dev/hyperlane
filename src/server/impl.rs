@@ -1,8 +1,8 @@
 use crate::*;
 
-/// Provides a default implementation for ServerData.
-impl Default for ServerData {
-    /// Creates a new ServerData instance with default values.
+/// Provides a default implementation for Server.
+impl Default for Server {
+    /// Creates a new Server instance with default values.
     ///
     /// # Returns
     ///
@@ -10,8 +10,8 @@ impl Default for ServerData {
     #[inline(always)]
     fn default() -> Self {
         Self {
-            server_config: ServerConfigData::default(),
-            request_config: RequestConfigData::default(),
+            server_config: ServerConfig::default(),
+            request_config: RequestConfig::default(),
             task_panic: vec![],
             request_error: vec![],
             route_matcher: RouteMatcher::new(),
@@ -21,19 +21,20 @@ impl Default for ServerData {
     }
 }
 
-/// Implements the `PartialEq` trait for `ServerData`.
+/// Implements the `PartialEq` trait for `Server`.
 ///
-/// This allows for comparing two `ServerData` instances for equality.
-impl PartialEq for ServerData {
-    /// Checks if two `ServerData` instances are equal.
+/// This allows for comparing two `Server` instances for equality.
+impl PartialEq for Server {
+    /// Checks if two `Server` instances are equal.
     ///
     /// # Arguments
     ///
-    /// - `&Self`- The other `ServerData` instance to compare against.
+    /// - `&Self`- The other `Server` instance to compare against.
     ///
     /// # Returns
     ///
     /// - `bool`- `true` if the instances are equal, `false` otherwise.
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.get_server_config() == other.get_server_config()
             && self.get_request_config() == other.get_request_config()
@@ -65,107 +66,16 @@ impl PartialEq for ServerData {
     }
 }
 
-/// Implements the `Eq` trait for `ServerData`.
-///
-/// This indicates that `ServerData` has a total equality relation.
-impl Eq for ServerData {}
-
-/// Implements the `PartialEq` trait for `Server`.
-///
-/// This allows for comparing two `Server` instances for equality.
-impl PartialEq for Server {
-    /// Checks if two `Server` instances are equal.
-    ///
-    /// # Arguments
-    ///
-    /// - `&Self`- The other `Server` instance to compare against.
-    ///
-    /// # Returns
-    ///
-    /// - `bool`- `true` if the instances are equal, `false` otherwise.
-    #[inline(always)]
-    fn eq(&self, other: &Self) -> bool {
-        if Arc::ptr_eq(self.get_0(), other.get_0()) {
-            return true;
-        }
-        if let (Ok(s), Ok(o)) = (self.get_0().try_read(), other.get_0().try_read()) {
-            *s == *o
-        } else {
-            false
-        }
-    }
-}
-
 /// Implements the `Eq` trait for `Server`.
 ///
 /// This indicates that `Server` has a total equality relation.
 impl Eq for Server {}
 
-/// Manages the state for handling a single connection, including the stream and context.
-///
-/// This struct provides a convenient way to pass around the necessary components
-/// for processing a request or WebSocket frame.
-impl HandlerState {
-    /// Creates a new HandlerState instance.
-    ///
-    /// # Arguments
-    ///
-    /// - `&'a ArcRwLockStream` - The network stream.
-    /// - `RequestConfig` - The request config.
-    ///
-    /// # Returns
-    ///
-    /// - `Self` - The newly created hook state.
-    #[inline(always)]
-    pub(super) fn new(stream: ArcRwLockStream, request_config: RequestConfigData) -> Self {
-        Self {
-            stream,
-            request_config,
-        }
-    }
-}
-
 /// Represents the server, providing methods to configure and run it.
 ///
-/// This struct wraps the `ServerData` configuration and routing logic,
+/// This struct wraps the `Server` configuration and routing logic,
 /// offering a high-level API for setting up the HTTP and WebSocket server.
 impl Server {
-    /// Creates a new Server instance with default settings.
-    ///
-    /// # Returns
-    ///
-    /// - `Self` - A new Server instance.
-    pub async fn new() -> Self {
-        let server: ServerData = ServerData::default();
-        Self(arc_rwlock(server))
-    }
-
-    /// Acquires a read lock on the inner server data.
-    ///
-    /// # Returns
-    ///
-    /// - `ServerStateReadGuard` - The read guard for ServerData.
-    async fn read(&self) -> ServerStateReadGuard<'_> {
-        self.get_0().read().await
-    }
-
-    /// Acquires a write lock on the inner server data.
-    ///
-    /// # Returns
-    ///
-    /// - `ServerStateWriteGuard` - The write guard for ServerData.
-    async fn write(&self) -> ServerStateWriteGuard<'_> {
-        self.get_0().write().await
-    }
-
-    /// Gets the route matcher.
-    ///
-    /// # Returns
-    /// - `RouteMatcher` - The route matcher.
-    pub async fn get_route_matcher(&self) -> RouteMatcher {
-        self.read().await.get_route_matcher().clone()
-    }
-
     /// Registers a hook into the server's processing pipeline.
     ///
     /// This function dispatches the provided `HookType` to the appropriate
@@ -180,34 +90,28 @@ impl Server {
     /// # Arguments
     ///
     /// - `HookType` - The `HookType` instance containing the hook configuration and factory.
-    pub async fn handle_hook(&self, hook: HookType) {
+    #[inline]
+    pub fn handle_hook(&mut self, hook: HookType) {
         match hook {
             HookType::TaskPanic(_, hook) => {
-                self.write().await.get_mut_task_panic().push(hook());
+                self.get_mut_task_panic().push(hook());
             }
             HookType::RequestError(_, hook) => {
-                self.write().await.get_mut_request_error().push(hook());
+                self.get_mut_request_error().push(hook());
             }
             HookType::RequestMiddleware(_, hook) => {
-                self.write().await.get_mut_request_middleware().push(hook());
+                self.get_mut_request_middleware().push(hook());
             }
             HookType::Route(path, hook) => {
-                self.write()
-                    .await
-                    .get_mut_route_matcher()
-                    .add(path, hook())
-                    .unwrap();
+                self.get_mut_route_matcher().add(path, hook()).unwrap();
             }
             HookType::ResponseMiddleware(_, hook) => {
-                self.write()
-                    .await
-                    .get_mut_response_middleware()
-                    .push(hook());
+                self.get_mut_response_middleware().push(hook());
             }
         };
     }
 
-    /// Sets the server configuration from a string.
+    /// Sets the server configuration from a JSON string.
     ///
     /// # Arguments
     ///
@@ -215,15 +119,14 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn config_from_json<C>(&self, json: C) -> &Self
+    /// - `&mut Self` - Reference to self for method chaining.
+    #[inline]
+    pub fn config_from_json<C>(&mut self, json: C) -> &mut Self
     where
         C: AsRef<str>,
     {
-        let config: ServerConfig = ServerConfig::from_json(json).unwrap();
-        self.write()
-            .await
-            .set_server_config(config.get_data().await);
+        let config: ServerConfig = serde_json::from_str(json.as_ref()).unwrap();
+        self.set_server_config(config);
         self
     }
 
@@ -235,11 +138,10 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn server_config(&self, config: ServerConfig) -> &Self {
-        self.write()
-            .await
-            .set_server_config(config.get_data().await);
+    /// - `&mut Self` - Reference to self for method chaining.
+    #[inline(always)]
+    pub fn server_config(&mut self, config: ServerConfig) -> &mut Self {
+        self.set_server_config(config);
         self
     }
 
@@ -251,11 +153,10 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn request_config(&self, request_config: RequestConfig) -> &Self {
-        self.write()
-            .await
-            .set_request_config(request_config.get_data().await);
+    /// - `&mut Self` - Reference to self for method chaining.
+    #[inline(always)]
+    pub fn request_config(&mut self, request_config: RequestConfig) -> &mut Self {
+        self.set_request_config(request_config);
         self
     }
 
@@ -270,15 +171,13 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn task_panic<S>(&self) -> &Self
+    /// - `&mut Self` - Reference to self for method chaining.
+    #[inline(always)]
+    pub fn task_panic<S>(&mut self) -> &mut Self
     where
         S: ServerHook,
     {
-        self.write()
-            .await
-            .get_mut_task_panic()
-            .push(server_hook_factory::<S>());
+        self.get_mut_task_panic().push(server_hook_factory::<S>());
         self
     }
 
@@ -293,14 +192,13 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn request_error<S>(&self) -> &Self
+    /// - `&mut Self` - Reference to self for method chaining.
+    #[inline(always)]
+    pub fn request_error<S>(&mut self) -> &mut Self
     where
         S: ServerHook,
     {
-        self.write()
-            .await
-            .get_mut_request_error()
+        self.get_mut_request_error()
             .push(server_hook_factory::<S>());
         self
     }
@@ -320,14 +218,13 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn route<S>(&self, path: impl AsRef<str>) -> &Self
+    /// - `&mut Self` - Reference to self for method chaining.
+    #[inline(always)]
+    pub fn route<S>(&mut self, path: impl AsRef<str>) -> &mut Self
     where
         S: ServerHook,
     {
-        self.write()
-            .await
-            .get_mut_route_matcher()
+        self.get_mut_route_matcher()
             .add(path.as_ref(), server_hook_factory::<S>())
             .unwrap();
         self
@@ -344,14 +241,13 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn request_middleware<S>(&self) -> &Self
+    /// - `&mut Self` - Reference to self for method chaining.
+    #[inline(always)]
+    pub fn request_middleware<S>(&mut self) -> &mut Self
     where
         S: ServerHook,
     {
-        self.write()
-            .await
-            .get_mut_request_middleware()
+        self.get_mut_request_middleware()
             .push(server_hook_factory::<S>());
         self
     }
@@ -367,30 +263,29 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// - `&Self` - Reference to self for method chaining.
-    pub async fn response_middleware<S>(&self) -> &Self
+    /// - `&mut Self` - Reference to self for method chaining.
+    #[inline(always)]
+    pub fn response_middleware<S>(&mut self) -> &mut Self
     where
         S: ServerHook,
     {
-        self.write()
-            .await
-            .get_mut_response_middleware()
+        self.get_mut_response_middleware()
             .push(server_hook_factory::<S>());
         self
     }
 
-    /// Get the host and port into a bindable address string.
+    /// Format the host and port into a bindable address string.
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The host address.
+    /// - `H: AsRef<str>` - The host address.
     /// - `u16` - The port number.
     ///
     /// # Returns
     ///
-    /// - `String` - The formatted address string.
+    /// - `String` - The formatted address string in the form "host:port".
     #[inline(always)]
-    pub fn get_bind_addr<H>(host: H, port: u16) -> String
+    pub fn format_bind_address<H>(host: H, port: u16) -> String
     where
         H: AsRef<str>,
     {
@@ -471,14 +366,14 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `&Context` - The context of the request during which the panic occurred.
+    /// - `&mut Context` - The context of the request during which the panic occurred.
     /// - `&PanicData` - The captured panic information.
-    async fn handle_panic_with_context(&self, ctx: &Context, panic: &PanicData) {
+    async fn handle_panic_with_context(&self, ctx: &mut Context, panic: &PanicData) {
         let panic_clone: PanicData = panic.clone();
-        ctx.cancel_aborted().await.set_task_panic(panic_clone).await;
-        for hook in self.read().await.get_task_panic().iter() {
+        ctx.set_aborted(false).set_task_panic(panic_clone);
+        for hook in self.get_task_panic().iter() {
             Box::pin(self.task_handler(ctx, hook, false)).await;
-            if ctx.get_aborted().await {
+            if ctx.get_aborted() {
                 return;
             }
         }
@@ -490,33 +385,39 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `&Context` - The context associated with the task.
+    /// - `&mut Context` - The context associated with the task.
     /// - `JoinError` - The `JoinError` returned from the panicked task.
-    async fn handle_task_panic(&self, ctx: &Context, join_error: JoinError) {
+    async fn handle_task_panic(&self, ctx: &mut Context, join_error: JoinError) {
         let panic: PanicData = PanicData::from_join_error(join_error);
-        ctx.set_response_status_code(HttpStatus::InternalServerError.code())
-            .await;
-        self.handle_panic_with_context(ctx, &panic).await;
+        ctx.get_mut_response()
+            .set_status_code(HttpStatus::InternalServerError.code());
+        self.handle_panic_with_context(ctx, &panic).await
     }
 
     /// Spawns a task handler for a given context and hook.
     ///
     /// # Arguments
     ///
-    /// - `&Context` - The context of the request.
+    /// - `&mut Context` - The context of the request.
     /// - `&ServerHookHandler` - The hook to execute.
     /// - `bool` - Whether to handle panics that occur during execution.
-    async fn task_handler(&self, ctx: &Context, hook: &ServerHookHandler, progress: bool) {
-        if let Err(join_error) = spawn(hook(ctx)).await
-            && join_error.is_panic()
-        {
-            if progress {
-                Box::pin(self.handle_task_panic(ctx, join_error)).await;
-            } else {
+    async fn task_handler(&self, ctx: &mut Context, hook: &ServerHookHandler, progress: bool) {
+        match spawn(hook(ctx)).await {
+            Ok(result_ctx) => {
+                *ctx = result_ctx;
+            }
+            Err(join_error) => {
+                if !join_error.is_panic() {
+                    return;
+                }
+                if progress {
+                    Box::pin(self.handle_task_panic(ctx, join_error)).await;
+                    return;
+                }
                 eprintln!("{}", join_error);
                 let _ = Self::try_flush_stdout_and_stderr();
             }
-        }
+        };
     }
 
     /// Creates and binds a `TcpListener` based on the server's configuration.
@@ -526,11 +427,7 @@ impl Server {
     /// - `Result<TcpListener, ServerError>` - A `Result` containing the bound `TcpListener` on success,
     ///   or a `ServerError` on failure.
     async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {
-        let config: ServerConfigData = self.read().await.get_server_config().clone();
-        let host: &String = config.get_host();
-        let port: u16 = config.get_port();
-        let addr: String = Self::get_bind_addr(host, port);
-        Ok(TcpListener::bind(&addr).await?)
+        Ok(TcpListener::bind(self.get_server_config().get_address()).await?)
     }
 
     /// Enters a loop to accept incoming TCP connections and spawn handlers for them.
@@ -544,7 +441,7 @@ impl Server {
     /// - `Result<(), ServerError>` - A `Result` which is typically `Ok(())` unless an unrecoverable
     ///   error occurs.
     async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
-        while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
+        while let Ok((stream, _)) = tcp_listener.accept().await {
             self.configure_stream(&stream).await;
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
             self.spawn_connection_handler(stream).await;
@@ -560,7 +457,7 @@ impl Server {
     ///
     /// - `&TcpStream` - A reference to the `TcpStream` to configure.
     async fn configure_stream(&self, stream: &TcpStream) {
-        let config: ServerConfigData = self.read().await.get_server_config().clone();
+        let config: ServerConfig = self.get_server_config().clone();
         if let Some(nodelay) = config.try_get_nodelay() {
             let _ = stream.set_nodelay(*nodelay);
         }
@@ -576,9 +473,8 @@ impl Server {
     /// - `ArcRwLockStream` - The thread-safe stream representing the client connection.
     async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
         let server: Server = self.clone();
-        let request_config: RequestConfigData = *self.read().await.get_request_config();
         spawn(async move {
-            server.handle_connection(stream, request_config).await;
+            server.handle_connection(stream).await;
         });
     }
 
@@ -586,16 +482,13 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `&Context` - The request context.
+    /// - `&mut Context` - The request context.
     /// - `&RequestError` - The error that occurred.
-    pub async fn handle_request_error(&self, ctx: &Context, error: &RequestError) {
-        ctx.cancel_aborted()
-            .await
-            .set_request_error_data(error.clone())
-            .await;
-        for hook in self.read().await.get_request_error().iter() {
+    pub async fn handle_request_error(&self, ctx: &mut Context, error: &RequestError) {
+        ctx.set_aborted(false).set_request_error_data(error.clone());
+        for hook in self.get_request_error().iter() {
             self.task_handler(ctx, hook, true).await;
-            if ctx.get_aborted().await {
+            if ctx.get_aborted() {
                 return;
             }
         }
@@ -608,15 +501,15 @@ impl Server {
     /// # Arguments
     ///
     /// - `ArcRwLockStream` - The stream for the client connection.
-    /// - `request_config` - The request config to use for reading the initial HTTP request.
-    async fn handle_connection(&self, stream: ArcRwLockStream, request_config: RequestConfigData) {
-        match Request::http_from_stream(&stream, &request_config).await {
+    async fn handle_connection(&self, stream: ArcRwLockStream) {
+        let server: ArcServer = Arc::new(self.clone());
+        match Request::http_from_stream(&stream, server.get_request_config()).await {
             Ok(request) => {
-                let hook: HandlerState = HandlerState::new(stream, request_config);
+                let hook: HandlerState = HandlerState::new(stream, server);
                 self.handle_http_requests(&hook, &request).await;
             }
             Err(error) => {
-                self.handle_request_error(&stream.into(), &error).await;
+                self.handle_request_error(&mut stream.into(), &error).await;
             }
         }
     }
@@ -636,23 +529,18 @@ impl Server {
     /// - `bool` - A boolean indicating whether the connection should be kept alive.
     async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {
         let route: &str = request.get_path();
-        let ctx: &Context = &Context::new(state.get_stream(), request, self.read().await.clone());
+        let ctx: &mut Context = &mut Context::new(state.get_stream(), request, state.get_server());
         let keep_alive: bool = request.is_enable_keep_alive();
         if self.handle_request_middleware(ctx).await {
-            return ctx.is_keep_alive(keep_alive).await;
+            return ctx.is_keep_alive(keep_alive);
         }
         if self.handle_route_matcher(ctx, route).await {
-            return ctx.is_keep_alive(keep_alive).await;
+            return ctx.is_keep_alive(keep_alive);
         }
         if self.handle_response_middleware(ctx).await {
-            return ctx.is_keep_alive(keep_alive).await;
+            return ctx.is_keep_alive(keep_alive);
         }
-        if let Some(panic) = ctx.try_get_task_panic_data().await {
-            ctx.set_response_status_code(HttpStatus::InternalServerError.code())
-                .await;
-            self.handle_panic_with_context(ctx, &panic).await;
-        }
-        ctx.is_keep_alive(keep_alive).await
+        ctx.is_keep_alive(keep_alive)
     }
 
     /// Handles subsequent HTTP requests on a persistent (keep-alive) connection.
@@ -666,7 +554,7 @@ impl Server {
             return;
         }
         let stream: &ArcRwLockStream = state.get_stream();
-        let request_config: &RequestConfigData = state.get_request_config();
+        let request_config: &RequestConfig = state.get_server().get_request_config();
         loop {
             match Request::http_from_stream(stream, request_config).await {
                 Ok(new_request) => {
@@ -675,7 +563,7 @@ impl Server {
                     }
                 }
                 Err(error) => {
-                    self.handle_request_error(&state.get_stream().into(), &error)
+                    self.handle_request_error(&mut state.get_stream().into(), &error)
                         .await;
                     return;
                 }
@@ -687,15 +575,15 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `&Context` - The request context.
+    /// - `&mut Context` - The request context.
     ///
     /// # Returns
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    pub(super) async fn handle_request_middleware(&self, ctx: &Context) -> bool {
-        for hook in self.read().await.get_request_middleware().iter() {
+    pub(super) async fn handle_request_middleware(&self, ctx: &mut Context) -> bool {
+        for hook in self.get_request_middleware().iter() {
             self.task_handler(ctx, hook, true).await;
-            if ctx.get_aborted().await {
+            if ctx.get_aborted() {
                 return true;
             }
         }
@@ -706,22 +594,16 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `&Context` - The request context.
+    /// - `&mut Context` - The request context.
     /// - `&str` - The request path to match.
     ///
     /// # Returns
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    pub(super) async fn handle_route_matcher(&self, ctx: &Context, path: &str) -> bool {
-        if let Some(hook) = self
-            .read()
-            .await
-            .get_route_matcher()
-            .try_resolve_route(ctx, path)
-            .await
-        {
+    pub(super) async fn handle_route_matcher(&self, ctx: &mut Context, path: &str) -> bool {
+        if let Some(hook) = self.get_route_matcher().try_resolve_route(ctx, path) {
             self.task_handler(ctx, &hook, true).await;
-            if ctx.get_aborted().await {
+            if ctx.get_aborted() {
                 return true;
             }
         }
@@ -732,15 +614,15 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `&Context` - The request context.
+    /// - `&mut Context` - The request context.
     ///
     /// # Returns
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    pub(super) async fn handle_response_middleware(&self, ctx: &Context) -> bool {
-        for hook in self.read().await.get_response_middleware().iter() {
+    pub(super) async fn handle_response_middleware(&self, ctx: &mut Context) -> bool {
+        for hook in self.get_response_middleware().iter() {
             self.task_handler(ctx, hook, true).await;
-            if ctx.get_aborted().await {
+            if ctx.get_aborted() {
                 return true;
             }
         }

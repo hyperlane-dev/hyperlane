@@ -2,46 +2,46 @@ use crate::*;
 
 #[tokio::test]
 async fn context_aborted_and_closed() {
-    let ctx: Context = Context::default();
-    assert!(!ctx.get_aborted().await);
-    ctx.aborted().await;
-    assert!(ctx.get_aborted().await);
-    ctx.cancel_aborted().await;
-    assert!(!ctx.get_aborted().await);
-    assert!(!ctx.get_closed().await);
-    ctx.closed().await;
-    assert!(ctx.get_closed().await);
-    ctx.cancel_closed().await;
-    assert!(!ctx.get_closed().await);
-    assert!(!ctx.is_terminated().await);
-    ctx.aborted().await;
-    assert!(ctx.is_terminated().await);
-    ctx.cancel_aborted().await;
-    ctx.closed().await;
-    assert!(ctx.is_terminated().await);
+    let mut ctx: Context = Context::default();
+    assert!(!ctx.get_aborted());
+    ctx.set_aborted(true);
+    assert!(ctx.get_aborted());
+    ctx.set_aborted(false);
+    assert!(!ctx.get_aborted());
+    assert!(!ctx.get_closed());
+    ctx.set_closed(true);
+    assert!(ctx.get_closed());
+    ctx.set_closed(false);
+    assert!(!ctx.get_closed());
+    assert!(!ctx.is_terminated());
+    ctx.set_aborted(true);
+    assert!(ctx.is_terminated());
+    ctx.set_aborted(false);
+    ctx.set_closed(true);
+    assert!(ctx.is_terminated());
 }
 
 #[tokio::test]
 async fn context_route_params() {
-    let ctx: Context = Context::default();
+    let mut ctx: Context = Context::default();
     let mut params: RouteParams = RouteParams::default();
     params.insert("id".to_string(), "123".to_string());
-    ctx.set_route_params(params).await;
-    let id: Option<String> = ctx.try_get_route_param("id").await;
+    ctx.set_route_params(params);
+    let id: Option<String> = ctx.try_get_route_param("id");
     assert_eq!(id, Some("123".to_string()));
-    let name: Option<String> = ctx.try_get_route_param("name").await;
+    let name: Option<String> = ctx.try_get_route_param("name");
     assert_eq!(name, None);
 }
 
 #[tokio::test]
 async fn context_request_and_response_string() {
-    let ctx: Context = Context::default();
+    let mut ctx: Context = Context::default();
     let request: Request = Request::default();
-    ctx.set_request(&request).await;
-    let fetched_request: Request = ctx.get_request().await;
+    ctx.set_request(request.clone());
+    let fetched_request: &Request = ctx.get_request();
     assert_eq!(request.to_string(), fetched_request.to_string());
     let response: Response = Response::default();
-    ctx.set_response(&response).await;
-    let fetched_response: Response = ctx.get_response().await;
+    ctx.set_response(response.clone());
+    let fetched_response: &Response = ctx.get_response();
     assert_eq!(response.to_string(), fetched_response.to_string());
 }

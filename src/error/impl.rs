@@ -14,6 +14,7 @@ impl From<std::io::Error> for ServerError {
     /// # Returns
     ///
     /// - `Self` - A new `ServerError::TcpBind` instance.
+    #[inline(always)]
     fn from(error: std::io::Error) -> Self {
         ServerError::TcpBind(error.to_string())
     }

@@ -5,21 +5,21 @@ use crate::*;
 /// This trait encapsulates the common behavior of being a sendable, synchronous
 /// function that accepts a `Context`. It is used as a base for other, more
 /// specific function traits.
-pub trait FnContextSendSync<R>: Fn(Context) -> R + Send + Sync {}
+pub trait FnContext<R>: Fn(&mut Context) -> R + Send + Sync {}
 
 /// A trait for functions that return a pinned, boxed, sendable future.
 ///
 /// This trait is essential for creating type-erased async function pointers,
 /// which is a common pattern for storing and dynamically dispatching different
 /// asynchronous handlers in a collection.
-pub trait FnContextPinBoxSendSync<T>: FnContextSendSync<SendableAsyncTask<T>> {}
+pub trait FnContextPinBox<T>: FnContext<SendableAsyncTask<T>> {}
 
 /// A trait for static, sendable, synchronous functions that return a future.
 ///
 /// This trait ensures that a hook function is safe to be sent across threads
 /// and has a static lifetime, making it suitable for use in long-lived components
 /// of the application, such as the main router.
-pub trait FnContextSendSyncStatic<Fut, T>: FnContextSendSync<Fut> + 'static
+pub trait FnContextStatic<Fut, T>: FnContext<Fut> + 'static
 where
     Fut: Future<Output = T> + Send,
 {
@@ -58,7 +58,7 @@ pub trait ServerHook: Send + Sync + 'static {
     /// # Returns
     ///
     /// A future that resolves to a new instance of this hook.
-    fn new(ctx: &Context) -> impl Future<Output = Self> + Send;
+    fn new(ctx: &mut Context) -> impl Future<Output = Self> + Send;
 
     /// Executes the hook's processing logic.
     ///
@@ -72,5 +72,5 @@ pub trait ServerHook: Send + Sync + 'static {
     /// # Returns
     ///
     /// A future that resolves when the processing is complete.
-    fn handle(self, ctx: &Context) -> impl Future<Output = ()> + Send;
+    fn handle(self, ctx: &mut Context) -> impl Future<Output = ()> + Send;
 }

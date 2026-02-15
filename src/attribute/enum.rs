@@ -15,12 +15,10 @@ pub(crate) enum Attribute {
 /// Defines keys for internal attributes used by the framework.
 ///
 /// These keys correspond to specific, built-in functionalities.
-#[derive(Clone, CustomDebug, Deserialize, DisplayDebug, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Copy, CustomDebug, Deserialize, DisplayDebug, Eq, Hash, PartialEq, Serialize)]
 pub(crate) enum InternalAttribute {
     /// The attribute key for task panic handling with detailed error information.
     TaskPanicData,
     /// The attribute key for request error handling.
     RequestErrorData,
-    /// The attribute key for hook functions with a custom identifier.
-    Hook(String),
 }

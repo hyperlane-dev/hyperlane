@@ -2,25 +2,25 @@ use crate::*;
 
 /// A blanket implementation for any function that takes a `Context` and returns a value.
 ///
-/// This implementation makes it easy to use any compatible function as a `FnContextSendSync`,
+/// This implementation makes it easy to use any compatible function as a `FnContext`,
 /// promoting a flexible and functional programming style.
-impl<F, R> FnContextSendSync<R> for F where F: Fn(Context) -> R + Send + Sync {}
+impl<F, R> FnContext<R> for F where F: Fn(&mut Context) -> R + Send + Sync {}
 
 /// A blanket implementation for functions that return a pinned, boxed, sendable future.
 ///
 /// This trait is a common pattern for asynchronous handlers in Rust, enabling type
 /// erasure and dynamic dispatch for futures. It is essential for storing different
 /// async functions in a collection.
-impl<F, T> FnContextPinBoxSendSync<T> for F where F: FnContextSendSync<SendableAsyncTask<T>> {}
+impl<F, T> FnContextPinBox<T> for F where F: FnContext<SendableAsyncTask<T>> {}
 
 /// A blanket implementation for static, sendable, synchronous functions that return a future.
 ///
 /// This trait is used for handlers that are known at compile time, ensuring they
 /// are safe to be sent across threads and have a static lifetime. This is crucial
 /// for handlers that are part of the application's long-lived state.
-impl<F, Fut, T> FnContextSendSyncStatic<Fut, T> for F
+impl<F, Fut, T> FnContextStatic<Fut, T> for F
 where
-    F: FnContextSendSync<Fut> + 'static,
+    F: FnContext<Fut> + 'static,
     Fut: Future<Output = T> + Send,
 {
 }
@@ -133,7 +133,7 @@ impl Hash for HookType {
     /// # Arguments
     ///
     /// - `&mut Hasher` - The hasher to use.
-    #[inline(always)]
+    #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
             HookType::TaskPanic(order, factory) => {
@@ -210,12 +210,12 @@ impl ServerHook for DefaultServerHook {
     ///
     /// # Arguments
     ///
-    /// - `&Context`: The context object providing server configuration and state
+    /// - `&mut Context`: The context object providing server configuration and state
     ///
     /// # Returns
     ///
     /// - `Self` - A new instance of `DefaultServerHook`
-    async fn new(_: &Context) -> Self {
+    async fn new(_: &mut Context) -> Self {
         Self
     }
 
@@ -223,6 +223,6 @@ impl ServerHook for DefaultServerHook {
     ///
     /// # Arguments
     ///
-    /// - `&Context`: The context object providing server configuration and state
-    async fn handle(self, _: &Context) {}
+    /// - `&mut Context`: The context object providing server configuration and state
+    async fn handle(self, _: &mut Context) {}
 }

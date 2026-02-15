@@ -4,6 +4,4 @@ mod r#struct;
 mod test;
 mod r#type;
 
-pub use r#struct::*;
-
-pub(crate) use r#type::*;
+pub use {r#struct::*, r#type::*};
