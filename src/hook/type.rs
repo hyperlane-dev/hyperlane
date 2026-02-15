@@ -1,14 +1,14 @@
 use crate::*;
 
-/// A type alias for a shared hook hook.
+/// A type alias for a shared hook handler.
 ///
 /// This type is used for storing handlers in a shared context, allowing multiple
-/// parts of the application to safely access and execute the same hook.
+/// parts of the application to safely access and execute the same handler.
 pub type HookHandler<T> = Arc<dyn FnContextPinBox<T>>;
 
-/// A type alias for a hook hook chain.
+/// A type alias for a hook handler chain.
 ///
-/// This type is used to represent a chain of middleware or hooks that can be
+/// This type is used to represent a chain of middleware handlers that can be
 /// executed sequentially.
 pub type HookHandlerChain<T> = Vec<HookHandler<T>>;
 
@@ -18,37 +18,39 @@ pub type HookHandlerChain<T> = Vec<HookHandler<T>>;
 /// future that can be easily managed by the async runtime.
 pub type AsyncTask = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 
-/// A type alias for a sendable asynchronous task with a generic output.
+/// A type alias for a boxed future with a generic output that can be sent across threads.
 ///
 /// This is often used to represent an asynchronous task that can be sent across threads.
-pub type SendableAsyncTask<T> = Pin<Box<dyn Future<Output = T> + Send>>;
+pub type FutureBox<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 
-/// A type alias for a shared asynchronous task factory.
+/// A type alias for a server control hook handler.
 ///
-/// This is useful for creating and sharing asynchronous task factories.
-pub type SharedAsyncTaskFactory<T> = Arc<dyn FnPinBoxFutureSend<T>>;
+/// This type represents a thread-safe, reference-counted function that returns
+/// a boxed future when invoked. It is used for server lifecycle hooks such as
+/// graceful shutdown and wait operations.
+pub type ServerControlHookHandler<T> = Arc<dyn FutureFn<T>>;
 
-/// A type alias for a hook hook factory function.
+/// A type alias for a hook handler factory function.
 ///
 /// This function pointer type is used to create ServerHookHandler instances
-/// based on generic types. It allows delayed instantiation of hooks.
+/// based on generic types. It allows delayed instantiation of handlers.
 pub type ServerHookHandlerFactory = fn() -> ServerHookHandler;
 
-/// Type alias for a shared server hook hook.
+/// Type alias for a shared server hook handler.
 ///
 /// This type allows storing handlers (route and middleware) of different concrete types
-/// in the same collection. The hook takes a `&Context` and returns
+/// in the same collection. The handler takes a `&Context` and returns
 /// a pinned, boxed future that resolves to `()`.
-pub type ServerHookHandler = Arc<dyn Fn(&mut Context) -> SendableAsyncTask<Context> + Send + Sync>;
+pub type ServerHookHandler = Arc<dyn Fn(&mut Context) -> FutureBox<()> + Send + Sync>;
 
-/// Type alias for a list of server hooks.
+/// Type alias for a list of server hook handlers.
 ///
 /// Used to store middleware handlers in the request/response processing pipeline.
 pub type ServerHookList = Vec<ServerHookHandler>;
 
-/// Type alias for a map of server hook handlers.
+/// Type alias for a map of server route handlers.
 ///
-/// Used for fast lookup of exact-match route.
+/// Used for fast lookup of exact-match routes.
 pub type ServerHookMap = HashMapXxHash3_64<String, ServerHookHandler>;
 
 /// Type alias for a collection of pattern-based server hook route grouped by segment count.

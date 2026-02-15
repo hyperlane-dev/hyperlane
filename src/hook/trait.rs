@@ -12,7 +12,7 @@ pub trait FnContext<R>: Fn(&mut Context) -> R + Send + Sync {}
 /// This trait is essential for creating type-erased async function pointers,
 /// which is a common pattern for storing and dynamically dispatching different
 /// asynchronous handlers in a collection.
-pub trait FnContextPinBox<T>: FnContext<SendableAsyncTask<T>> {}
+pub trait FnContextPinBox<T>: FnContext<FutureBox<T>> {}
 
 /// A trait for static, sendable, synchronous functions that return a future.
 ///
@@ -32,10 +32,16 @@ where
 pub trait FutureSendStatic<T>: Future<Output = T> + Send + 'static {}
 
 /// A trait for `Send`-able futures with a generic output.
+///
+/// This trait is used for asynchronous operations that need to be sendable across threads,
+/// such as in the server's request processing pipeline.
 pub trait FutureSend<T>: Future<Output = T> + Send {}
 
-/// A trait for thread-safe, reference-counted closures that produce a sendable async task.
-pub trait FnPinBoxFutureSend<T>: Fn() -> SendableAsyncTask<T> + Send + Sync {}
+/// A trait for thread-safe, reference-counted closures that produce a boxed future.
+///
+/// This trait is used for storing and executing asynchronous operations that need to be
+/// sendable across threads, such as in the server's request processing pipeline.
+pub trait FutureFn<T>: Fn() -> FutureBox<T> + Send + Sync {}
 
 /// Trait for server lifecycle hooks that process requests.
 ///
@@ -53,7 +59,7 @@ pub trait ServerHook: Send + Sync + 'static {
     ///
     /// # Arguments
     ///
-    /// - `&Context` - The request context containing all request/response data.
+    /// - `&mut Context` - The request context containing all request/response data.
     ///
     /// # Returns
     ///
@@ -67,7 +73,7 @@ pub trait ServerHook: Send + Sync + 'static {
     ///
     /// # Arguments
     ///
-    /// - `&Context` - The request context for accessing request/response data.
+    /// - `&mut Context` - The request context for accessing request/response data.
     ///
     /// # Returns
     ///

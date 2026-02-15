@@ -1,5 +1,18 @@
 use crate::*;
 
+/// Creates a default `ServerControlHook` instance with default no-op hooks.
+///
+/// The default `wait_hook` and `shutdown_hook` do nothing, allowing the server
+/// to run without specific shutdown or wait logic unless configured otherwise.
+///
+/// # Returns
+///
+/// - `ServerControlHookHandler` - A default `ServerControlHookHandler` instance.
+#[inline(always)]
+pub fn default_server_control_hook_handler() -> ServerControlHookHandler<()> {
+    Arc::new(|| Box::pin(async {}))
+}
+
 /// Creates a new `ServerHookHandler` from a trait object.
 ///
 /// # Arguments
@@ -14,12 +27,11 @@ pub fn server_hook_factory<R>() -> ServerHookHandler
 where
     R: ServerHook,
 {
-    Arc::new(move |ctx: &mut Context| -> SendableAsyncTask<Context> {
+    Arc::new(move |ctx: &mut Context| -> FutureBox<()> {
         let ctx_addr: usize = ctx as *mut Context as usize;
         Box::pin(async move {
             let ctx_ref: &mut Context = unsafe { &mut *(ctx_addr as *mut Context) };
             R::new(ctx_ref).await.handle(ctx_ref).await;
-            take(ctx_ref)
         })
     })
 }

@@ -15,12 +15,12 @@ pub struct ServerControlHook {
     #[debug(skip)]
     #[get(pub)]
     #[set(pub(crate))]
-    pub(super) wait_hook: SharedAsyncTaskFactory<()>,
+    pub(super) wait_hook: ServerControlHookHandler<()>,
     /// A hook that, when called, initiates a graceful shutdown of the server.
     /// This will stop the server from accepting new connections and allow existing ones
     /// to complete.
     #[debug(skip)]
     #[get(pub)]
     #[set(pub(crate))]
-    pub(super) shutdown_hook: SharedAsyncTaskFactory<()>,
+    pub(super) shutdown_hook: ServerControlHookHandler<()>,
 }

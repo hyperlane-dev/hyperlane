@@ -11,7 +11,7 @@ impl<F, R> FnContext<R> for F where F: Fn(&mut Context) -> R + Send + Sync {}
 /// This trait is a common pattern for asynchronous handlers in Rust, enabling type
 /// erasure and dynamic dispatch for futures. It is essential for storing different
 /// async functions in a collection.
-impl<F, T> FnContextPinBox<T> for F where F: FnContext<SendableAsyncTask<T>> {}
+impl<F, T> FnContextPinBox<T> for F where F: FnContext<FutureBox<T>> {}
 
 /// A blanket implementation for static, sendable, synchronous functions that return a future.
 ///
@@ -35,8 +35,8 @@ impl<T, R> FutureSendStatic<R> for T where T: Future<Output = R> + Send + 'stati
 /// Blanket implementation of `FutureSend` for any type that satisfies the bounds.
 impl<T, O> FutureSend<O> for T where T: Future<Output = O> + Send {}
 
-/// Blanket implementation of `FnPinBoxFutureSend` for any type that satisfies the bounds.
-impl<T, O> FnPinBoxFutureSend<O> for T where T: Fn() -> SendableAsyncTask<O> + Send + Sync {}
+/// Blanket implementation of `FutureFn` for any type that satisfies the bounds.
+impl<T, O> FutureFn<O> for T where T: Fn() -> FutureBox<O> + Send + Sync {}
 
 /// Provides a default implementation for `ServerControlHook`.
 impl Default for ServerControlHook {
@@ -47,12 +47,12 @@ impl Default for ServerControlHook {
     ///
     /// # Returns
     ///
-    /// - `Self` - A new `ServerControlHook` instance with default hooks.
+    /// - `Self` - A new instance with default hooks.
     #[inline(always)]
     fn default() -> Self {
         Self {
-            wait_hook: Arc::new(|| Box::pin(async {})),
-            shutdown_hook: Arc::new(|| Box::pin(async {})),
+            wait_hook: default_server_control_hook_handler(),
+            shutdown_hook: default_server_control_hook_handler(),
         }
     }
 }
@@ -173,7 +173,7 @@ impl Hash for HookType {
 impl HookType {
     /// Returns the optional execution priority (`order`) of a hook.
     ///
-    /// Hooks that carry an `order` indicate their execution priority.  
+    /// Hooks that carry an `order` indicate their execution priority.
     /// Hooks without an `order` are considered unordered and are ignored in duplicate checks.
     ///
     /// # Returns
@@ -210,7 +210,7 @@ impl ServerHook for DefaultServerHook {
     ///
     /// # Arguments
     ///
-    /// - `&mut Context`: The context object providing server configuration and state
+    /// - `&mut Context` - The context object providing server configuration and state
     ///
     /// # Returns
     ///
@@ -223,6 +223,6 @@ impl ServerHook for DefaultServerHook {
     ///
     /// # Arguments
     ///
-    /// - `&mut Context`: The context object providing server configuration and state
+    /// - `&mut Context` - The context object providing server configuration and state
     async fn handle(self, _: &mut Context) {}
 }

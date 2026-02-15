@@ -127,11 +127,11 @@ impl Server {
     /// This function dispatches the provided `HookType` to the appropriate
     /// internal hook collection based on its variant. The hook will be executed
     /// at the corresponding stage of request processing according to its type:
-    /// - `Panic`: Added to panic handlers for error recovery
-    /// - `RequestError`: Added to request error handlers
-    /// - `RequestMiddleware`: Added to pre-route middleware chain
-    /// - `Route`: Registered as a route handler for the specified path
-    /// - `ResponseMiddleware`: Added to post-route middleware chain
+    /// - `Panic` - Added to panic handlers for error recovery
+    /// - `RequestError` - Added to request error handlers
+    /// - `RequestMiddleware` - Added to pre-route middleware chain
+    /// - `Route` - Registered as a route handler for the specified path
+    /// - `ResponseMiddleware` - Added to post-route middleware chain
     ///
     /// # Arguments
     ///
@@ -450,21 +450,16 @@ impl Server {
     /// - `&ServerHookHandler` - The hook to execute.
     /// - `bool` - Whether to handle panics that occur during execution.
     async fn task_handler(&self, ctx: &mut Context, hook: &ServerHookHandler, progress: bool) {
-        match spawn(hook(ctx)).await {
-            Ok(result_ctx) => {
-                *ctx = result_ctx;
+        if let Err(join_error) = spawn(hook(ctx)).await {
+            if !join_error.is_panic() {
+                return;
             }
-            Err(join_error) => {
-                if !join_error.is_panic() {
-                    return;
-                }
-                if progress {
-                    Box::pin(self.handle_task_panic(ctx, join_error)).await;
-                    return;
-                }
-                eprintln!("{}", join_error);
-                let _ = Self::try_flush_stdout_and_stderr();
+            if progress {
+                Box::pin(self.handle_task_panic(ctx, join_error)).await;
+                return;
             }
+            eprintln!("{}", join_error);
+            let _ = Self::try_flush_stdout_and_stderr();
         };
     }
 
@@ -699,13 +694,13 @@ impl Server {
             let _ = server.accept_connections(&tcp_listener).await;
             let _ = wait_sender.send(());
         });
-        let wait_hook: SharedAsyncTaskFactory<()> = Arc::new(move || {
+        let wait_hook: ServerControlHookHandler<()> = Arc::new(move || {
             let mut wait_receiver_clone: Receiver<()> = wait_receiver.clone();
             Box::pin(async move {
                 let _ = wait_receiver_clone.changed().await;
             })
         });
-        let shutdown_hook: SharedAsyncTaskFactory<()> = Arc::new(move || {
+        let shutdown_hook: ServerControlHookHandler<()> = Arc::new(move || {
             let shutdown_sender_clone: Sender<()> = shutdown_sender.clone();
             Box::pin(async move {
                 let _ = shutdown_sender_clone.send(());
