@@ -10,7 +10,7 @@ pub(crate) struct HandlerState {
     /// A reference to the underlying network stream for the connection.
     pub(super) stream: ArcRwLockStream,
     /// The server for the current connection.
-    pub(super) server: ArcServer,
+    pub(super) server: &'static Server,
 }
 
 /// Represents the internal, mutable state of the web server.

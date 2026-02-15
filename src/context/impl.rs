@@ -1,20 +1,70 @@
 use crate::*;
 
-/// Implementation of `From` trait for `Context` from `Server`.
-impl From<Server> for Context {
-    /// Converts a `Server` into a `Context` with default request and response.
+/// Implementation of `Default` trait for `Context`.
+impl Default for Context {
+    /// Creates a default `Context` instance.
+    ///
+    /// # Returns
+    ///
+    /// - `Context` - A new context with default values and a static default server.
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            aborted: false,
+            closed: false,
+            stream: None,
+            request: Request::default(),
+            response: Response::default(),
+            route_params: RouteParams::default(),
+            attributes: ThreadSafeAttributeStore::default(),
+            server: default_server(),
+        }
+    }
+}
+
+/// Implementation of `PartialEq` trait for `Context`.
+impl PartialEq for Context {
+    /// Compares two `Context` instances for equality.
     ///
     /// # Arguments
     ///
-    /// - `Server` - The server to convert.
+    /// - `&Self` - The first `Context` instance.
+    /// - `&Self` - The second `Context` instance.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - True if the instances are equal, otherwise false.
+    #[inline(always)]
+    fn eq(&self, other: &Self) -> bool {
+        self.get_aborted() == other.get_aborted()
+            && self.get_closed() == other.get_closed()
+            && self.get_request() == other.get_request()
+            && self.get_response() == other.get_response()
+            && self.get_route_params() == other.get_route_params()
+            && self.get_attributes().len() == other.get_attributes().len()
+            && self.try_get_stream().is_some() == other.try_get_stream().is_some()
+            && self.get_server() == other.get_server()
+    }
+}
+
+/// Implementation of `Eq` trait for `Context`.
+impl Eq for Context {}
+
+/// Implementation of `From` trait for `Context` from `&'static Server`.
+impl From<&'static Server> for Context {
+    /// Converts a `&'static Server` into a `Context` with default request and response.
+    ///
+    /// # Arguments
+    ///
+    /// - `&'static Server` - The server reference to convert.
     ///
     /// # Returns
     ///
     /// - `Context` - The newly created context instance.
     #[inline(always)]
-    fn from(server: Server) -> Self {
+    fn from(server: &'static Server) -> Self {
         let mut ctx: Context = Context::default();
-        ctx.set_server(Arc::new(server));
+        ctx.set_server(server);
         ctx
     }
 }
@@ -55,33 +105,22 @@ impl From<ArcRwLockStream> for Context {
     }
 }
 
-/// Implementation of `PartialEq` trait for `Context`.
-impl PartialEq for Context {
-    /// Compares two `Context` instances for equality.
+/// Implementation of `From` trait for converting `usize` address into `&mut Context`.
+impl From<usize> for &'static mut Context {
+    /// Converts a memory address into a mutable reference to `Context`.
     ///
     /// # Arguments
     ///
-    /// - `&Self` - The first `Context` instance.
-    /// - `&Self` - The second `Context` instance.
+    /// - `usize` - The memory address of the `Context` instance.
     ///
     /// # Returns
     ///
-    /// - `bool` - True if the instances are equal, otherwise false.
+    /// - `&'static mut Context` - A mutable reference to the `Context` at the given address.
     #[inline(always)]
-    fn eq(&self, other: &Self) -> bool {
-        self.get_aborted() == other.get_aborted()
-            && self.get_closed() == other.get_closed()
-            && self.get_request() == other.get_request()
-            && self.get_response() == other.get_response()
-            && self.get_route_params() == other.get_route_params()
-            && self.get_attributes().len() == other.get_attributes().len()
-            && self.try_get_stream().is_some() == other.try_get_stream().is_some()
-            && self.get_server() == other.get_server()
+    fn from(addr: usize) -> &'static mut Context {
+        unsafe { &mut *(addr as *mut Context) }
     }
 }
-
-/// Implementation of `Eq` trait for `Context`.
-impl Eq for Context {}
 
 /// Implementation of methods for `Context` structure.
 impl Context {
@@ -91,20 +130,34 @@ impl Context {
     ///
     /// - `&ArcRwLockStream` - The network stream.
     /// - `&Request` - The HTTP request.
-    /// - `&ArcServer` - The server.
+    /// - `&'static Server` - The server.
     ///
     /// # Returns
     ///
     /// - `Context` - The newly created context.
     #[inline(always)]
-    pub(crate) fn new(stream: &ArcRwLockStream, request: &Request, server: &ArcServer) -> Context {
+    pub(crate) fn new(
+        stream: &ArcRwLockStream,
+        request: &Request,
+        server: &'static Server,
+    ) -> Context {
         let mut ctx: Context = Context::default();
         ctx.set_stream(Some(stream.clone()))
             .set_request(request.clone())
-            .set_server(server.clone())
+            .set_server(server)
             .get_mut_response()
             .set_version(request.get_version().clone());
         ctx
+    }
+
+    /// Returns the address of the context.
+    ///
+    /// # Returns
+    ///
+    /// - `usize` - The address of the context.
+    #[inline(always)]
+    pub fn get_address(&mut self) -> usize {
+        self as *mut Context as usize
     }
 
     /// Reads an HTTP request from the underlying stream.

@@ -33,7 +33,7 @@ use std::{
     io::{self, Write, stderr, stdout},
     net::SocketAddr,
     pin::Pin,
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
 use {

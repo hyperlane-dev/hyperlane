@@ -71,6 +71,23 @@ impl PartialEq for Server {
 /// This indicates that `Server` has a total equality relation.
 impl Eq for Server {}
 
+/// Implementation of `From` trait for converting `usize` address into `&Server`.
+impl From<usize> for &'static Server {
+    /// Converts a memory address into a reference to `Server`.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - The memory address of the `Server` instance.
+    ///
+    /// # Returns
+    ///
+    /// - `&'static Server` - A reference to the `Server` at the given address.
+    #[inline(always)]
+    fn from(addr: usize) -> &'static Server {
+        unsafe { &*(addr as *const Server) }
+    }
+}
+
 /// Converts a `ServerConfig` into a `Server` instance.
 ///
 /// This allows creating a `Server` directly from its configuration,
@@ -122,6 +139,16 @@ impl From<RequestConfig> for Server {
 /// This struct wraps the `Server` configuration and routing logic,
 /// offering a high-level API for setting up the HTTP and WebSocket server.
 impl Server {
+    /// Returns the address of the server.
+    ///
+    /// # Returns
+    ///
+    /// - `usize` - The address of the server.
+    #[inline(always)]
+    pub fn get_address(&self) -> usize {
+        self as *const Server as usize
+    }
+
     /// Registers a hook into the server's processing pipeline.
     ///
     /// This function dispatches the provided `HookType` to the appropriate
@@ -515,8 +542,9 @@ impl Server {
     ///
     /// - `ArcRwLockStream` - The thread-safe stream representing the client connection.
     async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
-        let server: Server = self.clone();
+        let server_address: usize = self.get_address();
         spawn(async move {
+            let server: &'static Server = server_address.into();
             server.handle_connection(stream).await;
         });
     }
@@ -548,10 +576,9 @@ impl Server {
     ///
     /// - `ArcRwLockStream` - The stream for the client connection.
     async fn handle_connection(&self, stream: ArcRwLockStream) {
-        let server: ArcServer = Arc::new(self.clone());
-        match Request::http_from_stream(&stream, server.get_request_config()).await {
+        match Request::http_from_stream(&stream, self.get_request_config()).await {
             Ok(request) => {
-                let hook: HandlerState = HandlerState::new(stream, server);
+                let hook: HandlerState = HandlerState::new(stream, self.get_address().into());
                 self.handle_http_requests(&hook, &request).await;
             }
             Err(error) => {
