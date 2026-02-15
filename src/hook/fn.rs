@@ -13,6 +13,16 @@ pub fn default_server_control_hook_handler() -> ServerControlHookHandler<()> {
     Arc::new(|| Box::pin(async {}))
 }
 
+/// Creates a default `ServerHookHandler` from a trait object.
+///
+/// # Returns
+///
+/// - `ServerHookHandler` - A default `ServerHookHandler` instance.
+#[inline(always)]
+pub fn default_server_hook_handler() -> ServerHookHandler {
+    Arc::new(|_: &mut Context| -> FutureBox<()> { Box::pin(async move {}) })
+}
+
 /// Creates a new `ServerHookHandler` from a trait object.
 ///
 /// # Arguments
