@@ -256,7 +256,7 @@ impl Context {
         if self.get_aborted() {
             return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
         }
-        if let Some(stream) = self.try_get_stream().as_ref() {
+        if let Some(stream) = self.try_get_stream() {
             let request_res: Result<Request, RequestError> =
                 Request::http_from_stream(stream, self.get_server().get_request_config()).await;
             if let Ok(request) = request_res.as_ref() {
@@ -276,7 +276,7 @@ impl Context {
         if self.get_aborted() {
             return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
         }
-        if let Some(stream) = self.try_get_stream().as_ref() {
+        if let Some(stream) = self.try_get_stream() {
             let last_request: &Request = self.get_request();
             let request_res: Result<Request, RequestError> = last_request
                 .ws_from_stream(stream, self.get_server().get_request_config())
