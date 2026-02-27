@@ -315,8 +315,8 @@ impl Server {
     ///
     /// - `&mut Self` - Reference to self for method chaining.
     #[inline(always)]
-    pub fn request_config(&mut self, request_config: RequestConfig) -> &mut Self {
-        self.set_request_config(request_config);
+    pub fn request_config(&mut self, config: RequestConfig) -> &mut Self {
+        self.set_request_config(config);
         self
     }
 

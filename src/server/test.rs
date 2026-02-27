@@ -425,6 +425,11 @@ impl ServerHook for GetAllRoutes {
 #[tokio::test]
 async fn main() {
     let mut server: Server = Server::default();
+    let mut server_config: ServerConfig = ServerConfig::default();
+    server_config
+        .set_address(Server::format_bind_address(DEFAULT_HOST, 80))
+        .set_nodelay(Some(false));
+    server.server_config(server_config);
     server.task_panic::<TaskPanicHook>();
     server.request_error::<RequestErrorHook>();
     server.request_middleware::<RequestMiddleware>();
