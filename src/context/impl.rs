@@ -141,7 +141,7 @@ impl From<usize> for &'static Context {
 }
 
 /// Implementation of `From` trait for converting `usize` address into `&mut Context`.
-impl From<usize> for &'static mut Context {
+impl<'a> From<usize> for &'a mut Context {
     /// Converts a memory address into a mutable reference to `Context`.
     ///
     /// # Arguments
@@ -150,9 +150,9 @@ impl From<usize> for &'static mut Context {
     ///
     /// # Returns
     ///
-    /// - `&'static mut Context` - A mutable reference to the `Context` at the given address.
+    /// - `&mut Context` - A mutable reference to the `Context` at the given address.
     #[inline(always)]
-    fn from(addr: usize) -> &'static mut Context {
+    fn from(addr: usize) -> &'a mut Context {
         unsafe { &mut *(addr as *mut Context) }
     }
 }
