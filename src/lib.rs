@@ -36,6 +36,8 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
+#[cfg(test)]
+use tokio::time::sleep;
 use {
     inventory::collect,
     lombok_macros::*,

@@ -438,8 +438,8 @@ async fn main() {
     server.route::<DynamicRoute>("/regex/{file:^.*$}");
     let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
     let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
-    tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+    spawn(async move {
+        sleep(Duration::from_secs(60)).await;
         server_control_hook_2.shutdown().await;
     });
     server_control_hook_1.wait().await;
