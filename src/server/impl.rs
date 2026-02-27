@@ -438,7 +438,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `H: AsRef<str>` - The host address.
+    /// - `AsRef<str>` - The host address.
     /// - `u16` - The port number.
     ///
     /// # Returns
@@ -577,35 +577,6 @@ impl Server {
         };
     }
 
-    /// Creates and binds a `TcpListener` based on the server's configuration.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<TcpListener, ServerError>` - A `Result` containing the bound `TcpListener` on success,
-    ///   or a `ServerError` on failure.
-    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {
-        Ok(TcpListener::bind(self.get_server_config().get_address()).await?)
-    }
-
-    /// Enters a loop to accept incoming TCP connections and spawn handlers for them.
-    ///
-    /// # Arguments
-    ///
-    /// - `&TcpListener` - A reference to the `TcpListener` to accept connections from.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<(), ServerError>` - A `Result` which is typically `Ok(())` unless an unrecoverable
-    ///   error occurs.
-    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
-        while let Ok((stream, _)) = tcp_listener.accept().await {
-            self.configure_stream(&stream).await;
-            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
-            self.spawn_connection_handler(stream).await;
-        }
-        Ok(())
-    }
-
     /// Configures socket options for a newly accepted `TcpStream`.
     ///
     /// This applies settings like `TCP_NODELAY`, and `IP_TTL` from the server's configuration.
@@ -620,115 +591,6 @@ impl Server {
         }
         if let Some(ttl) = config.try_get_ttl() {
             let _ = stream.set_ttl(*ttl);
-        }
-    }
-
-    /// Spawns a new asynchronous task to handle a single client connection.
-    ///
-    /// # Arguments
-    ///
-    /// - `ArcRwLockStream` - The thread-safe stream representing the client connection.
-    async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
-        let server_address: usize = self.into();
-        spawn(async move {
-            let server: &'static Server = server_address.into();
-            server.handle_connection(stream).await;
-        });
-    }
-
-    /// Handles errors that occur while processing HTTP requests.
-    ///
-    /// # Arguments
-    ///
-    /// - `&mut Context` - The request context.
-    /// - `&RequestError` - The error that occurred.
-    pub async fn handle_request_error(&self, ctx: &mut Context, error: &RequestError) {
-        ctx.set_aborted(false)
-            .set_closed(false)
-            .set_request_error_data(error.clone());
-        for hook in self.get_request_error().iter() {
-            self.task_handler(ctx, hook, true).await;
-            if ctx.get_aborted() {
-                return;
-            }
-        }
-        ctx.set_aborted(true).set_closed(true);
-    }
-
-    /// Handles a single client connection, determining whether it's an HTTP or WebSocket request.
-    ///
-    /// It reads the initial request from the stream and dispatches it to the appropriate hook.
-    ///
-    /// # Arguments
-    ///
-    /// - `ArcRwLockStream` - The stream for the client connection.
-    async fn handle_connection(&self, stream: ArcRwLockStream) {
-        match Request::http_from_stream(&stream, self.get_request_config()).await {
-            Ok(request) => {
-                let server_address: usize = self.into();
-                let hook: HandlerState = HandlerState::new(stream, server_address.into());
-                self.handle_http_requests(&hook, &request).await;
-            }
-            Err(error) => {
-                self.handle_request_error(&mut stream.into(), &error).await;
-            }
-        }
-    }
-
-    /// The core request handling pipeline.
-    ///
-    /// This function orchestrates the execution of request middleware, the route hook,
-    /// and response middleware. It supports both function-based and trait-based handlers.
-    ///
-    /// # Arguments
-    ///
-    /// - `&HandlerState` - The `HandlerState` for the current connection.
-    /// - `&Request` - The incoming request to be processed.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - A boolean indicating whether the connection should be kept alive.
-    async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {
-        let route: &str = request.get_path();
-        let ctx: &mut Context = &mut Context::new(state.get_stream(), request, state.get_server());
-        let keep_alive: bool = request.is_enable_keep_alive();
-        if self.handle_request_middleware(ctx).await {
-            return ctx.is_keep_alive(keep_alive);
-        }
-        if self.handle_route_matcher(ctx, route).await {
-            return ctx.is_keep_alive(keep_alive);
-        }
-        if self.handle_response_middleware(ctx).await {
-            return ctx.is_keep_alive(keep_alive);
-        }
-        ctx.is_keep_alive(keep_alive)
-    }
-
-    /// Handles subsequent HTTP requests on a persistent (keep-alive) connection.
-    ///
-    /// # Arguments
-    ///
-    /// - `&HandlerState` - The `HandlerState` for the current connection.
-    /// - `&Request` - The initial request that established the keep-alive connection.
-    async fn handle_http_requests(&self, state: &HandlerState, request: &Request) {
-        if !self.request_hook(state, request).await {
-            return;
-        }
-        let stream: &ArcRwLockStream = state.get_stream();
-        let request_config: &RequestConfig = state.get_server().get_request_config();
-        loop {
-            match Request::http_from_stream(stream, request_config).await {
-                Ok(new_request) => {
-                    if !self.request_hook(state, &new_request).await {
-                        return;
-                    }
-                }
-                Err(error) => {
-                    self.handle_request_error(&mut state.get_stream().into(), &error)
-                        .await;
-                    return;
-                }
-            }
         }
     }
 
@@ -788,6 +650,144 @@ impl Server {
             }
         }
         false
+    }
+
+    /// Spawns a new asynchronous task to handle a single client connection.
+    ///
+    /// # Arguments
+    ///
+    /// - `ArcRwLockStream` - The thread-safe stream representing the client connection.
+    async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
+        let server_address: usize = self.into();
+        spawn(async move {
+            let server: &'static Server = server_address.into();
+            server.handle_connection(stream).await;
+        });
+    }
+
+    /// Handles errors that occur while processing HTTP requests.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut Context` - The request context.
+    /// - `&RequestError` - The error that occurred.
+    pub async fn handle_request_error(&self, ctx: &mut Context, error: &RequestError) {
+        ctx.set_aborted(false)
+            .set_closed(false)
+            .set_request_error_data(error.clone());
+        for hook in self.get_request_error().iter() {
+            self.task_handler(ctx, hook, true).await;
+            if ctx.get_aborted() {
+                return;
+            }
+        }
+        ctx.set_aborted(true).set_closed(true);
+    }
+
+    /// The core request handling pipeline.
+    ///
+    /// This function orchestrates the execution of request middleware, the route hook,
+    /// and response middleware. It supports both function-based and trait-based handlers.
+    ///
+    /// # Arguments
+    ///
+    /// - `&HandlerState` - The `HandlerState` for the current connection.
+    /// - `&Request` - The incoming request to be processed.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - A boolean indicating whether the connection should be kept alive.
+    async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {
+        let route: &str = request.get_path();
+        let ctx: &mut Context = &mut Context::new(state.get_stream(), request, state.get_server());
+        let keep_alive: bool = request.is_enable_keep_alive();
+        if self.handle_request_middleware(ctx).await {
+            return ctx.is_keep_alive(keep_alive);
+        }
+        if self.handle_route_matcher(ctx, route).await {
+            return ctx.is_keep_alive(keep_alive);
+        }
+        if self.handle_response_middleware(ctx).await {
+            return ctx.is_keep_alive(keep_alive);
+        }
+        ctx.is_keep_alive(keep_alive)
+    }
+
+    /// Handles subsequent HTTP requests on a persistent (keep-alive) connection.
+    ///
+    /// # Arguments
+    ///
+    /// - `&HandlerState` - The `HandlerState` for the current connection.
+    /// - `&Request` - The initial request that established the keep-alive connection.
+    async fn handle_http_requests(&self, state: &HandlerState, request: &Request) {
+        if !self.request_hook(state, request).await {
+            return;
+        }
+        let stream: &ArcRwLockStream = state.get_stream();
+        let request_config: &RequestConfig = state.get_server().get_request_config();
+        loop {
+            match Request::http_from_stream(stream, request_config).await {
+                Ok(new_request) => {
+                    if !self.request_hook(state, &new_request).await {
+                        return;
+                    }
+                }
+                Err(error) => {
+                    self.handle_request_error(&mut state.get_stream().into(), &error)
+                        .await;
+                    return;
+                }
+            }
+        }
+    }
+
+    /// Handles a single client connection, determining whether it's an HTTP or WebSocket request.
+    ///
+    /// It reads the initial request from the stream and dispatches it to the appropriate hook.
+    ///
+    /// # Arguments
+    ///
+    /// - `ArcRwLockStream` - The stream for the client connection.
+    async fn handle_connection(&self, stream: ArcRwLockStream) {
+        match Request::http_from_stream(&stream, self.get_request_config()).await {
+            Ok(request) => {
+                let server_address: usize = self.into();
+                let hook: HandlerState = HandlerState::new(stream, server_address.into());
+                self.handle_http_requests(&hook, &request).await;
+            }
+            Err(error) => {
+                self.handle_request_error(&mut stream.into(), &error).await;
+            }
+        }
+    }
+
+    /// Enters a loop to accept incoming TCP connections and spawn handlers for them.
+    ///
+    /// # Arguments
+    ///
+    /// - `&TcpListener` - A reference to the `TcpListener` to accept connections from.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<(), ServerError>` - A `Result` which is typically `Ok(())` unless an unrecoverable
+    ///   error occurs.
+    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
+        while let Ok((stream, _)) = tcp_listener.accept().await {
+            self.configure_stream(&stream).await;
+            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
+            self.spawn_connection_handler(stream).await;
+        }
+        Ok(())
+    }
+
+    /// Creates and binds a `TcpListener` based on the server's configuration.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<TcpListener, ServerError>` - A `Result` containing the bound `TcpListener` on success,
+    ///   or a `ServerError` on failure.
+    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {
+        Ok(TcpListener::bind(self.get_server_config().get_address()).await?)
     }
 
     /// Starts the server, binds to the configured address, and begins listening for connections.
