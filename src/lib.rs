@@ -31,7 +31,6 @@ use std::{
     future::Future,
     hash::{Hash, Hasher},
     io::{self, Write, stderr, stdout},
-    net::SocketAddr,
     pin::Pin,
     sync::{Arc, OnceLock},
 };

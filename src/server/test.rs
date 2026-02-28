@@ -222,7 +222,16 @@ struct RequestMiddleware {
 
 impl ServerHook for RequestMiddleware {
     async fn new(ctx: &mut Context) -> Self {
-        let socket_addr: String = ctx.get_socket_addr_string().await;
+        let mut socket_addr: String = String::new();
+        if let Some(stream) = ctx.try_get_stream().as_ref() {
+            socket_addr = stream
+                .read()
+                .await
+                .peer_addr()
+                .ok()
+                .map(|data| data.to_string())
+                .unwrap_or_default();
+        }
         Self { socket_addr }
     }
 

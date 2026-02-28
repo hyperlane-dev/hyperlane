@@ -13,9 +13,8 @@ pub struct Context {
     #[get(type(copy))]
     pub(super) closed: bool,
     /// The underlying network stream for the connection.
-    #[get(pub(crate))]
     #[get_mut(skip)]
-    #[set(pub(crate))]
+    #[set(pub(super))]
     pub(super) stream: Option<ArcRwLockStream>,
     /// The incoming HTTP request.
     #[get_mut(skip)]
