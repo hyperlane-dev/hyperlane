@@ -514,66 +514,38 @@ impl Server {
         Self::flush_stderr();
     }
 
-    /// Handles a panic that has been captured and associated with a specific request `Context`.
-    ///
-    /// This function is invoked when a panic occurs within a task that has access to the request
-    /// context, such as a route hook or middleware. It ensures that the panic information is
-    /// recorded in the `Context` and then passed to the server's configured panic hook for
-    /// processing.
-    ///
-    /// By associating the panic with the context, the hook can access request-specific details
-    /// to provide more meaningful error logging and responses.
+    /// Spawns a task handler for a given stream and hook.
     ///
     /// # Arguments
     ///
-    /// - `&mut Context` - The context of the request during which the panic occurred.
-    /// - `&PanicData` - The captured panic information.
-    async fn handle_panic_with_context(&self, ctx: &mut Context, panic: &PanicData) {
-        ctx.set_aborted(false)
-            .set_closed(false)
-            .set_task_panic(panic.clone());
-        for hook in self.get_task_panic().iter() {
-            Box::pin(self.task_handler(ctx, hook, false)).await;
-            if ctx.get_aborted() {
-                return;
+    /// - `&ArcRwLockStream` - The stream of the request.
+    /// - `Future<Output = ()> + Send + 'static` - The hook to execute.
+    async fn task_handler<F>(&'static self, stream: &ArcRwLockStream, hook: F)
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        if let Err(error) = spawn(hook).await
+            && error.is_panic()
+        {
+            let mut ctx: Context = stream.into();
+            let panic: PanicData = PanicData::from_join_error(error);
+            ctx.set_task_panic(panic)
+                .get_mut_response()
+                .set_status_code(HttpStatus::InternalServerError.code());
+            let panic_hook = async move {
+                for hook in self.get_task_panic().iter() {
+                    hook(&mut ctx).await;
+                    if ctx.get_aborted() {
+                        return;
+                    }
+                }
+            };
+            if let Err(error) = spawn(panic_hook).await
+                && error.is_panic()
+            {
+                eprintln!("{}", error);
+                let _ = Self::try_flush_stdout_and_stderr();
             }
-        }
-        ctx.set_aborted(true).set_closed(true);
-    }
-
-    /// Handles a panic that occurred within a spawned Tokio task.
-    ///
-    /// It extracts the panic information from the `JoinError` and processes it.
-    ///
-    /// # Arguments
-    ///
-    /// - `&mut Context` - The context associated with the task.
-    /// - `JoinError` - The `JoinError` returned from the panicked task.
-    async fn handle_task_panic(&self, ctx: &mut Context, join_error: JoinError) {
-        let panic: PanicData = PanicData::from_join_error(join_error);
-        ctx.get_mut_response()
-            .set_status_code(HttpStatus::InternalServerError.code());
-        self.handle_panic_with_context(ctx, &panic).await
-    }
-
-    /// Spawns a task handler for a given context and hook.
-    ///
-    /// # Arguments
-    ///
-    /// - `&mut Context` - The context of the request.
-    /// - `&ServerHookHandler` - The hook to execute.
-    /// - `bool` - Whether to handle panics that occur during execution.
-    async fn task_handler(&self, ctx: &mut Context, hook: &ServerHookHandler, progress: bool) {
-        if let Err(join_error) = spawn(hook(ctx)).await {
-            if !join_error.is_panic() {
-                return;
-            }
-            if progress {
-                Box::pin(self.handle_task_panic(ctx, join_error)).await;
-                return;
-            }
-            eprintln!("{}", join_error);
-            let _ = Self::try_flush_stdout_and_stderr();
         };
     }
 
@@ -605,7 +577,7 @@ impl Server {
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
     pub(super) async fn handle_request_middleware(&self, ctx: &mut Context) -> bool {
         for hook in self.get_request_middleware().iter() {
-            self.task_handler(ctx, hook, true).await;
+            hook(ctx).await;
             if ctx.get_aborted() {
                 return true;
             }
@@ -625,7 +597,7 @@ impl Server {
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
     pub(super) async fn handle_route_matcher(&self, ctx: &mut Context, path: &str) -> bool {
         if let Some(hook) = self.get_route_matcher().try_resolve_route(ctx, path) {
-            self.task_handler(ctx, &hook, true).await;
+            hook(ctx).await;
             if ctx.get_aborted() {
                 return true;
             }
@@ -644,25 +616,12 @@ impl Server {
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
     pub(super) async fn handle_response_middleware(&self, ctx: &mut Context) -> bool {
         for hook in self.get_response_middleware().iter() {
-            self.task_handler(ctx, hook, true).await;
+            hook(ctx).await;
             if ctx.get_aborted() {
                 return true;
             }
         }
         false
-    }
-
-    /// Spawns a new asynchronous task to handle a single client connection.
-    ///
-    /// # Arguments
-    ///
-    /// - `ArcRwLockStream` - The thread-safe stream representing the client connection.
-    async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
-        let server_address: usize = self.into();
-        spawn(async move {
-            let server: &'static Server = server_address.into();
-            server.handle_connection(stream).await;
-        });
     }
 
     /// Handles errors that occur while processing HTTP requests.
@@ -676,12 +635,27 @@ impl Server {
             .set_closed(false)
             .set_request_error_data(error.clone());
         for hook in self.get_request_error().iter() {
-            self.task_handler(ctx, hook, true).await;
+            hook(ctx).await;
             if ctx.get_aborted() {
                 return;
             }
         }
         ctx.set_aborted(true).set_closed(true);
+    }
+
+    /// Spawns a new asynchronous task to handle a single client connection.
+    ///
+    /// # Arguments
+    ///
+    /// - `&ArcRwLockStream` - The thread-safe stream representing the client connection.
+    async fn spawn_connection_handler(&self, stream: &ArcRwLockStream) {
+        let server_address: usize = self.into();
+        let server: &'static Server = server_address.into();
+        let stream_clone: ArcRwLockStream = stream.clone();
+        let hook = async move {
+            server.handle_connection(stream_clone).await;
+        };
+        server.task_handler(stream, hook).await;
     }
 
     /// The core request handling pipeline.
@@ -775,7 +749,7 @@ impl Server {
         while let Ok((stream, _)) = tcp_listener.accept().await {
             self.configure_stream(&stream).await;
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
-            self.spawn_connection_handler(stream).await;
+            self.spawn_connection_handler(&stream).await;
         }
         Ok(())
     }
