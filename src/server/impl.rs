@@ -640,7 +640,6 @@ impl Server {
                 return;
             }
         }
-        ctx.set_aborted(true).set_closed(true);
     }
 
     /// Spawns a new asynchronous task to handle a single client connection.
