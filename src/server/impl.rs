@@ -518,23 +518,23 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `&ArcRwLockStream` - The stream of the request.
+    /// - `usize` - The address of the context.
     /// - `Future<Output = ()> + Send + 'static` - The hook to execute.
-    async fn task_handler<F>(&'static self, stream: &ArcRwLockStream, hook: F)
+    async fn task_handler<F>(&'static self, ctx_address: usize, hook: F)
     where
         F: Future<Output = ()> + Send + 'static,
     {
         if let Err(error) = spawn(hook).await
             && error.is_panic()
         {
-            let mut ctx: Context = stream.into();
+            let ctx: &mut Context = ctx_address.into();
             let panic: PanicData = PanicData::from_join_error(error);
             ctx.set_task_panic(panic)
                 .get_mut_response()
                 .set_status_code(HttpStatus::InternalServerError.code());
             let panic_hook = async move {
                 for hook in self.get_task_panic().iter() {
-                    hook(&mut ctx).await;
+                    hook(ctx).await;
                     if ctx.get_aborted() {
                         return;
                     }
@@ -546,6 +546,8 @@ impl Server {
                 eprintln!("{}", error);
                 let _ = Self::try_flush_stdout_and_stderr();
             }
+            let drop_ctx: &mut Context = ctx_address.into();
+            unsafe { drop(Box::from_raw(drop_ctx)) }
         };
     }
 
@@ -570,7 +572,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `&mut Context` - The request context.
+    /// - `&mut Context` - The `Context` for the current request.
     ///
     /// # Returns
     ///
@@ -589,7 +591,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `&mut Context` - The request context.
+    /// - `&mut Context` - The `Context` for the current request.
     /// - `&str` - The request path to match.
     ///
     /// # Returns
@@ -609,7 +611,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `&mut Context` - The request context.
+    /// - `&mut Context` - The `Context` for the current request.
     ///
     /// # Returns
     ///
@@ -628,7 +630,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `&mut Context` - The request context.
+    /// - `&mut Context` - The `Context` for the current request.
     /// - `&RequestError` - The error that occurred.
     pub async fn handle_request_error(&self, ctx: &mut Context, error: &RequestError) {
         ctx.set_aborted(false)
@@ -642,21 +644,6 @@ impl Server {
         }
     }
 
-    /// Spawns a new asynchronous task to handle a single client connection.
-    ///
-    /// # Arguments
-    ///
-    /// - `&ArcRwLockStream` - The thread-safe stream representing the client connection.
-    async fn spawn_connection_handler(&self, stream: &ArcRwLockStream) {
-        let server_address: usize = self.into();
-        let server: &'static Server = server_address.into();
-        let stream_clone: ArcRwLockStream = stream.clone();
-        let hook = async move {
-            server.handle_connection(stream_clone).await;
-        };
-        server.task_handler(stream, hook).await;
-    }
-
     /// The core request handling pipeline.
     ///
     /// This function orchestrates the execution of request middleware, the route hook,
@@ -664,19 +651,25 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `&HandlerState` - The `HandlerState` for the current connection.
+    /// - `&Context` - The `Context` for the current request.
     /// - `&Request` - The incoming request to be processed.
     ///
     /// # Returns
     ///
     /// - `bool` - A boolean indicating whether the connection should be kept alive.
-    async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {
-        let route: &str = request.get_path();
-        let ctx: &mut Context = &mut Context::new(state.get_stream(), request, state.get_server());
+    async fn request_hook(&self, ctx: &mut Context, request: &Request) -> bool {
+        let mut response: Response = Response::default();
+        response.set_version(request.get_version().clone());
+        ctx.set_aborted(false)
+            .set_closed(false)
+            .set_response(response)
+            .set_route_params(RouteParams::default())
+            .set_attributes(ThreadSafeAttributeStore::default());
         let keep_alive: bool = request.is_enable_keep_alive();
         if self.handle_request_middleware(ctx).await {
             return ctx.is_keep_alive(keep_alive);
         }
+        let route: &str = request.get_path();
         if self.handle_route_matcher(ctx, route).await {
             return ctx.is_keep_alive(keep_alive);
         }
@@ -690,24 +683,21 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `&HandlerState` - The `HandlerState` for the current connection.
+    /// - `&mut Context` - The `Context` for the current request.
     /// - `&Request` - The initial request that established the keep-alive connection.
-    async fn handle_http_requests(&self, state: &HandlerState, request: &Request) {
-        if !self.request_hook(state, request).await {
+    async fn handle_http_requests(&self, ctx: &mut Context, request: &Request) {
+        if !self.request_hook(ctx, request).await {
             return;
         }
-        let stream: &ArcRwLockStream = state.get_stream();
-        let request_config: &RequestConfig = state.get_server().get_request_config();
         loop {
-            match Request::http_from_stream(stream, request_config).await {
+            match ctx.http_from_stream().await {
                 Ok(new_request) => {
-                    if !self.request_hook(state, &new_request).await {
+                    if !self.request_hook(ctx, &new_request).await {
                         return;
                     }
                 }
                 Err(error) => {
-                    self.handle_request_error(&mut state.get_stream().into(), &error)
-                        .await;
+                    self.handle_request_error(ctx, &error).await;
                     return;
                 }
             }
@@ -720,18 +710,17 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `ArcRwLockStream` - The stream for the client connection.
-    async fn handle_connection(&self, stream: ArcRwLockStream) {
-        match Request::http_from_stream(&stream, self.get_request_config()).await {
+    /// - `&mut Context` - The `Context` for the current request.
+    async fn handle_connection(&self, ctx: &mut Context) {
+        match ctx.http_from_stream().await {
             Ok(request) => {
-                let server_address: usize = self.into();
-                let hook: HandlerState = HandlerState::new(stream, server_address.into());
-                self.handle_http_requests(&hook, &request).await;
+                self.handle_http_requests(ctx, &request).await;
             }
             Err(error) => {
-                self.handle_request_error(&mut stream.into(), &error).await;
+                self.handle_request_error(ctx, &error).await;
             }
         }
+        unsafe { drop(Box::from_raw(ctx)) }
     }
 
     /// Enters a loop to accept incoming TCP connections and spawn handlers for them.
@@ -748,7 +737,10 @@ impl Server {
         while let Ok((stream, _)) = tcp_listener.accept().await {
             self.configure_stream(&stream).await;
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
-            self.spawn_connection_handler(&stream).await;
+            let server_address: usize = self.into();
+            let server: &'static Server = server_address.into();
+            let ctx: &'static mut Context = Box::leak(Box::new(Context::new(&stream, server)));
+            spawn(server.task_handler(ctx.into(), server.handle_connection(ctx)));
         }
         Ok(())
     }

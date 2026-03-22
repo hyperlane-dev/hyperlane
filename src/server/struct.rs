@@ -1,18 +1,5 @@
 use crate::*;
 
-/// Represents the state associated with a single connection hook.
-///
-/// This struct encapsulates the necessary context for processing a connection,
-/// including a reference to the network stream and request configuration. It is created
-/// for each connection and passed to the relevant handlers.
-#[derive(Clone, CustomDebug, DisplayDebug, Getter, New)]
-pub(crate) struct HandlerState {
-    /// A reference to the underlying network stream for the connection.
-    pub(super) stream: ArcRwLockStream,
-    /// The server for the current connection.
-    pub(super) server: &'static Server,
-}
-
 /// Represents the internal, mutable state of the web server.
 ///
 /// This struct consolidates all the core components required for the server to operate,

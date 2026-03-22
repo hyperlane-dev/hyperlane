@@ -221,29 +221,20 @@ impl AsMut<Context> for Context {
 
 /// Implementation of methods for `Context` structure.
 impl Context {
-    /// Creates a new `Context` with the provided network stream, HTTP request and server.
+    /// Creates a new `Context` with the provided network stream and server.
     ///
     /// # Arguments
     ///
     /// - `&ArcRwLockStream` - The network stream.
-    /// - `&Request` - The HTTP request.
     /// - `&'static Server` - The server.
     ///
     /// # Returns
     ///
     /// - `Context` - The newly created context.
     #[inline(always)]
-    pub(crate) fn new(
-        stream: &ArcRwLockStream,
-        request: &Request,
-        server: &'static Server,
-    ) -> Context {
+    pub(crate) fn new(stream: &ArcRwLockStream, server: &'static Server) -> Context {
         let mut ctx: Context = Context::default();
-        ctx.set_stream(Some(stream.clone()))
-            .set_request(request.clone())
-            .set_server(server)
-            .get_mut_response()
-            .set_version(request.get_version().clone());
+        ctx.set_stream(Some(stream.clone())).set_server(server);
         ctx
     }
 

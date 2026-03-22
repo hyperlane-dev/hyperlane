@@ -18,7 +18,7 @@ pub struct Context {
     pub(super) stream: Option<ArcRwLockStream>,
     /// The incoming HTTP request.
     #[get_mut(skip)]
-    #[set(pub(super))]
+    #[set(pub(crate))]
     pub(super) request: Request,
     /// The outgoing HTTP response.
     pub(super) response: Response,
@@ -28,7 +28,7 @@ pub struct Context {
     pub(super) route_params: RouteParams,
     /// A collection of custom attributes for sharing data within the request lifecycle.
     #[get_mut(pub(super))]
-    #[set(pub(super))]
+    #[set(pub(crate))]
     pub(super) attributes: ThreadSafeAttributeStore,
     /// The server for accessing server-wide configuration and state.
     #[get_mut(skip)]
