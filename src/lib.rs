@@ -14,11 +14,15 @@ mod config;
 mod context;
 mod error;
 mod hook;
+mod lifetime;
 mod panic;
 mod route;
 mod server;
 
-pub use {attribute::*, config::*, context::*, error::*, hook::*, panic::*, route::*, server::*};
+pub use {
+    attribute::*, config::*, context::*, error::*, hook::*, lifetime::*, panic::*, route::*,
+    server::*,
+};
 
 pub use {http_type::*, inventory};
 

@@ -117,8 +117,8 @@ impl From<usize> for Context {
     ///
     /// - `Context` - A cloned `Context` instance from the given address.
     #[inline(always)]
-    fn from(addr: usize) -> Self {
-        let ctx: &Context = addr.into();
+    fn from(address: usize) -> Self {
+        let ctx: &Context = address.into();
         ctx.clone()
     }
 }
@@ -135,8 +135,8 @@ impl From<usize> for &'static Context {
     ///
     /// - `&'static Context` - A reference to the `Context` at the given address.
     #[inline(always)]
-    fn from(addr: usize) -> &'static Context {
-        unsafe { &*(addr as *const Context) }
+    fn from(address: usize) -> &'static Context {
+        unsafe { &*(address as *const Context) }
     }
 }
 
@@ -152,8 +152,8 @@ impl<'a> From<usize> for &'a mut Context {
     ///
     /// - `&mut Context` - A mutable reference to the `Context` at the given address.
     #[inline(always)]
-    fn from(addr: usize) -> &'a mut Context {
-        unsafe { &mut *(addr as *mut Context) }
+    fn from(address: usize) -> &'a mut Context {
+        unsafe { &mut *(address as *mut Context) }
     }
 }
 
@@ -199,9 +199,9 @@ impl AsRef<Context> for Context {
     ///
     /// - `&Context` - A reference to the `Context` instance.
     #[inline(always)]
-    fn as_ref(&self) -> &Context {
-        let addr: usize = (self as &Context).into();
-        addr.into()
+    fn as_ref(&self) -> &Self {
+        let address: usize = self.into();
+        address.into()
     }
 }
 
@@ -213,9 +213,23 @@ impl AsMut<Context> for Context {
     ///
     /// - `&mut Context` - A mutable reference to the `Context` instance.
     #[inline(always)]
-    fn as_mut(&mut self) -> &mut Context {
-        let addr: usize = (self as &mut Context).into();
-        addr.into()
+    fn as_mut(&mut self) -> &mut Self {
+        let address: usize = self.into();
+        address.into()
+    }
+}
+
+/// Implementation of `Lifetime` trait for `Context`.
+impl Lifetime for Context {
+    /// Converts a mutable reference to the context into a `'static` mutable reference.
+    ///
+    /// # Returns
+    ///
+    /// - `&'static mut Self`: A mutable reference to the context with a `'static` lifetime.
+    #[inline(always)]
+    fn leak_mut(&self) -> &'static mut Self {
+        let address: usize = self.into();
+        address.into()
     }
 }
 
@@ -232,7 +246,7 @@ impl Context {
     ///
     /// - `Context` - The newly created context.
     #[inline(always)]
-    pub(crate) fn new(stream: &ArcRwLockStream, server: &'static Server) -> Context {
+    pub(crate) fn new(stream: &ArcRwLockStream, server: &'static Server) -> Self {
         let mut ctx: Context = Context::default();
         ctx.set_stream(Some(stream.clone())).set_server(server);
         ctx

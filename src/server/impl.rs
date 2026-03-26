@@ -83,8 +83,8 @@ impl From<usize> for Server {
     ///
     /// - `Server` - A cloned `Server` instance from the given address.
     #[inline(always)]
-    fn from(addr: usize) -> Self {
-        let server: &Server = addr.into();
+    fn from(address: usize) -> Self {
+        let server: &Server = address.into();
         server.clone()
     }
 }
@@ -101,8 +101,8 @@ impl From<usize> for &'static Server {
     ///
     /// - `&'static Server` - A reference to the `Server` at the given address.
     #[inline(always)]
-    fn from(addr: usize) -> &'static Server {
-        unsafe { &*(addr as *const Server) }
+    fn from(address: usize) -> &'static Server {
+        unsafe { &*(address as *const Server) }
     }
 }
 
@@ -118,8 +118,8 @@ impl From<usize> for &'static mut Server {
     ///
     /// - `&'static mut Server` - A mutable reference to the `Server` at the given address.
     #[inline(always)]
-    fn from(addr: usize) -> &'static mut Server {
-        unsafe { &mut *(addr as *mut Server) }
+    fn from(address: usize) -> &'static mut Server {
+        unsafe { &mut *(address as *mut Server) }
     }
 }
 
@@ -165,9 +165,9 @@ impl AsRef<Server> for Server {
     ///
     /// - `&Server` - A reference to the `Server` instance.
     #[inline(always)]
-    fn as_ref(&self) -> &Server {
-        let addr: usize = (self as &Server).into();
-        addr.into()
+    fn as_ref(&self) -> &Self {
+        let address: usize = self.into();
+        address.into()
     }
 }
 
@@ -179,9 +179,9 @@ impl AsMut<Server> for Server {
     ///
     /// - `&mut Server` - A mutable reference to the `Server` instance.
     #[inline(always)]
-    fn as_mut(&mut self) -> &mut Server {
-        let addr: usize = (self as &mut Server).into();
-        addr.into()
+    fn as_mut(&mut self) -> &mut Self {
+        let address: usize = self.into();
+        address.into()
     }
 }
 
@@ -228,6 +228,20 @@ impl From<RequestConfig> for Server {
             request_config,
             ..Default::default()
         }
+    }
+}
+
+/// Implementation of `Lifetime` trait for `Server`.
+impl Lifetime for Server {
+    /// Converts a mutable reference to the server into a `'static` mutable reference.
+    ///
+    /// # Returns
+    ///
+    /// - `&'static mut Self`: A mutable reference to the server with a `'static` lifetime.
+    #[inline(always)]
+    fn leak_mut(&self) -> &'static mut Self {
+        let address: usize = self.into();
+        address.into()
     }
 }
 
@@ -733,26 +747,14 @@ impl Server {
     ///
     /// - `Result<(), ServerError>` - A `Result` which is typically `Ok(())` unless an unrecoverable
     ///   error occurs.
-    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
+    async fn tcp_accept(&'static mut self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
         while let Ok((stream, _)) = tcp_listener.accept().await {
             self.configure_stream(&stream).await;
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
-            let server_address: usize = self.into();
-            let server: &'static Server = server_address.into();
-            let ctx: &'static mut Context = Box::leak(Box::new(Context::new(&stream, server)));
-            spawn(server.task_handler(ctx.into(), server.handle_connection(ctx)));
+            let ctx: &'static mut Context = Box::leak(Box::new(Context::new(&stream, self)));
+            spawn(self.task_handler(ctx.into(), self.handle_connection(ctx)));
         }
         Ok(())
-    }
-
-    /// Creates and binds a `TcpListener` based on the server's configuration.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<TcpListener, ServerError>` - A `Result` containing the bound `TcpListener` on success,
-    ///   or a `ServerError` on failure.
-    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {
-        Ok(TcpListener::bind(self.get_server_config().get_address()).await?)
     }
 
     /// Starts the server, binds to the configured address, and begins listening for connections.
@@ -766,12 +768,13 @@ impl Server {
     /// Calling this function will shut down the server by aborting its main task.
     /// Returns an error if the server fails to start.
     pub async fn run(&self) -> Result<ServerControlHook, ServerError> {
-        let tcp_listener: TcpListener = self.create_tcp_listener().await?;
-        let server: Server = self.clone();
+        let bind_address: &String = self.get_server_config().get_address();
+        let tcp_listener: TcpListener = TcpListener::bind(bind_address).await?;
+        let server: &'static mut Self = self.leak_mut();
         let (wait_sender, wait_receiver) = channel(());
         let (shutdown_sender, mut shutdown_receiver) = channel(());
         let accept_connections: JoinHandle<()> = spawn(async move {
-            let _ = server.accept_connections(&tcp_listener).await;
+            let _ = server.tcp_accept(&tcp_listener).await;
             let _ = wait_sender.send(());
         });
         let wait_hook: ServerControlHookHandler<()> = Arc::new(move || {

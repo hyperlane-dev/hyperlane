@@ -1,7 +1,7 @@
 use crate::*;
 
 #[test]
-fn context_from_usize() {
+fn context_from_address() {
     let mut ctx: Context = Context::default();
     ctx.set_aborted(true);
     let ctx_address: usize = (&ctx).into();
@@ -10,7 +10,7 @@ fn context_from_usize() {
 }
 
 #[test]
-fn context_ref_from_usize() {
+fn context_ref_from_address() {
     let mut ctx: Context = Context::default();
     ctx.set_closed(true);
     let ctx_address: usize = (&ctx).into();
@@ -19,7 +19,7 @@ fn context_ref_from_usize() {
 }
 
 #[test]
-fn context_mut_from_usize() {
+fn context_mut_from_address() {
     let mut ctx: Context = Context::default();
     let ctx_address: usize = (&mut ctx).into();
     let ctx_mut: &mut Context = ctx_address.into();
@@ -28,14 +28,14 @@ fn context_mut_from_usize() {
 }
 
 #[test]
-fn context_ref_into_usize() {
+fn context_ref_into_address() {
     let ctx: Context = Context::default();
     let ctx_address: usize = (&ctx).into();
     assert!(ctx_address > 0);
 }
 
 #[test]
-fn context_mut_into_usize() {
+fn context_mut_into_address() {
     let mut ctx: Context = Context::default();
     let ctx_address: usize = (&mut ctx).into();
     assert!(ctx_address > 0);

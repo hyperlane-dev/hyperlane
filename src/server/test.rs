@@ -10,7 +10,7 @@ fn server_partial_eq() {
 }
 
 #[test]
-fn server_from_usize() {
+fn server_from_address() {
     let mut server: Server = Server::default();
     server.set_request_config(RequestConfig::default());
     let server_address: usize = (&server).into();
@@ -22,7 +22,7 @@ fn server_from_usize() {
 }
 
 #[test]
-fn server_ref_from_usize() {
+fn server_ref_from_address() {
     let mut server: Server = Server::default();
     server.set_server_config(ServerConfig::default());
     let server_address: usize = (&server).into();
@@ -31,7 +31,7 @@ fn server_ref_from_usize() {
 }
 
 #[test]
-fn server_mut_from_usize() {
+fn server_mut_from_address() {
     let mut server: Server = Server::default();
     let server_address: usize = (&mut server).into();
     let server_mut: &mut Server = server_address.into();
@@ -75,14 +75,14 @@ fn server_inner_partial_eq() {
 }
 
 #[test]
-fn server_ref_into_usize() {
+fn server_ref_into_address() {
     let server: Server = Server::default();
     let server_address: usize = (&server).into();
     assert!(server_address > 0);
 }
 
 #[test]
-fn server_mut_into_usize() {
+fn server_mut_into_address() {
     let mut server: Server = Server::default();
     let server_address: usize = (&mut server).into();
     assert!(server_address > 0);
@@ -367,11 +367,12 @@ impl ServerHook for WebsocketRoute {
     }
 
     async fn handle(self, ctx: &mut Context) {
+        let leak_ctx: &mut Context = ctx.leak_mut();
         loop {
             match ctx.ws_from_stream().await {
                 Ok(_) => {
-                    let body: Vec<u8> = ctx.get_request().get_body().clone();
-                    ctx.get_mut_response().set_body(body);
+                    let body: &Vec<u8> = ctx.get_request().get_body();
+                    leak_ctx.get_mut_response().set_body(body);
                     if self.try_send_body_hook(ctx).await.is_err() {
                         return;
                     }
