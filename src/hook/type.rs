@@ -39,7 +39,7 @@ pub type ServerHookHandlerFactory = fn() -> ServerHookHandler;
 /// Type alias for a shared server hook handler.
 ///
 /// This type allows storing handlers (route and middleware) of different concrete types
-/// in the same collection. The handler takes a `&Context` and returns
+/// in the same collection. The handler takes a `&mut Context` and returns
 /// a pinned, boxed future that resolves to `()`.
 pub type ServerHookHandler = Arc<dyn Fn(&mut Context) -> FutureBox<()> + Send + Sync>;
 

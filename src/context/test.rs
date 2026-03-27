@@ -106,3 +106,14 @@ fn context_as_mut() {
     ctx_mut.set_closed(true);
     assert!(ctx.get_closed());
 }
+
+#[tokio::test]
+async fn test_spawn_write() {
+    let ctx: &mut Context = &mut Context::default();
+    for i in 0..10000 {
+        let leak_ctx: &mut Context = ctx.leak_mut();
+        spawn(async move {
+            leak_ctx.get_mut_response().set_body(format!("args {}", i));
+        });
+    }
+}

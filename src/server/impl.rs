@@ -665,7 +665,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `&Context` - The `Context` for the current request.
+    /// - `&mut Context` - The `Context` for the current request.
     /// - `&Request` - The incoming request to be processed.
     ///
     /// # Returns
