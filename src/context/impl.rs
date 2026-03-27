@@ -134,6 +134,11 @@ impl From<usize> for &'static Context {
     /// # Returns
     ///
     /// - `&'static Context` - A reference to the `Context` at the given address.
+    ///
+    /// # Safety
+    ///
+    /// - The address is guaranteed to be a valid `Context` instance
+    ///   that was previously converted from a reference and is managed by the runtime.
     #[inline(always)]
     fn from(address: usize) -> &'static Context {
         unsafe { &*(address as *const Context) }
@@ -151,6 +156,11 @@ impl<'a> From<usize> for &'a mut Context {
     /// # Returns
     ///
     /// - `&mut Context` - A mutable reference to the `Context` at the given address.
+    ///
+    /// # Safety
+    ///
+    /// - The address is guaranteed to be a valid `Context` instance
+    ///   that was previously converted from a reference and is managed by the runtime.
     #[inline(always)]
     fn from(address: usize) -> &'a mut Context {
         unsafe { &mut *(address as *mut Context) }
@@ -221,11 +231,32 @@ impl AsMut<Context> for Context {
 
 /// Implementation of `Lifetime` trait for `Context`.
 impl Lifetime for Context {
-    /// Converts a mutable reference to the context into a `'static` mutable reference.
+    /// Converts a reference to the context into a `'static` reference.
+    ///
+    /// # Returns
+    ///
+    /// - `&'static Self`: A reference to the context with a `'static` lifetime.
+    ///
+    /// # Safety
+    ///
+    /// - The address is guaranteed to be a valid `Self` instance
+    ///   that was previously converted from a reference and is managed by the runtime.
+    #[inline(always)]
+    fn leak(&self) -> &'static Self {
+        let address: usize = self.into();
+        address.into()
+    }
+
+    /// Converts a reference to the context into a `'static` mutable reference.
     ///
     /// # Returns
     ///
     /// - `&'static mut Self`: A mutable reference to the context with a `'static` lifetime.
+    ///
+    /// # Safety
+    ///
+    /// - The address is guaranteed to be a valid `Self` instance
+    ///   that was previously converted from a reference and is managed by the runtime.
     #[inline(always)]
     fn leak_mut(&self) -> &'static mut Self {
         let address: usize = self.into();

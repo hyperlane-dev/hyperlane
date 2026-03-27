@@ -109,7 +109,7 @@ fn context_as_mut() {
 
 #[tokio::test]
 async fn test_spawn_write() {
-    let ctx: &mut Context = &mut Context::default();
+    let ctx: Context = Context::default();
     for i in 0..10000 {
         let leak_ctx: &mut Context = ctx.leak_mut();
         spawn(async move {

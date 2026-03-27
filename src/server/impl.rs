@@ -100,6 +100,11 @@ impl From<usize> for &'static Server {
     /// # Returns
     ///
     /// - `&'static Server` - A reference to the `Server` at the given address.
+    ///
+    /// # Safety
+    ///
+    /// - The address is guaranteed to be a valid `Server` instance
+    ///   that was previously converted from a reference and is managed by the runtime.
     #[inline(always)]
     fn from(address: usize) -> &'static Server {
         unsafe { &*(address as *const Server) }
@@ -117,6 +122,11 @@ impl From<usize> for &'static mut Server {
     /// # Returns
     ///
     /// - `&'static mut Server` - A mutable reference to the `Server` at the given address.
+    ///
+    /// # Safety
+    ///
+    /// - The address is guaranteed to be a valid `Server` instance
+    ///   that was previously converted from a reference and is managed by the runtime.
     #[inline(always)]
     fn from(address: usize) -> &'static mut Server {
         unsafe { &mut *(address as *mut Server) }
@@ -233,11 +243,32 @@ impl From<RequestConfig> for Server {
 
 /// Implementation of `Lifetime` trait for `Server`.
 impl Lifetime for Server {
-    /// Converts a mutable reference to the server into a `'static` mutable reference.
+    /// Converts a reference to the server into a `'static` reference.
+    ///
+    /// # Returns
+    ///
+    /// - `&'static Self`: A reference to the server with a `'static` lifetime.
+    ///
+    /// # Safety
+    ///
+    /// - The address is guaranteed to be a valid `Server` instance
+    ///   that was previously converted from a reference and is managed by the runtime.
+    #[inline(always)]
+    fn leak(&self) -> &'static Self {
+        let address: usize = self.into();
+        address.into()
+    }
+
+    /// Converts a reference to the server into a `'static` mutable reference.
     ///
     /// # Returns
     ///
     /// - `&'static mut Self`: A mutable reference to the server with a `'static` lifetime.
+    ///
+    /// # Safety
+    ///
+    /// - The address is guaranteed to be a valid `Server` instance
+    ///   that was previously converted from a reference and is managed by the runtime.
     #[inline(always)]
     fn leak_mut(&self) -> &'static mut Self {
         let address: usize = self.into();
@@ -534,6 +565,11 @@ impl Server {
     ///
     /// - `usize` - The address of the context.
     /// - `Future<Output = ()> + Send + 'static` - The hook to execute.
+    ///
+    /// # Safety
+    ///
+    /// - The address is guaranteed to be a valid `Context` instance
+    ///   that was previously converted from a reference and is managed by the runtime.
     async fn task_handler<F>(&'static self, ctx_address: usize, hook: F)
     where
         F: Future<Output = ()> + Send + 'static,
@@ -725,6 +761,11 @@ impl Server {
     /// # Arguments
     ///
     /// - `&mut Context` - The `Context` for the current request.
+    ///
+    /// # Safety
+    ///
+    /// - The `ctx` is a valid pointer to a `Context` that was
+    ///   originally created via `Box::into_raw` and is now being reclaimed.
     async fn handle_connection(&self, ctx: &mut Context) {
         match ctx.http_from_stream().await {
             Ok(request) => {
@@ -747,7 +788,7 @@ impl Server {
     ///
     /// - `Result<(), ServerError>` - A `Result` which is typically `Ok(())` unless an unrecoverable
     ///   error occurs.
-    async fn tcp_accept(&'static mut self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
+    async fn tcp_accept(&'static self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
         while let Ok((stream, _)) = tcp_listener.accept().await {
             self.configure_stream(&stream).await;
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
@@ -770,7 +811,7 @@ impl Server {
     pub async fn run(&self) -> Result<ServerControlHook, ServerError> {
         let bind_address: &String = self.get_server_config().get_address();
         let tcp_listener: TcpListener = TcpListener::bind(bind_address).await?;
-        let server: &'static mut Self = self.leak_mut();
+        let server: &'static Self = self.leak();
         let (wait_sender, wait_receiver) = channel(());
         let (shutdown_sender, mut shutdown_receiver) = channel(());
         let accept_connections: JoinHandle<()> = spawn(async move {

@@ -28,7 +28,7 @@ where
 /// A trait for futures that are sendable and have a static lifetime.
 ///
 /// This marker trait simplifies generic bounds for asynchronous operations, ensuring
-/// that futures can be safely managed by the async runtime without lifetime issues.
+///   that futures can be safely managed by the async runtime without lifetime issues.
 pub trait FutureSendStatic<T>: Future<Output = T> + Send + 'static {}
 
 /// A trait for `Send`-able futures with a generic output.
