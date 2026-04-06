@@ -1,7 +1,7 @@
 use crate::*;
 
-#[test]
-fn server_partial_eq() {
+#[tokio::test]
+async fn server_partial_eq() {
     let server1: Server = Server::default();
     let server2: Server = Server::default();
     assert_eq!(server1, server2);
@@ -9,8 +9,8 @@ fn server_partial_eq() {
     assert_eq!(server1, server1_clone);
 }
 
-#[test]
-fn server_from_address() {
+#[tokio::test]
+async fn server_from_address() {
     let mut server: Server = Server::default();
     server.set_request_config(RequestConfig::default());
     let server_address: usize = (&server).into();
@@ -21,8 +21,8 @@ fn server_from_address() {
     );
 }
 
-#[test]
-fn server_ref_from_address() {
+#[tokio::test]
+async fn server_ref_from_address() {
     let mut server: Server = Server::default();
     server.set_server_config(ServerConfig::default());
     let server_address: usize = (&server).into();
@@ -30,8 +30,8 @@ fn server_ref_from_address() {
     assert_eq!(server.get_server_config(), server_ref.get_server_config());
 }
 
-#[test]
-fn server_mut_from_address() {
+#[tokio::test]
+async fn server_mut_from_address() {
     let mut server: Server = Server::default();
     let server_address: usize = (&mut server).into();
     let server_mut: &mut Server = server_address.into();
@@ -41,8 +41,8 @@ fn server_mut_from_address() {
     assert!(server_mut.get_server_config().try_get_nodelay().is_some());
 }
 
-#[test]
-fn server_from_server_config() {
+#[tokio::test]
+async fn server_from_server_config() {
     let mut server_config: ServerConfig = ServerConfig::default();
     server_config.set_nodelay(Some(true));
     let server: Server = server_config.clone().into();
@@ -54,8 +54,8 @@ fn server_from_server_config() {
     assert!(server.get_response_middleware().is_empty());
 }
 
-#[test]
-fn server_from_request_config() {
+#[tokio::test]
+async fn server_from_request_config() {
     let mut request_config: RequestConfig = RequestConfig::default();
     request_config.set_buffer_size(KB_1);
     let server: Server = request_config.into();
@@ -67,29 +67,29 @@ fn server_from_request_config() {
     assert!(server.get_response_middleware().is_empty());
 }
 
-#[test]
-fn server_inner_partial_eq() {
+#[tokio::test]
+async fn server_inner_partial_eq() {
     let inner1: Server = Server::default();
     let inner2: Server = Server::default();
     assert_eq!(inner1, inner2);
 }
 
-#[test]
-fn server_ref_into_address() {
+#[tokio::test]
+async fn server_ref_into_address() {
     let server: Server = Server::default();
     let server_address: usize = (&server).into();
     assert!(server_address > 0);
 }
 
-#[test]
-fn server_mut_into_address() {
+#[tokio::test]
+async fn server_mut_into_address() {
     let mut server: Server = Server::default();
     let server_address: usize = (&mut server).into();
     assert!(server_address > 0);
 }
 
-#[test]
-fn server_as_ref() {
+#[tokio::test]
+async fn server_as_ref() {
     let mut server: Server = Server::default();
     server.set_server_config(ServerConfig::default());
     let server_ref: &Server = server.as_ref();
@@ -97,8 +97,8 @@ fn server_as_ref() {
     assert_eq!(server.get_request_config(), server_ref.get_request_config());
 }
 
-#[test]
-fn server_as_mut() {
+#[tokio::test]
+async fn server_as_mut() {
     let mut server: Server = Server::default();
     let server_mut: &mut Server = server.as_mut();
     let mut config: ServerConfig = ServerConfig::default();
@@ -117,8 +117,8 @@ impl ServerHook for TestSendRoute {
     async fn handle(self, _ctx: &mut Context) {}
 }
 
-#[test]
-fn server_send_sync() {
+#[tokio::test]
+async fn server_send_sync() {
     fn assert_send<T: Send>() {}
     fn assert_sync<T: Sync>() {}
     fn assert_send_sync<T: Send + Sync>() {}

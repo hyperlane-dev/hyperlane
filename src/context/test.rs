@@ -1,7 +1,7 @@
 use crate::*;
 
-#[test]
-fn context_from_address() {
+#[tokio::test]
+async fn context_from_address() {
     let mut ctx: Context = Context::default();
     ctx.set_aborted(true);
     let ctx_address: usize = (&ctx).into();
@@ -9,8 +9,8 @@ fn context_from_address() {
     assert_eq!(ctx.get_aborted(), ctx_from_addr.get_aborted());
 }
 
-#[test]
-fn context_ref_from_address() {
+#[tokio::test]
+async fn context_ref_from_address() {
     let mut ctx: Context = Context::default();
     ctx.set_closed(true);
     let ctx_address: usize = (&ctx).into();
@@ -18,8 +18,8 @@ fn context_ref_from_address() {
     assert_eq!(ctx.get_closed(), ctx_ref.get_closed());
 }
 
-#[test]
-fn context_mut_from_address() {
+#[tokio::test]
+async fn context_mut_from_address() {
     let mut ctx: Context = Context::default();
     let ctx_address: usize = (&mut ctx).into();
     let ctx_mut: &mut Context = ctx_address.into();
@@ -27,22 +27,22 @@ fn context_mut_from_address() {
     assert!(ctx_mut.get_aborted());
 }
 
-#[test]
-fn context_ref_into_address() {
+#[tokio::test]
+async fn context_ref_into_address() {
     let ctx: Context = Context::default();
     let ctx_address: usize = (&ctx).into();
     assert!(ctx_address > 0);
 }
 
-#[test]
-fn context_mut_into_address() {
+#[tokio::test]
+async fn context_mut_into_address() {
     let mut ctx: Context = Context::default();
     let ctx_address: usize = (&mut ctx).into();
     assert!(ctx_address > 0);
 }
 
-#[test]
-fn context_aborted_and_closed() {
+#[tokio::test]
+async fn context_aborted_and_closed() {
     let mut ctx: Context = Context::default();
     assert!(!ctx.get_aborted());
     ctx.set_aborted(true);
@@ -62,8 +62,8 @@ fn context_aborted_and_closed() {
     assert!(ctx.is_terminated());
 }
 
-#[test]
-fn context_route_params() {
+#[tokio::test]
+async fn context_route_params() {
     let mut ctx: Context = Context::default();
     let mut params: RouteParams = RouteParams::default();
     params.insert("id".to_string(), "123".to_string());
@@ -74,8 +74,8 @@ fn context_route_params() {
     assert_eq!(name, None);
 }
 
-#[test]
-fn context_request_and_response_string() {
+#[tokio::test]
+async fn context_request_and_response_string() {
     let mut ctx: Context = Context::default();
     let request: Request = Request::default();
     ctx.set_request(request.clone());
@@ -87,8 +87,8 @@ fn context_request_and_response_string() {
     assert_eq!(response.to_string(), fetched_response.to_string());
 }
 
-#[test]
-fn context_as_ref() {
+#[tokio::test]
+async fn context_as_ref() {
     let ctx: Context = Context::default();
     let ctx_ref: &Context = ctx.as_ref();
     assert_eq!(ctx.get_aborted(), ctx_ref.get_aborted());
@@ -97,8 +97,8 @@ fn context_as_ref() {
     assert_eq!(ctx.get_response(), ctx_ref.get_response());
 }
 
-#[test]
-fn context_as_mut() {
+#[tokio::test]
+async fn context_as_mut() {
     let mut ctx: Context = Context::default();
     ctx.set_aborted(true);
     let ctx_mut: &mut Context = ctx.as_mut();

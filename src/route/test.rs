@@ -16,22 +16,22 @@ impl ServerHook for TestRoute {
     }
 }
 
-#[test]
+#[tokio::test]
 #[should_panic(expected = "EmptyPattern")]
-fn empty_route() {
+async fn empty_route() {
     let _server: &Server = Server::default().route::<TestRoute>(EMPTY_STR);
 }
 
-#[test]
+#[tokio::test]
 #[should_panic(expected = "DuplicatePattern")]
-fn duplicate_route() {
+async fn duplicate_route() {
     let _server: &Server = Server::default()
         .route::<TestRoute>(ROOT_PATH)
         .route::<TestRoute>(ROOT_PATH);
 }
 
-#[test]
-fn get_route() {
+#[tokio::test]
+async fn get_route() {
     let mut server: Server = Server::default();
     server
         .route::<TestRoute>(ROOT_PATH)
@@ -53,8 +53,8 @@ fn get_route() {
     }
 }
 
-#[test]
-fn segment_count_optimization() {
+#[tokio::test]
+async fn segment_count_optimization() {
     let mut server: Server = Server::default();
     server.route::<TestRoute>("/users/{id}");
     server.route::<TestRoute>("/users/{id}/posts");
@@ -78,8 +78,8 @@ fn segment_count_optimization() {
     assert_eq!(route_matcher.get_dynamic_route().get(&4).unwrap().len(), 2);
 }
 
-#[test]
-fn regex_route_segment_count() {
+#[tokio::test]
+async fn regex_route_segment_count() {
     let mut server: Server = Server::default();
     server.route::<TestRoute>("/files/{path:.*}");
     server.route::<TestRoute>("/api/{version:\\d+}/users");
@@ -99,8 +99,8 @@ fn regex_route_segment_count() {
     );
 }
 
-#[test]
-fn mixed_route_types() {
+#[tokio::test]
+async fn mixed_route_types() {
     let mut server: Server = Server::default();
     server.route::<TestRoute>("/");
     server.route::<TestRoute>("/about");
@@ -113,8 +113,8 @@ fn mixed_route_types() {
     assert!(route_matcher.get_regex_route().contains_key(&2));
 }
 
-#[test]
-fn large_dynamic_routes() {
+#[tokio::test]
+async fn large_dynamic_routes() {
     const ROUTE_COUNT: u32 = 1000;
     let mut server: Server = Server::default();
     let start_insert: Instant = Instant::now();
@@ -146,8 +146,8 @@ fn large_dynamic_routes() {
     );
 }
 
-#[test]
-fn large_regex_routes() {
+#[tokio::test]
+async fn large_regex_routes() {
     const ROUTE_COUNT: u32 = 1000;
     let mut server: Server = Server::default();
     let start_insert: Instant = Instant::now();
@@ -179,8 +179,8 @@ fn large_regex_routes() {
     );
 }
 
-#[test]
-fn large_tail_regex_routes() {
+#[tokio::test]
+async fn large_tail_regex_routes() {
     const ROUTE_COUNT: u32 = 1000;
     let mut server: Server = Server::default();
     let start_insert: Instant = Instant::now();

@@ -29,17 +29,10 @@ impl Default for Task {
     fn default() -> Self {
         let worker_count: usize = Handle::try_current()
             .map(|handle: Handle| handle.metrics().num_workers())
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .max(1);
         let notify: &'static Notify = Box::leak(Box::new(Notify::new()));
         let shutdown: &'static AtomicBool = Box::leak(Box::new(AtomicBool::new(false)));
-        if worker_count == 0 {
-            return Self {
-                pool: Vec::new(),
-                notify,
-                counter: AtomicUsize::new(0),
-                shutdown,
-            };
-        }
         let mut pool: Vec<UnboundedSender<AsyncTask>> = Vec::with_capacity(worker_count);
         for _ in 0..worker_count {
             let (sender, mut receiver): (UnboundedSender<AsyncTask>, UnboundedReceiver<AsyncTask>) =
