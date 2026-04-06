@@ -12,11 +12,12 @@ impl Default for Server {
         Self {
             server_config: ServerConfig::default(),
             request_config: RequestConfig::default(),
-            task_panic: vec![],
-            request_error: vec![],
+            task_panic: Vec::new(),
+            request_error: Vec::new(),
             route_matcher: RouteMatcher::new(),
-            request_middleware: vec![],
-            response_middleware: vec![],
+            request_middleware: Vec::new(),
+            response_middleware: Vec::new(),
+            task: Task::default(),
         }
     }
 }
@@ -370,10 +371,6 @@ impl Server {
     /// This method allows registering task panic handlers that implement the `ServerHook` trait,
     /// which will be executed when a panic occurs during request processing.
     ///
-    /// # Type Parameters
-    ///
-    /// - `ServerHook` - The task panic handler type that implements `ServerHook`.
-    ///
     /// # Returns
     ///
     /// - `&mut Self` - Reference to self for method chaining.
@@ -390,10 +387,6 @@ impl Server {
     ///
     /// This method allows registering request error handlers that implement the `ServerHook` trait,
     /// which will be executed when a request error occurs during HTTP request processing.
-    ///
-    /// # Type Parameters
-    ///
-    /// - `ServerHook` - The request error handler type that implements `ServerHook`.
     ///
     /// # Returns
     ///
@@ -412,10 +405,6 @@ impl Server {
     ///
     /// This method allows registering route handlers that implement the `ServerHook` trait,
     /// providing type safety and better code organization.
-    ///
-    /// # Type Parameters
-    ///
-    /// - `ServerHook` - The route hook type that implements `ServerHook`.
     ///
     /// # Arguments
     ///
@@ -440,10 +429,6 @@ impl Server {
     /// This method allows registering middleware that implements the `ServerHook` trait,
     /// which will be executed before route handlers for every incoming request.
     ///
-    /// # Type Parameters
-    ///
-    /// - `ServerHook` - The middleware type that implements `ServerHook`.
-    ///
     /// # Returns
     ///
     /// - `&mut Self` - Reference to self for method chaining.
@@ -461,10 +446,6 @@ impl Server {
     ///
     /// This method allows registering middleware that implements the `ServerHook` trait,
     /// which will be executed after route handlers for every outgoing response.
-    ///
-    /// # Type Parameters
-    ///
-    /// - `ServerHook` - The middleware type that implements `ServerHook`.
     ///
     /// # Returns
     ///
@@ -597,7 +578,9 @@ impl Server {
                 let _ = Self::try_flush_stdout_and_stderr();
             }
             let drop_ctx: &mut Context = ctx_address.into();
-            unsafe { drop(Box::from_raw(drop_ctx)) }
+            if !drop_ctx.get_leaked() {
+                drop_ctx.free();
+            }
         };
     }
 
@@ -608,8 +591,8 @@ impl Server {
     /// # Arguments
     ///
     /// - `&TcpStream` - A reference to the `TcpStream` to configure.
-    async fn configure_stream(&self, stream: &TcpStream) {
-        let config: ServerConfig = self.get_server_config().clone();
+    fn configure_stream(&self, stream: &TcpStream) {
+        let config: &ServerConfig = self.get_server_config();
         if let Some(nodelay) = config.try_get_nodelay() {
             let _ = stream.set_nodelay(*nodelay);
         }
@@ -775,7 +758,9 @@ impl Server {
                 self.handle_request_error(ctx, &error).await;
             }
         }
-        unsafe { drop(Box::from_raw(ctx)) }
+        if !ctx.get_leaked() {
+            ctx.free();
+        }
     }
 
     /// Enters a loop to accept incoming TCP connections and spawn handlers for them.
@@ -783,19 +768,15 @@ impl Server {
     /// # Arguments
     ///
     /// - `&TcpListener` - A reference to the `TcpListener` to accept connections from.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<(), ServerError>` - A `Result` which is typically `Ok(())` unless an unrecoverable
-    ///   error occurs.
-    async fn tcp_accept(&'static self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
-        while let Ok((stream, _)) = tcp_listener.accept().await {
-            self.configure_stream(&stream).await;
-            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
-            let ctx: &'static mut Context = Box::leak(Box::new(Context::new(&stream, self)));
-            spawn(self.task_handler(ctx.into(), self.handle_connection(ctx)));
+    async fn tcp_accept(&'static self, tcp_listener: &TcpListener) {
+        loop {
+            if let Ok((stream, _)) = tcp_listener.accept().await {
+                self.configure_stream(&stream);
+                let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
+                let ctx: &'static mut Context = Box::leak(Box::new(Context::new(&stream, self)));
+                spawn(self.task_handler(ctx.into(), self.handle_connection(ctx)));
+            }
         }
-        Ok(())
     }
 
     /// Starts the server, binds to the configured address, and begins listening for connections.
@@ -815,7 +796,7 @@ impl Server {
         let (wait_sender, wait_receiver) = channel(());
         let (shutdown_sender, mut shutdown_receiver) = channel(());
         let accept_connections: JoinHandle<()> = spawn(async move {
-            let _ = server.tcp_accept(&tcp_listener).await;
+            server.tcp_accept(&tcp_listener).await;
             let _ = wait_sender.send(());
         });
         let wait_hook: ServerControlHookHandler<()> = Arc::new(move || {
@@ -833,6 +814,7 @@ impl Server {
         spawn(async move {
             let _ = shutdown_receiver.changed().await;
             accept_connections.abort();
+            server.get_task().shutdown();
         });
         let mut server_control_hook: ServerControlHook = ServerControlHook::default();
         server_control_hook.set_shutdown_hook(shutdown_hook);

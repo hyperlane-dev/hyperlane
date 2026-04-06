@@ -18,10 +18,11 @@ mod lifetime;
 mod panic;
 mod route;
 mod server;
+mod task;
 
 pub use {
     attribute::*, config::*, context::*, error::*, hook::*, lifetime::*, panic::*, route::*,
-    server::*,
+    server::*, task::*,
 };
 
 pub use {http_type::*, inventory};
@@ -36,7 +37,10 @@ use std::{
     hash::{Hash, Hasher},
     io::{self, Write, stderr, stdout},
     pin::Pin,
-    sync::{Arc, OnceLock},
+    sync::{
+        Arc, OnceLock,
+        atomic::{self, AtomicBool, AtomicUsize},
+    },
 };
 
 #[cfg(test)]
@@ -48,8 +52,13 @@ use {
     serde::{Deserialize, Serialize},
     tokio::{
         net::{TcpListener, TcpStream},
+        runtime::Handle,
         spawn,
-        sync::watch::{Receiver, Sender, channel},
-        task::{JoinError, JoinHandle},
+        sync::{
+            Notify,
+            mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel},
+            watch::{Receiver, Sender, channel},
+        },
+        task::{JoinError, JoinHandle, LocalSet, spawn_blocking, spawn_local},
     },
 };

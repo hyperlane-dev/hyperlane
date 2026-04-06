@@ -265,7 +265,7 @@ impl ServerHook for UpgradeMiddleware {
                 .set_header(UPGRADE, WEBSOCKET)
                 .set_header(CONNECTION, UPGRADE)
                 .set_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
-                .set_body(vec![]);
+                .set_body(Vec::new());
             if ctx.try_send().await.is_err() {
                 ctx.set_aborted(true).set_closed(true);
             }
@@ -326,7 +326,7 @@ impl ServerHook for SseRoute {
     async fn handle(self, ctx: &mut Context) {
         ctx.get_mut_response()
             .set_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
-            .set_body(vec![]);
+            .set_body(Vec::new());
         if ctx.try_send().await.is_err() {
             ctx.set_aborted(true).set_closed(true);
             return;
