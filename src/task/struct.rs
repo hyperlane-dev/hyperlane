@@ -11,10 +11,6 @@ pub struct Task {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) pool: Vec<UnboundedSender<AsyncTask>>,
-    /// Notification handle for waking up worker threads when tasks arrive.
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) notify: &'static Notify,
     /// Atomic counter for round-robin task distribution across workers.
     #[get_mut(pub(super))]
     #[set(pub(super))]
@@ -23,4 +19,8 @@ pub struct Task {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) shutdown: &'static AtomicBool,
+    /// Notification handles for precise wake-up of specific workers.
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) notifies: &'static Vec<Notify>,
 }

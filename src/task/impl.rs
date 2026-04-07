@@ -11,9 +11,9 @@ impl Clone for Task {
     fn clone(&self) -> Self {
         Self {
             pool: self.get_pool().clone(),
-            notify: self.get_notify(),
             counter: AtomicUsize::new(self.get_counter().load(atomic::Ordering::Relaxed)),
             shutdown: self.get_shutdown(),
+            notifies: self.get_notifies(),
         }
     }
 }
@@ -31,10 +31,11 @@ impl Default for Task {
             .map(|handle: Handle| handle.metrics().num_workers())
             .unwrap_or_default()
             .max(1);
-        let notify: &'static Notify = Box::leak(Box::new(Notify::new()));
         let shutdown: &'static AtomicBool = Box::leak(Box::new(AtomicBool::new(false)));
         let mut pool: Vec<UnboundedSender<AsyncTask>> = Vec::with_capacity(worker_count);
-        for _ in 0..worker_count {
+        let notifies: &'static Vec<Notify> =
+            Box::leak(Box::new((0..worker_count).map(|_| Notify::new()).collect()));
+        for notify in notifies.iter().take(worker_count) {
             let (sender, mut receiver): (UnboundedSender<AsyncTask>, UnboundedReceiver<AsyncTask>) =
                 unbounded_channel();
             pool.push(sender);
@@ -58,9 +59,9 @@ impl Default for Task {
         }
         Self {
             pool,
-            notify,
             counter: AtomicUsize::new(0),
             shutdown,
+            notifies,
         }
     }
 }
@@ -102,8 +103,8 @@ impl Task {
             .wrapping_rem(self.get_pool().len());
         if let Some(sender) = self.get_pool().get(index) {
             let result: bool = sender.send(Box::pin(hook)).is_ok();
-            if result {
-                self.get_notify().notify_one();
+            if result && let Some(notify) = self.get_notifies().get(index) {
+                notify.notify_one()
             }
             return result;
         }
@@ -117,6 +118,8 @@ impl Task {
     #[inline(always)]
     pub fn shutdown(&self) {
         self.get_shutdown().store(true, atomic::Ordering::Relaxed);
-        self.get_notify().notify_waiters();
+        self.get_notifies()
+            .iter()
+            .for_each(|notify: &Notify| notify.notify_one());
     }
 }

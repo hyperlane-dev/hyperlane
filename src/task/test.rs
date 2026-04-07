@@ -50,9 +50,9 @@ async fn task_try_spawn_local_round_robin() {
 async fn task_try_spawn_local_empty_pool() {
     let task: Task = Task {
         pool: Vec::new(),
-        notify: Box::leak(Box::new(Notify::new())),
         counter: AtomicUsize::new(0),
         shutdown: Box::leak(Box::new(AtomicBool::new(false))),
+        notifies: Box::leak(Box::new(Vec::new())),
     };
     let result: bool = task.try_spawn_local(None, async move {});
     assert!(!result);
