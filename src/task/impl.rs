@@ -1,23 +1,5 @@
 use crate::*;
 
-/// Creates a clone of the Task instance.
-impl Clone for Task {
-    /// Creates a clone of the Task instance.
-    ///
-    /// # Returns
-    ///
-    /// - `Self`: The cloned instance.
-    #[inline(always)]
-    fn clone(&self) -> Self {
-        Self {
-            pool: self.get_pool().clone(),
-            counter: AtomicUsize::new(self.get_counter().load(atomic::Ordering::Relaxed)),
-            shutdown: self.get_shutdown(),
-            notifies: self.get_notifies(),
-        }
-    }
-}
-
 /// Creates a default Task instance.
 impl Default for Task {
     /// Creates a default Task instance.
@@ -31,38 +13,7 @@ impl Default for Task {
             .map(|handle: Handle| handle.metrics().num_workers())
             .unwrap_or_default()
             .max(1);
-        let shutdown: &'static AtomicBool = Box::leak(Box::new(AtomicBool::new(false)));
-        let mut pool: Vec<UnboundedSender<AsyncTask>> = Vec::with_capacity(worker_count);
-        let notifies: &'static Vec<Notify> =
-            Box::leak(Box::new((0..worker_count).map(|_| Notify::new()).collect()));
-        for notify in notifies.iter().take(worker_count) {
-            let (sender, mut receiver): (UnboundedSender<AsyncTask>, UnboundedReceiver<AsyncTask>) =
-                unbounded_channel();
-            pool.push(sender);
-            spawn_blocking(move || {
-                Handle::current().block_on(LocalSet::new().run_until(async move {
-                    loop {
-                        if shutdown.load(atomic::Ordering::Relaxed) {
-                            break;
-                        }
-                        match receiver.try_recv() {
-                            Ok(task) => {
-                                spawn_local(task);
-                            }
-                            Err(_) => {
-                                notify.notified().await;
-                            }
-                        }
-                    }
-                }));
-            });
-        }
-        Self {
-            pool,
-            counter: AtomicUsize::new(0),
-            shutdown,
-            notifies,
-        }
+        Self::new(worker_count)
     }
 }
 
@@ -76,6 +27,53 @@ impl Drop for Task {
 }
 
 impl Task {
+    /// Creates a new Task instance.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize`: The number of worker threads to spawn.
+    ///
+    /// # Returns
+    ///
+    /// - `Self`: The new instance.
+    pub fn new(worker_count: usize) -> Self {
+        let mut pool: Vec<UnboundedSender<AsyncTask>> = Vec::with_capacity(worker_count);
+        let counter: Arc<AtomicUsize> = Arc::new(AtomicUsize::new(0));
+        let shutdown: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+        let notifies: Vec<Arc<Notify>> =
+            (0..worker_count).map(|_| Arc::new(Notify::new())).collect();
+        for notify in notifies.iter().take(worker_count) {
+            let (sender, mut receiver): (UnboundedSender<AsyncTask>, UnboundedReceiver<AsyncTask>) =
+                unbounded_channel();
+            pool.push(sender);
+            let shutdown_clone: Arc<AtomicBool> = shutdown.clone();
+            let notify_clone: Arc<Notify> = notify.clone();
+            spawn_blocking(move || {
+                Handle::current().block_on(LocalSet::new().run_until(async move {
+                    loop {
+                        if shutdown_clone.load(atomic::Ordering::Relaxed) {
+                            break;
+                        }
+                        match receiver.try_recv() {
+                            Ok(task) => {
+                                spawn_local(task);
+                            }
+                            Err(_) => {
+                                notify_clone.notified().await;
+                            }
+                        }
+                    }
+                }));
+            });
+        }
+        Self {
+            pool,
+            counter,
+            shutdown,
+            notifies,
+        }
+    }
+
     /// Attempts to spawn a server task onto the global server task pool.
     ///
     /// This function sends the task to one of the worker threads in the pool.
@@ -120,6 +118,6 @@ impl Task {
         self.get_shutdown().store(true, atomic::Ordering::Relaxed);
         self.get_notifies()
             .iter()
-            .for_each(|notify: &Notify| notify.notify_one());
+            .for_each(|notify: &Arc<Notify>| notify.notify_one());
     }
 }

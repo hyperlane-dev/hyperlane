@@ -17,7 +17,6 @@ impl Default for Server {
             route_matcher: RouteMatcher::new(),
             request_middleware: Vec::new(),
             response_middleware: Vec::new(),
-            task: Task::default(),
         }
     }
 }
@@ -577,10 +576,8 @@ impl Server {
                 eprintln!("{}", error);
                 let _ = Self::try_flush_stdout_and_stderr();
             }
-            let drop_ctx: &mut Context = ctx_address.into();
-            if !drop_ctx.get_leaked() {
-                drop_ctx.free();
-            }
+            let free_ctx: &mut Context = ctx_address.into();
+            free_ctx.free();
         };
     }
 
@@ -758,9 +755,7 @@ impl Server {
                 self.handle_request_error(ctx, &error).await;
             }
         }
-        if !ctx.get_leaked() {
-            ctx.free();
-        }
+        ctx.free();
     }
 
     /// Enters a loop to accept incoming TCP connections and spawn handlers for them.
@@ -814,7 +809,6 @@ impl Server {
         spawn(async move {
             let _ = shutdown_receiver.changed().await;
             accept_connections.abort();
-            server.get_task().shutdown();
         });
         let mut server_control_hook: ServerControlHook = ServerControlHook::default();
         server_control_hook.set_shutdown_hook(shutdown_hook);

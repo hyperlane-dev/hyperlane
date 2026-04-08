@@ -12,9 +12,6 @@ pub struct Context {
     /// A flag indicating whether the connection has been closed.
     #[get(type(copy))]
     pub(super) closed: bool,
-    /// A flag indicating whether the context has been leaked and should not be dropped by the framework.
-    #[get(type(copy))]
-    pub(super) leaked: bool,
     /// The underlying network stream for the connection.
     #[get_mut(skip)]
     #[set(pub(super))]

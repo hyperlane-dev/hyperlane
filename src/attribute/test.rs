@@ -1,7 +1,7 @@
 use crate::*;
 
-#[tokio::test]
-async fn get_panic_from_context() {
+#[test]
+fn get_panic_from_context() {
     let mut ctx: Context = Context::default();
     let set_panic: PanicData = PanicData::new(
         Some("test".to_string()),
@@ -13,8 +13,8 @@ async fn get_panic_from_context() {
     assert_eq!(set_panic, get_panic);
 }
 
-#[tokio::test]
-async fn context_attributes() {
+#[test]
+fn context_attributes() {
     let mut ctx: Context = Context::default();
     ctx.set_attribute("key1", "value1".to_string());
     let value: Option<String> = ctx.try_get_attribute("key1");
@@ -46,8 +46,8 @@ async fn get_panic_from_join_error() {
     );
 }
 
-#[tokio::test]
-async fn run_set_func() {
+#[test]
+fn run_set_func() {
     let mut ctx: Context = Context::default();
     const KEY: &str = "string";
     const PARAM: &str = "test";

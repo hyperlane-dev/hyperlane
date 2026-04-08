@@ -38,8 +38,4 @@ pub struct Server {
     #[get_mut(pub(super))]
     #[set(skip)]
     pub(super) response_middleware: ServerHookList,
-    /// Task manager for handling async tasks across worker threads.
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) task: Task,
 }

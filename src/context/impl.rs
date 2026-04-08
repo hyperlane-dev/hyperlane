@@ -12,7 +12,6 @@ impl Default for Context {
         Self {
             aborted: false,
             closed: false,
-            leaked: false,
             stream: None,
             request: Request::default(),
             response: Response::default(),
@@ -39,7 +38,6 @@ impl PartialEq for Context {
     fn eq(&self, other: &Self) -> bool {
         self.get_aborted() == other.get_aborted()
             && self.get_closed() == other.get_closed()
-            && self.get_leaked() == other.get_leaked()
             && self.get_request() == other.get_request()
             && self.get_response() == other.get_response()
             && self.get_route_params() == other.get_route_params()
@@ -292,30 +290,8 @@ impl Context {
     /// - The address is guaranteed to be a valid `Self` instance
     ///   that was previously converted from a reference and is managed by the runtime.
     #[inline(always)]
-    pub fn free(&mut self) {
+    pub(crate) fn free(&mut self) {
         let _ = unsafe { Box::from_raw(self) };
-    }
-
-    /// Attempts to spawn a server task onto the global server task pool.
-    ///
-    /// This method uses the context's memory address as the worker index
-    /// to ensure tasks from the same context are routed to the same worker.
-    ///
-    /// # Arguments
-    ///
-    /// - `Future<Output = ()> + Send + 'static` - The future to spawn on the server task.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - `true` if the task was successfully sent, `false` if the pool is not initialized.
-    #[inline(always)]
-    pub fn try_spawn_local<F>(&self, hook: F) -> bool
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        self.get_server()
-            .get_task()
-            .try_spawn_local(Some(self.into()), hook)
     }
 
     /// Reads an HTTP request from the underlying stream.
