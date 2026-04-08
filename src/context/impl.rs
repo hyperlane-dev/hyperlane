@@ -308,6 +308,7 @@ impl Context {
     /// # Returns
     ///
     /// - `bool` - `true` if the task was successfully sent, `false` if the pool is not initialized.
+    #[inline(always)]
     pub fn try_spawn_local<F>(&self, hook: F) -> bool
     where
         F: Future<Output = ()> + Send + 'static,

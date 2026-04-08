@@ -76,7 +76,7 @@ impl Drop for Task {
 }
 
 impl Task {
-    /// Spawns a task onto the task pool using round-robin distribution.
+    /// Attempts to spawn a server task onto the global server task pool.
     ///
     /// This function sends the task to one of the worker threads in the pool.
     /// The worker is selected using a round-robin algorithm based on an atomic counter,
