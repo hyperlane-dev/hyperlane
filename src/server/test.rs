@@ -368,20 +368,11 @@ impl ServerHook for WebsocketRoute {
 
     async fn handle(self, ctx: &mut Context) {
         let leak_ctx: &Context = ctx.leak();
-        loop {
-            match ctx.ws_from_stream().await {
-                Ok(_) => {
-                    let body: &Vec<u8> = leak_ctx.get_request().get_body();
-                    ctx.get_mut_response().set_body(body);
-                    if self.try_send_body_hook(ctx).await.is_err() {
-                        return;
-                    }
-                }
-                Err(error) => {
-                    ctx.get_mut_response().set_body(error.to_string());
-                    let _ = self.try_send_body_hook(ctx).await;
-                    return;
-                }
+        while ctx.ws_from_stream().await.is_ok() {
+            let body: &Vec<u8> = leak_ctx.get_request().get_body();
+            ctx.get_mut_response().set_body(body);
+            if self.try_send_body_hook(ctx).await.is_err() {
+                return;
             }
         }
     }
