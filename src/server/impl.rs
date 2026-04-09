@@ -559,7 +559,9 @@ impl Server {
         {
             let ctx: &mut Context = ctx_address.into();
             let panic: PanicData = PanicData::from_join_error(error);
-            ctx.set_task_panic(panic)
+            ctx.set_aborted(false)
+                .set_closed(false)
+                .set_task_panic(panic)
                 .get_mut_response()
                 .set_status_code(HttpStatus::InternalServerError.code());
             let panic_hook = async move {
