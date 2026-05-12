@@ -7,7 +7,6 @@ use crate::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub struct Context {
     /// The incoming HTTP request.
-    #[set(pub(crate))]
     pub(super) request: Request,
     /// The outgoing HTTP response.
     pub(super) response: Response,
