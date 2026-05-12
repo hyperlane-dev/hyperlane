@@ -7,7 +7,7 @@ use crate::*;
 ///
 /// # Returns
 ///
-/// - `ServerControlHookHandler` - A default `ServerControlHookHandler` instance.
+/// - `ServerControlHookHandler<()>` - A default `ServerControlHookHandler<()>` instance.
 #[inline(always)]
 pub fn default_server_control_hook_handler() -> ServerControlHookHandler<()> {
     Arc::new(|| Box::pin(async {}))
@@ -20,7 +20,9 @@ pub fn default_server_control_hook_handler() -> ServerControlHookHandler<()> {
 /// - `ServerHookHandler` - A default `ServerHookHandler` instance.
 #[inline(always)]
 pub fn default_server_hook_handler() -> ServerHookHandler {
-    Arc::new(|_: &mut Context| -> FutureBox<()> { Box::pin(async move {}) })
+    Arc::new(|_: &mut Stream, _: &mut Context| -> FutureBox<Status> {
+        Box::pin(async move { Status::default() })
+    })
 }
 
 /// Creates a new `ServerHookHandler` from a trait object.
@@ -37,13 +39,17 @@ pub fn server_hook_factory<R>() -> ServerHookHandler
 where
     R: ServerHook,
 {
-    Arc::new(move |ctx: &mut Context| -> FutureBox<()> {
-        let ctx_address: usize = ctx.into();
-        Box::pin(async move {
-            let ctx: &mut Context = ctx_address.into();
-            R::new(ctx).await.handle(ctx).await;
-        })
-    })
+    Arc::new(
+        move |stream: &mut Stream, ctx: &mut Context| -> FutureBox<Status> {
+            let ctx_address: usize = ctx.into();
+            let stream_address: usize = stream.into();
+            Box::pin(async move {
+                let ctx: &mut Context = ctx_address.into();
+                let stream: &mut Stream = stream_address.into();
+                R::new(stream, ctx).await.handle(stream, ctx).await
+            })
+        },
+    )
 }
 
 /// Verifies that hooks with the same type and execution priority are unique.

@@ -10,14 +10,10 @@ impl Default for Context {
     #[inline(always)]
     fn default() -> Self {
         Self {
-            aborted: false,
-            closed: false,
-            stream: None,
             request: Request::default(),
             response: Response::default(),
             route_params: RouteParams::default(),
             attributes: ThreadSafeAttributeStore::default(),
-            server: default_server(),
         }
     }
 }
@@ -36,92 +32,15 @@ impl PartialEq for Context {
     /// - `bool` - True if the instances are equal, otherwise false.
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
-        self.get_aborted() == other.get_aborted()
-            && self.get_closed() == other.get_closed()
-            && self.get_request() == other.get_request()
+        self.get_request() == other.get_request()
             && self.get_response() == other.get_response()
             && self.get_route_params() == other.get_route_params()
             && self.get_attributes().len() == other.get_attributes().len()
-            && self.try_get_stream().is_some() == other.try_get_stream().is_some()
-            && self.get_server() == other.get_server()
     }
 }
 
 /// Implementation of `Eq` trait for `Context`.
 impl Eq for Context {}
-
-/// Implementation of `From` trait for `Context` from `&'static Server`.
-impl From<&'static Server> for Context {
-    /// Converts a `&'static Server` into a `Context` with default request and response.
-    ///
-    /// # Arguments
-    ///
-    /// - `&'static Server` - The server reference to convert.
-    ///
-    /// # Returns
-    ///
-    /// - `Context` - The newly created context instance.
-    #[inline(always)]
-    fn from(server: &'static Server) -> Self {
-        let mut ctx: Context = Context::default();
-        ctx.set_server(server);
-        ctx
-    }
-}
-
-/// Implementation of `From` trait for converting `&ArcRwLockStream` into `Context`.
-impl From<&ArcRwLockStream> for Context {
-    /// Converts a reference to a network stream into a `Context` with default request.
-    ///
-    /// # Arguments
-    ///
-    /// - `&ArcRwLockStream` - The network stream reference to convert.
-    ///
-    /// # Returns
-    ///
-    /// - `Context` - The newly created context instance.
-    #[inline(always)]
-    fn from(stream: &ArcRwLockStream) -> Self {
-        let mut ctx: Context = Context::default();
-        ctx.set_stream(Some(stream.clone()));
-        ctx
-    }
-}
-
-/// Implementation of `From` trait for converting `ArcRwLockStream` into `Context`.
-impl From<ArcRwLockStream> for Context {
-    /// Converts a network stream into a `Context` with default request.
-    ///
-    /// # Arguments
-    ///
-    /// - `ArcRwLockStream` - The network stream to convert.
-    ///
-    /// # Returns
-    ///
-    /// - `Context` - The newly created context instance.
-    #[inline(always)]
-    fn from(stream: ArcRwLockStream) -> Self {
-        (&stream).into()
-    }
-}
-
-/// Implementation of `From` trait for converting `usize` address into `Context`.
-impl From<usize> for Context {
-    /// Converts a memory address into an owned `Context` by cloning from the reference.
-    ///
-    /// # Arguments
-    ///
-    /// - `usize` - The memory address of the `Context` instance.
-    ///
-    /// # Returns
-    ///
-    /// - `Context` - A cloned `Context` instance from the given address.
-    #[inline(always)]
-    fn from(address: usize) -> Self {
-        let ctx: &Context = address.into();
-        ctx.clone()
-    }
-}
 
 /// Implementation of `From` trait for converting `usize` address into `&Context`.
 impl From<usize> for &'static Context {
@@ -242,7 +161,7 @@ impl Lifetime for Context {
     /// - The address is guaranteed to be a valid `Self` instance
     ///   that was previously converted from a reference and is managed by the runtime.
     #[inline(always)]
-    fn leak(&self) -> &'static Self {
+    unsafe fn leak(&self) -> &'static Self {
         let address: usize = self.into();
         address.into()
     }
@@ -258,7 +177,7 @@ impl Lifetime for Context {
     /// - The address is guaranteed to be a valid `Self` instance
     ///   that was previously converted from a reference and is managed by the runtime.
     #[inline(always)]
-    fn leak_mut(&self) -> &'static mut Self {
+    unsafe fn leak_mut(&self) -> &'static mut Self {
         let address: usize = self.into();
         address.into()
     }
@@ -266,23 +185,6 @@ impl Lifetime for Context {
 
 /// Implementation of methods for `Context` structure.
 impl Context {
-    /// Creates a new `Context` with the provided network stream and server.
-    ///
-    /// # Arguments
-    ///
-    /// - `&ArcRwLockStream` - The network stream.
-    /// - `&'static Server` - The server.
-    ///
-    /// # Returns
-    ///
-    /// - `Context` - The newly created context.
-    #[inline(always)]
-    pub(crate) fn new(stream: &ArcRwLockStream, server: &'static Server) -> Self {
-        let mut ctx: Context = Context::default();
-        ctx.set_stream(Some(stream.clone())).set_server(server);
-        ctx
-    }
-
     /// Free the context.
     ///
     /// # Safety
@@ -290,82 +192,8 @@ impl Context {
     /// - The address is guaranteed to be a valid `Self` instance
     ///   that was previously converted from a reference and is managed by the runtime.
     #[inline(always)]
-    pub(crate) fn free(&mut self) {
+    pub(crate) unsafe fn free(&mut self) {
         let _ = unsafe { Box::from_raw(self) };
-    }
-
-    /// Reads an HTTP request from the underlying stream.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<Request, RequestError>` - The parsed request or error.
-    pub async fn http_from_stream(&mut self) -> Result<Request, RequestError> {
-        if self.get_aborted() {
-            return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
-        }
-        if let Some(stream) = self.try_get_stream() {
-            let request_res: Result<Request, RequestError> =
-                Request::http_from_stream(stream, self.get_server().get_request_config()).await;
-            if let Ok(request) = request_res.as_ref() {
-                self.set_request(request.clone());
-            }
-            return request_res;
-        };
-        Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
-    }
-
-    /// Reads a WebSocket frame from the underlying stream.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<Request, RequestError>` - The parsed frame or error.
-    pub async fn ws_from_stream(&mut self) -> Result<Request, RequestError> {
-        if self.get_aborted() {
-            return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
-        }
-        if let Some(stream) = self.try_get_stream() {
-            let last_request: &Request = self.get_request();
-            let request_res: Result<Request, RequestError> = last_request
-                .ws_from_stream(stream, self.get_server().get_request_config())
-                .await;
-            match request_res.as_ref() {
-                Ok(request) => {
-                    self.set_request(request.clone());
-                }
-                Err(_) => {
-                    self.set_request(last_request.clone());
-                }
-            }
-            return request_res;
-        };
-        Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
-    }
-
-    /// Checks if the connection has been terminated (aborted or closed).
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the connection is either aborted or closed, otherwise false.
-    #[inline(always)]
-    pub fn is_terminated(&self) -> bool {
-        self.get_aborted() || self.get_closed()
-    }
-
-    /// Checks if the connection should be kept alive.
-    ///
-    /// This method evaluates whether the connection should remain open based on
-    /// the closed state and the keep_alive parameter.
-    ///
-    /// # Arguments
-    ///
-    /// - `bool` - Whether keep-alive is enabled for the request.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - True if the connection should be kept alive, otherwise false.
-    #[inline(always)]
-    pub(crate) fn is_keep_alive(&self, keep_alive: bool) -> bool {
-        !self.get_closed() && keep_alive
     }
 
     /// Attempts to retrieve a specific route parameter by its name.
@@ -635,201 +463,5 @@ impl Context {
     #[inline(always)]
     pub fn get_request_error_data(&self) -> RequestError {
         self.get_internal_attribute(InternalAttribute::RequestErrorData)
-    }
-
-    /// Sends HTTP response data over the stream.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<(), ResponseError>` - Result indicating success or failure.
-    pub async fn try_send(&mut self) -> Result<(), ResponseError> {
-        if self.is_terminated() {
-            return Err(ResponseError::Terminated);
-        }
-        let response_data: ResponseData = self.get_mut_response().build();
-        if let Some(stream) = self.try_get_stream() {
-            return stream.try_send(response_data).await;
-        }
-        Err(ResponseError::NotFoundStream)
-    }
-
-    /// Sends HTTP response data over the stream.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the write operation fails.
-    pub async fn send(&mut self) {
-        self.try_send().await.unwrap();
-    }
-
-    /// Sends HTTP response body.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<(), ResponseError>` - Result indicating success or failure.
-    pub async fn try_send_body(&self) -> Result<(), ResponseError> {
-        if self.is_terminated() {
-            return Err(ResponseError::Terminated);
-        }
-        self.try_send_body_with_data(self.get_response().get_body())
-            .await
-    }
-
-    /// Sends HTTP response body.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the write operation fails.
-    pub async fn send_body(&self) {
-        self.try_send_body().await.unwrap();
-    }
-
-    /// Sends only the response body to the client with additional data.
-    ///
-    /// This method is useful for streaming data or for responses where headers have already been sent.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<[u8]>` - The additional data to send as the body.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<(), ResponseError>` - The result of the send operation.
-    pub async fn try_send_body_with_data<D>(&self, data: D) -> Result<(), ResponseError>
-    where
-        D: AsRef<[u8]>,
-    {
-        if self.is_terminated() {
-            return Err(ResponseError::Terminated);
-        }
-        if let Some(stream) = self.try_get_stream() {
-            return stream.try_send_body(data).await;
-        }
-        Err(ResponseError::NotFoundStream)
-    }
-
-    /// Sends HTTP response body.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<[u8]>` - The response body data (must implement AsRef<[u8]>).
-    ///
-    /// # Panics
-    ///
-    /// Panics if the write operation fails.
-    pub async fn send_body_with_data<D>(&self, data: D)
-    where
-        D: AsRef<[u8]>,
-    {
-        self.try_send_body_with_data(data).await.unwrap();
-    }
-
-    /// Sends multiple HTTP response bodies sequentially.
-    ///
-    /// # Arguments
-    ///
-    /// - `I: IntoIterator<Item = D>, D: AsRef<[u8]>` - The response body data list to send.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<(), ResponseError>` - Result indicating success or failure.
-    pub async fn try_send_body_list<I, D>(&self, data_iter: I) -> Result<(), ResponseError>
-    where
-        I: IntoIterator<Item = D>,
-        D: AsRef<[u8]>,
-    {
-        if self.is_terminated() {
-            return Err(ResponseError::Terminated);
-        }
-        if let Some(stream) = self.try_get_stream() {
-            return stream.try_send_body_list(data_iter).await;
-        }
-        Err(ResponseError::NotFoundStream)
-    }
-
-    /// Sends multiple HTTP response bodies sequentially.
-    ///
-    /// # Arguments
-    ///
-    /// - `I: IntoIterator<Item = D>, D: AsRef<[u8]>` - The response body data list to send.
-    ///
-    /// # Panics
-    ///
-    /// Panics if any write operation fails.
-    pub async fn send_body_list<I, D>(&self, data_iter: I)
-    where
-        I: IntoIterator<Item = D>,
-        D: AsRef<[u8]>,
-    {
-        self.try_send_body_list(data_iter).await.unwrap();
-    }
-
-    /// Sends a list of response bodies to the client with additional data.
-    ///
-    /// This is useful for streaming multiple data chunks or for responses where headers have already been sent.
-    ///
-    /// # Arguments
-    ///
-    /// - `I: IntoIterator<Item = D>, D: AsRef<[u8]>` - The additional data to send as a list of bodies.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<(), ResponseError>` - The result of the send operation.
-    pub async fn try_send_body_list_with_data<I, D>(
-        &self,
-        data_iter: I,
-    ) -> Result<(), ResponseError>
-    where
-        I: IntoIterator<Item = D>,
-        D: AsRef<[u8]>,
-    {
-        if self.is_terminated() {
-            return Err(ResponseError::Terminated);
-        }
-        if let Some(stream) = self.try_get_stream() {
-            return stream.try_send_body_list(data_iter).await;
-        }
-        Err(ResponseError::NotFoundStream)
-    }
-
-    /// Sends a list of response bodies to the client with additional data.
-    ///
-    /// # Arguments
-    ///
-    /// - `I: IntoIterator<Item = D>, D: AsRef<[u8]>` - The additional data to send as a list of bodies.
-    ///
-    /// # Panics
-    ///
-    /// Panics if any write operation fails.
-    pub async fn send_body_list_with_data<I, D>(&self, data_iter: I)
-    where
-        I: IntoIterator<Item = D>,
-        D: AsRef<[u8]>,
-    {
-        self.try_send_body_list_with_data(data_iter).await.unwrap()
-    }
-
-    /// Flushes the underlying network stream, ensuring all buffered data is sent.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<(), ResponseError>` - The result of the flush operation.
-    pub async fn try_flush(&self) -> Result<(), ResponseError> {
-        if self.is_terminated() {
-            return Err(ResponseError::Terminated);
-        }
-        if let Some(stream) = self.try_get_stream() {
-            return stream.try_flush().await;
-        }
-        Err(ResponseError::NotFoundStream)
-    }
-
-    /// Flushes all buffered data to the stream.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the flush operation fails.
-    pub async fn flush(&self) {
-        self.try_flush().await.unwrap();
     }
 }

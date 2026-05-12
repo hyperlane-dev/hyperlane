@@ -59,12 +59,13 @@ pub trait ServerHook: Send + Sync + 'static {
     ///
     /// # Arguments
     ///
+    /// - `&mut Stream` - The stream object providing server configuration and state
     /// - `&mut Context` - The request context containing all request/response data.
     ///
     /// # Returns
     ///
     /// A future that resolves to a new instance of this hook.
-    fn new(ctx: &mut Context) -> impl Future<Output = Self> + Send;
+    fn new(stream: &mut Stream, ctx: &mut Context) -> impl Future<Output = Self> + Send;
 
     /// Executes the hook's processing logic.
     ///
@@ -73,10 +74,11 @@ pub trait ServerHook: Send + Sync + 'static {
     ///
     /// # Arguments
     ///
+    /// - `&mut Stream` - The stream object providing server configuration and state
     /// - `&mut Context` - The request context for accessing request/response data.
     ///
     /// # Returns
     ///
-    /// A future that resolves when the processing is complete.
-    fn handle(self, ctx: &mut Context) -> impl Future<Output = ()> + Send;
+    /// - `Status` - `Status::Continue` if the pipeline should proceed, `Status::Reject` if the pipeline should be aborted.
+    fn handle(self, stream: &mut Stream, ctx: &mut Context) -> impl Future<Output = Status> + Send;
 }

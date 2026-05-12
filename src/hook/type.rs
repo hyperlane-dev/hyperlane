@@ -12,12 +12,6 @@ pub type HookHandler<T> = Arc<dyn FnContextPinBox<T>>;
 /// executed sequentially.
 pub type HookHandlerChain<T> = Vec<HookHandler<T>>;
 
-/// A type alias for an asynchronous task.
-///
-/// This is a common return type for asynchronous handlers, providing a type-erased
-/// future that can be easily managed by the async runtime.
-pub type AsyncTask = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
-
 /// A type alias for a boxed future with a generic output that can be sent across threads.
 ///
 /// This is often used to represent an asynchronous task that can be sent across threads.
@@ -39,9 +33,10 @@ pub type ServerHookHandlerFactory = fn() -> ServerHookHandler;
 /// Type alias for a shared server hook handler.
 ///
 /// This type allows storing handlers (route and middleware) of different concrete types
-/// in the same collection. The handler takes a `&mut Context` and returns
-/// a pinned, boxed future that resolves to `()`.
-pub type ServerHookHandler = Arc<dyn Fn(&mut Context) -> FutureBox<()> + Send + Sync>;
+/// in the same collection. The handler takes a `&mut Stream` and `&mut Context` and returns
+/// a pinned, boxed future that resolves to `Status`.
+pub type ServerHookHandler =
+    Arc<dyn Fn(&mut Stream, &mut Context) -> FutureBox<Status> + Send + Sync>;
 
 /// Type alias for a list of server hook handlers.
 ///

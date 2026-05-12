@@ -254,7 +254,7 @@ impl Lifetime for Server {
     /// - The address is guaranteed to be a valid `Server` instance
     ///   that was previously converted from a reference and is managed by the runtime.
     #[inline(always)]
-    fn leak(&self) -> &'static Self {
+    unsafe fn leak(&self) -> &'static Self {
         let address: usize = self.into();
         address.into()
     }
@@ -270,7 +270,7 @@ impl Lifetime for Server {
     /// - The address is guaranteed to be a valid `Server` instance
     ///   that was previously converted from a reference and is managed by the runtime.
     #[inline(always)]
-    fn leak_mut(&self) -> &'static mut Self {
+    unsafe fn leak_mut(&self) -> &'static mut Self {
         let address: usize = self.into();
         address.into()
     }
@@ -487,7 +487,7 @@ impl Server {
         stdout().flush()
     }
 
-    /// Flushes the standard error stream.
+    /// Flushes the standard output stream.
     ///
     /// # Panics
     ///
@@ -543,6 +543,7 @@ impl Server {
     ///
     /// # Arguments
     ///
+    /// - `usize` - The address of the stream.
     /// - `usize` - The address of the context.
     /// - `Future<Output = ()> + Send + 'static` - The hook to execute.
     ///
@@ -550,7 +551,7 @@ impl Server {
     ///
     /// - The address is guaranteed to be a valid `Context` instance
     ///   that was previously converted from a reference and is managed by the runtime.
-    async fn task_handler<F>(&'static self, ctx_address: usize, hook: F)
+    async fn task_handler<F>(&'static self, stream_address: usize, ctx_address: usize, hook: F)
     where
         F: Future<Output = ()> + Send + 'static,
     {
@@ -558,16 +559,15 @@ impl Server {
             && error.is_panic()
         {
             let ctx: &mut Context = ctx_address.into();
+            let stream: &mut Stream = stream_address.into();
             let panic: PanicData = PanicData::from_join_error(error);
-            ctx.set_aborted(false)
-                .set_closed(false)
-                .set_task_panic(panic)
+            ctx.set_task_panic(panic)
                 .get_mut_response()
                 .set_status_code(HttpStatus::InternalServerError.code());
+            stream.set_closed(false);
             let panic_hook = async move {
                 for hook in self.get_task_panic().iter() {
-                    hook(ctx).await;
-                    if ctx.get_aborted() {
+                    if hook(stream, ctx).await.is_reject() {
                         return;
                     }
                 }
@@ -579,7 +579,11 @@ impl Server {
                 let _ = Self::try_flush_stdout_and_stderr();
             }
             let free_ctx: &mut Context = ctx_address.into();
-            free_ctx.free();
+            let free_stream: &mut Stream = stream_address.into();
+            unsafe {
+                free_ctx.free();
+                free_stream.free();
+            }
         };
     }
 
@@ -604,15 +608,19 @@ impl Server {
     ///
     /// # Arguments
     ///
+    /// - `&mut Stream` - The `Stream` for the current request.
     /// - `&mut Context` - The `Context` for the current request.
     ///
     /// # Returns
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    pub(super) async fn handle_request_middleware(&self, ctx: &mut Context) -> bool {
+    pub(super) async fn handle_request_middleware(
+        &self,
+        stream: &mut Stream,
+        ctx: &mut Context,
+    ) -> bool {
         for hook in self.get_request_middleware().iter() {
-            hook(ctx).await;
-            if ctx.get_aborted() {
+            if hook(stream, ctx).await.is_reject() {
                 return true;
             }
         }
@@ -623,18 +631,23 @@ impl Server {
     ///
     /// # Arguments
     ///
+    /// - `&mut Stream` - The `Stream` for the current request.
     /// - `&mut Context` - The `Context` for the current request.
     /// - `&str` - The request path to match.
     ///
     /// # Returns
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    pub(super) async fn handle_route_matcher(&self, ctx: &mut Context, path: &str) -> bool {
-        if let Some(hook) = self.get_route_matcher().try_resolve_route(ctx, path) {
-            hook(ctx).await;
-            if ctx.get_aborted() {
-                return true;
-            }
+    pub(super) async fn handle_route_matcher(
+        &self,
+        stream: &mut Stream,
+        ctx: &mut Context,
+        path: &str,
+    ) -> bool {
+        if let Some(hook) = self.get_route_matcher().try_resolve_route(ctx, path)
+            && hook(stream, ctx).await.is_reject()
+        {
+            return true;
         }
         false
     }
@@ -643,15 +656,19 @@ impl Server {
     ///
     /// # Arguments
     ///
+    /// - `&mut Stream` - The `Stream` for the current request.
     /// - `&mut Context` - The `Context` for the current request.
     ///
     /// # Returns
     ///
     /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    pub(super) async fn handle_response_middleware(&self, ctx: &mut Context) -> bool {
+    pub(super) async fn handle_response_middleware(
+        &self,
+        stream: &mut Stream,
+        ctx: &mut Context,
+    ) -> bool {
         for hook in self.get_response_middleware().iter() {
-            hook(ctx).await;
-            if ctx.get_aborted() {
+            if hook(stream, ctx).await.is_reject() {
                 return true;
             }
         }
@@ -662,15 +679,19 @@ impl Server {
     ///
     /// # Arguments
     ///
+    /// - `&mut Stream` - The `Stream` for the current request.
     /// - `&mut Context` - The `Context` for the current request.
     /// - `&RequestError` - The error that occurred.
-    pub async fn handle_request_error(&self, ctx: &mut Context, error: &RequestError) {
-        ctx.set_aborted(false)
-            .set_closed(false)
-            .set_request_error_data(error.clone());
+    pub async fn handle_request_error(
+        &self,
+        stream: &mut Stream,
+        ctx: &mut Context,
+        error: &RequestError,
+    ) {
+        ctx.set_request_error_data(error.clone());
+        stream.set_closed(false);
         for hook in self.get_request_error().iter() {
-            hook(ctx).await;
-            if ctx.get_aborted() {
+            if hook(stream, ctx).await.is_reject() {
                 return;
             }
         }
@@ -683,53 +704,65 @@ impl Server {
     ///
     /// # Arguments
     ///
+    /// - `&mut Stream` - The `Stream` for the current request.
     /// - `&mut Context` - The `Context` for the current request.
     /// - `&Request` - The incoming request to be processed.
     ///
     /// # Returns
     ///
     /// - `bool` - A boolean indicating whether the connection should be kept alive.
-    async fn request_hook(&self, ctx: &mut Context, request: &Request) -> bool {
+    async fn request_hook(
+        &self,
+        stream: &mut Stream,
+        ctx: &mut Context,
+        request: &Request,
+    ) -> bool {
         let mut response: Response = Response::default();
         response.set_version(request.get_version().clone());
-        ctx.set_aborted(false)
-            .set_closed(false)
+        ctx.set_request(request.clone())
             .set_response(response)
             .set_route_params(RouteParams::default())
             .set_attributes(ThreadSafeAttributeStore::default());
+        stream.set_closed(false);
         let keep_alive: bool = request.is_enable_keep_alive();
-        if self.handle_request_middleware(ctx).await {
-            return ctx.is_keep_alive(keep_alive);
+        if self.handle_request_middleware(stream, ctx).await {
+            return stream.is_keep_alive(keep_alive);
         }
         let route: &str = request.get_path();
-        if self.handle_route_matcher(ctx, route).await {
-            return ctx.is_keep_alive(keep_alive);
+        if self.handle_route_matcher(stream, ctx, route).await {
+            return stream.is_keep_alive(keep_alive);
         }
-        if self.handle_response_middleware(ctx).await {
-            return ctx.is_keep_alive(keep_alive);
+        if self.handle_response_middleware(stream, ctx).await {
+            return stream.is_keep_alive(keep_alive);
         }
-        ctx.is_keep_alive(keep_alive)
+        stream.is_keep_alive(keep_alive)
     }
 
     /// Handles subsequent HTTP requests on a persistent (keep-alive) connection.
     ///
     /// # Arguments
     ///
+    /// - `&mut Stream` - The `Stream` for the current request.
     /// - `&mut Context` - The `Context` for the current request.
     /// - `&Request` - The initial request that established the keep-alive connection.
-    async fn handle_http_requests(&self, ctx: &mut Context, request: &Request) {
-        if !self.request_hook(ctx, request).await {
+    async fn handle_http_requests(
+        &self,
+        stream: &mut Stream,
+        ctx: &mut Context,
+        request: &Request,
+    ) {
+        if !self.request_hook(stream, ctx, request).await {
             return;
         }
         loop {
-            match ctx.http_from_stream().await {
+            match stream.try_get_http_request().await {
                 Ok(new_request) => {
-                    if !self.request_hook(ctx, &new_request).await {
+                    if !self.request_hook(stream, ctx, &new_request).await {
                         return;
                     }
                 }
                 Err(error) => {
-                    self.handle_request_error(ctx, &error).await;
+                    self.handle_request_error(stream, ctx, &error).await;
                     return;
                 }
             }
@@ -742,22 +775,26 @@ impl Server {
     ///
     /// # Arguments
     ///
+    /// - `&mut Stream` - The `Stream` for the current request.
     /// - `&mut Context` - The `Context` for the current request.
     ///
     /// # Safety
     ///
     /// - The `ctx` is a valid pointer to a `Context` that was
     ///   originally created via `Box::into_raw` and is now being reclaimed.
-    async fn handle_connection(&self, ctx: &mut Context) {
-        match ctx.http_from_stream().await {
+    async fn handle_connection(&self, stream: &mut Stream, ctx: &mut Context) {
+        match stream.try_get_http_request().await {
             Ok(request) => {
-                self.handle_http_requests(ctx, &request).await;
+                self.handle_http_requests(stream, ctx, &request).await;
             }
             Err(error) => {
-                self.handle_request_error(ctx, &error).await;
+                self.handle_request_error(stream, ctx, &error).await;
             }
         }
-        ctx.free();
+        unsafe {
+            ctx.free();
+            stream.free();
+        }
     }
 
     /// Enters a loop to accept incoming TCP connections and spawn handlers for them.
@@ -769,9 +806,15 @@ impl Server {
         loop {
             if let Ok((stream, _)) = tcp_listener.accept().await {
                 self.configure_stream(&stream);
-                let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
-                let ctx: &'static mut Context = Box::leak(Box::new(Context::new(&stream, self)));
-                spawn(self.task_handler(ctx.into(), self.handle_connection(ctx)));
+                let request_config: RequestConfig = *self.get_request_config();
+                let stream: &'static mut Stream =
+                    Box::leak(Box::new(Stream::new(stream, request_config, false)));
+                let ctx: &'static mut Context = Box::leak(Box::new(Context::default()));
+                spawn(self.task_handler(
+                    stream.into(),
+                    ctx.into(),
+                    self.handle_connection(stream, ctx),
+                ));
             }
         }
     }
@@ -789,7 +832,7 @@ impl Server {
     pub async fn run(&self) -> Result<ServerControlHook, ServerError> {
         let bind_address: &String = self.get_server_config().get_address();
         let tcp_listener: TcpListener = TcpListener::bind(bind_address).await?;
-        let server: &'static Self = self.leak();
+        let server: &'static Self = unsafe { self.leak() };
         let (wait_sender, wait_receiver) = channel(());
         let (shutdown_sender, mut shutdown_receiver) = channel(());
         let accept_connections: JoinHandle<()> = spawn(async move {

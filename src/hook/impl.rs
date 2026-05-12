@@ -210,12 +210,13 @@ impl ServerHook for DefaultServerHook {
     ///
     /// # Arguments
     ///
+    /// - `&mut Stream` - The stream object providing server configuration and state
     /// - `&mut Context` - The context object providing server configuration and state
     ///
     /// # Returns
     ///
     /// - `Self` - A new instance of `DefaultServerHook`
-    async fn new(_: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
 
@@ -223,6 +224,13 @@ impl ServerHook for DefaultServerHook {
     ///
     /// # Arguments
     ///
+    /// - `&mut Stream` - The stream object providing server configuration and state
     /// - `&mut Context` - The context object providing server configuration and state
-    async fn handle(self, _: &mut Context) {}
+    ///
+    /// # Returns
+    ///
+    /// - `Status` - `Status::Reject` by default, indicating the pipeline should be aborted.
+    async fn handle(self, _: &mut Stream, _: &mut Context) -> Status {
+        Status::default()
+    }
 }

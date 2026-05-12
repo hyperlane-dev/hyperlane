@@ -5,14 +5,15 @@ struct TestRoute {
 }
 
 impl ServerHook for TestRoute {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self {
             data: String::new(),
         }
     }
 
-    async fn handle(mut self, _ctx: &mut Context) {
+    async fn handle(mut self, _: &mut Stream, _: &mut Context) -> Status {
         self.data = String::from("test");
+        Status::Continue
     }
 }
 
