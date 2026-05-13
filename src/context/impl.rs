@@ -185,17 +185,6 @@ impl Lifetime for Context {
 
 /// Implementation of methods for `Context` structure.
 impl Context {
-    /// Free the context.
-    ///
-    /// # Safety
-    ///
-    /// - The address is guaranteed to be a valid `Self` instance
-    ///   that was previously converted from a reference and is managed by the runtime.
-    #[inline(always)]
-    pub(crate) unsafe fn free(&mut self) {
-        let _ = unsafe { Box::from_raw(self) };
-    }
-
     /// Attempts to retrieve a specific route parameter by its name.
     ///
     /// # Arguments

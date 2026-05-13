@@ -558,8 +558,8 @@ impl Server {
         if let Err(error) = spawn(hook).await
             && error.is_panic()
         {
-            let ctx: &mut Context = ctx_address.into();
-            let stream: &mut Stream = stream_address.into();
+            let mut ctx: &mut Context = ctx_address.into();
+            let mut stream: &mut Stream = stream_address.into();
             let panic: PanicData = PanicData::from_join_error(error);
             ctx.set_task_panic(panic)
                 .get_mut_response()
@@ -578,11 +578,11 @@ impl Server {
                 eprintln!("{}", error);
                 let _ = Self::try_flush_stdout_and_stderr();
             }
-            let free_ctx: &mut Context = ctx_address.into();
-            let free_stream: &mut Stream = stream_address.into();
+            ctx = ctx_address.into();
+            stream = stream_address.into();
             unsafe {
-                free_ctx.free();
-                free_stream.free();
+                let _ = Box::from_raw(ctx);
+                let _ = Box::from_raw(stream);
             }
         };
     }
@@ -792,8 +792,8 @@ impl Server {
             }
         }
         unsafe {
-            ctx.free();
-            stream.free();
+            let _ = Box::from_raw(ctx);
+            let _ = Box::from_raw(stream);
         }
     }
 
