@@ -234,14 +234,11 @@ struct RequestMiddleware {
 
 impl ServerHook for RequestMiddleware {
     async fn new(stream: &mut Stream, _: &mut Context) -> Self {
-        let mut socket_addr: String = String::new();
-
-        socket_addr = stream
+        let socket_addr: String = stream
             .get_stream()
             .peer_addr()
             .map(|data| data.to_string())
             .unwrap_or_default();
-
         Self { socket_addr }
     }
 

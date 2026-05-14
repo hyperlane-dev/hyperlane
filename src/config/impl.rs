@@ -13,6 +13,7 @@ impl Default for ServerConfig {
             address: Server::format_bind_address(DEFAULT_HOST, DEFAULT_WEB_PORT),
             nodelay: DEFAULT_NODELAY,
             ttl: DEFAULT_TTI,
+            worker_threads: None,
         }
     }
 }

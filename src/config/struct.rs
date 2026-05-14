@@ -13,4 +13,6 @@ pub struct ServerConfig {
     pub(super) nodelay: Option<bool>,
     /// The `IP_TTL` option for sockets.
     pub(super) ttl: Option<u32>,
+    /// Number of worker threads (thread-per-core). None = logical CPU count.
+    pub(super) worker_threads: Option<usize>,
 }

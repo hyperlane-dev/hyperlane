@@ -365,6 +365,27 @@ impl Server {
         self
     }
 
+    /// Sets the number of worker threads (thread-per-core model).
+    ///
+    /// Each worker runs an independent single-threaded Tokio runtime on its own OS thread,
+    /// accepting connections via `SO_REUSEPORT`. This achieves a shared-nothing architecture
+    /// where no state is shared across threads.
+    ///
+    /// Defaults to the number of logical CPU cores when not set.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - The number of worker threads to spawn.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Self` - Reference to self for method chaining.
+    #[inline(always)]
+    pub fn worker_threads(&mut self, n: usize) -> &mut Self {
+        self.get_mut_server_config().set_worker_threads(Some(n));
+        self
+    }
+
     /// Registers a task panic handler to the processing pipeline.
     ///
     /// This method allows registering task panic handlers that implement the `ServerHook` trait,
@@ -537,54 +558,6 @@ impl Server {
     pub fn flush_stdout_and_stderr() {
         Self::flush_stdout();
         Self::flush_stderr();
-    }
-
-    /// Spawns a task handler for a given stream and hook.
-    ///
-    /// # Arguments
-    ///
-    /// - `usize` - The address of the stream.
-    /// - `usize` - The address of the context.
-    /// - `Future<Output = ()> + Send + 'static` - The hook to execute.
-    ///
-    /// # Safety
-    ///
-    /// - The address is guaranteed to be a valid `Context` instance
-    ///   that was previously converted from a reference and is managed by the runtime.
-    async fn task_handler<F>(&'static self, stream_address: usize, ctx_address: usize, hook: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        if let Err(error) = spawn(hook).await
-            && error.is_panic()
-        {
-            let mut ctx: &mut Context = ctx_address.into();
-            let mut stream: &mut Stream = stream_address.into();
-            let panic: PanicData = PanicData::from_join_error(error);
-            ctx.set_task_panic(panic)
-                .get_mut_response()
-                .set_status_code(HttpStatus::InternalServerError.code());
-            stream.set_closed(false);
-            let panic_hook = async move {
-                for hook in self.get_task_panic().iter() {
-                    if hook(stream, ctx).await.is_reject() {
-                        return;
-                    }
-                }
-            };
-            if let Err(error) = spawn(panic_hook).await
-                && error.is_panic()
-            {
-                eprintln!("{}", error);
-                let _ = Self::try_flush_stdout_and_stderr();
-            }
-            ctx = ctx_address.into();
-            stream = stream_address.into();
-            unsafe {
-                let _ = Box::from_raw(ctx);
-                let _ = Box::from_raw(stream);
-            }
-        };
     }
 
     /// Configures socket options for a newly accepted `TcpStream`.
@@ -797,12 +770,15 @@ impl Server {
         }
     }
 
-    /// Enters a loop to accept incoming TCP connections and spawn handlers for them.
+    /// Accept loop for the thread-per-core model using `spawn_local`.
+    ///
+    /// Runs entirely on the current OS thread's single-threaded Tokio runtime.
+    /// Connection tasks are `spawn_local`'d so they never leave this thread.
     ///
     /// # Arguments
     ///
-    /// - `&TcpListener` - A reference to the `TcpListener` to accept connections from.
-    async fn tcp_accept(&'static self, tcp_listener: &TcpListener) {
+    /// - `&tokio::net::TcpListener` - A reference to the `TcpListener` to accept connections from.
+    async fn tcp_accept_local(&'static self, tcp_listener: &tokio::net::TcpListener) {
         loop {
             if let Ok((stream, _)) = tcp_listener.accept().await {
                 self.configure_stream(&stream);
@@ -810,7 +786,7 @@ impl Server {
                 let stream: &'static mut Stream =
                     Box::leak(Box::new(Stream::new(stream, request_config, false)));
                 let ctx: &'static mut Context = Box::leak(Box::new(Context::default()));
-                spawn(self.task_handler(
+                spawn_local(self.task_handler_local(
                     stream.into(),
                     ctx.into(),
                     self.handle_connection(stream, ctx),
@@ -819,26 +795,184 @@ impl Server {
         }
     }
 
-    /// Starts the server, binds to the configured address, and begins listening for connections.
+    /// Task handler variant for the thread-local (`spawn_local`) execution path.
     ///
-    /// This is the main entry point to launch the server. It will initialize the panic hook,
-    /// create a TCP listener, and then enter the connection acceptance loop in a background task.
+    /// Functionally identical to `task_handler` but without the `Send` bound,
+    /// allowing use inside a `tokio::task::LocalSet`.
+    async fn task_handler_local<F>(
+        &'static self,
+        stream_address: usize,
+        ctx_address: usize,
+        hook: F,
+    ) where
+        F: Future<Output = ()> + 'static,
+    {
+        if let Err(error) = spawn_local(hook).await
+            && error.is_panic()
+        {
+            let mut ctx: &mut Context = ctx_address.into();
+            let mut stream: &mut Stream = stream_address.into();
+            let panic: PanicData = PanicData::from_join_error(error);
+            ctx.set_task_panic(panic)
+                .get_mut_response()
+                .set_status_code(HttpStatus::InternalServerError.code());
+            stream.set_closed(false);
+            let panic_hook = async move {
+                for hook in self.get_task_panic().iter() {
+                    if hook(stream, ctx).await.is_reject() {
+                        return;
+                    }
+                }
+            };
+            if let Err(error) = spawn_local(panic_hook).await
+                && error.is_panic()
+            {
+                eprintln!("{}", error);
+                let _ = Self::try_flush_stdout_and_stderr();
+            }
+            ctx = ctx_address.into();
+            stream = stream_address.into();
+            unsafe {
+                let _ = Box::from_raw(ctx);
+                let _ = Box::from_raw(stream);
+            }
+        };
+    }
+
+    /// Accept loop for the io_uring path (Linux only).
+    ///
+    /// Uses `tokio_uring::net::TcpListener` for accept, then hands off
+    /// the accepted stream to the standard Tokio connection handler.
+    #[cfg(feature = "io-uring")]
+    async fn tcp_accept_uring(&'static self, tcp_listener: &tokio_uring::net::TcpListener) {
+        loop {
+            if let Ok((uring_stream, _)) = tcp_listener.accept().await {
+                let std_stream = match uring_stream.into_std() {
+                    Ok(s) => s,
+                    Err(_) => continue,
+                };
+                if std_stream.set_nonblocking(true).is_err() {
+                    continue;
+                }
+                let stream = match TcpStream::from_std(std_stream) {
+                    Ok(s) => s,
+                    Err(_) => continue,
+                };
+                self.configure_stream(&stream);
+                let request_config: RequestConfig = *self.get_request_config();
+                let stream: &'static mut Stream =
+                    Box::leak(Box::new(Stream::new(stream, request_config, false)));
+                let ctx: &'static mut Context = Box::leak(Box::new(Context::default()));
+                tokio_uring::spawn(self.task_handler_local(
+                    stream.into(),
+                    ctx.into(),
+                    self.handle_connection(stream, ctx),
+                ));
+            }
+        }
+    }
+
+    /// Builds a `socket2::Socket` bound to `addr` with `SO_REUSEADDR` and (on Unix) `SO_REUSEPORT`.
+    ///
+    /// `SO_REUSEPORT` lets multiple worker threads each hold their own file descriptor for
+    /// the same port; the kernel distributes incoming connections across them.
+    ///
+    /// # Arguments
+    ///
+    /// - `&SocketAddr` - The address to bind the listener socket to.
+    ///
+    /// # Returns
+    ///
+    /// - `io::Result<std::net::TcpListener>` - The listener socket on success.
+    fn build_listener_socket(addr: &SocketAddr) -> io::Result<std::net::TcpListener> {
+        let domain = if addr.is_ipv6() {
+            Domain::IPV6
+        } else {
+            Domain::IPV4
+        };
+        let socket = Socket::new(domain, Type::STREAM, None)?;
+        socket.set_reuse_address(true)?;
+        #[cfg(unix)]
+        socket.set_reuse_port(true)?;
+        socket.set_nonblocking(true)?;
+        socket.bind(&SockAddr::from(*addr))?;
+        socket.listen(1024)?;
+        Ok(std::net::TcpListener::from(socket))
+    }
+
+    /// Starts the server using a thread-per-core shared-nothing architecture.
+    ///
+    /// Each worker thread owns a full clone of this `Server` (routes, middleware, config)
+    /// and runs an independent single-threaded Tokio runtime. Connections are distributed
+    /// across workers by the OS via `SO_REUSEPORT` (Unix) or a single shared fd (Windows).
+    ///
+    /// When the `io-uring` feature is enabled on Linux, the accept loop uses
+    /// `tokio_uring` instead of epoll-based Tokio.
+    ///
+    /// The public API is unchanged: returns a `ServerControlHook` for await/shutdown.
     ///
     /// # Returns
     ///
     /// Returns a `Result` containing a shutdown function on success.
-    /// Calling this function will shut down the server by aborting its main task.
-    /// Returns an error if the server fails to start.
+    /// Returns an error if the server fails to bind or spawn workers.
     pub async fn run(&self) -> Result<ServerControlHook, ServerError> {
-        let bind_address: &String = self.get_server_config().get_address();
-        let tcp_listener: TcpListener = TcpListener::bind(bind_address).await?;
-        let server: &'static Self = unsafe { self.leak() };
+        let bind_address: &str = self.get_server_config().get_address();
+        let worker_count: usize = (*self.get_server_config().try_get_worker_threads())
+            .unwrap_or_else(|| {
+                thread::available_parallelism()
+                    .map(|n| n.get())
+                    .unwrap_or(1)
+            });
+        let addr: SocketAddr = bind_address
+            .parse()
+            .map_err(|e: AddrParseError| io::Error::new(io::ErrorKind::InvalidInput, e))?;
         let (wait_sender, wait_receiver) = channel(());
-        let (shutdown_sender, mut shutdown_receiver) = channel(());
-        let accept_connections: JoinHandle<()> = spawn(async move {
-            server.tcp_accept(&tcp_listener).await;
-            let _ = wait_sender.send(());
-        });
+        let (shutdown_sender, shutdown_receiver) = channel(());
+        #[cfg(not(unix))]
+        let base_listener: io::Result<std::net::TcpListener> = Self::build_listener_socket(&addr)?;
+        for i in 0..worker_count {
+            #[cfg(unix)]
+            let std_listener: std::net::TcpListener = Self::build_listener_socket(&addr)?;
+            #[cfg(not(unix))]
+            let std_listener: std::net::TcpListener = base_listener.try_clone()?;
+            let mut shutdown_rx: Receiver<()> = shutdown_receiver.clone();
+            let server: &mut Server = unsafe { self.leak_mut() };
+            let wait_sender_clone: Sender<()> = wait_sender.clone();
+            thread::Builder::new()
+                .name(format!("hyperlane-worker-{i}"))
+                .spawn(move || {
+                    #[cfg(not(feature = "io-uring"))]
+                    {
+                        let rt = tokio::runtime::Builder::new_current_thread()
+                            .enable_all()
+                            .build()
+                            .expect("worker runtime");
+                        let local: LocalSet = LocalSet::new();
+                        rt.block_on(local.run_until(async move {
+                            let listener: tokio::net::TcpListener =
+                                tokio::net::TcpListener::from_std(std_listener)
+                                    .expect("tokio listener");
+                            select! {
+                                _ = server.tcp_accept_local(&listener) => {}
+                                _ = shutdown_rx.changed() => {}
+                            }
+                        }));
+                    }
+                    #[cfg(feature = "io-uring")]
+                    {
+                        tokio_uring::start(async move {
+                            let listener = tokio_uring::net::TcpListener::from_std(std_listener)
+                                .expect("uring listener");
+                            tokio::select! {
+                                _ = server.tcp_accept_uring(&listener) => {}
+                                _ = shutdown_rx.changed() => {}
+                            }
+                        });
+                    }
+                    let _ = wait_sender_clone.send(());
+                })?;
+        }
+        drop(wait_sender);
         let wait_hook: ServerControlHookHandler<()> = Arc::new(move || {
             let mut wait_receiver_clone: Receiver<()> = wait_receiver.clone();
             Box::pin(async move {
@@ -850,10 +984,6 @@ impl Server {
             Box::pin(async move {
                 let _ = shutdown_sender_clone.send(());
             })
-        });
-        spawn(async move {
-            let _ = shutdown_receiver.changed().await;
-            accept_connections.abort();
         });
         let mut server_control_hook: ServerControlHook = ServerControlHook::default();
         server_control_hook.set_shutdown_hook(shutdown_hook);
