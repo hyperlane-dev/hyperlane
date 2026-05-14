@@ -840,10 +840,13 @@ impl Server {
     }
 
     /// Accept loop for the io_uring path (Linux only).
-    ///
     /// Uses `tokio_uring::net::TcpListener` for accept, then hands off
     /// the accepted stream to the standard Tokio connection handler.
-    #[cfg(feature = "io-uring")]
+    ///
+    /// # Arguments
+    ///
+    /// - `&tokio_uring::net::TcpListener` - The listener socket.
+    #[cfg(all(target_os = "linux", feature = "io-uring"))]
     async fn tcp_accept_uring(&'static self, tcp_listener: &tokio_uring::net::TcpListener) {
         loop {
             if let Ok((uring_stream, _)) = tcp_listener.accept().await {
@@ -901,20 +904,16 @@ impl Server {
     }
 
     /// Starts the server using a thread-per-core shared-nothing architecture.
-    ///
     /// Each worker thread owns a full clone of this `Server` (routes, middleware, config)
     /// and runs an independent single-threaded Tokio runtime. Connections are distributed
     /// across workers by the OS via `SO_REUSEPORT` (Unix) or a single shared fd (Windows).
-    ///
     /// When the `io-uring` feature is enabled on Linux, the accept loop uses
     /// `tokio_uring` instead of epoll-based Tokio.
-    ///
     /// The public API is unchanged: returns a `ServerControlHook` for await/shutdown.
     ///
     /// # Returns
     ///
-    /// Returns a `Result` containing a shutdown function on success.
-    /// Returns an error if the server fails to bind or spawn workers.
+    /// - `Result<ServerControlHook, ServerError>` - containing a shutdown function on success.
     pub async fn run(&self) -> Result<ServerControlHook, ServerError> {
         let bind_address: &str = self.get_server_config().get_address();
         let worker_count: usize = (*self.get_server_config().try_get_worker_threads())
@@ -941,7 +940,7 @@ impl Server {
             thread::Builder::new()
                 .name(format!("hyperlane-worker-{i}"))
                 .spawn(move || {
-                    #[cfg(not(feature = "io-uring"))]
+                    #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
                     {
                         let rt = tokio::runtime::Builder::new_current_thread()
                             .enable_all()
@@ -958,7 +957,7 @@ impl Server {
                             }
                         }));
                     }
-                    #[cfg(feature = "io-uring")]
+                    #[cfg(all(target_os = "linux", feature = "io-uring"))]
                     {
                         tokio_uring::start(async move {
                             let listener = tokio_uring::net::TcpListener::from_std(std_listener)
