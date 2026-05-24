@@ -7,10 +7,12 @@ use crate::*;
 #[derive(Clone, CustomDebug, Data, Deserialize, DisplayDebug, Eq, New, PartialEq, Serialize)]
 pub struct ServerConfig {
     /// The address the server will bind to.
-    #[set(type(AsRef<str>))]
+    #[set(pub, type(AsRef<str>))]
     pub(super) address: String,
     /// The `TCP_NODELAY` option for sockets.
+    #[set(pub)]
     pub(super) nodelay: Option<bool>,
     /// The `IP_TTL` option for sockets.
+    #[set(pub)]
     pub(super) ttl: Option<u32>,
 }

@@ -388,7 +388,7 @@ impl Context {
     ///
     /// - `&mut Self` - Reference to the modified context for method chaining.
     #[inline(always)]
-    pub(crate) fn set_task_panic(&mut self, panic_data: PanicData) -> &mut Self {
+    pub fn set_task_panic(&mut self, panic_data: PanicData) -> &mut Self {
         self.set_internal_attribute(InternalAttribute::TaskPanicData, panic_data)
     }
 

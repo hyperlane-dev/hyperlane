@@ -542,11 +542,7 @@ impl RouteMatcher {
     /// # Returns
     ///
     /// - `Option<ServerHookHandler>` - The matched route hook if found, None otherwise.
-    pub(crate) fn try_resolve_route(
-        &self,
-        ctx: &mut Context,
-        path: &str,
-    ) -> Option<ServerHookHandler> {
+    pub fn try_resolve_route(&self, ctx: &mut Context, path: &str) -> Option<ServerHookHandler> {
         if let Some(hook) = self.get_static_route().get(path) {
             ctx.set_route_params(RouteParams::default());
             return Some(hook.clone());
