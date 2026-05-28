@@ -70,7 +70,7 @@ where
 #[inline(always)]
 pub fn assert_hook_unique_order(list: Vec<HookType>) {
     let mut seen: HashSet<(HookType, isize)> = HashSet::new();
-    list.iter().for_each(|hook| {
+    list.iter().for_each(|hook: &HookType| {
         if let Some(order) = hook.try_get_order()
             && !seen.insert((*hook, order))
         {

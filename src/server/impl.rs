@@ -47,22 +47,22 @@ impl PartialEq for Server {
                 .get_task_panic()
                 .iter()
                 .zip(other.get_task_panic().iter())
-                .all(|(a, b)| Arc::ptr_eq(a, b))
+                .all(|pair: (&ServerHookHandler, &ServerHookHandler)| Arc::ptr_eq(pair.0, pair.1))
             && self
                 .get_request_error()
                 .iter()
                 .zip(other.get_request_error().iter())
-                .all(|(a, b)| Arc::ptr_eq(a, b))
+                .all(|pair: (&ServerHookHandler, &ServerHookHandler)| Arc::ptr_eq(pair.0, pair.1))
             && self
                 .get_request_middleware()
                 .iter()
                 .zip(other.get_request_middleware().iter())
-                .all(|(a, b)| Arc::ptr_eq(a, b))
+                .all(|pair: (&ServerHookHandler, &ServerHookHandler)| Arc::ptr_eq(pair.0, pair.1))
             && self
                 .get_response_middleware()
                 .iter()
                 .zip(other.get_response_middleware().iter())
-                .all(|(a, b)| Arc::ptr_eq(a, b))
+                .all(|pair: (&ServerHookHandler, &ServerHookHandler)| Arc::ptr_eq(pair.0, pair.1))
     }
 }
 

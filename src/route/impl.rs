@@ -126,7 +126,10 @@ impl PartialEq for RouteMatcher {
             match other.get_dynamic_route().get(segment_count) {
                 Some(other_routes) if routes.len() == other_routes.len() => {
                     for (pattern, _) in routes {
-                        if !other_routes.iter().any(|(p, _)| p == pattern) {
+                        if !other_routes
+                            .iter()
+                            .any(|entry: &(RoutePattern, ServerHookHandler)| &entry.0 == pattern)
+                        {
                             return false;
                         }
                     }
@@ -141,7 +144,10 @@ impl PartialEq for RouteMatcher {
             match other.get_regex_route().get(segment_count) {
                 Some(other_routes) if routes.len() == other_routes.len() => {
                     for (pattern, _) in routes {
-                        if !other_routes.iter().any(|(p, _)| p == pattern) {
+                        if !other_routes
+                            .iter()
+                            .any(|entry: &(RoutePattern, ServerHookHandler)| &entry.0 == pattern)
+                        {
                             return false;
                         }
                     }
@@ -198,11 +204,15 @@ impl Ord for RouteSegment {
     #[inline(always)]
     fn cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
-            (Self::Static(s1), Self::Static(s2)) => s1.cmp(s2),
-            (Self::Dynamic(d1), Self::Dynamic(d2)) => d1.cmp(d2),
-            (Self::Regex(n1, r1), Self::Regex(n2, r2)) => {
-                n1.cmp(n2).then_with(|| r1.as_str().cmp(r2.as_str()))
+            (Self::Static(left_static), Self::Static(right_static)) => {
+                left_static.cmp(right_static)
             }
+            (Self::Dynamic(left_dynamic), Self::Dynamic(right_dynamic)) => {
+                left_dynamic.cmp(right_dynamic)
+            }
+            (Self::Regex(left_name, left_regex), Self::Regex(right_name, right_regex)) => left_name
+                .cmp(right_name)
+                .then_with(|| left_regex.as_str().cmp(right_regex.as_str())),
             (Self::Static(_), _) => Ordering::Less,
             (_, Self::Static(_)) => Ordering::Greater,
             (Self::Dynamic(_), _) => Ordering::Less,
@@ -227,9 +237,11 @@ impl PartialEq for RouteSegment {
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Static(l0), Self::Static(r0)) => l0 == r0,
-            (Self::Dynamic(l0), Self::Dynamic(r0)) => l0 == r0,
-            (Self::Regex(l0, l1), Self::Regex(r0, r1)) => l0 == r0 && l1.as_str() == r1.as_str(),
+            (Self::Static(left_value), Self::Static(right_value)) => left_value == right_value,
+            (Self::Dynamic(left_value), Self::Dynamic(right_value)) => left_value == right_value,
+            (Self::Regex(left_name, left_regex), Self::Regex(right_name, right_regex)) => {
+                left_name == right_name && left_regex.as_str() == right_regex.as_str()
+            }
             _ => false,
         }
     }
@@ -247,13 +259,13 @@ impl Hash for RouteSegment {
     #[inline(always)]
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
-            Self::Static(s) => {
+            Self::Static(static_value) => {
                 0u8.hash(state);
-                s.hash(state);
+                static_value.hash(state);
             }
-            Self::Dynamic(d) => {
+            Self::Dynamic(dynamic_value) => {
                 1u8.hash(state);
-                d.hash(state);
+                dynamic_value.hash(state);
             }
             Self::Regex(name, regex) => {
                 2u8.hash(state);
@@ -353,12 +365,12 @@ impl RoutePattern {
         let path_bytes: &[u8] = path.as_bytes();
         let path_separator_byte: u8 = DEFAULT_HTTP_PATH_BYTES[0];
         let mut segment_start: usize = 0;
-        for (i, &byte) in path_bytes.iter().enumerate() {
-            if byte == path_separator_byte {
-                if segment_start < i {
-                    path_segments.push(&path[segment_start..i]);
+        for (byte_index, &current_byte) in path_bytes.iter().enumerate() {
+            if current_byte == path_separator_byte {
+                if segment_start < byte_index {
+                    path_segments.push(&path[segment_start..byte_index]);
                 }
-                segment_start = i + 1;
+                segment_start = byte_index + 1;
             }
         }
         if segment_start < path.len() {
@@ -416,7 +428,7 @@ impl RoutePattern {
     pub(crate) fn is_static(&self) -> bool {
         self.get_0()
             .iter()
-            .all(|seg| matches!(seg, RouteSegment::Static(_)))
+            .all(|segment: &RouteSegment| matches!(segment, RouteSegment::Static(_)))
     }
 
     /// Checks if the route pattern is dynamic.
@@ -428,11 +440,11 @@ impl RoutePattern {
     pub(crate) fn is_dynamic(&self) -> bool {
         self.get_0()
             .iter()
-            .any(|seg| matches!(seg, RouteSegment::Dynamic(_)))
+            .any(|segment: &RouteSegment| matches!(segment, RouteSegment::Dynamic(_)))
             && self
                 .get_0()
                 .iter()
-                .all(|seg| !matches!(seg, RouteSegment::Regex(_, _)))
+                .all(|segment: &RouteSegment| !matches!(segment, RouteSegment::Regex(_, _)))
     }
 
     /// Gets the number of segments in this route pattern.
@@ -522,7 +534,9 @@ impl RouteMatcher {
         let segment_count: usize = route_pattern.segment_count();
         let routes_for_count: &mut Vec<(RoutePattern, ServerHookHandler)> =
             target_map.entry(segment_count).or_default();
-        match routes_for_count.binary_search_by(|(p, _)| p.cmp(&route_pattern)) {
+        match routes_for_count.binary_search_by(|entry: &(RoutePattern, ServerHookHandler)| {
+            entry.0.cmp(&route_pattern)
+        }) {
             Ok(_) => return Err(RouteError::DuplicatePattern(pattern.to_owned())),
             Err(pos) => routes_for_count.insert(pos, (route_pattern, hook)),
         }

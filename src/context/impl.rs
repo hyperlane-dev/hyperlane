@@ -239,7 +239,7 @@ impl Context {
     {
         self.get_attributes()
             .get(&Attribute::External(key.as_ref().to_owned()).to_string())
-            .and_then(|arc| arc.downcast_ref::<V>())
+            .and_then(|arc: &ArcAnySendSync| arc.downcast_ref::<V>())
             .cloned()
     }
 
@@ -333,7 +333,7 @@ impl Context {
     {
         self.get_attributes()
             .get(&Attribute::Internal(key).to_string())
-            .and_then(|arc| arc.downcast_ref::<V>())
+            .and_then(|arc: &ArcAnySendSync| arc.downcast_ref::<V>())
             .cloned()
     }
 
