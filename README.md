@@ -2,7 +2,7 @@
 
 ## hyperlane
 
-<img src="https://docs.ltpp.vip/img/hyperlane.png" alt="" height="160">
+<img src="https://ltpp.vip/github/pages/eastspire/docs-pages/img/hyperlane.png" alt="" height="160">
 
 [![](https://img.shields.io/crates/v/hyperlane.svg)](https://crates.io/crates/hyperlane)
 [![](https://img.shields.io/crates/d/hyperlane.svg)](https://img.shields.io/crates/d/hyperlane.svg)
@@ -27,7 +27,6 @@ cargo add hyperlane
 ## Quick start
 
 - [hyperlane-quick-start git](https://github.com/hyperlane-dev/hyperlane-quick-start)
-- [hyperlane-quick-start docs](https://docs.ltpp.vip/hyperlane/quick-start/)
 
 ```sh
 git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
