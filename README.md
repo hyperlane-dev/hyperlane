@@ -2,7 +2,7 @@
 
 ## hyperlane
 
-<img src="https://ltpp.vip/github/pages/eastspire/docs-pages/img/hyperlane.png" alt="" height="160">
+<img src="https://ltpp.vip/github/pages/docs-pages/pages/img/hyperlane.png" alt="" height="160">
 
 [![](https://img.shields.io/crates/v/hyperlane.svg)](https://crates.io/crates/hyperlane)
 [![](https://img.shields.io/crates/d/hyperlane.svg)](https://img.shields.io/crates/d/hyperlane.svg)
