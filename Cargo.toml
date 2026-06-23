@@ -12,11 +12,25 @@ categories = ["network-programming", "web-programming"]
 exclude = ["target", "Cargo.lock", "sh", ".github", "logs", "img", "**/*.log"]
 
 [dependencies]
+h3 = "0.0.8"
+h2 = "0.4.15"
+bytes = "1.12.0"
+http = "1.4.2"
 regex = "1.12.4"
-http-type = "20.0.6"
+h3-quinn = "0.0.10"
+http-type = { path = "../http-type" }
 inventory = "0.3.24"
+tokio-rustls = "0.26.4"
 lombok-macros = "2.0.29"
+rustls-pemfile = "2.2.0"
+tokio = { version = "1.52.3", features = ["full"] }
+rustls = { version = "0.23.41", features = ["ring"] }
 serde = { version = "1.0.228", features = ["derive"] }
+quinn = { version = "0.11.11", features = ["runtime-tokio", "ring"] }
+
+[dev-dependencies]
+tokio-rustls = "0.26"
+rustls-pemfile = "2.2.0"
 
 [profile.dev]
 incremental = false

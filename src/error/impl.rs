@@ -2,20 +2,20 @@ use crate::*;
 
 /// Implementation of `From` trait for converting external errors into `ServerError`.
 ///
-/// This allows using the `?` operator to automatically convert `std::io::Error`
+/// This allows using the `?` operator to automatically convert `IoError`
 /// into `ServerError::TcpBind` when binding to a TCP socket.
-impl From<std::io::Error> for ServerError {
-    /// Creates a new `ServerError::TcpBind` instance from a `std::io::Error`.
+impl From<IoError> for ServerError {
+    /// Creates a new `ServerError::TcpBind` instance from an `IoError`.
     ///
     /// # Arguments
     ///
-    /// - `std::io::Error` - The `std::io::Error` to convert.
+    /// - `IoError` - The I/O error to convert.
     ///
     /// # Returns
     ///
     /// - `Self` - A new `ServerError::TcpBind` instance.
     #[inline(always)]
-    fn from(error: std::io::Error) -> Self {
+    fn from(error: IoError) -> Self {
         ServerError::TcpBind(error.to_string())
     }
 }

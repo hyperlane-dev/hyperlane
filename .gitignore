@@ -2,3 +2,5 @@
 *.log
 /logs
 Cargo.lock
+cert.pem
+key.pem

@@ -9,8 +9,10 @@ fn server_error() {
     let new_unknown_error: ServerError = ServerError::Unknown("something went wrong".to_string());
     assert_eq!(unknown_error, new_unknown_error);
     let request: Request = Request::default();
-    let invalid_http_request_error: ServerError = ServerError::InvalidHttpRequest(request.clone());
-    let new_invalid_http_request_error: ServerError = ServerError::InvalidHttpRequest(request);
+    let invalid_http_request_error: ServerError =
+        ServerError::InvalidHttpRequest(Box::new(request.clone()));
+    let new_invalid_http_request_error: ServerError =
+        ServerError::InvalidHttpRequest(Box::new(request));
     assert_eq!(invalid_http_request_error, new_invalid_http_request_error);
     let other_error: ServerError = ServerError::Other("other error".to_string());
     let new_other_error: ServerError = ServerError::Other("other error".to_string());

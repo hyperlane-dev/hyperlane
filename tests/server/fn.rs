@@ -38,7 +38,7 @@ fn server_mut_from_address() {
     let mut config: ServerConfig = ServerConfig::default();
     config.set_nodelay(Some(true));
     server_mut.set_server_config(config);
-    assert!(server_mut.get_server_config().try_get_nodelay().is_some());
+    assert!(server_mut.get_server_config().get_nodelay().is_some());
 }
 
 #[test]
@@ -104,7 +104,7 @@ fn server_as_mut() {
     let mut config: ServerConfig = ServerConfig::default();
     config.set_nodelay(Some(true));
     server_mut.set_server_config(config);
-    assert!(server.get_server_config().try_get_nodelay().is_some());
+    assert!(server.get_server_config().get_nodelay().is_some());
 }
 
 #[test]
@@ -156,8 +156,12 @@ async fn main() {
     let mut server: Server = Server::default();
     let mut server_config: ServerConfig = ServerConfig::default();
     server_config
-        .set_address(Server::format_bind_address(DEFAULT_HOST, 80))
-        .set_nodelay(Some(false));
+        .set_address(Server::format_bind_address(DEFAULT_HOST, 8443))
+        .set_nodelay(Some(false))
+        .set_enable_http2(true)
+        .set_enable_http3(true)
+        .set_cert_path(Some("cert.pem".to_string()))
+        .set_key_path(Some("key.pem".to_string()));
     server.server_config(server_config);
     server.task_panic::<TaskPanicHook>();
     server.request_error::<RequestErrorHook>();

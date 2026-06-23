@@ -10,7 +10,7 @@ pub enum ServerError {
     /// An error occurred while reading an HTTP request.
     HttpRead(String),
     /// The received HTTP request was invalid or malformed.
-    InvalidHttpRequest(Request),
+    InvalidHttpRequest(Box<Request>),
     /// Other error.
     Other(String),
 }

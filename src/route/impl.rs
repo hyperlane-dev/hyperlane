@@ -52,7 +52,7 @@ impl Hash for RoutePattern {
     ///
     /// # Arguments
     ///
-    /// - `&mut Hasher` - The hasher to use.
+    /// - `&mut H` - The hasher to use.
     #[inline(always)]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.get_0().hash(state);
@@ -255,7 +255,7 @@ impl Hash for RouteSegment {
     ///
     /// # Arguments
     ///
-    /// - `&mut Hasher` - The hasher to use.
+    /// - `&mut H` - The hasher to use.
     #[inline(always)]
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {

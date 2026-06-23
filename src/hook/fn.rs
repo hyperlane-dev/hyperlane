@@ -27,10 +27,6 @@ pub fn default_server_hook_handler() -> ServerHookHandler {
 
 /// Creates a new `ServerHookHandler` from a trait object.
 ///
-/// # Arguments
-///
-/// - `ServerHook` - The trait object implementing `ServerHook`.
-///
 /// # Returns
 ///
 /// - `ServerHookHandler` - A new `ServerHookHandler` instance.

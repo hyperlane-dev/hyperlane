@@ -25,15 +25,19 @@ use std::{
     collections::HashSet,
     future::Future,
     hash::{Hash, Hasher},
-    io::{self, Write, stderr, stdout},
+    io::{self, Error as IoError, Write, stderr, stdout},
+    net::{AddrParseError, SocketAddr},
     pin::Pin,
+    ptr::fn_addr_eq,
     sync::Arc,
 };
 
 use {
     inventory::collect,
     lombok_macros::*,
+    quinn::{self},
     regex::Regex,
+    rustls::{self},
     serde::{Deserialize, Serialize},
     tokio::{
         net::{TcpListener, TcpStream},
@@ -41,4 +45,5 @@ use {
         sync::watch::{Receiver, Sender, channel},
         task::JoinHandle,
     },
+    tokio_rustls::TlsAcceptor,
 };

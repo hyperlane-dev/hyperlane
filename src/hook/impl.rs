@@ -81,7 +81,7 @@ impl ServerControlHook {
 /// Implements the `PartialEq` trait for `HookType`.
 ///
 /// This allows for comparing two `HookType` instances for equality.
-/// Function pointers are compared using `std::ptr::fn_addr_eq` for reliable comparison.
+/// Function pointers are compared using `fn_addr_eq` for reliable comparison.
 impl PartialEq for HookType {
     /// Checks if two `HookType` instances are equal.
     ///
@@ -96,23 +96,23 @@ impl PartialEq for HookType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (HookType::TaskPanic(order1, factory1), HookType::TaskPanic(order2, factory2)) => {
-                order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2)
+                order1 == order2 && fn_addr_eq(*factory1, *factory2)
             }
             (
                 HookType::RequestError(order1, factory1),
                 HookType::RequestError(order2, factory2),
-            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
+            ) => order1 == order2 && fn_addr_eq(*factory1, *factory2),
             (
                 HookType::RequestMiddleware(order1, factory1),
                 HookType::RequestMiddleware(order2, factory2),
-            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
+            ) => order1 == order2 && fn_addr_eq(*factory1, *factory2),
             (HookType::Route(path1, factory1), HookType::Route(path2, factory2)) => {
-                path1 == path2 && std::ptr::fn_addr_eq(*factory1, *factory2)
+                path1 == path2 && fn_addr_eq(*factory1, *factory2)
             }
             (
                 HookType::ResponseMiddleware(order1, factory1),
                 HookType::ResponseMiddleware(order2, factory2),
-            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
+            ) => order1 == order2 && fn_addr_eq(*factory1, *factory2),
             _ => false,
         }
     }
@@ -132,7 +132,7 @@ impl Hash for HookType {
     ///
     /// # Arguments
     ///
-    /// - `&mut Hasher` - The hasher to use.
+    /// - `&mut H` - The hasher to use.
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
@@ -190,6 +190,14 @@ impl HookType {
         }
     }
 
+    /// Returns the optional factory function for middleware and error hooks.
+    ///
+    /// Route hooks carry a path instead of a factory, so they return `None`.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<ServerHookHandlerFactory>`: The factory for middleware/error
+    ///   hooks, or `None` for route hooks.
     #[inline(always)]
     pub fn try_get_hook(&self) -> Option<ServerHookHandlerFactory> {
         match *self {

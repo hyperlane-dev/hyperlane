@@ -378,7 +378,7 @@ impl Server {
     where
         S: ServerHook,
     {
-        self.get_mut_task_panic().push(server_hook_factory::<S>());
+        self.handle_hook(HookType::TaskPanic(None, || server_hook_factory::<S>()));
         self
     }
 
@@ -395,8 +395,7 @@ impl Server {
     where
         S: ServerHook,
     {
-        self.get_mut_request_error()
-            .push(server_hook_factory::<S>());
+        self.handle_hook(HookType::RequestError(None, || server_hook_factory::<S>()));
         self
     }
 
@@ -407,7 +406,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The route path pattern.
+    /// - `impl AsRef<str>` - The route path pattern.
     ///
     /// # Returns
     ///
@@ -417,9 +416,8 @@ impl Server {
     where
         S: ServerHook,
     {
-        self.get_mut_route_matcher()
-            .add(path.as_ref(), server_hook_factory::<S>())
-            .unwrap();
+        let path: &'static str = Box::leak(path.as_ref().to_string().into_boxed_str());
+        self.handle_hook(HookType::Route(path, || server_hook_factory::<S>()));
         self
     }
 
@@ -436,8 +434,9 @@ impl Server {
     where
         S: ServerHook,
     {
-        self.get_mut_request_middleware()
-            .push(server_hook_factory::<S>());
+        self.handle_hook(HookType::RequestMiddleware(None, || {
+            server_hook_factory::<S>()
+        }));
         self
     }
 
@@ -454,8 +453,9 @@ impl Server {
     where
         S: ServerHook,
     {
-        self.get_mut_response_middleware()
-            .push(server_hook_factory::<S>());
+        self.handle_hook(HookType::ResponseMiddleware(None, || {
+            server_hook_factory::<S>()
+        }));
         self
     }
 
@@ -596,11 +596,11 @@ impl Server {
     /// - `&TcpStream` - A reference to the `TcpStream` to configure.
     fn configure_stream(&self, stream: &TcpStream) {
         let config: &ServerConfig = self.get_server_config();
-        if let Some(nodelay) = config.try_get_nodelay() {
-            let _ = stream.set_nodelay(*nodelay);
+        if let Some(nodelay) = config.get_nodelay() {
+            let _ = stream.set_nodelay(nodelay);
         }
-        if let Some(ttl) = config.try_get_ttl() {
-            let _ = stream.set_ttl(*ttl);
+        if let Some(ttl) = config.get_ttl() {
+            let _ = stream.set_ttl(ttl);
         }
     }
 
@@ -738,6 +738,54 @@ impl Server {
         stream.is_keep_alive(keep_alive)
     }
 
+    /// Creates a connected local TCP stream pair and returns the server side as a `Stream`.
+    ///
+    /// This is used as a placeholder for HTTP/2 and HTTP/3 request processing where the
+    /// middleware trait signature requires a `Stream` but the actual transport is framed by
+    /// the protocol handler.
+    async fn create_dummy_stream() -> Stream {
+        let listener: TcpListener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr: SocketAddr = listener.local_addr().unwrap();
+        let connect: JoinHandle<TcpStream> =
+            spawn(async move { TcpStream::connect(addr).await.unwrap() });
+        let (server_stream, _) = listener.accept().await.unwrap();
+        let _ = connect.await.unwrap();
+        Stream::new(server_stream, RequestConfig::default(), false)
+    }
+
+    /// Builds the response for a decoded HTTP/2 or HTTP/3 request by running the
+    /// request middleware, route matcher, and response middleware chains.
+    ///
+    /// The dummy stream is used so that hooks expecting a raw `Stream` can still
+    /// run; writes to it are discarded because protocol responses are sent via the
+    /// framed protocol handles.
+    ///
+    /// # Arguments
+    ///
+    /// - `request` - The decoded incoming request.
+    /// - `version` - The response HTTP version to set (`Http2` or `Http3`).
+    async fn build_http_response(&self, request: Request, version: HttpVersion) -> Response {
+        let mut response: Response = Response::default();
+        response.set_version(version);
+        let mut ctx: Context = Context::default();
+        ctx.set_request(request)
+            .set_response(response)
+            .set_route_params(RouteParams::default())
+            .set_attributes(ThreadSafeAttributeStore::default());
+        let mut dummy_stream: Stream = Self::create_dummy_stream().await;
+        let route: String = ctx.get_request().get_path().to_owned();
+        let _ = self
+            .handle_request_middleware(&mut dummy_stream, &mut ctx)
+            .await;
+        let _ = self
+            .handle_route_matcher(&mut dummy_stream, &mut ctx, &route)
+            .await;
+        let _ = self
+            .handle_response_middleware(&mut dummy_stream, &mut ctx)
+            .await;
+        std::mem::take(ctx.get_mut_response())
+    }
+
     /// Handles subsequent HTTP requests on a persistent (keep-alive) connection.
     ///
     /// # Arguments
@@ -806,9 +854,28 @@ impl Server {
         loop {
             if let Ok((stream, _)) = tcp_listener.accept().await {
                 self.configure_stream(&stream);
+                let enable_http2: bool = self.get_server_config().get_enable_http2();
+                let mut preface_stream: Stream =
+                    Stream::new(stream, RequestConfig::default(), false);
+                let is_h2_preface: bool = if enable_http2 {
+                    preface_stream.is_http2_preface().await
+                } else {
+                    false
+                };
+                if is_h2_preface {
+                    let tcp_stream: TcpStream = preface_stream.into_tcp_stream();
+                    spawn(async move {
+                        let _ = Http2Connection::new(|request: Request, _response: Response| {
+                            self.build_http_response(request, HttpVersion::Http2)
+                        })
+                        .handle(tcp_stream)
+                        .await;
+                    });
+                    continue;
+                }
                 let request_config: RequestConfig = *self.get_request_config();
-                let stream: &'static mut Stream =
-                    Box::leak(Box::new(Stream::new(stream, request_config, false)));
+                preface_stream.replace_request_config(request_config);
+                let stream: &'static mut Stream = Box::leak(Box::new(preface_stream));
                 let ctx: &'static mut Context = Box::leak(Box::new(Context::default()));
                 spawn(self.task_handler(
                     stream.into(),
@@ -819,10 +886,69 @@ impl Server {
         }
     }
 
+    /// Accepts TLS-wrapped TCP connections and dispatches them to the appropriate handler.
+    ///
+    /// ALPN protocol `h2` is handled as HTTP/2. Any other negotiated protocol
+    /// (including `http/1.1` or no ALPN) falls back to the standard HTTP/1.1
+    /// connection lifecycle over the TLS stream.
+    async fn tls_accept(&'static self, tcp_listener: &TcpListener, tls_acceptor: TlsAcceptor) {
+        loop {
+            if let Ok((stream, _)) = tcp_listener.accept().await {
+                self.configure_stream(&stream);
+                let enable_http2: bool = self.get_server_config().get_enable_http2();
+                if let Ok(tls_stream) = tls_acceptor.accept(stream).await {
+                    let alpn_opt: Option<Vec<u8>> = tls_stream
+                        .get_ref()
+                        .1
+                        .alpn_protocol()
+                        .map(|protocol: &[u8]| protocol.to_vec());
+                    if enable_http2 && alpn_opt.as_deref() == Some(b"h2") {
+                        spawn(async move {
+                            let _ =
+                                Http2Connection::new(|request: Request, _response: Response| {
+                                    self.build_http_response(request, HttpVersion::Http2)
+                                })
+                                .handle(tls_stream)
+                                .await;
+                        });
+                        continue;
+                    }
+                    let request_config: RequestConfig = *self.get_request_config();
+                    let preface_stream: Stream = Stream::new_tls(tls_stream, request_config, false);
+                    let stream: &'static mut Stream = Box::leak(Box::new(preface_stream));
+                    let ctx: &'static mut Context = Box::leak(Box::new(Context::default()));
+                    spawn(self.task_handler(
+                        stream.into(),
+                        ctx.into(),
+                        self.handle_connection(stream, ctx),
+                    ));
+                }
+            }
+        }
+    }
+
+    /// Accepts incoming QUIC connections and dispatches them to the HTTP/3 handler.
+    async fn http3_accept(&'static self, endpoint: quinn::Endpoint) {
+        while let Some(incoming) = endpoint.accept().await {
+            if let Ok(quic_conn) = incoming.await {
+                spawn(async move {
+                    let _ = Http3Connection::new(|request: Request, _response: Response| {
+                        self.build_http_response(request, HttpVersion::Http3)
+                    })
+                    .handle(quic_conn)
+                    .await;
+                });
+            }
+        }
+    }
+
     /// Starts the server, binds to the configured address, and begins listening for connections.
     ///
     /// This is the main entry point to launch the server. It will initialize the panic hook,
     /// create a TCP listener, and then enter the connection acceptance loop in a background task.
+    /// When TLS certificate and key paths are configured, the TCP listener runs in TLS mode and
+    /// accepts HTTP/2 over TLS (`h2`). When HTTP/3 is enabled and TLS is configured, a QUIC
+    /// endpoint is also started on the configured HTTP/3 bind address.
     ///
     /// # Returns
     ///
@@ -830,15 +956,51 @@ impl Server {
     /// Calling this function will shut down the server by aborting its main task.
     /// Returns an error if the server fails to start.
     pub async fn run(&self) -> Result<ServerControlHook, ServerError> {
-        let bind_address: &String = self.get_server_config().get_address();
-        let tcp_listener: TcpListener = TcpListener::bind(bind_address).await?;
+        let bind_address: String = self.get_server_config().get_address().clone();
+        let tcp_listener: TcpListener = TcpListener::bind(&bind_address).await?;
+        let cert_path: Option<String> = self.get_server_config().get_cert_path();
+        let key_path: Option<String> = self.get_server_config().get_key_path();
+        let has_tls: bool = cert_path.is_some() && key_path.is_some();
+        let enable_http3: bool = self.get_server_config().get_enable_http3();
         let server: &'static Self = unsafe { self.leak() };
         let (wait_sender, wait_receiver) = channel(());
         let (shutdown_sender, mut shutdown_receiver) = channel(());
-        let accept_connections: JoinHandle<()> = spawn(async move {
-            server.tcp_accept(&tcp_listener).await;
-            let _ = wait_sender.send(());
-        });
+        let mut accept_handles: Vec<JoinHandle<()>> = Vec::new();
+        if has_tls {
+            let tls_config: rustls::ServerConfig =
+                TlsConfig::new(cert_path.clone().unwrap(), key_path.clone().unwrap())
+                    .load()
+                    .await
+                    .map_err(|e| ServerError::Other(e.to_string()))?;
+            let tls_acceptor: TlsAcceptor = TlsAcceptor::from(Arc::new(tls_config));
+            accept_handles.push(spawn(async move {
+                server.tls_accept(&tcp_listener, tls_acceptor).await;
+                let _ = wait_sender.send(());
+            }));
+        } else {
+            accept_handles.push(spawn(async move {
+                server.tcp_accept(&tcp_listener).await;
+                let _ = wait_sender.send(());
+            }));
+        }
+        if enable_http3 && has_tls {
+            let quic_config: quinn::ServerConfig =
+                TlsConfig::new(cert_path.unwrap(), key_path.unwrap())
+                    .load_quic()
+                    .await
+                    .map_err(|e| ServerError::Other(e.to_string()))?;
+            let http3_bind_address: SocketAddr = self
+                .get_server_config()
+                .get_effective_http3_bind_address()
+                .parse()
+                .map_err(|e: AddrParseError| ServerError::Other(e.to_string()))?;
+            let endpoint: quinn::Endpoint =
+                quinn::Endpoint::server(quic_config, http3_bind_address)
+                    .map_err(|e: IoError| ServerError::Other(e.to_string()))?;
+            accept_handles.push(spawn(async move {
+                server.http3_accept(endpoint).await;
+            }));
+        }
         let wait_hook: ServerControlHookHandler<()> = Arc::new(move || {
             let mut wait_receiver_clone: Receiver<()> = wait_receiver.clone();
             Box::pin(async move {
@@ -853,7 +1015,9 @@ impl Server {
         });
         spawn(async move {
             let _ = shutdown_receiver.changed().await;
-            accept_connections.abort();
+            for handle in accept_handles {
+                handle.abort();
+            }
         });
         let mut server_control_hook: ServerControlHook = ServerControlHook::default();
         server_control_hook.set_shutdown_hook(shutdown_hook);
