@@ -10,7 +10,9 @@ pub struct DefaultServerHook;
 ///
 /// This zero-size struct provides associated functions for creating
 /// and managing hook handlers in a semantically organized way.
-#[derive(Clone, Copy, Debug, DisplayDebug)]
+#[derive(
+    Clone, Copy, Debug, Deserialize, DisplayDebug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize,
+)]
 pub struct Hook;
 
 /// Represents the hooks for managing the server's lifecycle, specifically for waiting and shutting down.
