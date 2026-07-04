@@ -51,8 +51,8 @@ impl Default for ServerControlHook {
     #[inline(always)]
     fn default() -> Self {
         Self {
-            wait_hook: default_server_control_hook_handler(),
-            shutdown_hook: default_server_control_hook_handler(),
+            wait_hook: Hook::default_control_handler(),
+            shutdown_hook: Hook::default_control_handler(),
         }
     }
 }
@@ -75,6 +75,64 @@ impl ServerControlHook {
     /// performing any necessary cleanup or graceful shutdown procedures.
     pub async fn shutdown(&self) {
         self.get_shutdown_hook()().await;
+    }
+}
+
+/// Factory and utility functions for creating hook handlers.
+///
+/// This impl block groups semantically related factory methods that create
+/// various hook handler types used throughout the server lifecycle.
+impl Hook {
+    /// Creates a default `ServerControlHookHandler` instance with default no-op hooks.
+    ///
+    /// The default `wait_hook` and `shutdown_hook` do nothing, allowing the server
+    /// to run without specific shutdown or wait logic unless configured otherwise.
+    ///
+    /// # Returns
+    ///
+    /// - `ServerControlHookHandler<()>` - A default `ServerControlHookHandler<()>` instance.
+    #[inline(always)]
+    pub fn default_control_handler() -> ServerControlHookHandler<()> {
+        Arc::new(|| Box::pin(async {}))
+    }
+
+    /// Creates a default `ServerHookHandler` from a trait object.
+    ///
+    /// # Returns
+    ///
+    /// - `ServerHookHandler` - A default `ServerHookHandler` instance.
+    #[inline(always)]
+    pub fn default_handler() -> ServerHookHandler {
+        Arc::new(|_: &mut Stream, _: &mut Context| -> FutureBox<Status> {
+            Box::pin(async move { Status::default() })
+        })
+    }
+
+    /// Creates a new `ServerHookHandler` from a trait object.
+    ///
+    /// # Arguments
+    ///
+    /// - `ServerHook` - The trait object implementing `ServerHook`.
+    ///
+    /// # Returns
+    ///
+    /// - `ServerHookHandler` - A new `ServerHookHandler` instance.
+    #[inline(always)]
+    pub fn factory<R>() -> ServerHookHandler
+    where
+        R: ServerHook,
+    {
+        Arc::new(
+            move |stream: &mut Stream, ctx: &mut Context| -> FutureBox<Status> {
+                let ctx_address: usize = ctx.into();
+                let stream_address: usize = stream.into();
+                Box::pin(async move {
+                    let ctx: &mut Context = ctx_address.into();
+                    let stream: &mut Stream = stream_address.into();
+                    R::new(stream, ctx).await.handle(stream, ctx).await
+                })
+            },
+        )
     }
 }
 
@@ -200,9 +258,36 @@ impl HookType {
             _ => None,
         }
     }
+
+    /// Verifies that hooks with the same type and execution priority are unique.
+    ///
+    /// This function validates that no two hooks of the same type have identical
+    /// execution priorities (orders). Only hooks that define an explicit priority
+    /// (non-None order) are checked for uniqueness. Hooks without a priority are
+    /// ignored in duplicate detection.
+    ///
+    /// # Arguments
+    ///
+    /// - `Vec<HookType>` - A vector of `HookType` instances to validate for uniqueness.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if duplicate hooks are detected with the same type and priority,
+    ///   displaying the hook type and order in the error message.
+    #[inline(always)]
+    pub fn assert_unique_order(list: Vec<HookType>) {
+        let mut seen: HashSet<(HookType, isize)> = HashSet::new();
+        list.iter().for_each(|hook: &HookType| {
+            if let Some(order) = hook.try_get_order()
+                && !seen.insert((*hook, order))
+            {
+                panic!("Duplicate hook detected: {} with order {}", hook, order);
+            }
+        });
+    }
 }
 
-/// Implement `ServerHook` for `DefaultServerHook`
+/// Implements `ServerHook` for `DefaultServerHook`
 ///
 /// This implementation provides default no-op handlers for server hook operations.
 impl ServerHook for DefaultServerHook {

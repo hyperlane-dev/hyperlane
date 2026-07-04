@@ -378,7 +378,7 @@ impl Server {
     where
         S: ServerHook,
     {
-        self.get_mut_task_panic().push(server_hook_factory::<S>());
+        self.get_mut_task_panic().push(Hook::factory::<S>());
         self
     }
 
@@ -395,8 +395,7 @@ impl Server {
     where
         S: ServerHook,
     {
-        self.get_mut_request_error()
-            .push(server_hook_factory::<S>());
+        self.get_mut_request_error().push(Hook::factory::<S>());
         self
     }
 
@@ -418,7 +417,7 @@ impl Server {
         S: ServerHook,
     {
         self.get_mut_route_matcher()
-            .add(path.as_ref(), server_hook_factory::<S>())
+            .add(path.as_ref(), Hook::factory::<S>())
             .unwrap();
         self
     }
@@ -436,8 +435,7 @@ impl Server {
     where
         S: ServerHook,
     {
-        self.get_mut_request_middleware()
-            .push(server_hook_factory::<S>());
+        self.get_mut_request_middleware().push(Hook::factory::<S>());
         self
     }
 
@@ -455,7 +453,7 @@ impl Server {
         S: ServerHook,
     {
         self.get_mut_response_middleware()
-            .push(server_hook_factory::<S>());
+            .push(Hook::factory::<S>());
         self
     }
 

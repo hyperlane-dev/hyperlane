@@ -6,6 +6,13 @@ use crate::*;
 )]
 pub struct DefaultServerHook;
 
+/// Namespace for hook handler factory and utility functions.
+///
+/// This zero-size struct provides associated functions for creating
+/// and managing hook handlers in a semantically organized way.
+#[derive(Clone, Copy, Debug, DisplayDebug)]
+pub struct Hook;
+
 /// Represents the hooks for managing the server's lifecycle, specifically for waiting and shutting down.
 #[derive(Clone, CustomDebug, DisplayDebug, Getter, Setter)]
 pub struct ServerControlHook {
