@@ -2,7 +2,18 @@ use crate::*;
 
 /// Default server hook
 #[derive(
-    Clone, Copy, Debug, Deserialize, DisplayDebug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    DisplayDebug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+    Default,
 )]
 pub struct DefaultServerHook;
 
@@ -11,7 +22,18 @@ pub struct DefaultServerHook;
 /// This zero-size struct provides associated functions for creating
 /// and managing hook handlers in a semantically organized way.
 #[derive(
-    Clone, Copy, Debug, Deserialize, DisplayDebug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    DisplayDebug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+    Default,
 )]
 pub struct Hook;
 
