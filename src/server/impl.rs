@@ -709,6 +709,7 @@ impl Server {
         response.set_version(request.get_version().clone());
         ctx.set_request(request.clone());
         ctx.set_response(response);
+        ctx.set_route_params(RouteParams::default());
         ctx.clear_attribute();
         stream.set_closed(false);
         let keep_alive: bool = request.is_enable_keep_alive();
@@ -817,33 +818,8 @@ impl Server {
     /// Calling this function will shut down the server by aborting its main task.
     /// Returns an error if the server fails to start.
     pub async fn run(&self) -> Result<ServerControlHook, ServerError> {
-        let server_config: &ServerConfig = self.get_server_config();
-        let bind_address: &String = server_config.get_address();
-        let socket_addr: SocketAddr =
-            bind_address
-                .as_str()
-                .parse()
-                .map_err(|error: AddrParseError| {
-                    ServerError::TcpBind(format!("invalid bind address: {error}"))
-                })?;
-        let domain: Domain = if socket_addr.is_ipv4() {
-            Domain::IPV4
-        } else {
-            Domain::IPV6
-        };
-        let socket: Socket = Socket::new(domain, Type::STREAM, None)?;
-        if let Some(reuse_address) = server_config.try_get_reuse_address() {
-            socket.set_reuse_address(*reuse_address)?;
-        }
-        if let Some(nonblocking) = server_config.try_get_nonblocking() {
-            socket.set_nonblocking(*nonblocking)?;
-        }
-        let listen_backlog: i32 = server_config
-            .try_get_listen_backlog()
-            .unwrap_or(DEFAULT_LISTEN_BACKLOG);
-        socket.bind(&socket_addr.into())?;
-        socket.listen(listen_backlog)?;
-        let tcp_listener: TcpListener = TcpListener::from_std(socket.into())?;
+        let bind_address: &String = self.get_server_config().get_address();
+        let tcp_listener: TcpListener = TcpListener::bind(&bind_address).await?;
         let server: &'static Self = unsafe { self.leak() };
         let (wait_sender, wait_receiver) = channel(());
         let (shutdown_sender, mut shutdown_receiver) = channel(());

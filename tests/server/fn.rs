@@ -157,10 +157,7 @@ async fn main() {
     let mut server_config: ServerConfig = ServerConfig::default();
     server_config
         .set_address(Server::format_bind_address(DEFAULT_HOST, 80))
-        .set_nodelay(Some(false))
-        .set_nonblocking(Some(true))
-        .set_reuse_address(Some(true))
-        .set_listen_backlog(Some(DEFAULT_LISTEN_BACKLOG));
+        .set_nodelay(Some(false));
     server.server_config(server_config);
     server.task_panic::<TaskPanicHook>();
     server.request_error::<RequestErrorHook>();

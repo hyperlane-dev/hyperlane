@@ -1,6 +1,6 @@
 [package]
 name = "hyperlane"
-version = "21.3.1"
+version = "21.3.2"
 readme = "README.md"
 edition = "2024"
 authors = ["root@ltpp.vip"]
@@ -13,8 +13,7 @@ exclude = ["target", "Cargo.lock", "sh", ".github", "logs", "img", "**/*.log"]
 
 [dependencies]
 regex = "1.13.0"
-socket2 = "0.6.4"
-http-type = "20.1.4"
+http-type = "20.1.5"
 inventory = "0.3.24"
 lombok-macros = "2.0.31"
 serde = { version = "1.0.228", features = ["derive"] }

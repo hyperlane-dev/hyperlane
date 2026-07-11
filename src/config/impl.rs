@@ -13,9 +13,6 @@ impl Default for ServerConfig {
             address: Server::format_bind_address(DEFAULT_HOST, DEFAULT_WEB_PORT),
             nodelay: DEFAULT_NODELAY,
             ttl: DEFAULT_TTI,
-            reuse_address: DEFAULT_REUSE_ADDRESS,
-            listen_backlog: Some(DEFAULT_LISTEN_BACKLOG),
-            nonblocking: DEFAULT_NONBLOCKING,
         }
     }
 }
