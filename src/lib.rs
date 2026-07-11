@@ -26,6 +26,7 @@ use std::{
     future::Future,
     hash::{Hash, Hasher},
     io::{self, Write, stderr, stdout},
+    net::{AddrParseError, SocketAddr},
     pin::Pin,
     sync::Arc,
 };
@@ -35,6 +36,7 @@ use {
     lombok_macros::*,
     regex::Regex,
     serde::{Deserialize, Serialize},
+    socket2::{Domain, Socket, Type},
     tokio::{
         net::{TcpListener, TcpStream},
         spawn,

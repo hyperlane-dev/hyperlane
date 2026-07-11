@@ -340,6 +340,65 @@ impl RoutePattern {
         Ok(segments)
     }
 
+    /// Fast-path matcher for purely static route patterns.
+    ///
+    /// Walks the request path bytes once, comparing each segment against the
+    /// expected static literal in the pattern. Performs **no Vec allocation**
+    /// and returns an empty `RouteParams` on success.
+    ///
+    /// The caller must guarantee `self.is_purely_static()` is `true` and that
+    /// `path` is non-empty after the leading `/` has been trimmed.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - The request path (already trimmed of the leading slash).
+    ///
+    /// # Returns
+    ///
+    /// - `Option<RouteParams>` - `Some` with an empty params map on match, `None` otherwise.
+    fn try_match_static_path(&self, path: &str) -> Option<RouteParams> {
+        let route_segments_len: usize = self.get_0().len();
+        let path_bytes: &[u8] = path.as_bytes();
+        let path_separator_byte: u8 = DEFAULT_HTTP_PATH_BYTES[0];
+        let mut segment_start: usize = 0;
+        let mut matched_segments: usize = 0;
+        let mut saw_content: bool = false;
+        for (byte_index, &current_byte) in path_bytes.iter().enumerate() {
+            if current_byte == path_separator_byte {
+                saw_content = true;
+                let expected: &str = match self.get_0().get(matched_segments) {
+                    Some(RouteSegment::Static(s)) => s.as_str(),
+                    Some(_) => return None,
+                    None => return None,
+                };
+                if &path[segment_start..byte_index] != expected {
+                    return None;
+                }
+                matched_segments += 1;
+                segment_start = byte_index + 1;
+            }
+        }
+        if segment_start < path.len() {
+            saw_content = true;
+            let expected: &str = match self.get_0().get(matched_segments) {
+                Some(RouteSegment::Static(s)) => s.as_str(),
+                Some(_) => return None,
+                None => return None,
+            };
+            if &path[segment_start..] != expected {
+                return None;
+            }
+            matched_segments += 1;
+        }
+        let all_matched: bool = matched_segments == route_segments_len;
+        let empty_single_match: bool = !saw_content && route_segments_len == 1 && path.is_empty();
+        if all_matched || empty_single_match {
+            Some(hash_map_xx_hash3_64())
+        } else {
+            None
+        }
+    }
+
     /// Matches this route pattern against a request path.
     ///
     /// If the pattern matches, extracts any dynamic or regex parameters.
@@ -360,6 +419,9 @@ impl RoutePattern {
                 return Some(hash_map_xx_hash3_64());
             }
             return None;
+        }
+        if self.is_static() {
+            return self.try_match_static_path(path);
         }
         let mut path_segments: PathComponentList = Vec::with_capacity(route_segments_len);
         let path_bytes: &[u8] = path.as_bytes();
@@ -543,30 +605,30 @@ impl RouteMatcher {
         Ok(())
     }
 
-    /// Resolves and executes a route hook.
+    /// Resolves a route hook by reference (no Arc::clone) for hot-path use.
     ///
-    /// This method searches for a matching route and executes it if found.
-    /// Finds a matching route hook for the given path.
+    /// Returns a reference to the matched `ServerHookHandler` if any. The
+    /// caller must clone if it needs to retain the hook beyond the await point.
+    /// Returns `None` if no route matched.
     ///
     /// # Arguments
     ///
-    /// - `&mut Context` - The request context.
+    /// - `&mut Context` - The request context (for storing route params).
     /// - `&str` - The request path to resolve.
-    ///
-    /// # Returns
-    ///
-    /// - `Option<ServerHookHandler>` - The matched route hook if found, None otherwise.
-    pub fn try_resolve_route(&self, ctx: &mut Context, path: &str) -> Option<ServerHookHandler> {
+    pub fn try_resolve_route<'a>(
+        &'a self,
+        ctx: &mut Context,
+        path: &str,
+    ) -> Option<&'a ServerHookHandler> {
         if let Some(hook) = self.get_static_route().get(path) {
-            ctx.set_route_params(RouteParams::default());
-            return Some(hook.clone());
+            return Some(hook);
         }
         let path_segment_count: usize = Self::count_path_segments(path);
         if let Some(routes) = self.get_dynamic_route().get(&path_segment_count) {
             for (pattern, hook) in routes {
                 if let Some(params) = pattern.try_match_path(path) {
                     ctx.set_route_params(params);
-                    return Some(hook.clone());
+                    return Some(hook);
                 }
             }
         }
@@ -574,21 +636,20 @@ impl RouteMatcher {
             for (pattern, hook) in routes {
                 if let Some(params) = pattern.try_match_path(path) {
                     ctx.set_route_params(params);
-                    return Some(hook.clone());
+                    return Some(hook);
                 }
             }
         }
         for (&segment_count, routes) in self.get_regex_route() {
-            if segment_count == path_segment_count {
+            if segment_count >= path_segment_count {
                 continue;
             }
             for (pattern, hook) in routes {
                 if pattern.has_tail_regex()
-                    && path_segment_count >= segment_count
                     && let Some(params) = pattern.try_match_path(path)
                 {
                     ctx.set_route_params(params);
-                    return Some(hook.clone());
+                    return Some(hook);
                 }
             }
         }

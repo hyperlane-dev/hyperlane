@@ -14,6 +14,7 @@ fn server_config_from_json() {
     new_server_config
         .set_address("0.0.0.0:80")
         .set_nodelay(Some(true))
-        .set_ttl(Some(64));
+        .set_ttl(Some(64))
+        .set_listen_backlog(None);
     assert_eq!(server_config, new_server_config);
 }
