@@ -1,4 +1,4 @@
-use crate::*;
+use super::*;
 
 #[tokio::test]
 #[should_panic(expected = "EmptyPattern")]

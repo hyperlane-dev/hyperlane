@@ -1,4 +1,4 @@
-use crate::*;
+use super::*;
 
 // Associate a plugin registry with the specified type.
 collect!(HookType);

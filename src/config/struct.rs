@@ -1,4 +1,4 @@
-use crate::*;
+use super::*;
 
 /// Represents the server configuration.
 ///
