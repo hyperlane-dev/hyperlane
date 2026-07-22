@@ -2,14 +2,14 @@ use super::*;
 
 /// Implementation of `From` trait for converting external errors into `ServerError`.
 ///
-/// This allows using the `?` operator to automatically convert `std::io::Error`
+/// This allows using the `?` operator to automatically convert `IoError`
 /// into `ServerError::TcpBind` when binding to a TCP socket.
 impl From<std::io::Error> for ServerError {
-    /// Creates a new `ServerError::TcpBind` instance from a `std::io::Error`.
+    /// Creates a new `ServerError::TcpBind` instance from a `IoError`.
     ///
     /// # Arguments
     ///
-    /// - `std::io::Error` - The `std::io::Error` to convert.
+    /// - `IoError` - The `IoError` to convert.
     ///
     /// # Returns
     ///

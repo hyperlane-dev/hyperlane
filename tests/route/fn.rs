@@ -117,7 +117,7 @@ fn large_dynamic_routes() {
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/123");
-        let _ = route_matcher.try_resolve_route(&mut ctx, &path);
+        let _: Option<&ServerHookHandler> = route_matcher.try_resolve_route(&mut ctx, &path);
     }
     let match_duration: Duration = start_match.elapsed();
     println!(
@@ -150,7 +150,7 @@ fn large_regex_routes() {
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/123");
-        let _ = route_matcher.try_resolve_route(&mut ctx, &path);
+        let _: Option<&ServerHookHandler> = route_matcher.try_resolve_route(&mut ctx, &path);
     }
     let match_duration: Duration = start_match.elapsed();
     println!(
@@ -183,7 +183,7 @@ fn large_tail_regex_routes() {
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/some/nested/path");
-        let _ = route_matcher.try_resolve_route(&mut ctx, &path);
+        let _: Option<&ServerHookHandler> = route_matcher.try_resolve_route(&mut ctx, &path);
     }
     let match_duration: Duration = start_match.elapsed();
     println!(

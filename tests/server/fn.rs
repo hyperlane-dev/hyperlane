@@ -170,7 +170,7 @@ async fn main() {
     server.route::<GetAllRoutes>("/get/all/routes");
     server.route::<DynamicRoute>("/dynamic/{routing}");
     server.route::<DynamicRoute>("/regex/{file:^.*$}");
-    let _ = SERVER_REF.set(server.clone());
+    let _: Result<(), Server> = SERVER_REF.set(server.clone());
     let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
     let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
     spawn(async move {

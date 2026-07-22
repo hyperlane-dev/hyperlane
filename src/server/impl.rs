@@ -569,8 +569,8 @@ impl Server {
                 }
             }
             unsafe {
-                let _ = Box::from_raw(ctx);
-                let _ = Box::from_raw(stream);
+                let _: Box<Context> = Box::from_raw(ctx);
+                let _: Box<Stream> = Box::from_raw(stream);
             }
         };
     }
@@ -585,10 +585,10 @@ impl Server {
     fn configure_stream(&self, stream: &TcpStream) {
         let config: &ServerConfig = self.get_server_config();
         if let Some(nodelay) = config.try_get_nodelay() {
-            let _ = stream.set_nodelay(*nodelay);
+            let _: Result<(), std::io::Error> = stream.set_nodelay(*nodelay);
         }
         if let Some(ttl) = config.try_get_ttl() {
-            let _ = stream.set_ttl(*ttl);
+            let _: Result<(), std::io::Error> = stream.set_ttl(*ttl);
         }
     }
 
@@ -780,8 +780,8 @@ impl Server {
             }
         }
         unsafe {
-            let _ = Box::from_raw(ctx);
-            let _ = Box::from_raw(stream);
+            let _: Box<Context> = Box::from_raw(ctx);
+            let _: Box<Stream> = Box::from_raw(stream);
         }
     }
 
@@ -825,22 +825,25 @@ impl Server {
         let (shutdown_sender, mut shutdown_receiver) = channel(());
         let accept_connections: JoinHandle<()> = spawn(async move {
             server.tcp_accept(&tcp_listener).await;
-            let _ = wait_sender.send(());
+            let _: Result<(), tokio::sync::watch::error::SendError<()>> = wait_sender.send(());
         });
         let wait_hook: ServerControlHookHandler<()> = Arc::new(move || {
             let mut wait_receiver_clone: Receiver<()> = wait_receiver.clone();
             Box::pin(async move {
-                let _ = wait_receiver_clone.changed().await;
+                let _: Result<(), tokio::sync::watch::error::RecvError> =
+                    wait_receiver_clone.changed().await;
             })
         });
         let shutdown_hook: ServerControlHookHandler<()> = Arc::new(move || {
             let shutdown_sender_clone: Sender<()> = shutdown_sender.clone();
             Box::pin(async move {
-                let _ = shutdown_sender_clone.send(());
+                let _: Result<(), tokio::sync::watch::error::SendError<()>> =
+                    shutdown_sender_clone.send(());
             })
         });
         spawn(async move {
-            let _ = shutdown_receiver.changed().await;
+            let _: Result<(), tokio::sync::watch::error::RecvError> =
+                shutdown_receiver.changed().await;
             accept_connections.abort();
         });
         let mut server_control_hook: ServerControlHook = ServerControlHook::default();
