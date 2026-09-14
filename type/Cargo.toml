@@ -1,0 +1,47 @@
+[package]
+name = "hyperlane-type"
+version = "21.3.6"
+readme = "README.md"
+edition = "2024"
+authors = ["root@ltpp.vip"]
+license = "MIT"
+description = """A comprehensive Rust type library for HTTP operations and concurrent programming. Provides core HTTP types (Request/Response with builder patterns, Method, HttpStatus, HttpVersion, ContentType, FileExtension with MIME mapping, Cookie parsing/building, HttpUrl parsing, WebSocket frame/opcode, protocol upgrade types, stream/task management, panic handling), thread-safe concurrent wrappers (ArcMutex, ArcRwLock, BoxRwLock, RcRwLock), dynamic dispatch types (BoxAny, RcAny, ArcAny with Send/Sync variants), high-performance hash collections (HashMapXxHash3_64, HashSetXxHash3_64), and static lifetime utilities (BoxLeak, Lifetime trait)."""
+keywords = ["http", "request", "response", "tcp", "redirect"]
+repository = "https://github.com/hyperlane-dev/hyperlane.git"
+categories = ["network-programming", "web-programming"]
+exclude = ["target", "Cargo.lock", "sh", ".github"]
+
+[dependencies]
+hex = "0.4.3"
+url = "2.5.8"
+serde_json = "1.0.151"
+serde-xml-rs = "0.8.2"
+http-compress = "3.0.28"
+http-constant = "5.6.15"
+lombok-macros = "2.0.36"
+serde_urlencoded = "0.7.1"
+tokio = { version = "1.53.1", features = ["full"] }
+serde = { version = "1.0.229", features = ["derive"] }
+
+[dev-dependencies]
+tokio = { version = "1.53.1", features = ["full"] }
+serde = { version = "1.0.229", features = ["derive"] }
+url = "2.5.8"
+
+[profile.dev]
+incremental = false
+opt-level = 3
+lto = true
+panic = "unwind"
+debug = false
+codegen-units = 1
+strip = "debuginfo"
+
+[profile.release]
+incremental = false
+opt-level = 3
+lto = true
+panic = "unwind"
+debug = false
+codegen-units = 1
+strip = "debuginfo"

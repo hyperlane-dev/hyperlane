@@ -1,0 +1,51 @@
+[package]
+name = "hyperlane-macros"
+version = "21.3.6"
+readme = "README.md"
+edition = "2024"
+authors = ["root@ltpp.vip"]
+license = "MIT"
+description = """A comprehensive collection of procedural macros for building HTTP servers with enhanced functionality. This crate provides attribute macros that simplify HTTP request handling, protocol validation, response management, and request data extraction."""
+keywords = ["http", "request", "response", "tcp", "cross-platform"]
+repository = "https://github.com/hyperlane-dev/hyperlane.git"
+categories = ["network-programming", "web-programming"]
+exclude = [
+    "target",
+    "Cargo.lock",
+    "sh",
+    ".github",
+    "logs",
+    "img",
+    "**/*.log",
+    "debug",
+]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+hyperlane-core = { path = "../core", version = "21.3.6" }
+quote = "1.0.47"
+proc-macro2 = "1.0.107"
+syn = { version = "2.0.119", features = ["full"] }
+
+[dev-dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+
+[profile.dev]
+incremental = false
+opt-level = 3
+lto = true
+panic = "unwind"
+debug = false
+codegen-units = 1
+strip = "debuginfo"
+
+[profile.release]
+incremental = false
+opt-level = 3
+lto = true
+panic = "unwind"
+debug = false
+codegen-units = 1
+strip = "debuginfo"

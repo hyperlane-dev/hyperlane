@@ -1,0 +1,50 @@
+[package]
+name = "hyperlane-cli"
+version = "21.3.6"
+readme = "README.md"
+edition = "2024"
+authors = ["root@ltpp.vip"]
+license = "MIT"
+description = """A command-line tool for Hyperlane framework."""
+keywords = ["output", "console", "log", "print", "color"]
+repository = "https://github.com/hyperlane-dev/hyperlane.git"
+categories = ["command-line-interface", "development-tools", "visualization"]
+exclude = ["target", "Cargo.lock", "sh", ".github", "tmp"]
+
+[[bin]]
+name = "hyperlane"
+path = "src/main.rs"
+
+[dependencies]
+toml = "0.9.12"
+regex = "1.13.1"
+thiserror = "2.0.19"
+tokio = { version = "1.53.1", features = ["full"] }
+log = "0.4.33"
+which = "8.0.5"
+notify = { version = "8.2.0", default-features = false, features = [
+    "macos_fsevent",
+] }
+color-output = "10.0.10"
+lombok-macros = "2.0.36"
+hyperlane-core = { path = "../core", version = "21.3.6" }
+hyperlane-type = { path = "../type", version = "21.3.6" }
+hyperlane-macros = { path = "../macros", version = "21.3.6" }
+
+[profile.dev]
+incremental = false
+opt-level = 3
+lto = true
+panic = "unwind"
+debug = false
+codegen-units = 1
+strip = "debuginfo"
+
+[profile.release]
+incremental = false
+opt-level = 3
+lto = true
+panic = "unwind"
+debug = false
+codegen-units = 1
+strip = "debuginfo"

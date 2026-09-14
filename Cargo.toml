@@ -1,22 +1,41 @@
-[package]
-name = "hyperlane"
+[workspace]
+resolver = "2"
+members = [
+    "core",
+    "macros",
+    "type",
+    "cli",
+]
+
+[workspace.package]
 version = "21.3.6"
-readme = "README.md"
 edition = "2024"
 authors = ["root@ltpp.vip"]
 license = "MIT"
+repository = "https://github.com/hyperlane-dev/hyperlane.git"
+
+[workspace.dependencies]
+hyperlane-core = { path = "core", version = "21.3.6" }
+hyperlane-macros = { path = "macros", version = "21.3.6" }
+hyperlane-type = { path = "type", version = "21.3.6" }
+hyperlane-cli = { path = "cli", version = "21.3.6" }
+
+[package]
+name = "hyperlane"
+version.workspace = true
+readme = "README.md"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
 description = """A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility."""
 keywords = ["http", "request", "response", "tcp", "cross-platform"]
-repository = "https://github.com/hyperlane-dev/hyperlane.git"
+repository.workspace = true
 categories = ["network-programming", "web-programming"]
 exclude = ["target", "Cargo.lock", "sh", ".github", "logs", "img", "**/*.log"]
 
 [dependencies]
-regex = "1.13.1"
-http-type = "20.1.9"
-inventory = "0.3.24"
-lombok-macros = "2.0.36"
-serde = { version = "1.0.229", features = ["derive"] }
+hyperlane-core = { workspace = true }
+hyperlane-macros = { workspace = true }
 
 [profile.dev]
 incremental = false

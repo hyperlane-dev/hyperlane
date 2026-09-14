@@ -1,0 +1,32 @@
+# Explicit LF enforcement for tracked source/config files
+# (overrides any local phantom writes that introduce CRLF)
+*.rs        text eol=lf
+*.toml      text eol=lf
+*.md        text eol=lf
+*.json      text eol=lf
+*.html      text eol=lf
+*.js        text eol=lf
+*.css       text eol=lf
+*.lock      text eol=lf
+*.yaml      text eol=lf
+*.yml       text eol=lf
+*.sh        text eol=lf
+*.bash      text eol=lf
+*.txt       text eol=lf
+
+# Force binary for non-text
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.webp      binary
+*.wasm      binary
+*.zip       binary
+*.tar       binary
+*.gz        binary
+*.pdf       binary
+*.exe       binary
+*.dll       binary
+*.so        binary
+*.dylib     binary

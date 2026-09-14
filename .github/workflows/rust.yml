@@ -2,6 +2,8 @@ name: Rust
 on:
   push:
     branches: [master]
+  pull_request:
+    branches: [master]
 env:
   CARGO_TERM_COLOR: always
 jobs:
@@ -11,6 +13,7 @@ jobs:
       version: ${{ steps.read.outputs.version }}
       tag: ${{ steps.read.outputs.tag }}
       package_name: ${{ steps.read.outputs.package_name }}
+      branch_name: ${{ steps.read.outputs.branch_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,120 +32,335 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Install toml-cli
-        run: cargo install toml-cli
       - name: Cache toml-cli
+        id: cache_toml_cli
         uses: actions/cache@v3
         with:
           path: ~/.cargo/bin/toml
           key: toml-cli-${{ runner.os }}
+      - name: Install toml-cli
+        if: steps.cache_toml_cli.outputs.cache-hit != 'true'
+        run: |
+          for i in 1 2 3 4 5 6 7 8; do
+            if cargo install toml-cli; then
+              break
+            fi
+            echo "🔁 Retrying..."
+          done
       - name: Read cargo metadata
         id: read
         run: |
           VERSION=$(toml get Cargo.toml package.version --raw)
           PACKAGE_NAME=$(toml get Cargo.toml package.name --raw)
+          BRANCH_NAME="${{ github.ref_name }}"
           echo "📦 Detected package: $PACKAGE_NAME v$VERSION"
+          echo "🌿 Branch: $BRANCH_NAME"
           if [ -z "$VERSION" ] || [ -z "$PACKAGE_NAME" ]; then
             echo "❌ Failed to read package info from Cargo.toml"
           fi
+          if [ "$BRANCH_NAME" = "master" ]; then
+            TAG="v$VERSION"
+          else
+            TAG="v$VERSION-$BRANCH_NAME"
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "package_name=$PACKAGE_NAME" >> $GITHUB_OUTPUT
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
-  check:
+  sync_workspace_version:
+    permissions:
+      contents: write
     needs: setup
+    if: github.event_name == 'push' && github.ref_name == 'master'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - name: Restore toml-cli
+        id: cache_toml_cli
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/bin/toml
+          key: toml-cli-${{ runner.os }}
+      - name: Install toml-cli
+        if: steps.cache_toml_cli.outputs.cache-hit != 'true'
+        run: |
+          for i in 1 2 3 4 5 6 7 8; do
+            if cargo install toml-cli; then
+              break
+            fi
+            echo "🔁 Retrying..."
+          done
+      - name: Sync workspace version
+        run: |
+          VERSION="${{ needs.setup.outputs.version }}"
+          ROOT_DIR=$(pwd)
+          echo "🔧 Syncing all versions to $VERSION"
+
+          MEMBER_PKG_NAMES=""
+          MEMBERS=$(toml get Cargo.toml workspace.members --raw | tr -d '[]"' | sed 's/,/\n/g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$')
+          echo "📋 Found workspace members: $MEMBERS"
+          for member in $MEMBERS; do
+            SUB_TOML="${ROOT_DIR}/${member}/Cargo.toml"
+            if [ -f "$SUB_TOML" ]; then
+              PKG_NAME=$(toml get "$SUB_TOML" package.name --raw)
+              MEMBER_PKG_NAMES="$MEMBER_PKG_NAMES $PKG_NAME"
+              echo "📋 Member: $member -> package: $PKG_NAME"
+            else
+              echo "⚠️ $SUB_TOML not found, skipping"
+            fi
+          done
+
+          ROOT_PKG_NAME=$(toml get Cargo.toml package.name --raw)
+          MEMBER_PKG_NAMES="$MEMBER_PKG_NAMES $ROOT_PKG_NAME"
+
+          SUB_TABLE_PKGS=$(grep -oP '^\[workspace\.dependencies\.\K[^\]]+' Cargo.toml || true)
+          for pkg_name in $SUB_TABLE_PKGS; do
+            if ! echo "$MEMBER_PKG_NAMES" | grep -qw "$pkg_name"; then
+              MEMBER_PKG_NAMES="$MEMBER_PKG_NAMES $pkg_name"
+            fi
+          done
+
+          echo "📋 All package names to sync:$MEMBER_PKG_NAMES"
+
+          for pkg_name in $MEMBER_PKG_NAMES; do
+            if grep -q "^${pkg_name}[[:space:]]*=" Cargo.toml && grep -q "^${pkg_name}[[:space:]]*=.*version" Cargo.toml; then
+              sed -i -E "s|^(${pkg_name}[[:space:]]*=[[:space:]]*\{.*version[[:space:]]*=[[:space:]]*\")([^\"]+)(\".*)|\1${VERSION}\3|" Cargo.toml
+              echo "🔧 workspace.dependencies.${pkg_name}.version -> $VERSION (inline)"
+            elif grep -q "^\[workspace\.dependencies\.${pkg_name}\]" Cargo.toml; then
+              sed -i -E "/^\[workspace\.dependencies\.${pkg_name}\]/,/^\[/ s|^(version[[:space:]]*=[[:space:]]*\")([^\"]+)(\")|\1${VERSION}\3|" Cargo.toml
+              echo "🔧 workspace.dependencies.${pkg_name}.version -> $VERSION (sub-table)"
+            else
+              echo "⏭️ workspace.dependencies.${pkg_name} not found, skipping"
+            fi
+          done
+
+          for member in $MEMBERS; do
+            SUB_TOML="${ROOT_DIR}/${member}/Cargo.toml"
+            if [ -f "$SUB_TOML" ]; then
+              sed -i -E "s|^(version[[:space:]]*=[[:space:]]*\")([^\"]+)(\")|\1${VERSION}\3|" "$SUB_TOML"
+              echo "🔧 ${member}/Cargo.toml package.version -> $VERSION"
+            else
+              echo "⚠️ ${member}/Cargo.toml not found, skipping"
+            fi
+          done
+
+          sed -i -E "0,/^(version[[:space:]]*=[[:space:]]*\")([^\"]+)(\")/s|^(version[[:space:]]*=[[:space:]]*\")([^\"]+)(\")|\1${VERSION}\3|" Cargo.toml
+          echo "🔧 Cargo.toml package.version -> $VERSION"
+      - name: Update Cargo.lock
+        run: cargo generate-lockfile
+      - name: Commit and push
+        run: |
+          git config user.name "eastspire"
+          git config user.email "root@ltpp.vip"
+          git add -A
+          git diff --cached --quiet || git commit -m "chore: sync all package versions to ${{ needs.setup.outputs.version }}"
+          git push
+
+  check:
+    needs: sync_workspace_version
+    if: always() && (github.event_name == 'pull_request' || (github.event_name == 'push' && needs.sync_workspace_version.result == 'success'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
       - name: Setup rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
           components: rustfmt
       - name: Format check
-        run: cargo fmt -- --check
+        run: cargo fmt --all -- --check
 
   tests:
-    needs: setup
+    needs: sync_workspace_version
+    if: always() && (github.event_name == 'pull_request' || (github.event_name == 'push' && needs.sync_workspace_version.result == 'success'))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
       - name: Prepare environment
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
       - name: Run tests
-        run: cargo test --all-features -- --nocapture
+        run: cargo test --workspace --all-features -- --nocapture
 
   clippy:
-    needs: setup
+    needs: sync_workspace_version
+    if: always() && (github.event_name == 'pull_request' || (github.event_name == 'push' && needs.sync_workspace_version.result == 'success'))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
       - name: Load clippy
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
           components: clippy
       - name: Run clippy
-        run: cargo clippy --all-features
+        run: cargo clippy --workspace --all-features --all-targets
 
   build:
-    needs: setup
+    needs: sync_workspace_version
+    if: always() && (github.event_name == 'pull_request' || (github.event_name == 'push' && needs.sync_workspace_version.result == 'success'))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
       - name: Setup build
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
       - name: Build release
-        run: cargo check --release --all-features
+        run: cargo check --release --workspace --all-features
 
   publish:
-    needs: [setup, check, tests, clippy, build]
-    if: needs.setup.outputs.tag != ''
+    permissions:
+      contents: write
+    needs: [setup, sync_workspace_version, check, tests, clippy, build]
+    if: always() && github.event_name == 'push' && github.ref_name == 'master' && needs.setup.outputs.tag != '' && needs.check.result == 'success' && needs.tests.result == 'success' && needs.clippy.result == 'success' && needs.build.result == 'success'
     runs-on: ubuntu-latest
     outputs:
       published: ${{ steps.publish.outputs.published }}
     steps:
+      - name: Check branch
+        id: check_branch
+        run: |
+          if [ "${{ needs.setup.outputs.branch_name }}" != "master" ]; then
+            echo "⚠️ Not on master branch (current: ${{ needs.setup.outputs.branch_name }}), skipping publish"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "✅ On master branch, proceeding with publish"
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
       - name: Checkout
+        if: steps.check_branch.outputs.skip == 'false'
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
       - name: Restore toml-cli
+        if: steps.check_branch.outputs.skip == 'false'
         uses: actions/cache@v3
         with:
           path: ~/.cargo/bin/toml
           key: toml-cli-${{ runner.os }}
+      - name: Install cargo-release
+        if: steps.check_branch.outputs.skip == 'false'
+        run: |
+          for i in 1 2 3 4 5 6 7 8; do
+            if cargo install cargo-release; then
+              break
+            fi
+            echo "🔁 Retrying..."
+          done
+      - name: Configure git
+        if: steps.check_branch.outputs.skip == 'false'
+        run: |
+          git config user.name "eastspire"
+          git config user.email "root@ltpp.vip"
       - name: Publish to crates.io
         id: publish
+        if: steps.check_branch.outputs.skip == 'false'
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
-          set -e
           echo "published=false" >> $GITHUB_OUTPUT
           echo "${{ secrets.CARGO_REGISTRY_TOKEN }}" | cargo login
-          PACKAGE_NAME=$(toml get Cargo.toml package.name --raw)
-          VERSION=${{ needs.setup.outputs.version }}
-          if cargo publish --allow-dirty; then
-            echo "published=true" >> $GITHUB_OUTPUT
+          VERSION="${{ needs.setup.outputs.version }}"
+          PUBLISH_ORDER=("hyperlane-type" "hyperlane-macros" "hyperlane-core" "hyperlane-cli" "hyperlane")
+          SKIP_PACKAGES=()
+          MAIN_PACKAGE="hyperlane"
+          declare -A PUBLISH_RESULT
+          for PKG_NAME in "${PUBLISH_ORDER[@]}"; do
+            for SKIP in "${SKIP_PACKAGES[@]}"; do
+              if [ "$PKG_NAME" = "$SKIP" ]; then
+                echo "⏭️ Skipping $PKG_NAME (publish = false)"
+                continue 2
+              fi
+            done
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "📦 Publishing $PKG_NAME v$VERSION"
+            PKG_PUBLISHED=false
+            for ((i=1; i<=36; i++)); do
+              echo "🚀 Attempt $i/36: publishing $PKG_NAME v$VERSION"
+              set +e
+              PUBLISH_OUTPUT=$(cargo publish -p "$PKG_NAME" --allow-dirty --no-verify 2>&1)
+              PUBLISH_EXIT_CODE=$?
+              set -e
+              echo "$PUBLISH_OUTPUT"
+              if [ $PUBLISH_EXIT_CODE -eq 0 ]; then
+                echo "✅ $PKG_NAME v$VERSION publish exited with code 0"
+                PKG_PUBLISHED=true
+                break
+              fi
+              if echo "$PUBLISH_OUTPUT" | grep -q "is already published"; then
+                echo "📦 $PKG_NAME v$VERSION is already published to crates.io"
+                PKG_PUBLISHED=true
+                break
+              fi
+              if echo "$PUBLISH_OUTPUT" | grep -q "already been uploaded"; then
+                echo "📦 $PKG_NAME v$VERSION is already uploaded to crates.io"
+                PKG_PUBLISHED=true
+                break
+              fi
+              echo "⚠️ Attempt $i failed for $PKG_NAME (exit code: $PUBLISH_EXIT_CODE)"
+              if echo "$PUBLISH_OUTPUT" | grep -qi "unauthorized\|forbidden\|token\|credential"; then
+                echo "🚫 Authentication error detected, aborting $PKG_NAME"
+                break
+              fi
+              if [ "$i" -lt "36" ]; then
+                echo "🔁 Retrying..."
+              fi
+            done
+            PUBLISH_RESULT[$PKG_NAME]=$PKG_PUBLISHED
+            if [ "$PKG_PUBLISHED" = "true" ]; then
+              VERIFY_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "User-Agent: hyperlane" "https://crates.io/api/v1/crates/$PKG_NAME/$VERSION" || echo "000")
+              if [ "$VERIFY_HTTP_CODE" = "200" ]; then
+                echo "✅ $PKG_NAME v$VERSION verified on crates.io (HTTP 200)"
+              else
+                echo "⚠️ $PKG_NAME v$VERSION could not be verified (HTTP $VERIFY_HTTP_CODE), but publish reported success - continuing"
+              fi
+            else
+              echo "❌ $PKG_NAME v$VERSION failed to publish, continuing with next package"
+            fi
+          done
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📋 Publish Summary:"
+          for PKG_NAME in "${PUBLISH_ORDER[@]}"; do
+            if [ "${PUBLISH_RESULT[$PKG_NAME]:-false}" = "true" ]; then
+              echo "  ✅ $PKG_NAME v$VERSION"
+            else
+              echo "  ❌ $PKG_NAME v$VERSION"
+            fi
+          done
+          if [ "${PUBLISH_RESULT[$MAIN_PACKAGE]:-false}" = "true" ]; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
             echo "🎉🎉🎉 PUBLISH SUCCESSFUL 🎉🎉🎉"
-            echo "✅ Successfully published $PACKAGE_NAME v$VERSION to crates.io"
-            echo "📦 Crates.io: [https://crates.io/crates/$PACKAGE_NAME/$VERSION](https://crates.io/crates/$PACKAGE_NAME/$VERSION)"
-            echo "📚 Docs.rs: [https://docs.rs/$PACKAGE_NAME/$VERSION](https://docs.rs/$PACKAGE_NAME/$VERSION)"
+            echo "✅ Main package $MAIN_PACKAGE v$VERSION published to crates.io"
+            echo "📦 Crates.io: https://crates.io/crates/$MAIN_PACKAGE/$VERSION"
+            echo "📚 Docs.rs: https://docs.rs/$MAIN_PACKAGE/$VERSION"
           else
-            echo "❌ Publish failed"
+            echo "❌ Main package $MAIN_PACKAGE v$VERSION failed to publish"
           fi
 
   release:
-    needs: [setup, check, tests, clippy, build]
+    needs: [setup, sync_workspace_version, check, tests, clippy, build, publish]
     permissions:
       contents: write
       packages: write
-    if: needs.setup.outputs.tag != ''
+    if: always() && github.event_name == 'push' && github.ref_name == 'master' && needs.setup.outputs.tag != '' && needs.publish.result == 'success'
     runs-on: ubuntu-latest
     outputs:
       released: ${{ steps.release.outputs.released }}
@@ -150,11 +368,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.ref }}
           fetch-depth: 0
-      - name: Get package name
+      - name: Get package name and branch info
         id: package_info
         run: |
           echo "package_name=${{ needs.setup.outputs.package_name }}" >> $GITHUB_OUTPUT
+          echo "branch_name=${{ needs.setup.outputs.branch_name }}" >> $GITHUB_OUTPUT
       - name: Check tag status
         id: check_tag
         run: |
@@ -199,21 +419,24 @@ jobs:
             echo "🔄 Updating existing release: $TAG"
             gh release view "$TAG" --json assets --jq '.assets[].name' | while read asset; do
               if [ -n "$asset" ]; then
-                echo "🗑️ Deleting asset: $asset"
+                echo "🗑️ deleting asset: $asset"
                 gh release delete-asset "$TAG" "$asset" --yes || true
               fi
             done
+            BRANCH_NAME="${{ steps.package_info.outputs.branch_name }}"
+            TITLE="[$BRANCH_NAME]($TAG updated $(date '+%Y-%m-%d %H:%M:%S'))"
             if gh release edit "$TAG" \
-              --title "$TAG (Updated $(date '+%Y-%m-%d %H:%M:%S'))" \
-              --notes "Release $TAG - Updated at $(date '+%Y-%m-%d %H:%M:%S UTC')
-            ## Changes
-            - Version: $VERSION
-            - Package: $PACKAGE_NAME
-            ## Links
-            📦 [Crate on crates.io](https://crates.io/crates/$PACKAGE_NAME/$VERSION)
-            📚 [Documentation on docs.rs](https://docs.rs/$PACKAGE_NAME/$VERSION)
-            📋 [Commit History](https://github.com/${{ github.repository }}/commits/$TAG)" && \
-               gh release upload "$TAG" "${PACKAGE_NAME}-${VERSION}.zip" "${PACKAGE_NAME}-${VERSION}.tar.gz" --clobber; then
+                --title "$TITLE" \
+                --notes "[$BRANCH_NAME] - release $TAG updated at $(date '+%Y-%m-%d %H:%M:%S UTC')
+              ## Changes
+              - Branch: $BRANCH_NAME
+              - Version: $VERSION
+              - Package: $PACKAGE_NAME
+              ## Links
+              📦 [Crate on crates.io](https://crates.io/crates/$PACKAGE_NAME/$VERSION)
+              📚 [Documentation on docs.rs](https://docs.rs/$PACKAGE_NAME/$VERSION)
+              📋 [Commit History](https://github.com/${{ github.repository }}/commits/$TAG)" && \
+                 gh release upload "$TAG" "${PACKAGE_NAME}-${VERSION}.zip" "${PACKAGE_NAME}-${VERSION}.tar.gz" --clobber; then
               echo "released=true" >> $GITHUB_OUTPUT
               echo "✅ Updated release $TAG"
               echo "🔖 Tag: $TAG"
@@ -223,15 +446,18 @@ jobs:
             fi
           else
             if [ "${{ steps.check_tag.outputs.remote_tag_exists }}" = "false" ]; then
-              echo "🏷️ Creating and pushing tag: $TAG"
+              echo "🏷️ creating and pushing tag: $TAG"
               git tag "$TAG"
               git push origin "$TAG"
             fi
-            echo "🆕 Creating new release: $TAG"
+            echo "🆕 creating new release: $TAG"
+            BRANCH_NAME="${{ steps.package_info.outputs.branch_name }}"
+            TITLE="[$BRANCH_NAME]($TAG created $(date '+%Y-%m-%d %H:%M:%S'))"
             if gh release create "$TAG" \
-              --title "$TAG (Created $(date '+%Y-%m-%d %H:%M:%S'))" \
-              --notes "Release $TAG - Created at $(date '+%Y-%m-%d %H:%M:%S UTC')
+              --title "$TITLE" \
+              --notes "[$BRANCH_NAME] - release $TAG created at $(date '+%Y-%m-%d %H:%M:%S UTC')
             ## Changes
+            - Branch: $BRANCH_NAME
             - Version: $VERSION
             - Package: $PACKAGE_NAME
             ## Links
@@ -241,11 +467,11 @@ jobs:
               --latest && \
                gh release upload "$TAG" "${PACKAGE_NAME}-${VERSION}.zip" "${PACKAGE_NAME}-${VERSION}.tar.gz"; then
               echo "released=true" >> $GITHUB_OUTPUT
-              echo "✅ Created release $TAG"
-              echo "🔖 Tag: $TAG"
-              echo "🚀 Release: [GitHub Release](${{ github.server_url }}/${{ github.repository }}/releases/tag/$TAG)"
+              echo "✅ created release $TAG"
+              echo "🔖 tag: $TAG"
+              echo "🚀 release: [GitHub Release](${{ github.server_url }}/${{ github.repository }}/releases/tag/$TAG)"
             else
-              echo "❌ Failed to create release"
+              echo "❌ failed to create release"
             fi
           fi
         env:
