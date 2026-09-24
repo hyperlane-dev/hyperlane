@@ -1,50 +1,41 @@
 [package]
 name = "hyperlane-cli"
-version = "21.3.6"
-readme = "README.md"
-edition = "2024"
-authors = ["root@ltpp.vip"]
-license = "MIT"
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
 description = """A command-line tool for Hyperlane framework."""
 keywords = ["output", "console", "log", "print", "color"]
-repository = "https://github.com/hyperlane-dev/hyperlane.git"
 categories = ["command-line-interface", "development-tools", "visualization"]
-exclude = ["target", "Cargo.lock", "sh", ".github", "tmp"]
+exclude = [
+    '**/*.log',
+    '.github',
+    'Cargo.lock',
+    'debug',
+    'img',
+    'logs',
+    'sh',
+    'target',
+    'tmp',
+]
 
 [[bin]]
 name = "hyperlane"
 path = "src/main.rs"
 
 [dependencies]
-toml = "0.9.12"
-regex = "1.13.1"
-thiserror = "2.0.19"
-tokio = { version = "1.53.1", features = ["full"] }
-log = "0.4.33"
-which = "8.0.5"
-notify = { version = "8.2.0", default-features = false, features = [
-    "macos_fsevent",
-] }
-color-output = "10.0.10"
-lombok-macros = "2.0.36"
-hyperlane-core = { path = "../core", version = "21.3.6" }
-hyperlane-type = { path = "../type", version = "21.3.6" }
-hyperlane-macros = { path = "../macros", version = "21.3.6" }
+hyperlane-core = { workspace = true }
+hyperlane-type = { workspace = true }
+hyperlane-macros = { workspace = true }
 
-[profile.dev]
-incremental = false
-opt-level = 3
-lto = true
-panic = "unwind"
-debug = false
-codegen-units = 1
-strip = "debuginfo"
-
-[profile.release]
-incremental = false
-opt-level = 3
-lto = true
-panic = "unwind"
-debug = false
-codegen-units = 1
-strip = "debuginfo"
+log = { workspace = true }
+toml = { workspace = true }
+regex = { workspace = true }
+tokio = { workspace = true }
+which = { workspace = true }
+notify = { workspace = true }
+thiserror = { workspace = true }
+color-output = { workspace = true }
+lombok-macros = { workspace = true }

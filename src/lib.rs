@@ -1,2 +1,1 @@
-pub use hyperlane_core::*;
-pub use hyperlane_macros::*;
+pub use {hyperlane_core::*, hyperlane_macros::*};

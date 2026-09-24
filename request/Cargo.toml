@@ -1,0 +1,26 @@
+[package]
+name = "http-request"
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """http-request is a lightweight, efficient library for building, sending, and handling HTTP/HTTPS requests in Rust applications. It provides a simple and intuitive API, allowing developers to easily interact with web services, whether they use the "HTTP" or "HTTPS" protocol. The library supports various HTTP methods, custom headers, request bodies, timeout, automatic handling of redirects (including detecting redirect loops), and enhanced response body decoding (both automatic and manual), enabling fast and secure communication. Whether working with secure "HTTPS" connections or standard "HTTP" requests, the library is optimized for performance, minimal resource usage, and easy integration into Rust projects."""
+keywords = ["http", "request", "response", "tcp", "redirect"]
+categories = ["network-programming", "web-programming"]
+exclude = ['**/*.log', '.github', 'Cargo.lock', 'debug', 'img', 'logs', 'sh', 'target', 'tmp']
+
+[dependencies]
+serde = { workspace = true }
+futures = { workspace = true }
+http-type = { workspace = true }
+serde_json = { workspace = true }
+tungstenite = { workspace = true }
+webpki-roots = { workspace = true }
+tokio-tungstenite = { workspace = true }
+rustls = { workspace = true }
+tokio-rustls = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

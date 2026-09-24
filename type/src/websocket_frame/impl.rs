@@ -319,9 +319,9 @@ impl WebSocketFrame {
             padded_data.push(0);
         }
         padded_data.extend_from_slice(&original_size_bits.to_be_bytes());
-        for block in padded_data.chunks_exact(64) {
+        for block in padded_data.as_chunks::<64>().0 {
             let mut message_schedule: [u32; 80] = [0u32; 80];
-            for (chunk_index, block_chunk) in block.chunks_exact(4).enumerate().take(16) {
+            for (chunk_index, block_chunk) in block.as_chunks::<4>().0.iter().enumerate().take(16) {
                 message_schedule[chunk_index] = u32::from_be_bytes([
                     block_chunk[0],
                     block_chunk[1],

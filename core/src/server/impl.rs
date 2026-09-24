@@ -817,9 +817,11 @@ impl Server {
     /// Returns a `Result` containing a shutdown function on success.
     /// Calling this function will shut down the server by aborting its main task.
     /// Returns an error if the server fails to start.
-    pub async fn run(&self) -> Result<ServerControlHook, ServerError> {
+    pub async fn run(&self) -> Result<ServerControlHook, Box<ServerError>> {
         let bind_address: &String = self.get_server_config().get_address();
-        let tcp_listener: TcpListener = TcpListener::bind(&bind_address).await?;
+        let tcp_listener: TcpListener = TcpListener::bind(&bind_address)
+            .await
+            .map_err(|error| Box::new(ServerError::from(error)))?;
         let server: &'static Self = unsafe { self.leak() };
         let (wait_sender, wait_receiver) = channel(());
         let (shutdown_sender, mut shutdown_receiver) = channel(());
