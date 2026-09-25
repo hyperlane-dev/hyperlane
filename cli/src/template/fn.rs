@@ -402,11 +402,29 @@ pub async fn execute_template(
             create_model_template(&target_dir, &config.component_name, &sub_type).await?;
         }
     }
-    let _: Result<(), io::Error> = crate::fmt::format_path(&target_dir).await;
+    let _: Result<(), io::Error> = format_generated_path(&target_dir).await;
     log::info!(
         "Created {dir_name} '{}' at {}",
         config.component_name,
         target_dir.display()
     );
+    Ok(())
+}
+
+/// Run `cargo fmt` on freshly generated template code so the scaffolded
+/// files match the project formatting out of the box.
+///
+/// # Arguments
+///
+/// - `&Path`: Path to format
+///
+/// # Returns
+///
+/// - `Result<(), io::Error>`: Success or error
+async fn format_generated_path(path: &Path) -> Result<(), io::Error> {
+    let mut cmd: Command = Command::new("cargo");
+    cmd.arg("fmt").arg("--").arg(path);
+    cmd.stdout(Stdio::null()).stderr(Stdio::null());
+    cmd.status().await?;
     Ok(())
 }
