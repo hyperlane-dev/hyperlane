@@ -147,7 +147,7 @@ jobs:
           ref: ${{ github.ref }}
       - name: Install crates-cli
         if: steps.check_branch.outputs.skip == 'false'
-        run: cargo install --git https://github.com/crates-dev/ctares.git crates-cli
+        run: cargo install crates-cli
       - name: Bump and sync workspace versions
         id: bump_sync
         if: steps.check_branch.outputs.skip == 'false'
