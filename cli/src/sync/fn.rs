@@ -75,9 +75,10 @@ fn read_member_crate_name(doc: &Value) -> Result<String, SyncError> {
 fn find_dep_alias_for_member_path(deps: &Value, member_path: &str) -> Option<String> {
     let table: &toml::map::Map<String, Value> = deps.as_table()?;
     for (alias, entry) in table {
-        let entry_table: &toml::map::Map<String, Value> = entry.as_table()?;
-        let path: &Value = entry_table.get("path")?;
-        if path.as_str()? == member_path {
+        if let Some(entry_table) = entry.as_table()
+            && let Some(path) = entry_table.get("path")
+            && path.as_str() == Some(member_path)
+        {
             return Some(alias.clone());
         }
     }
