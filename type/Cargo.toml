@@ -1,0 +1,30 @@
+[package]
+name = "hyperlane-type"
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A comprehensive Rust type library for HTTP operations and concurrent programming. Provides core HTTP types (Request/Response with builder patterns, Method, HttpStatus, HttpVersion, ContentType, FileExtension with MIME mapping, Cookie parsing/building, HttpUrl parsing, WebSocket frame/opcode, protocol upgrade types, stream/task management, panic handling), thread-safe concurrent wrappers (ArcMutex, ArcRwLock, BoxRwLock, RcRwLock), dynamic dispatch types (BoxAny, RcAny, ArcAny with Send/Sync variants), high-performance hash collections (HashMapXxHash3_64, HashSetXxHash3_64), and static lifetime utilities (BoxLeak, Lifetime trait)."""
+keywords = ["http", "request", "response", "tcp", "redirect"]
+categories = ["network-programming", "web-programming"]
+exclude = ['**/*.log', '.github', 'Cargo.lock', 'debug', 'img', 'logs', 'sh', 'target', 'tmp']
+
+[dependencies]
+http-compress = { workspace = true }
+http-constant = { workspace = true }
+
+hex = { workspace = true }
+url = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+serde_json = { workspace = true }
+serde-xml-rs = { workspace = true }
+lombok-macros = { workspace = true }
+serde_urlencoded = { workspace = true }
+
+[dev-dependencies]
+url = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }

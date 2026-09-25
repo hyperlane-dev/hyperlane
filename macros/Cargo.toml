@@ -1,0 +1,25 @@
+[package]
+name = "hyperlane-macros"
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A comprehensive collection of procedural macros for building HTTP servers with enhanced functionality. This crate provides attribute macros that simplify HTTP request handling, protocol validation, response management, and request data extraction."""
+keywords = ["http", "request", "response", "tcp", "cross-platform"]
+categories = ["network-programming", "web-programming"]
+exclude = ['**/*.log', '.github', 'Cargo.lock', 'debug', 'img', 'logs', 'sh', 'target', 'tmp']
+
+[lib]
+proc-macro = true
+
+[dependencies]
+hyperlane-core = { workspace = true }
+
+syn = { workspace = true }
+quote = { workspace = true }
+proc-macro2 = { workspace = true }
+
+[dev-dependencies]
+serde = { workspace = true }

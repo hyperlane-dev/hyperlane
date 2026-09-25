@@ -1,0 +1,23 @@
+[package]
+name = "hyperlane-core"
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility."""
+keywords = ["http", "request", "response", "tcp", "cross-platform"]
+categories = ["network-programming", "web-programming"]
+exclude = ['**/*.log', '.github', 'Cargo.lock', 'debug', 'img', 'logs', 'sh', 'target', 'tmp']
+
+[dependencies]
+hyperlane-type = { workspace = true }
+
+regex = { workspace = true }
+serde = { workspace = true }
+inventory = { workspace = true }
+lombok-macros = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

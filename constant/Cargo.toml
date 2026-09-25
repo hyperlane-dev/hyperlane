@@ -1,0 +1,12 @@
+[package]
+name = "http-constant"
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A comprehensive library providing common HTTP constants for header names, versions, MIME types, and protocol identifiers."""
+keywords = ["http", "request", "response", "tcp", "redirect"]
+categories = ["network-programming", "web-programming"]
+exclude = ['**/*.log', '.github', 'Cargo.lock', 'debug', 'img', 'logs', 'sh', 'target', 'tmp']

@@ -1,0 +1,41 @@
+[package]
+name = "hyperlane-cli"
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A command-line tool for Hyperlane framework."""
+keywords = ["output", "console", "log", "print", "color"]
+categories = ["command-line-interface", "development-tools", "visualization"]
+exclude = [
+    '**/*.log',
+    '.github',
+    'Cargo.lock',
+    'debug',
+    'img',
+    'logs',
+    'sh',
+    'target',
+    'tmp',
+]
+
+[[bin]]
+name = "hyperlane"
+path = "src/main.rs"
+
+[dependencies]
+hyperlane-core = { workspace = true }
+hyperlane-type = { workspace = true }
+hyperlane-macros = { workspace = true }
+
+log = { workspace = true }
+toml = { workspace = true }
+regex = { workspace = true }
+tokio = { workspace = true }
+which = { workspace = true }
+notify = { workspace = true }
+thiserror = { workspace = true }
+color-output = { workspace = true }
+lombok-macros = { workspace = true }
