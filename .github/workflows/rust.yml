@@ -143,6 +143,24 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
+      - name: Sync workspace member versions
+        id: sync_versions
+        if: steps.check_branch.outputs.skip == 'false'
+        run: |
+          set -e
+          bash scripts/sync_versions.sh
+          if git diff --quiet Cargo.toml; then
+            echo "sync_needed=false" >> $GITHUB_OUTPUT
+            echo "Workspace member versions already in sync, no commit needed"
+          else
+            echo "sync_needed=true" >> $GITHUB_OUTPUT
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add Cargo.toml
+            git commit -m "chore: sync [workspace.dependencies] versions to v${{ needs.setup.outputs.version }}"
+            git push origin HEAD:master
+            echo "Committed and pushed Cargo.toml version sync"
+          fi
       - name: Publish to crates.io
         id: publish
         if: steps.check_branch.outputs.skip == 'false'
@@ -159,7 +177,7 @@ jobs:
             "http-compress"
             "http-constant"
             "http-request"
-            "hyperlane-type"
+            "http-type"
             "hyperlane-core"
             "hyperlane-macros"
             "hyperlane"
@@ -303,7 +321,7 @@ jobs:
             "http-compress"
             "http-constant"
             "http-request"
-            "hyperlane-type"
+            "http-type"
             "hyperlane-core"
             "hyperlane-macros"
             "hyperlane"

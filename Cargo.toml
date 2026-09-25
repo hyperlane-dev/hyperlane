@@ -25,13 +25,13 @@ resolver = "2"
 members = ["core", "macros", "type", "cli", "request", "constant", "compress"]
 
 [workspace.dependencies]
-hyperlane-cli = { path = "cli", version = "21.5.0" }
-hyperlane-core = { path = "core", version = "21.5.0" }
-hyperlane-type = { path = "type", version = "21.5.0" }
-http-compress = { path = "compress", version = "21.5.0" }
-http-constant = { path = "constant", version = "21.5.0" }
-http-request = { path = "request", version = "21.5.0" }
-hyperlane-macros = { path = "macros", version = "21.5.0" }
+hyperlane-cli = { path = "cli", version = "21.5.1" }
+hyperlane-core = { path = "core", version = "21.5.1" }
+http-type = { path = "type", version = "21.5.1" }
+http-compress = { path = "compress", version = "21.5.1" }
+http-constant = { path = "constant", version = "21.5.1" }
+http-request = { path = "request", version = "21.5.1" }
+hyperlane-macros = { path = "macros", version = "21.5.1" }
 
 hex = "0.4.3"
 url = "2.5.8"
@@ -44,7 +44,6 @@ quote = "1.0.47"
 regex = "1.13.1"
 futures = "0.3.33"
 twox-hash = "2.1.4"
-http-type = "20.1.9"
 inventory = "0.3.24"
 thiserror = "2.0.21"
 serde-xml-rs = "0.8.2"

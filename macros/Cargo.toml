@@ -9,7 +9,7 @@ repository.workspace = true
 description = """A comprehensive collection of procedural macros for building HTTP servers with enhanced functionality. This crate provides attribute macros that simplify HTTP request handling, protocol validation, response management, and request data extraction."""
 keywords = ["http", "request", "response", "tcp", "cross-platform"]
 categories = ["network-programming", "web-programming"]
-exclude = ['**/*.log', '.github', 'Cargo.lock', 'debug', 'img', 'logs', 'sh', 'target', 'tmp']
+exclude.workspace = true
 
 [lib]
 proc-macro = true

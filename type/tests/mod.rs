@@ -25,7 +25,7 @@ mod task;
 mod upgrade_type;
 mod websocket_frame;
 
-use hyperlane_type::*;
+use http_type::*;
 
 use std::{
     collections::VecDeque,

@@ -7,7 +7,7 @@ mod server;
 
 pub use {config::*, context::*, error::*, hook::*, route::*, server::*};
 
-pub use {hyperlane_type::*, inventory};
+pub use {http_type::*, inventory};
 
 use std::{
     cmp::Ordering,

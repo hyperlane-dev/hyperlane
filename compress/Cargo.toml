@@ -9,7 +9,7 @@ repository.workspace = true
 description = """A high-performance async library for HTTP compression/decompression, supporting Brotli, Deflate, and Gzip algorithms. Provides both compression and decompression capabilities with optimized memory usage, ideal for HTTP clients/servers and network programming."""
 keywords = ["http", "request", "response", "tcp", "redirect"]
 categories = ["network-programming", "web-programming"]
-exclude = ['**/*.log', '.github', 'Cargo.lock', 'debug', 'img', 'logs', 'sh', 'target', 'tmp']
+exclude.workspace = true
 
 [dependencies]
 brotli = { workspace = true }
