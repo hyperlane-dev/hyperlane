@@ -196,11 +196,19 @@ pub async fn execute_bump(
     let path: &Path = Path::new(manifest_path);
     let content: String = read_to_string(path).await?;
     let mut new_version: Option<String> = None;
-    let mut found_version: bool = false;
     let mut updated_content: String = content.clone();
+    let mut in_workspace_package: bool = false;
+    let mut in_package: bool = false;
+    let mut line_count: usize = 0;
     for line in content.lines() {
-        if found_version {
-            break;
+        line_count += 1;
+        let trimmed: &str = line.trim();
+        if trimmed.starts_with('[') {
+            in_workspace_package = trimmed == "[workspace.package]";
+            in_package = trimmed == "[package]";
+        }
+        if !in_workspace_package && !in_package {
+            continue;
         }
         if let Some((version_start, version_end)) = find_version_position(line) {
             let version_str: &str = &line[version_start..version_end];
@@ -213,12 +221,24 @@ pub async fn execute_bump(
                     &line[..version_start],
                     &line[version_end..]
                 );
-                updated_content = updated_content.replacen(line, &new_line, 1);
-                found_version = true;
+                let mut rebuilt: String = String::with_capacity(content.len());
+                let mut current: usize = 0;
+                for existing_line in content.lines() {
+                    current += 1;
+                    if current == line_count {
+                        rebuilt.push_str(&new_line);
+                        rebuilt.push('\n');
+                    } else {
+                        rebuilt.push_str(existing_line);
+                        rebuilt.push('\n');
+                    }
+                }
+                updated_content = rebuilt;
+                break;
             }
         }
     }
-    if !found_version {
+    if new_version.is_none() {
         return Err("version field not found in Cargo.toml".into());
     }
     write(path, updated_content).await?;
