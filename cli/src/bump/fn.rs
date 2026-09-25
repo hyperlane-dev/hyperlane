@@ -155,30 +155,6 @@ fn bump_version(version: &Version, bump_type: &BumpVersionType) -> Version {
     }
 }
 
-/// Find version value position in a line
-///
-/// # Arguments
-///
-/// - `&str`: The line to search
-///
-/// # Returns
-///
-/// - `Option<(usize, usize)>`: Start and end positions of version string within quotes
-fn find_version_position(line: &str) -> Option<(usize, usize)> {
-    let trimmed: &str = line.trim();
-    if !trimmed.starts_with("version") || !trimmed.contains('=') {
-        return None;
-    }
-    let eq_pos: usize = line.find('=')?;
-    let after_eq: &str = &line[eq_pos + 1..];
-    let quote_start: usize = after_eq.find('"')?;
-    let after_first_quote: &str = &after_eq[quote_start + 1..];
-    let quote_end: usize = after_first_quote.find('"')?;
-    let version_start: usize = eq_pos + 1 + quote_start + 1;
-    let version_end: usize = version_start + quote_end;
-    Some((version_start, version_end))
-}
-
 /// Read and update version in Cargo.toml
 ///
 /// # Arguments
@@ -195,55 +171,45 @@ pub async fn execute_bump(
 ) -> Result<String, Box<dyn std::error::Error>> {
     let path: &Path = Path::new(manifest_path);
     let content: String = read_to_string(path).await?;
-    let mut new_version: Option<String> = None;
-    let mut updated_content: String = content.clone();
-    let mut in_workspace_package: bool = false;
-    let mut in_package: bool = false;
-    let mut line_count: usize = 0;
-    for line in content.lines() {
-        line_count += 1;
-        let trimmed: &str = line.trim();
-        if trimmed.starts_with('[') {
-            in_workspace_package = trimmed == "[workspace.package]";
-            in_package = trimmed == "[package]";
-        }
-        if !in_workspace_package && !in_package {
-            continue;
-        }
-        if let Some((version_start, version_end)) = find_version_position(line) {
-            let version_str: &str = &line[version_start..version_end];
-            if let Some(version) = parse_version(version_str) {
-                let bumped: Version = bump_version(&version, bump_type);
-                let version_string: String = version_to_string(&bumped);
-                new_version = Some(version_string.clone());
-                let new_line: String = format!(
-                    "{}{version_string}{}",
-                    &line[..version_start],
-                    &line[version_end..]
-                );
-                let mut rebuilt: String = String::with_capacity(content.len());
-                let mut current: usize = 0;
-                for existing_line in content.lines() {
-                    current += 1;
-                    if current == line_count {
-                        rebuilt.push_str(&new_line);
-                        rebuilt.push('\n');
-                    } else {
-                        rebuilt.push_str(existing_line);
-                        rebuilt.push('\n');
-                    }
-                }
-                updated_content = rebuilt;
-                break;
-            }
-        }
-    }
-    if new_version.is_none() {
-        return Err("version field not found in Cargo.toml".into());
-    }
-    write(path, updated_content).await?;
-    match new_version {
-        Some(v) => Ok(v),
-        None => Err("failed to bump version".into()),
-    }
+    let mut manifest: toml::Value = toml::from_str(&content)
+        .map_err(|e: toml::de::Error| format!("failed to parse {}: {}", manifest_path, e))?;
+    let target: &str = if manifest
+        .get("workspace")
+        .and_then(|w| w.get("package"))
+        .is_some()
+    {
+        "workspace.package.version"
+    } else if manifest.get("package").is_some() {
+        "package.version"
+    } else {
+        return Err("neither [package] nor [workspace.package] found in Cargo.toml".into());
+    };
+    let version_value: &mut toml::Value = match target {
+        "workspace.package.version" => manifest
+            .get_mut("workspace")
+            .and_then(|w: &mut toml::Value| w.get_mut("package"))
+            .and_then(|p: &mut toml::Value| p.get_mut("version"))
+            .ok_or_else(|| -> Box<dyn std::error::Error> {
+                "workspace.package.version not found".into()
+            })?,
+        _ => manifest
+            .get_mut("package")
+            .and_then(|p: &mut toml::Value| p.get_mut("version"))
+            .ok_or_else(|| -> Box<dyn std::error::Error> { "package.version not found".into() })?,
+    };
+    let version_str: String = version_value
+        .as_str()
+        .ok_or_else(|| -> Box<dyn std::error::Error> { "version field is not a string".into() })?
+        .to_string();
+    let version: Version =
+        parse_version(&version_str).ok_or_else(|| -> Box<dyn std::error::Error> {
+            format!("failed to parse version: {}", version_str).into()
+        })?;
+    let bumped: Version = bump_version(&version, bump_type);
+    let version_string: String = version_to_string(&bumped);
+    *version_value = toml::Value::String(version_string.clone());
+    let serialized: String = toml::to_string(&manifest)
+        .map_err(|e: toml::ser::Error| format!("failed to serialize manifest: {}", e))?;
+    write(path, serialized).await?;
+    Ok(version_string)
 }
