@@ -12,7 +12,7 @@ categories = ["network-programming", "web-programming"]
 exclude.workspace = true
 
 [workspace.package]
-version = "21.6.1"
+version = "21.6.2"
 readme = "README.md"
 edition = "2024"
 authors = ["root@ltpp.vip"]
@@ -25,12 +25,12 @@ resolver = "2"
 members = ["core", "macros", "type", "cli", "request", "constant", "compress"]
 
 [workspace.dependencies]
+http-type = { path = "type", version = "21.6.1" }
 hyperlane-cli = { path = "cli", version = "21.6.1" }
 hyperlane-core = { path = "core", version = "21.6.1" }
-http-type = { path = "type", version = "21.6.1" }
+http-request = { path = "request", version = "21.6.1" }
 http-compress = { path = "compress", version = "21.6.1" }
 http-constant = { path = "constant", version = "21.6.1" }
-http-request = { path = "request", version = "21.6.1" }
 hyperlane-macros = { path = "macros", version = "21.6.1" }
 
 hex = "0.4.3"
