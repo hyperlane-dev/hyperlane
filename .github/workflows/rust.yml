@@ -160,11 +160,12 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add Cargo.toml
-            git commit -m "chore: bump version to v$(grep '^version' Cargo.toml | head -1 | sed -E 's/.*\"([^\"]+)\".*/\1/') and sync workspace member deps"
+            BUMPED_VERSION="$(grep -E '^version[[:space:]]*=[[:space:]]*"' Cargo.toml | head -1 | sed -E 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/')"
+            git commit -m "chore: bump version to v${BUMPED_VERSION} and sync workspace member deps"
             git push origin HEAD:master
             echo "Committed and pushed Cargo.toml bump + sync"
           fi
-          BUMPED_VERSION="$(grep '^version' Cargo.toml | head -1 | sed -E 's/.*\"([^\"]+)\".*/\1/')"
+          BUMPED_VERSION="$(grep -E '^version[[:space:]]*=[[:space:]]*"' Cargo.toml | head -1 | sed -E 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/')"
           BUMPED_TAG="v${BUMPED_VERSION}"
           echo "bumped_version=$BUMPED_VERSION" >> $GITHUB_OUTPUT
           echo "bumped_tag=$BUMPED_TAG" >> $GITHUB_OUTPUT
