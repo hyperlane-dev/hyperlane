@@ -155,7 +155,6 @@ jobs:
 
           VERSION="${{ needs.setup.outputs.version }}"
 
-          # 拓扑 publish 顺序: 叶子 -> 依赖方
           PUBLISH_ORDER=(
             "http-compress"
             "http-constant"
@@ -311,7 +310,6 @@ jobs:
             "hyperlane-cli"
           )
 
-          # 用 printf 拼接 markdown,避免 YAML 多行字符串解析问题
           NOTES_FILE="$(mktemp)"
           {
             printf '## Release %s\n\n' "$TAG"
