@@ -123,11 +123,12 @@ jobs:
     permissions:
       contents: write
     needs: [setup, check, tests, clippy, build]
-    if: always() && github.event_name == 'push' && github.ref_name == 'master' && needs.setup.outputs.tag != '' && needs.check.result == 'success' && needs.tests.result == 'success' && needs.clippy.result == 'success' && needs.build.result == 'success'
+    if: always() && github.event_name == 'push' && github.ref_name == 'master' && needs.publish.outputs.bumped_tag != '' && needs.check.result == 'success' && needs.tests.result == 'success' && needs.clippy.result == 'success' && needs.build.result == 'success'
     runs-on: ubuntu-latest
     outputs:
       published: ${{ steps.publish.outputs.published }}
       bumped_version: ${{ steps.bump_sync.outputs.bumped_version }}
+      bumped_tag: ${{ steps.bump_sync.outputs.bumped_tag }}
     steps:
       - name: Check branch
         id: check_branch
@@ -164,8 +165,10 @@ jobs:
             echo "Committed and pushed Cargo.toml bump + sync"
           fi
           BUMPED_VERSION="$(grep '^version' Cargo.toml | head -1 | sed -E 's/.*\"([^\"]+)\".*/\1/')"
+          BUMPED_TAG="v${BUMPED_VERSION}"
           echo "bumped_version=$BUMPED_VERSION" >> $GITHUB_OUTPUT
-          echo "Bumped version: $BUMPED_VERSION"
+          echo "bumped_tag=$BUMPED_TAG" >> $GITHUB_OUTPUT
+          echo "Bumped version: $BUMPED_VERSION (tag: $BUMPED_TAG)"
       - name: Publish to crates.io
         id: publish
         if: steps.check_branch.outputs.skip == 'false'
@@ -264,7 +267,7 @@ jobs:
     permissions:
       contents: write
       packages: write
-    if: always() && github.event_name == 'push' && github.ref_name == 'master' && needs.setup.outputs.tag != '' && needs.publish.result == 'success'
+    if: always() && github.event_name == 'push' && github.ref_name == 'master' && needs.publish.outputs.bumped_tag != '' && needs.publish.result == 'success'
     runs-on: ubuntu-latest
     outputs:
       released: ${{ steps.release.outputs.released }}
@@ -277,29 +280,29 @@ jobs:
       - name: Check tag status
         id: check_tag
         run: |
-          if git tag -l | grep -q "^${{ needs.setup.outputs.tag }}$"; then
+          if git tag -l | grep -q "^${{ needs.publish.outputs.bumped_tag }}$"; then
             echo "tag_exists=true" >> $GITHUB_OUTPUT
-            echo "Tag ${{ needs.setup.outputs.tag }} exists locally"
+            echo "Tag ${{ needs.publish.outputs.bumped_tag }} exists locally"
           else
             echo "tag_exists=false" >> $GITHUB_OUTPUT
-            echo "Tag ${{ needs.setup.outputs.tag }} does not exist locally"
+            echo "Tag ${{ needs.publish.outputs.bumped_tag }} does not exist locally"
           fi
-          if git ls-remote --tags origin | grep -q "refs/tags/${{ needs.setup.outputs.tag }}$"; then
+          if git ls-remote --tags origin | grep -q "refs/tags/${{ needs.publish.outputs.bumped_tag }}$"; then
             echo "remote_tag_exists=true" >> $GITHUB_OUTPUT
-            echo "Tag ${{ needs.setup.outputs.tag }} exists on remote"
+            echo "Tag ${{ needs.publish.outputs.bumped_tag }} exists on remote"
           else
             echo "remote_tag_exists=false" >> $GITHUB_OUTPUT
-            echo "Tag ${{ needs.setup.outputs.tag }} does not exist on remote"
+            echo "Tag ${{ needs.publish.outputs.bumped_tag }} does not exist on remote"
           fi
       - name: Check release status
         id: check_release
         run: |
-          if gh release view "${{ needs.setup.outputs.tag }}" > /dev/null 2>&1; then
+          if gh release view "${{ needs.publish.outputs.bumped_tag }}" > /dev/null 2>&1; then
             echo "release_exists=true" >> $GITHUB_OUTPUT
-            echo "Release ${{ needs.setup.outputs.tag }} already exists"
+            echo "Release ${{ needs.publish.outputs.bumped_tag }} already exists"
           else
             echo "release_exists=false" >> $GITHUB_OUTPUT
-            echo "Release ${{ needs.setup.outputs.tag }} does not exist"
+            echo "Release ${{ needs.publish.outputs.bumped_tag }} does not exist"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -308,7 +311,7 @@ jobs:
         run: |
           set -e
           VERSION="${{ needs.publish.outputs.bumped_version }}"
-          TAG="${{ needs.setup.outputs.tag }}"
+          TAG="${{ needs.publish.outputs.bumped_tag }}"
           REPO_NAME="${{ github.event.repository.name }}"
           echo "Building source archive for $REPO_NAME v$VERSION..."
           git archive --format=tar.gz --prefix="${REPO_NAME}-${VERSION}/" HEAD > "${REPO_NAME}-${VERSION}.tar.gz"
@@ -319,7 +322,7 @@ jobs:
           set -e
           echo "released=false" >> $GITHUB_OUTPUT
           VERSION="${{ needs.publish.outputs.bumped_version }}"
-          TAG="${{ needs.setup.outputs.tag }}"
+          TAG="${{ needs.publish.outputs.bumped_tag }}"
           ARCHIVE="${{ steps.build_archive.outputs.archive_path }}"
 
           PACKAGES=(
