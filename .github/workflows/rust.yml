@@ -177,91 +177,10 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
           set -e
-          echo "published=false" >> $GITHUB_OUTPUT
           echo "${{ secrets.CARGO_REGISTRY_TOKEN }}" | cargo login
-
-          VERSION="${{ steps.bump_sync.outputs.bumped_version }}"
-
-          PUBLISH_ORDER=(
-            "http-compress"
-            "http-constant"
-            "http-type"
-            "http-request"
-            "hyperlane-core"
-            "hyperlane-macros"
-            "hyperlane"
-            "hyperlane-cli"
-          )
-
-          declare -A PUBLISH_RESULT
-          for PKG_NAME in "${PUBLISH_ORDER[@]}"; do
-            echo "===================================="
-            echo "Publishing $PKG_NAME v$VERSION"
-            PKG_PUBLISHED=false
-            for ((i=1; i<=36; i++)); do
-              echo "Attempt $i/36: publishing $PKG_NAME v$VERSION"
-              set +e
-              PUBLISH_OUTPUT=$(cargo publish -p "$PKG_NAME" --allow-dirty --no-verify 2>&1)
-              PUBLISH_EXIT_CODE=$?
-              set -e
-              echo "$PUBLISH_OUTPUT"
-              if [ $PUBLISH_EXIT_CODE -eq 0 ]; then
-                echo "$PKG_NAME v$VERSION publish exited with code 0"
-                PKG_PUBLISHED=true
-                break
-              fi
-              if echo "$PUBLISH_OUTPUT" | grep -q "is already published"; then
-                echo "$PKG_NAME v$VERSION is already published to crates.io"
-                PKG_PUBLISHED=true
-                break
-              fi
-              if echo "$PUBLISH_OUTPUT" | grep -q "already been uploaded"; then
-                echo "$PKG_NAME v$VERSION is already uploaded to crates.io"
-                PKG_PUBLISHED=true
-                break
-              fi
-              echo "Attempt $i failed for $PKG_NAME (exit code: $PUBLISH_EXIT_CODE)"
-              if echo "$PUBLISH_OUTPUT" | grep -qi "unauthorized\|forbidden\|token\|credential"; then
-                echo "Authentication error detected, aborting $PKG_NAME"
-                break
-              fi
-              if [ "$i" -lt "36" ]; then
-                echo "Retrying..."
-                sleep $((i * 5))
-              fi
-            done
-            PUBLISH_RESULT[$PKG_NAME]=$PKG_PUBLISHED
-            if [ "$PKG_PUBLISHED" = "true" ]; then
-              VERIFY_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "User-Agent: hyperlane" "https://crates.io/api/v1/crates/$PKG_NAME/$VERSION" || echo "000")
-              if [ "$VERIFY_HTTP_CODE" = "200" ]; then
-                echo "$PKG_NAME v$VERSION verified on crates.io (HTTP 200)"
-              else
-                echo "$PKG_NAME v$VERSION could not be verified (HTTP $VERIFY_HTTP_CODE), continuing"
-              fi
-            else
-              echo "$PKG_NAME v$VERSION failed to publish, continuing"
-            fi
-          done
-
-          echo "===================================="
-          echo "Publish Summary:"
-          ALL_OK=true
-          for PKG_NAME in "${PUBLISH_ORDER[@]}"; do
-            if [ "${PUBLISH_RESULT[$PKG_NAME]:-false}" = "true" ]; then
-              echo "  OK: $PKG_NAME v$VERSION"
-            else
-              echo "  FAIL: $PKG_NAME v$VERSION"
-              ALL_OK=false
-            fi
-          done
-
-          if [ "$ALL_OK" = "true" ]; then
-            echo "published=true" >> "$GITHUB_OUTPUT"
-            echo "ALL PUBLISH SUCCESSFUL"
-          else
-            echo "One or more packages failed to publish"
-            exit 1
-          fi
+          cargo run --bin hyperlane -p hyperlane-cli -- publish
+          echo "published=true" >> "$GITHUB_OUTPUT"
+          echo "ALL PUBLISH SUCCESSFUL"
 
   release:
     needs: [setup, check, tests, clippy, build, publish]

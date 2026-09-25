@@ -1,6 +1,8 @@
 use super::*;
 
-/// Discover all packages in the workspace
+/// Discover all packages in the workspace: every `[workspace.members]`
+/// entry in declaration order, with the root package (when the workspace
+/// root manifest also declares `[package]`) appended last.
 ///
 /// # Arguments
 ///
@@ -9,8 +11,8 @@ use super::*;
 /// # Returns
 ///
 /// - `Result<Vec<Package>, PublishError>`: List of packages or error
-async fn discover_packages(workspace_root: &Path) -> Result<Vec<Package>, PublishError> {
-    let content: String = read_to_string(workspace_root).await?;
+async fn discover_packages(workspace_manifest: &Path) -> Result<Vec<Package>, PublishError> {
+    let content: String = read_to_string(workspace_manifest).await?;
     let doc: Value = toml::from_str(&content).map_err(|_| PublishError::ManifestParseError)?;
     let mut packages: Vec<Package> = Vec::new();
     if let Some(workspace) = doc.get("workspace")
@@ -20,14 +22,14 @@ async fn discover_packages(workspace_root: &Path) -> Result<Vec<Package>, Publis
     {
         for member in members {
             if let Some(pattern) = member.as_str() {
-                let base_path: &Path = workspace_root.parent().unwrap_or(workspace_root);
+                let base_path: &Path = workspace_manifest.parent().unwrap_or(workspace_manifest);
                 expand_pattern(base_path, pattern, &mut packages).await?;
             }
         }
     }
-    if packages.is_empty() {
-        let package: Package = read_single_package(workspace_root).await?;
-        packages.push(package);
+    if doc.get("package").is_some() {
+        let root_package: Package = read_package_manifest(workspace_manifest).await?;
+        packages.push(root_package);
     }
     Ok(packages)
 }
@@ -72,19 +74,6 @@ async fn expand_pattern(
         }
     }
     Ok(())
-}
-
-/// Read a single package (non-workspace mode)
-///
-/// # Arguments
-///
-/// - `&Path`: Path to Cargo.toml
-///
-/// # Returns
-///
-/// - `Result<Package, PublishError>`: Package info or error
-async fn read_single_package(manifest_path: &Path) -> Result<Package, PublishError> {
-    read_package_manifest(manifest_path).await
 }
 
 /// Read package manifest and extract information
@@ -163,60 +152,74 @@ fn extract_local_dependencies(
     Ok(deps)
 }
 
-/// Perform topological sort on packages based on dependencies
+/// Validate that the publish order satisfies every package's local
+/// dependency constraints: a package must never appear before a
+/// workspace-local dependency of its own.
 ///
 /// # Arguments
 ///
-/// - `&[Package]`: List of packages to sort
+/// - `&[Package]`: Packages in intended publish order
 ///
 /// # Returns
 ///
-/// - `Result<Vec<Package>, PublishError>`: Sorted packages or error if circular
-fn topological_sort(packages: &[Package]) -> Result<Vec<Package>, PublishError> {
-    let mut in_degree: HashMap<String, usize> = HashMap::new();
-    let mut graph: HashMap<String, Vec<String>> = HashMap::new();
-    let package_map: HashMap<String, Package> = packages
+/// - `Result<(), PublishError>`: `InvalidPublishOrder` naming the first
+///   offending pair when the order violates a local dependency.
+fn validate_publish_order(packages: &[Package]) -> Result<(), PublishError> {
+    let position: HashMap<String, usize> = packages
         .iter()
-        .map(|package: &Package| (package.name.clone(), package.clone()))
+        .enumerate()
+        .map(|(index, package): (usize, &Package)| (package.name.clone(), index))
         .collect();
     for package in packages {
-        in_degree.entry(package.name.clone()).or_insert(0);
+        let Some(package_position) = position.get(&package.name) else {
+            continue;
+        };
         for dep in &package.local_dependencies {
-            if package_map.contains_key(dep) {
-                graph
-                    .entry(dep.clone())
-                    .or_default()
-                    .push(package.name.clone());
-                *in_degree.entry(package.name.clone()).or_insert(0) += 1;
+            if let Some(dep_position) = position.get(dep)
+                && dep_position > package_position
+            {
+                return Err(PublishError::InvalidPublishOrder(format!(
+                    "{} depends on {} but is listed before it in [workspace.members]",
+                    package.name, dep
+                )));
             }
         }
     }
-    let mut queue: VecDeque<String> = VecDeque::new();
-    for (name, degree) in &in_degree {
-        if *degree == 0 {
-            queue.push_back(name.clone());
-        }
-    }
-    let mut result: Vec<Package> = Vec::new();
-    while let Some(name) = queue.pop_front() {
-        if let Some(package) = package_map.get(&name) {
-            result.push(package.clone());
-        }
-        if let Some(dependents) = graph.get(&name) {
-            for dependent in dependents {
-                if let Some(degree) = in_degree.get_mut(dependent) {
-                    *degree -= 1;
-                    if *degree == 0 {
-                        queue.push_back(dependent.clone());
-                    }
-                }
-            }
-        }
-    }
-    if result.len() != packages.len() {
-        return Err(PublishError::CircularDependency);
-    }
-    Ok(result)
+    Ok(())
+}
+
+/// Resolve the publish order for a workspace: `[workspace.members]`
+/// declaration order with the root package (if any) appended last,
+/// validated against local dependency constraints.
+///
+/// # Arguments
+///
+/// - `&str`: Path to the workspace root Cargo.toml
+///
+/// # Returns
+///
+/// - `Result<Vec<Package>, PublishError>`: Ordered packages, or an
+///   error when the members order violates a local dependency.
+pub async fn resolve_publish_order(manifest_path: &str) -> Result<Vec<Package>, PublishError> {
+    let workspace_manifest: &Path = Path::new(manifest_path);
+    let packages: Vec<Package> = discover_packages(workspace_manifest).await?;
+    validate_publish_order(&packages)?;
+    Ok(packages)
+}
+
+/// Check whether `cargo publish` stderr indicates the package version is
+/// already present on the registry (a success case for idempotent
+/// re-runs).
+///
+/// # Arguments
+///
+/// - `&str`: cargo publish stderr output
+///
+/// # Returns
+///
+/// - `bool`: True when the output means "already published"
+pub fn is_already_published(stderr: &str) -> bool {
+    stderr.contains("already been uploaded") || stderr.contains("is already published")
 }
 
 /// Publish a single package with retry logic
@@ -272,20 +275,28 @@ async fn publish_single_package(package: &Package) -> Result<(), Box<dyn std::er
     let output: std::process::Output = Command::new("cargo")
         .arg("publish")
         .arg("--allow-dirty")
+        .arg("--no-verify")
         .current_dir(&package.path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
         .await?;
     if output.status.success() {
-        Ok(())
-    } else {
-        let stderr: String = String::from_utf8_lossy(&output.stderr).to_string();
-        Err(stderr.into())
+        return Ok(());
     }
+    let stderr: String = String::from_utf8_lossy(&output.stderr).to_string();
+    if is_already_published(&stderr) {
+        log::info!("{} is already published, treating as success", package.name);
+        return Ok(());
+    }
+    Err(stderr.into())
 }
 
 /// Execute publish command for all packages in workspace
+///
+/// Publishes in `[workspace.members]` declaration order with the root
+/// package (if any) last, after validating the order against local
+/// dependency constraints.
 ///
 /// # Arguments
 ///
@@ -318,13 +329,13 @@ pub async fn execute_publish(
             sync_report.workspace_version,
         );
     }
-    let packages: Vec<Package> = discover_packages(&workspace_manifest).await?;
-    if packages.is_empty() {
+    let ordered_packages: Vec<Package> =
+        resolve_publish_order(workspace_manifest.to_str().unwrap_or("Cargo.toml")).await?;
+    if ordered_packages.is_empty() {
         return Ok(Vec::new());
     }
-    let sorted_packages: Vec<Package> = topological_sort(&packages)?;
     let mut results: Vec<PublishResult> = Vec::new();
-    for package in sorted_packages {
+    for package in ordered_packages {
         log::info!("Publishing {} v{}...", package.name, package.version);
         let result: PublishResult = publish_package_with_retry(&package, max_retries).await;
         if result.success {

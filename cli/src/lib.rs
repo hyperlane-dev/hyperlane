@@ -17,7 +17,7 @@ pub use {
 };
 
 pub(crate) use std::{
-    collections::{HashMap, VecDeque},
+    collections::HashMap,
     env::args,
     io,
     path::{Path, PathBuf},
