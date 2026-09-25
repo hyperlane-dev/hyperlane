@@ -148,7 +148,7 @@ jobs:
         if: steps.check_branch.outputs.skip == 'false'
         run: |
           set -e
-          cargo run --bin hyperlane -- sync
+          cargo run --bin hyperlane -p hyperlane-cli -- sync
           if git diff --quiet Cargo.toml; then
             echo "sync_changed=false" >> $GITHUB_OUTPUT
             echo "Workspace member versions already in sync"
