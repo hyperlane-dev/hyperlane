@@ -187,8 +187,8 @@ jobs:
             "http-constant"
             "http-type"
             "http-request"
-            "hyperlane-macros"
             "hyperlane-core"
+            "hyperlane-macros"
             "hyperlane"
             "hyperlane-cli"
           )
@@ -331,8 +331,8 @@ jobs:
             "http-constant"
             "http-type"
             "http-request"
-            "hyperlane-macros"
             "hyperlane-core"
+            "hyperlane-macros"
             "hyperlane"
             "hyperlane-cli"
           )
