@@ -185,10 +185,10 @@ jobs:
           PUBLISH_ORDER=(
             "http-compress"
             "http-constant"
-            "http-request"
             "http-type"
-            "hyperlane-core"
+            "http-request"
             "hyperlane-macros"
+            "hyperlane-core"
             "hyperlane"
             "hyperlane-cli"
           )
@@ -329,10 +329,10 @@ jobs:
           PACKAGES=(
             "http-compress"
             "http-constant"
-            "http-request"
             "http-type"
-            "hyperlane-core"
+            "http-request"
             "hyperlane-macros"
+            "hyperlane-core"
             "hyperlane"
             "hyperlane-cli"
           )
