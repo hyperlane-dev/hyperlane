@@ -12,15 +12,16 @@ categories = ["network-programming", "web-programming"]
 exclude.workspace = true
 
 [dependencies]
-serde = { workspace = true }
-futures = { workspace = true }
 http-type = { workspace = true }
+
+futures = { workspace = true }
+rustls = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
+tokio-rustls = { workspace = true }
+tokio-tungstenite = { workspace = true }
 tungstenite = { workspace = true }
 webpki-roots = { workspace = true }
-tokio-tungstenite = { workspace = true }
-rustls = { workspace = true }
-tokio-rustls = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
