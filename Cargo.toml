@@ -12,7 +12,7 @@ categories = ["network-programming", "web-programming"]
 exclude.workspace = true
 
 [workspace.package]
-version = "21.6.3"
+version = "21.7.0"
 readme = "README.md"
 edition = "2024"
 authors = ["root@ltpp.vip"]
@@ -22,16 +22,16 @@ exclude = ["target", "Cargo.lock", "sh", ".github", "logs", "img", "**/*.log"]
 
 [workspace]
 resolver = "2"
-members = ["core", "macros", "type", "cli", "request", "constant", "compress"]
+members = ["compress", "constant", "type", "request", "core", "macros", "cli"]
 
 [workspace.dependencies]
-http-type = { path = "type", version = "21.6.3" }
-hyperlane-cli = { path = "cli", version = "21.6.3" }
-hyperlane-core = { path = "core", version = "21.6.3" }
-http-request = { path = "request", version = "21.6.3" }
-http-compress = { path = "compress", version = "21.6.3" }
-http-constant = { path = "constant", version = "21.6.3" }
-hyperlane-macros = { path = "macros", version = "21.6.3" }
+http-type = { path = "type", version = "21.7.0" }
+hyperlane-cli = { path = "cli", version = "21.7.0" }
+hyperlane-core = { path = "core", version = "21.7.0" }
+http-request = { path = "request", version = "21.7.0" }
+http-compress = { path = "compress", version = "21.7.0" }
+http-constant = { path = "constant", version = "21.7.0" }
+hyperlane-macros = { path = "macros", version = "21.7.0" }
 
 hex = "0.4.3"
 url = "2.5.8"
