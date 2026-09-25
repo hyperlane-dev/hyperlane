@@ -175,3 +175,49 @@ edition = "2024"
         execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Patch).await;
     assert!(result.is_err());
 }
+
+#[tokio::test]
+async fn test_execute_bump_preserves_manifest_formatting() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_preserve_format");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "root"
+version.workspace = true
+
+[workspace.package]
+version = "21.5.2"
+edition = "2024"
+
+# comment above workspace.dependencies must survive
+[workspace.dependencies]
+hyperlane-core = { path = "core", version = "21.5.2" }
+serde = { version = "1.0.229", features = ["derive"] }
+
+[profile.dev]
+opt-level = 3
+"#;
+    let expected: &str = r#"[package]
+name = "root"
+version.workspace = true
+
+[workspace.package]
+version = "21.5.3"
+edition = "2024"
+
+# comment above workspace.dependencies must survive
+[workspace.dependencies]
+hyperlane-core = { path = "core", version = "21.5.2" }
+serde = { version = "1.0.229", features = ["derive"] }
+
+[profile.dev]
+opt-level = 3
+"#;
+    write(&manifest_path, content).await.unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Patch).await;
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "21.5.3");
+    let updated: String = read_to_string(&manifest_path).await.unwrap();
+    assert_eq!(updated, expected);
+}

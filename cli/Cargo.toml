@@ -27,5 +27,6 @@ tokio = { workspace = true }
 which = { workspace = true }
 notify = { workspace = true }
 thiserror = { workspace = true }
+toml_edit = { workspace = true }
 color-output = { workspace = true }
 lombok-macros = { workspace = true }

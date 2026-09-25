@@ -134,8 +134,7 @@ edition = "2024"
     assert_eq!(report.workspace_version, "0.2.0");
     assert!(report.file_changed);
     let updated: String = read_to_string(&workspace_manifest).await.unwrap();
-    assert!(updated.contains("[workspace.dependencies.beta]\npath = \"beta\""));
-    assert!(updated.contains(r#"version = "0.2.0""#));
+    assert!(updated.contains(r#"beta = { path = "beta", version = "0.2.0" }"#));
     assert!(!updated.contains(r#"version = "0.1.5""#));
     let second_report: SyncReport = execute_sync(workspace_manifest.to_str().unwrap())
         .await
@@ -175,9 +174,7 @@ edition = "2024"
     assert_eq!(report.renamed_entries[0].1, "gamma");
     assert!(report.file_changed);
     let updated: String = read_to_string(&workspace_manifest).await.unwrap();
-    assert!(updated.contains("[workspace.dependencies.gamma]"));
-    assert!(updated.contains(r#"path = "gamma""#));
-    assert!(updated.contains(r#"version = "0.3.0""#));
+    assert!(updated.contains(r#"gamma = { path = "gamma", version = "0.3.0" }"#));
     assert!(!updated.contains("stale_alias"));
 }
 
@@ -220,12 +217,10 @@ three = { path = "three", version = "0.0.0" }
     let updated: String = read_to_string(&workspace_manifest).await.unwrap();
     for member in ["one", "two", "three"] {
         assert!(
-            updated.contains(&format!("[workspace.dependencies.{member}]")),
-            "expected dotted-form workspace.dependencies.{member} entry in:\n{updated}"
-        );
-        assert!(
-            updated.contains(r#"version = "9.9.9""#),
-            "expected version 9.9.9 in updated manifest:\n{updated}"
+            updated.contains(&format!(
+                r#"{member} = {{ path = "{member}", version = "9.9.9" }}"#
+            )),
+            "expected preserved inline-form workspace.dependencies.{member} entry in:\n{updated}"
         );
     }
 }
@@ -294,4 +289,96 @@ version = "0.1.0"
         .unwrap();
     assert!(!report.file_changed);
     assert_eq!(report.versioned_entries.len(), 0);
+}
+
+#[tokio::test]
+async fn test_execute_sync_preserves_manifest_formatting() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_sync_preserve_format");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let workspace_manifest: PathBuf = tmp_dir.join("Cargo.toml");
+    let member_dir: PathBuf = tmp_dir.join("delta");
+    create_dir_all(&member_dir).await.unwrap();
+    let workspace_content: &str = r#"[workspace]
+members = ["delta"]
+
+[workspace.package]
+version = "1.0.0"
+
+# comment above workspace.dependencies must survive
+[workspace.dependencies]
+delta = { path = "delta", version = "0.9.9" }
+serde = { version = "1.0.0", features = ["derive"] }
+
+[profile.dev]
+opt-level = 3
+"#;
+    let expected_content: &str = r#"[workspace]
+members = ["delta"]
+
+[workspace.package]
+version = "1.0.0"
+
+# comment above workspace.dependencies must survive
+[workspace.dependencies]
+delta = { path = "delta", version = "1.0.0" }
+serde = { version = "1.0.0", features = ["derive"] }
+
+[profile.dev]
+opt-level = 3
+"#;
+    write(&workspace_manifest, workspace_content).await.unwrap();
+    write(
+        &member_dir.join("Cargo.toml"),
+        r#"[package]
+name = "delta"
+version = "0.9.9"
+edition = "2024"
+"#,
+    )
+    .await
+    .unwrap();
+    let report: SyncReport = execute_sync(workspace_manifest.to_str().unwrap())
+        .await
+        .unwrap();
+    assert!(report.file_changed);
+    let updated: String = read_to_string(&workspace_manifest).await.unwrap();
+    assert_eq!(updated, expected_content);
+}
+
+#[tokio::test]
+async fn test_execute_sync_falls_back_to_package_version() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_sync_package_version_fallback");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let workspace_manifest: PathBuf = tmp_dir.join("Cargo.toml");
+    let member_dir: PathBuf = tmp_dir.join("epsilon");
+    create_dir_all(&member_dir).await.unwrap();
+    let workspace_content: &str = r#"[package]
+name = "root"
+version = "2.0.0"
+
+[workspace]
+members = ["epsilon"]
+
+[workspace.dependencies]
+epsilon = { path = "epsilon", version = "1.0.0" }
+"#;
+    write(&workspace_manifest, workspace_content).await.unwrap();
+    write(
+        &member_dir.join("Cargo.toml"),
+        r#"[package]
+name = "epsilon"
+version = "1.0.0"
+edition = "2024"
+"#,
+    )
+    .await
+    .unwrap();
+    let report: SyncReport = execute_sync(workspace_manifest.to_str().unwrap())
+        .await
+        .unwrap();
+    assert_eq!(report.workspace_version, "2.0.0");
+    assert!(report.file_changed);
+    let updated: String = read_to_string(&workspace_manifest).await.unwrap();
+    assert!(updated.contains(r#"epsilon = { path = "epsilon", version = "2.0.0" }"#));
+    assert!(updated.contains("[package]\nname = \"root\"\nversion = \"2.0.0\""));
 }

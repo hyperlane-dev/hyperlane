@@ -1,142 +1,94 @@
-[dependencies.hyperlane-core]
-workspace = true
-
-[dependencies.hyperlane-macros]
-workspace = true
-
 [package]
-categories = ["network-programming", "web-programming"]
-description = "A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility."
-keywords = ["http", "request", "response", "tcp", "cross-platform"]
 name = "hyperlane"
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = """A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility."""
+keywords = ["http", "request", "response", "tcp", "cross-platform"]
+repository.workspace = true
+categories = ["network-programming", "web-programming"]
+exclude.workspace = true
 
-[package.authors]
-workspace = true
+[workspace.package]
+version = "21.6.0"
+readme = "README.md"
+edition = "2024"
+authors = ["root@ltpp.vip"]
+license = "MIT"
+repository = "https://github.com/hyperlane-dev/hyperlane.git"
+exclude = ["target", "Cargo.lock", "sh", ".github", "logs", "img", "**/*.log"]
 
-[package.edition]
-workspace = true
+[workspace]
+resolver = "2"
+members = ["core", "macros", "type", "cli", "request", "constant", "compress"]
 
-[package.exclude]
-workspace = true
+[workspace.dependencies]
+hyperlane-cli = { path = "cli", version = "21.5.2" }
+hyperlane-core = { path = "core", version = "21.5.2" }
+http-type = { path = "type", version = "21.5.2" }
+http-compress = { path = "compress", version = "21.5.2" }
+http-constant = { path = "constant", version = "21.5.2" }
+http-request = { path = "request", version = "21.5.2" }
+hyperlane-macros = { path = "macros", version = "21.5.2" }
 
-[package.license]
-workspace = true
+hex = "0.4.3"
+url = "2.5.8"
+log = "0.4.34"
+toml = "0.9.8"
+which = "8.0.6"
+brotli = "9.0.0"
+flate2 = "1.1.10"
+quote = "1.0.47"
+regex = "1.13.1"
+futures = "0.3.33"
+twox-hash = "2.1.4"
+inventory = "0.3.24"
+thiserror = "2.0.21"
+toml_edit = "0.25.15"
+serde-xml-rs = "0.8.2"
+serde_json = "1.0.151"
+tungstenite = "0.30.0"
+webpki-roots = "1.0.9"
+proc-macro2 = "1.0.107"
+color-output = "10.0.10"
+lombok-macros = "2.1.0"
+serde_urlencoded = "0.7.1"
+tokio-tungstenite = "0.30.0"
+syn = { version = "3.0.6", features = ["full"] }
+tokio = { version = "1.53.1", features = ["full"] }
+serde = { version = "1.0.229", features = ["derive"] }
+notify = { version = "8.2.0", default-features = false, features = [
+    "macos_fsevent",
+] }
+rustls = { version = "0.23.45", default-features = false, features = [
+    "ring",
+    "tls12",
+] }
+tokio-rustls = { version = "0.26.5", default-features = false, features = [
+    "ring",
+    "tls12",
+] }
 
-[package.readme]
-workspace = true
-
-[package.repository]
-workspace = true
-
-[package.version]
-workspace = true
+[dependencies]
+hyperlane-core = { workspace = true }
+hyperlane-macros = { workspace = true }
 
 [profile.dev]
-codegen-units = 1
-debug = false
 incremental = false
-lto = true
 opt-level = 3
+lto = true
 panic = "unwind"
+debug = false
+codegen-units = 1
 strip = "debuginfo"
 
 [profile.release]
-codegen-units = 1
-debug = false
 incremental = false
-lto = true
 opt-level = 3
+lto = true
 panic = "unwind"
+debug = false
+codegen-units = 1
 strip = "debuginfo"
-
-[workspace]
-members = ["core", "macros", "type", "cli", "request", "constant", "compress"]
-resolver = "2"
-
-[workspace.dependencies]
-brotli = "9.0.0"
-color-output = "10.0.10"
-flate2 = "1.1.10"
-futures = "0.3.33"
-hex = "0.4.3"
-inventory = "0.3.24"
-log = "0.4.34"
-lombok-macros = "2.1.0"
-proc-macro2 = "1.0.107"
-quote = "1.0.47"
-regex = "1.13.1"
-serde-xml-rs = "0.8.2"
-serde_json = "1.0.151"
-serde_urlencoded = "0.7.1"
-thiserror = "2.0.21"
-tokio-tungstenite = "0.30.0"
-toml = "0.9.8"
-tungstenite = "0.30.0"
-twox-hash = "2.1.4"
-url = "2.5.8"
-webpki-roots = "1.0.9"
-which = "8.0.6"
-
-[workspace.dependencies.http-compress]
-path = "compress"
-version = "21.5.5"
-
-[workspace.dependencies.http-constant]
-path = "constant"
-version = "21.5.5"
-
-[workspace.dependencies.http-request]
-path = "request"
-version = "21.5.5"
-
-[workspace.dependencies.http-type]
-path = "type"
-version = "21.5.5"
-
-[workspace.dependencies.hyperlane-cli]
-path = "cli"
-version = "21.5.5"
-
-[workspace.dependencies.hyperlane-core]
-path = "core"
-version = "21.5.5"
-
-[workspace.dependencies.hyperlane-macros]
-path = "macros"
-version = "21.5.5"
-
-[workspace.dependencies.notify]
-default-features = false
-features = ["macos_fsevent"]
-version = "8.2.0"
-
-[workspace.dependencies.rustls]
-default-features = false
-features = ["ring", "tls12"]
-version = "0.23.45"
-
-[workspace.dependencies.serde]
-features = ["derive"]
-version = "1.0.229"
-
-[workspace.dependencies.syn]
-features = ["full"]
-version = "3.0.6"
-
-[workspace.dependencies.tokio]
-features = ["full"]
-version = "1.53.1"
-
-[workspace.dependencies.tokio-rustls]
-default-features = false
-features = ["ring", "tls12"]
-version = "0.26.5"
-
-[workspace.package]
-authors = ["root@ltpp.vip"]
-edition = "2024"
-exclude = ["target", "Cargo.lock", "sh", ".github", "logs", "img", "**/*.log"]
-license = "MIT"
-readme = "README.md"
-repository = "https://github.com/hyperlane-dev/hyperlane.git"
-version = "21.5.5"

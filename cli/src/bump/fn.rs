@@ -157,6 +157,10 @@ fn bump_version(version: &Version, bump_type: &BumpVersionType) -> Version {
 
 /// Read and update version in Cargo.toml
 ///
+/// The edit is applied on a `toml_edit::DocumentMut`, so comments, key
+/// order and inline-table formatting outside the version value are
+/// preserved byte-for-byte.
+///
 /// # Arguments
 ///
 /// - `&str`: Path to Cargo.toml file
@@ -171,33 +175,28 @@ pub async fn execute_bump(
 ) -> Result<String, Box<dyn std::error::Error>> {
     let path: &Path = Path::new(manifest_path);
     let content: String = read_to_string(path).await?;
-    let mut manifest: toml::Value = toml::from_str(&content)
-        .map_err(|e: toml::de::Error| format!("failed to parse {}: {}", manifest_path, e))?;
-    let target: &str = if manifest
+    let mut doc: DocumentMut = content
+        .parse()
+        .map_err(|e: TomlError| format!("failed to parse {}: {}", manifest_path, e))?;
+    let version_slot: &mut Item = if doc
         .get("workspace")
-        .and_then(|w| w.get("package"))
+        .and_then(|workspace: &Item| workspace.get("package"))
         .is_some()
     {
-        "workspace.package.version"
-    } else if manifest.get("package").is_some() {
-        "package.version"
+        doc.get_mut("workspace")
+            .and_then(|workspace: &mut Item| workspace.get_mut("package"))
+            .and_then(|package: &mut Item| package.get_mut("version"))
+            .ok_or_else(|| -> Box<dyn std::error::Error> {
+                "workspace.package.version not found".into()
+            })?
+    } else if doc.get("package").is_some() {
+        doc.get_mut("package")
+            .and_then(|package: &mut Item| package.get_mut("version"))
+            .ok_or_else(|| -> Box<dyn std::error::Error> { "package.version not found".into() })?
     } else {
         return Err("neither [package] nor [workspace.package] found in Cargo.toml".into());
     };
-    let version_value: &mut toml::Value = match target {
-        "workspace.package.version" => manifest
-            .get_mut("workspace")
-            .and_then(|w: &mut toml::Value| w.get_mut("package"))
-            .and_then(|p: &mut toml::Value| p.get_mut("version"))
-            .ok_or_else(|| -> Box<dyn std::error::Error> {
-                "workspace.package.version not found".into()
-            })?,
-        _ => manifest
-            .get_mut("package")
-            .and_then(|p: &mut toml::Value| p.get_mut("version"))
-            .ok_or_else(|| -> Box<dyn std::error::Error> { "package.version not found".into() })?,
-    };
-    let version_str: String = version_value
+    let version_str: String = version_slot
         .as_str()
         .ok_or_else(|| -> Box<dyn std::error::Error> { "version field is not a string".into() })?
         .to_string();
@@ -207,9 +206,7 @@ pub async fn execute_bump(
         })?;
     let bumped: Version = bump_version(&version, bump_type);
     let version_string: String = version_to_string(&bumped);
-    *version_value = toml::Value::String(version_string.clone());
-    let serialized: String = toml::to_string(&manifest)
-        .map_err(|e: toml::ser::Error| format!("failed to serialize manifest: {}", e))?;
-    write(path, serialized).await?;
+    set_item_string_preserving_decor(version_slot, &version_string);
+    write(path, doc.to_string()).await?;
     Ok(version_string)
 }
