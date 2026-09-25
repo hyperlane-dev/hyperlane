@@ -123,7 +123,7 @@ jobs:
     permissions:
       contents: write
     needs: [setup, check, tests, clippy, build]
-    if: always() && github.event_name == 'push' && github.ref_name == 'master' && needs.publish.outputs.bumped_tag != '' && needs.check.result == 'success' && needs.tests.result == 'success' && needs.clippy.result == 'success' && needs.build.result == 'success'
+    if: always() && github.event_name == 'push' && github.ref_name == 'master' && needs.setup.outputs.tag != '' && needs.check.result == 'success' && needs.tests.result == 'success' && needs.clippy.result == 'success' && needs.build.result == 'success'
     runs-on: ubuntu-latest
     outputs:
       published: ${{ steps.publish.outputs.published }}
