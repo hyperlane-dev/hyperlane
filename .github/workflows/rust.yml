@@ -149,7 +149,7 @@ jobs:
         if: steps.check_branch.outputs.skip == 'false'
         run: |
           for i in 1 2 3 4 5 6 7 8; do
-            if cargo install --git https://github.com/crates-dev/ctares.git crates-cli; then
+            if cargo install crates-cli; then
               break
             fi
             echo "Retrying..."
