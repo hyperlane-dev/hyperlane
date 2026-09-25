@@ -79,31 +79,31 @@ which = "8.0.6"
 
 [workspace.dependencies.http-compress]
 path = "compress"
-version = "21.5.3"
+version = "21.5.4"
 
 [workspace.dependencies.http-constant]
 path = "constant"
-version = "21.5.3"
+version = "21.5.4"
 
 [workspace.dependencies.http-request]
 path = "request"
-version = "21.5.3"
+version = "21.5.4"
 
 [workspace.dependencies.http-type]
 path = "type"
-version = "21.5.3"
+version = "21.5.4"
 
 [workspace.dependencies.hyperlane-cli]
 path = "cli"
-version = "21.5.3"
+version = "21.5.4"
 
 [workspace.dependencies.hyperlane-core]
 path = "core"
-version = "21.5.3"
+version = "21.5.4"
 
 [workspace.dependencies.hyperlane-macros]
 path = "macros"
-version = "21.5.3"
+version = "21.5.4"
 
 [workspace.dependencies.notify]
 default-features = false
@@ -139,4 +139,4 @@ exclude = ["target", "Cargo.lock", "sh", ".github", "logs", "img", "**/*.log"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/hyperlane-dev/hyperlane.git"
-version = "21.5.3"
+version = "21.5.4"
