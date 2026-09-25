@@ -6,13 +6,14 @@ mod help;
 mod logger;
 mod new;
 mod publish;
+mod sync;
 mod template;
 mod version;
 mod watch;
 
 pub use {
-    bump::*, command::*, config::*, fmt::*, help::*, logger::*, new::*, publish::*, template::*,
-    version::*, watch::*,
+    bump::*, command::*, config::*, fmt::*, help::*, logger::*, new::*, publish::*, sync::*,
+    template::*, version::*, watch::*,
 };
 
 pub(crate) use std::{

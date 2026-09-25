@@ -38,6 +38,9 @@ pub fn parse_args() -> Args {
             "publish" if (command == CommandType::Help || command == CommandType::Version) => {
                 command = CommandType::Publish;
             }
+            "sync" if (command == CommandType::Help || command == CommandType::Version) => {
+                command = CommandType::Sync;
+            }
             "new" if (command == CommandType::Help || command == CommandType::Version) => {
                 command = CommandType::New;
                 i += 1;

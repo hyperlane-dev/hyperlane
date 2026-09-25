@@ -9,6 +9,10 @@ pub enum CommandType {
     Bump,
     /// Publish packages in monorepo
     Publish,
+    /// Sync [workspace.dependencies] entry versions and aliases with the
+    /// [workspace.package].version declared in the workspace root and the
+    /// `[package].name` declared in each member crate.
+    Sync,
     /// Create a new project from template
     New,
     /// Generate template components

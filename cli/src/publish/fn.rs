@@ -300,7 +300,25 @@ pub async fn execute_publish(
     max_retries: u32,
 ) -> Result<Vec<PublishResult>, PublishError> {
     let path: &Path = Path::new(manifest_path);
-    let packages: Vec<Package> = discover_packages(path).await?;
+    let path: &Path = match path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent,
+        _ => Path::new("."),
+    };
+    let workspace_manifest: PathBuf = path.join("Cargo.toml");
+    let sync_report: SyncReport =
+        match execute_sync(workspace_manifest.to_str().unwrap_or("Cargo.toml")).await {
+            Ok(report) => report,
+            Err(error) => return Err(PublishError::SyncFailed(error)),
+        };
+    if sync_report.file_changed {
+        log::info!(
+            "publish: synced workspace dependencies ({} renamed, {} versioned) to v{}",
+            sync_report.renamed_entries.len(),
+            sync_report.versioned_entries.len(),
+            sync_report.workspace_version,
+        );
+    }
+    let packages: Vec<Package> = discover_packages(&workspace_manifest).await?;
     if packages.is_empty() {
         return Ok(Vec::new());
     }

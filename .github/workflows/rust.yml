@@ -148,12 +148,12 @@ jobs:
         if: steps.check_branch.outputs.skip == 'false'
         run: |
           set -e
-          bash scripts/sync_versions.sh
+          cargo run --bin hyperlane --offline -- sync
           if git diff --quiet Cargo.toml; then
-            echo "sync_needed=false" >> $GITHUB_OUTPUT
-            echo "Workspace member versions already in sync, no commit needed"
+            echo "sync_changed=false" >> $GITHUB_OUTPUT
+            echo "Workspace member versions already in sync"
           else
-            echo "sync_needed=true" >> $GITHUB_OUTPUT
+            echo "sync_changed=true" >> $GITHUB_OUTPUT
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add Cargo.toml

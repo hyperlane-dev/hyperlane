@@ -62,6 +62,26 @@ async fn main() {
                 }
             }
         }
+        CommandType::Sync => {
+            let manifest_path: String = args
+                .manifest_path
+                .unwrap_or_else(|| "Cargo.toml".to_string());
+            match execute_sync(&manifest_path).await {
+                Ok(report) => {
+                    log::info!(
+                        "sync complete: v{} (renamed {}, versioned {}, file_changed {})",
+                        report.workspace_version,
+                        report.renamed_entries.len(),
+                        report.versioned_entries.len(),
+                        report.file_changed,
+                    );
+                }
+                Err(error) => {
+                    log::error!("sync failed: {error}");
+                    exit(1);
+                }
+            }
+        }
         CommandType::New => {
             if let Some(project_name) = args.project_name {
                 if let Err(error) = execute_new(&project_name).await {

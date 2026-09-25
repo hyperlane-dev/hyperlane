@@ -7,6 +7,9 @@ pub fn print_help() {
     log::info!("  fmt       Format Rust code using cargo fmt");
     log::info!("  watch     Watch files and run cargo run using cargo-watch");
     log::info!("  publish   Publish packages in monorepo with topological ordering");
+    log::info!(
+        "  sync      Sync [workspace.dependencies] versions/aliases to workspace.package.version"
+    );
     log::info!("  new       Create a new project from template");
     log::info!(
         "  template  Generate template components (controller|domain|exception|mapper|model|repository|service|utils|view)"
@@ -40,4 +43,7 @@ pub fn print_help() {
     log::info!("Publish Options:");
     log::info!("  --manifest-path <PATH>  Path to workspace Cargo.toml [default: Cargo.toml]");
     log::info!("  --max-retries <N>       Maximum retry attempts per package [default: 3]");
+    log::info!("");
+    log::info!("Sync Options:");
+    log::info!("  --manifest-path <PATH>  Path to workspace Cargo.toml [default: Cargo.toml]");
 }

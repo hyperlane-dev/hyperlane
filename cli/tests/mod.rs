@@ -3,6 +3,7 @@ mod config;
 mod fmt;
 mod new;
 mod publish;
+mod sync;
 mod version;
 
 use hyperlane_cli::*;
