@@ -12,7 +12,7 @@ categories = ["network-programming", "web-programming"]
 exclude.workspace = true
 
 [workspace.package]
-version = "21.7.6"
+version = "21.7.7"
 readme = "README.md"
 edition = "2024"
 authors = ["root@ltpp.vip"]
@@ -40,7 +40,7 @@ brotli = "9.0.0"
 quote = "1.0.47"
 regex = "1.13.1"
 flate2 = "1.1.10"
-futures = "0.3.33"
+futures = "0.3.34"
 twox-hash = "2.1.4"
 inventory = "0.3.24"
 thiserror = "2.0.21"
@@ -48,9 +48,9 @@ serde-xml-rs = "0.8.2"
 serde_json = "1.0.151"
 tungstenite = "0.30.0"
 webpki-roots = "1.0.9"
-lombok-macros = "2.1.0"
+lombok-macros = "10.1.7"
 proc-macro2 = "1.0.107"
-color-output = "10.0.10"
+color-output = "10.1.7"
 serde_urlencoded = "0.7.1"
 tokio-tungstenite = "0.30.0"
 syn = { version = "3.0.6", features = ["full"] }
