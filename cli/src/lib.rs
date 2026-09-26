@@ -1,5 +1,6 @@
+//! hyperlane-cli
+//!
 //! A command-line tool for Hyperlane framework.
-
 mod command;
 mod config;
 mod help;

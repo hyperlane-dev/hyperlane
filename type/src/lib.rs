@@ -1,16 +1,6 @@
-//! A comprehensive Rust type library for HTTP operations and
-//! concurrent programming. Provides core HTTP types
-//! (Request/Response with builder patterns, Method,
-//! HttpStatus, HttpVersion, ContentType, FileExtension with
-//! MIME mapping, Cookie parsing/building, HttpUrl parsing,
-//! WebSocket frame/opcode, protocol upgrade types,
-//! stream/task management, panic handling), thread-safe
-//! concurrent wrappers (ArcMutex, ArcRwLock, BoxRwLock,
-//! RcRwLock), dynamic dispatch types (BoxAny, RcAny, ArcAny
-//! with Send/Sync variants), high-performance hash collections
-//!  (HashMapXxHash3_64, HashSetXxHash3_64), and static lifetime
-//! utilities (BoxLeak, Lifetime trait).
-
+//! http-type
+//!
+//! A comprehensive Rust type library for HTTP operations and concurrent programming.
 mod any;
 mod arc_mutex;
 mod arc_rwlock;
