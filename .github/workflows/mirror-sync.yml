@@ -1,0 +1,61 @@
+name: Mirror
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    name: Push
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Configure git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global init.defaultBranch main
+
+      - name: Push to Gitee
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          set -e
+          if [ -z "$GITEE_TOKEN" ]; then
+            echo "::error::GITEE_TOKEN secret is missing"; exit 1
+          fi
+          git remote remove gitee 2>/dev/null || true
+          git remote add gitee "https://eastspire:${GITEE_TOKEN}@gitee.com/eastspire/${REPO_NAME}.git"
+          git push gitee --mirror --force 2>&1 || {
+            echo "::warning::gitee mirror push failed — repo may need 'allow token push' enabled in gitee backend"
+            exit 0
+          }
+
+      - name: Push to GitCode
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          set -e
+          if [ -z "$GITCODE_TOKEN" ]; then
+            echo "::error::GITCODE_TOKEN secret is missing"; exit 1
+          fi
+          git remote remove gitcode 2>/dev/null || true
+          git remote add gitcode "https://oauth2:${GITCODE_TOKEN}@gitcode.com/eastspire/${REPO_NAME}.git"
+          git push gitcode --mirror --force 2>&1 || {
+            echo "::warning::gitcode mirror push failed — repo may need 'allow access token push' enabled in gitcode backend"
+            exit 0
+          }
