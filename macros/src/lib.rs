@@ -1,6 +1,7 @@
 //! hyperlane-macros
 //!
 //! A comprehensive collection of procedural macros for building HTTP servers with enhanced functionality.
+
 mod closed;
 mod common;
 mod context;

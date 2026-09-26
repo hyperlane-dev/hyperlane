@@ -1,6 +1,7 @@
 //! http-request
 //!
 //! An HTTP request library providing client-side HTTP request construction and response parsing.
+
 mod common;
 mod request;
 mod response;

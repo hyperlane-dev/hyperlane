@@ -1,6 +1,7 @@
 //! http-constant
 //!
 //! A comprehensive library providing common HTTP constants for header names, versions, MIME types, and protocol identifiers.
+
 mod body;
 mod common;
 mod content_type_value;
