@@ -1,5 +1,3 @@
-//! Hyperlane CLI
-//!
 //! A command-line tool for Hyperlane framework.
 
 use hyperlane_cli::*;

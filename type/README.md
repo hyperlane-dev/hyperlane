@@ -14,7 +14,7 @@
 
 [Api Docs](https://docs.rs/hyperlane/latest/)
 
-> A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
+> A comprehensive Rust type library for HTTP operations and concurrent programming. Provides core HTTP types (Request/Response with builder patterns, Method, HttpStatus, HttpVersion, ContentType, FileExtension with MIME mapping, Cookie parsing/building, HttpUrl parsing, WebSocket frame/opcode, protocol upgrade types, stream/task management, panic handling), thread-safe concurrent wrappers (ArcMutex, ArcRwLock, BoxRwLock, RcRwLock), dynamic dispatch types (BoxAny, RcAny, ArcAny with Send/Sync variants), high-performance hash collections (HashMapXxHash3_64, HashSetXxHash3_64), and static lifetime utilities (BoxLeak, Lifetime trait).
 
 ## Installation
 
