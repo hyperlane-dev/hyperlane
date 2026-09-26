@@ -138,7 +138,7 @@ fn is_context_type(ty: &Type) -> bool {
     {
         let path: &Path = &type_path.path;
         if path.segments.len() >= 2 {
-            let segments: Vec<_> = path.segments.iter().collect();
+            let segments: Vec<&syn::PathSegment> = path.segments.iter().collect();
             if segments.len() >= 2 {
                 let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
                 if last_two[0].ident == "hyperlane" && last_two[1].ident == "Context" {
@@ -170,7 +170,7 @@ fn is_stream_type(ty: &Type) -> bool {
     {
         let path: &Path = &type_path.path;
         if path.segments.len() >= 2 {
-            let segments: Vec<_> = path.segments.iter().collect();
+            let segments: Vec<&syn::PathSegment> = path.segments.iter().collect();
             if segments.len() >= 2 {
                 let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
                 if last_two[0].ident == "hyperlane" && last_two[1].ident == "Stream" {
