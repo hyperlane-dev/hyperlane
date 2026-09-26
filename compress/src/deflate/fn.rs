@@ -26,7 +26,11 @@ pub fn encode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
         return Cow::Owned(Vec::new());
     }
     match buffered_writer.into_inner() {
-        Ok(encoder) => Cow::Owned(encoder.finish().unwrap_or_else(|_| Vec::new())),
+        Ok(encoder) => Cow::Owned(
+            encoder
+                .finish()
+                .unwrap_or_else(|_: std::io::Error| Vec::new()),
+        ),
         Err(_) => Cow::Owned(Vec::new()),
     }
 }

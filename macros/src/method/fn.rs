@@ -47,7 +47,7 @@ pub(crate) fn methods_macro(
     let sig: &Signature = &input_fn.sig;
     match parse_context_from_signature(sig) {
         Ok(context) => {
-            let method_checks = methods.methods.iter().map(|method| {
+            let method_checks = methods.methods.iter().map(|method: &syn::Ident| {
                 let method_str: String = method.to_string();
                 let check_fn: proc_macro2::Ident =
                     Ident::new(&format!("is_{method_str}"), method.span());

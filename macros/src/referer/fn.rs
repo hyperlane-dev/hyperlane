@@ -19,9 +19,9 @@ pub(crate) fn referer_macro(
 ) -> TokenStream {
     let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_referer.referer_values.iter().map(|referer_value| {
+        let statements = multi_referer.referer_values.iter().map(|referer_value: &syn::Expr| {
             quote! {
-                if #context.get_request().try_get_header_back(::hyperlane_core::REFERER).map_or(true, |referer_header| referer_header != #referer_value) {
+                if #context.get_request().try_get_header_back(::hyperlane_core::REFERER).map_or(true, |referer_header: ::hyperlane_core::RequestHeadersValueItem| referer_header != #referer_value) {
                     return ::hyperlane_core::Status::Continue;
                 }
             }
@@ -51,9 +51,9 @@ pub(crate) fn reject_referer_macro(
 ) -> TokenStream {
     let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_referer.referer_values.iter().map(|referer_value| {
+        let statements = multi_referer.referer_values.iter().map(|referer_value: &syn::Expr| {
             quote! {
-                if #context.get_request().try_get_header_back(::hyperlane_core::REFERER).map_or(false, |referer_header| referer_header == #referer_value) {
+                if #context.get_request().try_get_header_back(::hyperlane_core::REFERER).map_or(false, |referer_header: ::hyperlane_core::RequestHeadersValueItem| referer_header == #referer_value) {
                     return ::hyperlane_core::Status::Continue;
                 }
             }

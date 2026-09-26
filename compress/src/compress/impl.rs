@@ -84,7 +84,7 @@ impl Compress {
     pub fn from(header: &HashMap<String, String, BuildHasherDefault<XxHash3_64>>) -> Self {
         header
             .get(CONTENT_ENCODING)
-            .map(|value| value.parse::<Compress>().unwrap_or_default())
+            .map(|value: &String| value.parse::<Compress>().unwrap_or_default())
             .unwrap_or_default()
     }
 

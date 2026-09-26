@@ -69,7 +69,7 @@ fn inject_at_end(
                 };
                 let normalized_leading: Vec<proc_macro2::TokenStream> = leading_stmts
                     .iter()
-                    .map(|stmt| match stmt {
+                    .map(|stmt: &syn::Stmt| match stmt {
                         Stmt::Expr(expr, None) => quote! { #expr; },
                         _ => quote! { #stmt },
                     })

@@ -79,16 +79,20 @@ pub(crate) fn prologue_hooks_macro(
 ) -> TokenStream {
     let functions: Punctuated<Expr, Token![,]> =
         parse_macro_input!(attr with Punctuated::parse_terminated);
-    inject(position, item, |context, stream| {
-        let hook_calls = functions.iter().map(|function_expr| {
+    inject(
+        position,
+        item,
+        |context: &syn::Ident, stream: &syn::Ident| {
+            let hook_calls = functions.iter().map(|function_expr: &syn::Expr| {
+                quote! {
+                    let _ = #function_expr(#stream, #context).await;
+                }
+            });
             quote! {
-                let _ = #function_expr(#stream, #context).await;
+                #(#hook_calls)*
             }
-        });
-        quote! {
-            #(#hook_calls)*
-        }
-    })
+        },
+    )
 }
 
 /// Expands macro to add multiple post-hook function calls.
@@ -109,14 +113,18 @@ pub(crate) fn epilogue_hooks_macro(
 ) -> TokenStream {
     let functions: Punctuated<Expr, Token![,]> =
         parse_macro_input!(attr with Punctuated::parse_terminated);
-    inject(position, item, |context, stream| {
-        let hook_calls = functions.iter().map(|function_expr| {
+    inject(
+        position,
+        item,
+        |context: &syn::Ident, stream: &syn::Ident| {
+            let hook_calls = functions.iter().map(|function_expr: &syn::Expr| {
+                quote! {
+                    let _ = #function_expr(#stream, #context).await;
+                }
+            });
             quote! {
-                let _ = #function_expr(#stream, #context).await;
+                #(#hook_calls)*
             }
-        });
-        quote! {
-            #(#hook_calls)*
-        }
-    })
+        },
+    )
 }

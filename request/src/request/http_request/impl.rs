@@ -26,7 +26,8 @@ impl HttpRequest {
 
     /// Parse the configured URL into a [`HttpUrlComponents`].
     pub(crate) fn parse_url(&self) -> Result<HttpUrlComponents, RequestError> {
-        HttpUrlComponents::parse(&self.url).map_err(|e| RequestError::Request(e.to_string()))
+        HttpUrlComponents::parse(&self.url)
+            .map_err(|e: ::http_type::HttpUrlError| RequestError::Request(e.to_string()))
     }
 
     /// `Host` + path (including query string) for the request line.
@@ -53,7 +54,7 @@ impl HttpRequest {
         let host_value: String = self
             .parse_url()
             .ok()
-            .and_then(|u| u.host.clone())
+            .and_then(|u: ::http_type::HttpUrlComponents| u.host.clone())
             .unwrap_or_default();
         let content_length_value: String = body_length.to_string();
         if !Self::header_has_key(&header, HOST) {
@@ -68,7 +69,10 @@ impl HttpRequest {
         if !Self::header_has_key(&header, USER_AGENT) {
             header.insert(USER_AGENT.to_ascii_lowercase(), APP_NAME.to_owned());
         }
-        let estimated_size: usize = header.iter().map(|(k, v)| k.len() + v.len() + 4).sum();
+        let estimated_size: usize = header
+            .iter()
+            .map(|(k, v): (&String, &String)| k.len() + v.len() + 4)
+            .sum();
         let mut out: Vec<u8> = Vec::with_capacity(estimated_size);
         for (key, value) in &header {
             out.extend_from_slice(key.as_bytes());
@@ -81,7 +85,7 @@ impl HttpRequest {
 
     fn header_has_key(header: &HashMap<String, String>, target_key: &str) -> bool {
         let target = target_key.to_ascii_lowercase();
-        header.keys().any(|k| k == &target)
+        header.keys().any(|k: &String| k == &target)
     }
 
     /// Encode `self.body` according to the `Content-Type` header.
@@ -90,8 +94,8 @@ impl HttpRequest {
         let ct = self
             .headers
             .iter()
-            .find(|(k, _)| k.eq_ignore_ascii_case(CONTENT_TYPE))
-            .map(|(_, v)| v.clone());
+            .find(|(k, _): &(&String, &String)| k.eq_ignore_ascii_case(CONTENT_TYPE))
+            .map(|(_, v): (&String, &String)| v.clone());
         match ct {
             Some(value) => value
                 .to_lowercase()
@@ -185,7 +189,7 @@ impl HttpRequest {
         let request = build_http_request("GET", path, header_bytes, None, version);
         stream
             .write_all(&request)
-            .and_then(|_| stream.flush())
+            .and_then(|_: ()| stream.flush())
             .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         self.read_response_sync(stream)
     }
@@ -201,7 +205,7 @@ impl HttpRequest {
         let request = build_http_request("POST", path, header_bytes, Some(body_bytes), version);
         stream
             .write_all(&request)
-            .and_then(|_| stream.flush())
+            .and_then(|_: ()| stream.flush())
             .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         self.read_response_sync(stream)
     }
@@ -314,7 +318,7 @@ impl HttpRequest {
                 None => return false,
             };
             let raw = &body_bytes[pos..chunk_size_end];
-            let chunk_size_str: &[u8] = match raw.iter().position(|&b| b == b';') {
+            let chunk_size_str: &[u8] = match raw.iter().position(|&b: &u8| b == b';') {
                 Some(p) => &raw[..p],
                 None => raw,
             };

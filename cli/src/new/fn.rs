@@ -40,7 +40,7 @@ async fn check_git_available() -> Result<(), NewError> {
         .stderr(Stdio::null())
         .output()
         .await
-        .map_err(|_| NewError::GitNotFound)?;
+        .map_err(|_: std::io::Error| NewError::GitNotFound)?;
     if output.status.success() {
         Ok(())
     } else {

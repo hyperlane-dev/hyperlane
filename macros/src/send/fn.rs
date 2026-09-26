@@ -25,18 +25,22 @@ pub(crate) fn try_send_macro(
         let data: SendData = parse_macro_input!(attr as SendData);
         Some(data.data)
     };
-    inject(position, item, |context, stream| match data_expr {
-        Some(expr) => {
-            quote! {
-                let _: ::std::result::Result<(), ::hyperlane_core::ResponseError> = #stream.try_send(#expr).await;
+    inject(
+        position,
+        item,
+        |context: &syn::Ident, stream: &syn::Ident| match data_expr {
+            Some(expr) => {
+                quote! {
+                    let _: ::std::result::Result<(), ::hyperlane_core::ResponseError> = #stream.try_send(#expr).await;
+                }
             }
-        }
-        None => {
-            quote! {
-                let _: ::std::result::Result<(), ::hyperlane_core::ResponseError> = #stream.try_send(#context.get_mut_response().build()).await;
+            None => {
+                quote! {
+                    let _: ::std::result::Result<(), ::hyperlane_core::ResponseError> = #stream.try_send(#context.get_mut_response().build()).await;
+                }
             }
-        }
-    })
+        },
+    )
 }
 
 /// Sends data via stream after function execution, panics on failure.
@@ -60,16 +64,20 @@ pub(crate) fn send_macro(attr: TokenStream, item: TokenStream, position: Positio
         let data: SendData = parse_macro_input!(attr as SendData);
         Some(data.data)
     };
-    inject(position, item, |context, stream| match data_expr {
-        Some(expr) => {
-            quote! {
-                #stream.send(#expr).await;
+    inject(
+        position,
+        item,
+        |context: &syn::Ident, stream: &syn::Ident| match data_expr {
+            Some(expr) => {
+                quote! {
+                    #stream.send(#expr).await;
+                }
             }
-        }
-        None => {
-            quote! {
-                #stream.send(#context.get_mut_response().build()).await;
+            None => {
+                quote! {
+                    #stream.send(#context.get_mut_response().build()).await;
+                }
             }
-        }
-    })
+        },
+    )
 }

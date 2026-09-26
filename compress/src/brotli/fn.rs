@@ -17,7 +17,11 @@ pub fn encode(data: &'_ [u8]) -> Cow<'_, [u8]> {
     if encoder.write_all(data).is_err() {
         return Cow::Owned(Vec::new());
     }
-    Cow::Owned(encoder.finish().unwrap_or_else(|_| Vec::new()))
+    Cow::Owned(
+        encoder
+            .finish()
+            .unwrap_or_else(|_: std::io::Error| Vec::new()),
+    )
 }
 
 /// Decompresses the given data using the specified decompressor.

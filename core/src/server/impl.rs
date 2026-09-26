@@ -821,7 +821,7 @@ impl Server {
         let bind_address: &String = self.get_server_config().get_address();
         let tcp_listener: TcpListener = TcpListener::bind(&bind_address)
             .await
-            .map_err(|error| Box::new(ServerError::from(error)))?;
+            .map_err(|error: std::io::Error| Box::new(ServerError::from(error)))?;
         let server: &'static Self = unsafe { self.leak() };
         let (wait_sender, wait_receiver) = channel(());
         let (shutdown_sender, mut shutdown_receiver) = channel(());

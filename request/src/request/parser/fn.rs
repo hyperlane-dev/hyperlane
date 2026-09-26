@@ -45,7 +45,7 @@ pub(crate) fn build_http_request(
     http_version_str: String,
 ) -> Vec<u8> {
     let request_line_size: usize = method.len() + 1 + path.len() + 1 + http_version_str.len();
-    let body_size: usize = body_bytes.as_ref().map_or(0, |b| b.len());
+    let body_size: usize = body_bytes.as_ref().map_or(0, |b: &Vec<u8>| b.len());
     let total_size: usize = request_line_size + 2 + header_bytes.len() + 2 + body_size;
     let mut request: Vec<u8> = Vec::with_capacity(total_size);
     request.extend_from_slice(method.as_bytes());
@@ -78,7 +78,7 @@ pub(crate) fn parse_chunked_body(body_bytes: &[u8]) -> Vec<u8> {
             None => break,
         };
         let chunk_size_str: &[u8] = &body_bytes[pos..chunk_size_end];
-        let chunk_size_str: &[u8] = match chunk_size_str.iter().position(|&b| b == b';') {
+        let chunk_size_str: &[u8] = match chunk_size_str.iter().position(|&b: &u8| b == b';') {
             Some(p) => &chunk_size_str[..p],
             None => chunk_size_str,
         };
