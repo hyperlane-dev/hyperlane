@@ -118,55 +118,55 @@ impl RequestBuilder {
 
     /// Set request timeout in milliseconds.
     pub fn timeout(&mut self, ms: u64) -> &mut Self {
-        self.request.config.set_timeout(ms);
+        self.request.get_config_mut().set_timeout(ms);
         self
     }
 
     /// Set per-read buffer size.
     pub fn buffer_size(&mut self, n: usize) -> &mut Self {
-        self.request.config.set_buffer_size(n);
+        self.request.get_config_mut().set_buffer_size(n);
         self
     }
 
     /// Force HTTP/1.1.
     pub fn http1_1_only(&mut self) -> &mut Self {
-        self.request.config.http_version = HttpVersion::Http1_1;
+        self.request.get_config_mut().http_version = HttpVersion::Http1_1;
         self
     }
 
     /// Force HTTP/2.
     pub fn http2_only(&mut self) -> &mut Self {
-        self.request.config.http_version = HttpVersion::Http2;
+        self.request.get_config_mut().http_version = HttpVersion::Http2;
         self
     }
 
     /// Enable auto-follow of 3xx redirects.
     pub fn redirect(&mut self) -> &mut Self {
-        self.request.config.set_redirect(true);
+        self.request.get_config_mut().set_redirect(true);
         self
     }
 
     /// Disable auto-follow of 3xx redirects (default).
     pub fn no_redirect(&mut self) -> &mut Self {
-        self.request.config.set_redirect(false);
+        self.request.get_config_mut().set_redirect(false);
         self
     }
 
     /// Maximum number of redirects to follow (default `DEFAULT_MAX_REDIRECT_TIMES`).
     pub fn max_redirect_times(&mut self, n: usize) -> &mut Self {
-        self.request.config.set_max_redirect_times(n);
+        self.request.get_config_mut().set_max_redirect_times(n);
         self
     }
 
     /// Enable automatic response body decompression (gzip / deflate / br).
     pub fn decode(&mut self) -> &mut Self {
-        self.request.config.set_decode(true);
+        self.request.get_config_mut().set_decode(true);
         self
     }
 
     /// Disable automatic response body decompression.
     pub fn no_decode(&mut self) -> &mut Self {
-        self.request.config.set_decode(false);
+        self.request.get_config_mut().set_decode(false);
         self
     }
 
@@ -176,13 +176,13 @@ impl RequestBuilder {
     /// Construct via [`Proxy::http`] / [`Proxy::https`] / [`Proxy::socks5`]
     /// and optionally chain `.auth(user, pass)`.
     pub fn proxy(&mut self, proxy: Proxy) -> &mut Self {
-        self.request.config.set_proxy(Some(proxy));
+        self.request.get_config_mut().set_proxy(Some(proxy));
         self
     }
 
     /// Clear the proxy (use direct connection).
     pub fn no_proxy(&mut self) -> &mut Self {
-        self.request.config.set_proxy(None);
+        self.request.get_config_mut().set_proxy(None);
         self
     }
 

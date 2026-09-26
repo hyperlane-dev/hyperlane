@@ -104,6 +104,66 @@ impl HttpRequest {
         self
     }
 
+    /// Get a copy of the HTTP method.
+    pub fn get_method(&self) -> Method {
+        self.method.clone()
+    }
+
+    /// Get a clone of the URL string.
+    pub fn get_url(&self) -> String {
+        self.url.clone()
+    }
+
+    /// Get a reference to the URL string.
+    pub fn get_url_ref(&self) -> &str {
+        self.url.as_str()
+    }
+
+    /// Get a clone of the request headers map.
+    pub fn get_headers(&self) -> HashMap<String, String> {
+        self.headers.clone()
+    }
+
+    /// Get a reference to the request headers map.
+    pub fn get_headers_ref(&self) -> &HashMap<String, String> {
+        &self.headers
+    }
+
+    /// Get a clone of the body.
+    pub fn get_body(&self) -> Body {
+        self.body.clone()
+    }
+
+    /// Get a reference to the body.
+    pub fn get_body_ref(&self) -> &Body {
+        &self.body
+    }
+
+    /// Get a clone of the request config.
+    pub fn get_config(&self) -> RequestConfig {
+        self.config.clone()
+    }
+
+    /// Get a reference to the request config.
+    pub fn get_config_ref(&self) -> &RequestConfig {
+        &self.config
+    }
+
+    /// Get a mutable reference to the request config.
+    pub fn get_config_mut(&mut self) -> &mut RequestConfig {
+        &mut self.config
+    }
+
+    /// Get a reference to the internal scratch `Tmp`.
+    pub(crate) fn get_tmp_ref(&self) -> &Tmp {
+        &self.tmp
+    }
+
+    /// Get a mutable reference to the internal scratch `Tmp`.
+    pub(crate) fn get_tmp_mut(&mut self) -> &mut Tmp {
+        &mut self.tmp
+    }
+
     /// Normalize a header key to lowercase so `set_header` /
     /// `remove_header` lookups are case-insensitive.
     fn normalize_header_key(key: &str) -> String {
