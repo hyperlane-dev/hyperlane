@@ -32,16 +32,29 @@ jobs:
           GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
           REPO_NAME: ${{ github.event.repository.name }}
         run: |
-          set -e
           if [ -z "$GITEE_TOKEN" ]; then
             echo "::error::GITEE_TOKEN secret is missing"; exit 1
           fi
           git remote remove gitee 2>/dev/null || true
           git remote add gitee "https://eastspire:${GITEE_TOKEN}@gitee.com/eastspire/${REPO_NAME}.git"
-          git push gitee --mirror --force 2>&1 || {
-            echo "::warning::gitee mirror push failed — repo may need 'allow token push' enabled in gitee backend"
-            exit 0
-          }
+          # Retry 8 times (matches crate-cli publish max_retries); exponential backoff 2,4,8,16,32,64,128,256 seconds
+          attempt=0
+          max_retries=8
+          while [ $attempt -le $max_retries ]; do
+            if [ $attempt -gt 0 ]; then
+              delay=$((2 ** attempt))
+              echo "::notice::Retry $attempt/$max_retries after ${delay}s sleep"
+              sleep $delay
+            fi
+            attempt=$((attempt + 1))
+            if git push gitee 'refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*' --force 2>&1; then
+              echo "::notice::Gitee mirror push succeeded on attempt $attempt"
+              exit 0
+            fi
+            echo "::warning::Gitee mirror push failed on attempt $attempt"
+          done
+          echo "::error::Gitee mirror push failed after $((max_retries + 1)) attempts"
+          exit 1
 
       - name: Push to GitCode
         env:
@@ -49,13 +62,26 @@ jobs:
           GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
           REPO_NAME: ${{ github.event.repository.name }}
         run: |
-          set -e
           if [ -z "$GITCODE_TOKEN" ]; then
             echo "::error::GITCODE_TOKEN secret is missing"; exit 1
           fi
           git remote remove gitcode 2>/dev/null || true
           git remote add gitcode "https://oauth2:${GITCODE_TOKEN}@gitcode.com/eastspire/${REPO_NAME}.git"
-          git push gitcode --mirror --force 2>&1 || {
-            echo "::warning::gitcode mirror push failed — repo may need 'allow access token push' enabled in gitcode backend"
-            exit 0
-          }
+          # Retry 8 times (matches crate-cli publish max_retries); exponential backoff 2,4,8,16,32,64,128,256 seconds
+          attempt=0
+          max_retries=8
+          while [ $attempt -le $max_retries ]; do
+            if [ $attempt -gt 0 ]; then
+              delay=$((2 ** attempt))
+              echo "::notice::Retry $attempt/$max_retries after ${delay}s sleep"
+              sleep $delay
+            fi
+            attempt=$((attempt + 1))
+            if git push gitcode 'refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*' --force 2>&1; then
+              echo "::notice::GitCode mirror push succeeded on attempt $attempt"
+              exit 0
+            fi
+            echo "::warning::GitCode mirror push failed on attempt $attempt"
+          done
+          echo "::error::GitCode mirror push failed after $((max_retries + 1)) attempts"
+          exit 1
