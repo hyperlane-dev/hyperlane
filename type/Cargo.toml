@@ -16,15 +16,14 @@ http-compress = { workspace = true }
 http-constant = { workspace = true }
 
 hex = { workspace = true }
-url = { workspace = true }
-serde = { workspace = true }
-tokio = { workspace = true }
-serde_json = { workspace = true }
-serde-xml-rs = { workspace = true }
 lombok-macros = { workspace = true }
+serde = { workspace = true }
+serde-xml-rs = { workspace = true }
+serde_json = { workspace = true }
 serde_urlencoded = { workspace = true }
-
-[dev-dependencies]
+tokio = { workspace = true }
 url = { workspace = true }
+[dev-dependencies]
 serde = { workspace = true }
 tokio = { workspace = true }
+url = { workspace = true }

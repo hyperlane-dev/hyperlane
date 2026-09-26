@@ -20,9 +20,9 @@ http-type = { workspace = true }
 hyperlane-core = { workspace = true }
 hyperlane-macros = { workspace = true }
 
+color-output = { workspace = true }
 log = { workspace = true }
-tokio = { workspace = true }
+lombok-macros = { workspace = true }
 notify = { workspace = true }
 thiserror = { workspace = true }
-color-output = { workspace = true }
-lombok-macros = { workspace = true }
+tokio = { workspace = true }
