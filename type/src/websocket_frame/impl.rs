@@ -26,7 +26,7 @@ impl WebSocketOpcode {
     ///
     /// # Arguments
     ///
-    /// - `u8`: The raw opcode value.
+    /// - `u8` - The raw opcode value.
     ///
     /// # Returns
     ///
@@ -167,9 +167,9 @@ impl WebSocketFrame {
     /// # Returns
     ///
     /// - `Option<(WebSocketFrame, usize)>`
-    ///     - `Some((WebSocketFrame, usize))`: If the frame is successfully decoded, returns the decoded frame
+    ///     - `Some((WebSocketFrame, usize))` - If the frame is successfully decoded, returns the decoded frame
     ///       and the number of bytes consumed from the input slice.
-    ///     - `None`: If the frame is incomplete or malformed.
+    ///     - `None` - If the frame is incomplete or malformed.
     pub fn decode_ws_frame<D>(data: D) -> Option<(WebSocketFrame, usize)>
     where
         D: AsRef<[u8]>,
@@ -554,11 +554,11 @@ impl WebSocketFrame {
     ///
     /// # Arguments
     ///
-    /// - `&mut Vec<u8>`: The accumulated frame data.
+    /// - `&mut Vec<u8>` - The accumulated frame data.
     ///
     /// # Returns
     ///
-    /// - `Result<Option<RequestBody>, RequestError>`: Some(request) if frame is complete, None to continue, or error.
+    /// - `Result<Option<RequestBody>, RequestError>` - Some(request) if frame is complete, None to continue, or error.
     #[inline(always)]
     pub(crate) fn build_full_frame(
         &self,

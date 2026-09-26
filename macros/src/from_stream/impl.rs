@@ -6,7 +6,7 @@ use super::*;
 /// It supports an optional variable name parameter.
 ///
 /// # Arguments
-/// - `input`: The parse stream containing the token stream to be parsed
+/// - `input` - The parse stream containing the token stream to be parsed
 ///
 /// # Returns
 /// Returns a `syn::Result<Self>` containing the parsed FromStreamData on success,
@@ -24,7 +24,7 @@ impl Parse for FromStreamData {
     /// 2. No parameters: variable_name will be None
     ///
     /// # Arguments
-    /// - `ParseStream`: The ParseStream containing the token stream to be parsed
+    /// - `ParseStream` - The ParseStream containing the token stream to be parsed
     ///
     /// # Returns
     /// Returns `syn::Result<Self>` where:

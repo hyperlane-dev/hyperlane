@@ -31,11 +31,11 @@ impl From<ParseError> for HttpUrlError {
     ///
     /// # Arguments
     ///
-    /// - `ParseError`: The URL parse error to convert.
+    /// - `ParseError` - The URL parse error to convert.
     ///
     /// # Returns
     ///
-    /// - `HttpUrlError`: The corresponding error as `InvalidUrl`.
+    /// - `HttpUrlError` - The corresponding error as `InvalidUrl`.
     #[inline(always)]
     fn from(_: ParseError) -> Self {
         HttpUrlError::InvalidUrl

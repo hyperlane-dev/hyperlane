@@ -15,9 +15,9 @@ pub struct RoutePattern(
 /// The core routing engine responsible for matching request paths to their corresponding handlers.
 ///
 /// The matcher categorizes route into three types for optimized performance:
-/// 1.  `static_route`- For exact path matches, offering the fastest lookups.
-/// 2.  `dynamic_route`- For paths with variable segments.
-/// 3.  `regex_route`- For complex matching based on regular expressions.
+/// 1.  `static_route` - For exact path matches, offering the fastest lookups.
+/// 2.  `dynamic_route` - For paths with variable segments.
+/// 3.  `regex_route` - For complex matching based on regular expressions.
 ///
 /// When a request comes in, the matcher checks these categories in order to find the appropriate hook.
 #[derive(Clone, CustomDebug, DisplayDebug, Getter, GetterMut, Setter)]

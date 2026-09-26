@@ -29,11 +29,11 @@ impl PartialEq for Server {
     ///
     /// # Arguments
     ///
-    /// - `&Self`- The other `Server` instance to compare against.
+    /// - `&Self` - The other `Server` instance to compare against.
     ///
     /// # Returns
     ///
-    /// - `bool`- `true` if the instances are equal, `false` otherwise.
+    /// - `bool` - `true` if the instances are equal, `false` otherwise.
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.get_server_config() == other.get_server_config()
@@ -247,7 +247,7 @@ impl Lifetime for Server {
     ///
     /// # Returns
     ///
-    /// - `&'static Self`: A reference to the server with a `'static` lifetime.
+    /// - `&'static Self` - A reference to the server with a `'static` lifetime.
     ///
     /// # Safety
     ///
@@ -263,7 +263,7 @@ impl Lifetime for Server {
     ///
     /// # Returns
     ///
-    /// - `&'static mut Self`: A mutable reference to the server with a `'static` lifetime.
+    /// - `&'static mut Self` - A mutable reference to the server with a `'static` lifetime.
     ///
     /// # Safety
     ///
@@ -354,7 +354,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `RequestConfig`- The HTTP request config to set.
+    /// - `RequestConfig` - The HTTP request config to set.
     ///
     /// # Returns
     ///
@@ -694,30 +694,24 @@ impl Server {
     ///
     /// - `&mut Stream` - The `Stream` for the current request.
     /// - `&mut Context` - The `Context` for the current request.
-    /// - `&Request` - The incoming request to be processed.
+    /// - `Request` - The incoming request to be processed.
     ///
     /// # Returns
     ///
     /// - `bool` - A boolean indicating whether the connection should be kept alive.
-    async fn request_hook(
-        &self,
-        stream: &mut Stream,
-        ctx: &mut Context,
-        request: &Request,
-    ) -> bool {
-        let mut response: Response = Response::default();
-        response.set_version(request.get_version().clone());
-        ctx.set_request(request.clone());
-        ctx.set_response(response);
-        ctx.set_route_params(RouteParams::default());
+    async fn request_hook(&self, stream: &mut Stream, ctx: &mut Context, request: Request) -> bool {
+        let keep_alive: bool = request.is_enable_keep_alive();
+        let version: RequestVersion = request.get_version().clone();
+        let route: RequestPath = request.get_path().clone();
+        ctx.set_request(request);
+        ctx.get_mut_response().reset().set_version(version);
+        ctx.clear_route_params();
         ctx.clear_attribute();
         stream.set_closed(false);
-        let keep_alive: bool = request.is_enable_keep_alive();
         if self.handle_request_middleware(stream, ctx).await {
             return stream.is_keep_alive(keep_alive);
         }
-        let route: &str = request.get_path();
-        if self.handle_route_matcher(stream, ctx, route).await {
+        if self.handle_route_matcher(stream, ctx, &route).await {
             return stream.is_keep_alive(keep_alive);
         }
         if self.handle_response_middleware(stream, ctx).await {
@@ -732,24 +726,21 @@ impl Server {
     ///
     /// - `&mut Stream` - The `Stream` for the current request.
     /// - `&mut Context` - The `Context` for the current request.
-    /// - `&Request` - The initial request that established the keep-alive connection.
-    async fn handle_http_requests(
-        &self,
-        stream: &mut Stream,
-        ctx: &mut Context,
-        request: &Request,
-    ) {
+    /// - `Request` - The initial request that established the keep-alive connection.
+    async fn handle_http_requests(&self, stream: &mut Stream, ctx: &mut Context, request: Request) {
         if !self.request_hook(stream, ctx, request).await {
             return;
         }
         loop {
-            match stream.try_get_http_request().await {
-                Ok(new_request) => {
-                    if !self.request_hook(stream, ctx, &new_request).await {
+            let mut reused_request: Request = mem::take(ctx.get_mut_request());
+            match stream.try_fill_http_request(&mut reused_request).await {
+                Ok(()) => {
+                    if !self.request_hook(stream, ctx, reused_request).await {
                         return;
                     }
                 }
                 Err(error) => {
+                    ctx.set_request(reused_request);
                     self.handle_request_error(stream, ctx, &error).await;
                     return;
                 }
@@ -773,7 +764,7 @@ impl Server {
     async fn handle_connection(&self, stream: &mut Stream, ctx: &mut Context) {
         match stream.try_get_http_request().await {
             Ok(request) => {
-                self.handle_http_requests(stream, ctx, &request).await;
+                self.handle_http_requests(stream, ctx, request).await;
             }
             Err(error) => {
                 self.handle_request_error(stream, ctx, &error).await;

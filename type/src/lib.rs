@@ -40,10 +40,12 @@ pub use {http_compress::*, http_constant::*, serde_json, tokio};
 
 use std::{
     any::Any,
+    cell::{RefCell, RefMut},
     collections::{HashMap, HashSet, VecDeque},
-    fmt::{self, Debug, Display, Formatter},
+    fmt::{self, Debug, Display, Formatter, Write},
     hash::Hash,
-    io::ErrorKind,
+    io::{self, ErrorKind},
+    mem,
     net::IpAddr,
     num::ParseIntError,
     pin::Pin,
@@ -54,6 +56,8 @@ use std::{
         Arc,
         atomic::{self, AtomicBool, AtomicUsize},
     },
+    task::{Context, Poll},
+    thread_local,
     time::Duration,
 };
 
@@ -62,7 +66,7 @@ use {
     lombok_macros::*,
     serde::{Deserialize, Serialize, de::DeserializeOwned},
     tokio::{
-        io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
+        io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, ReadBuf},
         net::TcpStream,
         runtime::Handle,
         sync::{

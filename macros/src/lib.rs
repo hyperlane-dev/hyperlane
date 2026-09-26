@@ -52,8 +52,8 @@ use {
 ///
 /// # Arguments
 ///
-/// - `TokenStream`: Optional variable name to store the read request data.
-/// - `TokenStream`: The function item to be modified
+/// - `TokenStream` - Optional variable name to store the read request data.
+/// - `TokenStream` - The function item to be modified
 ///
 /// # Returns
 ///
@@ -127,8 +127,8 @@ pub fn try_get_websocket_request(attr: TokenStream, item: TokenStream) -> TokenS
 ///
 /// # Arguments
 ///
-/// - `TokenStream`: Optional variable name to store the read request data.
-/// - `TokenStream`: The function item to be modified
+/// - `TokenStream` - Optional variable name to store the read request data.
+/// - `TokenStream` - The function item to be modified
 ///
 /// # Returns
 ///
@@ -3269,7 +3269,7 @@ pub fn hyperlane(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Parameters
 ///
-/// - `path`: String literal defining the route path
+/// - `path` - String literal defining the route path
 ///
 /// # Dependencies
 ///

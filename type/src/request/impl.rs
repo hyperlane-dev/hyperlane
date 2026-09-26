@@ -23,11 +23,11 @@ impl From<std::io::Error> for RequestError {
     ///
     /// # Arguments
     ///
-    /// - `std::io::Error`: The I/O error to convert.
+    /// - `std::io::Error` - The I/O error to convert.
     ///
     /// # Returns
     ///
-    /// - `RequestError`: The corresponding request error.
+    /// - `RequestError` - The corresponding request error.
     #[inline(always)]
     fn from(error: std::io::Error) -> Self {
         let kind: ErrorKind = error.kind();
@@ -46,11 +46,11 @@ impl From<Elapsed> for RequestError {
     ///
     /// # Arguments
     ///
-    /// - `Elapsed`: The elapsed error to convert.
+    /// - `Elapsed` - The elapsed error to convert.
     ///
     /// # Returns
     ///
-    /// - `RequestError`: The corresponding request error as `ReadTimeout`.
+    /// - `RequestError` - The corresponding request error as `ReadTimeout`.
     #[inline(always)]
     fn from(_: Elapsed) -> Self {
         RequestError::ReadTimeout(HttpStatus::RequestTimeout)
@@ -65,11 +65,11 @@ impl From<ParseIntError> for RequestError {
     ///
     /// # Arguments
     ///
-    /// - `ParseIntError`: The parse error to convert.
+    /// - `ParseIntError` - The parse error to convert.
     ///
     /// # Returns
     ///
-    /// - `RequestError`: The corresponding request error as `InvalidContentLength`.
+    /// - `RequestError` - The corresponding request error as `InvalidContentLength`.
     #[inline(always)]
     fn from(_: ParseIntError) -> Self {
         RequestError::InvalidContentLength(HttpStatus::BadRequest)
@@ -84,11 +84,11 @@ impl From<ResponseError> for RequestError {
     ///
     /// # Arguments
     ///
-    /// - `ResponseError`: The response error to convert.
+    /// - `ResponseError` - The response error to convert.
     ///
     /// # Returns
     ///
-    /// - `RequestError`: The corresponding request error as `WriteTimeout`.
+    /// - `RequestError` - The corresponding request error as `WriteTimeout`.
     #[inline(always)]
     fn from(_: ResponseError) -> Self {
         RequestError::WriteTimeout(HttpStatus::InternalServerError)
@@ -274,15 +274,34 @@ impl Default for Request {
 }
 
 impl Request {
+    /// Resets the request to its default state while retaining allocated capacity.
+    ///
+    /// This keeps the header map, query map, body, and string allocations so
+    /// persistent (keep-alive) connections avoid repeated allocation per request.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Self` - A mutable reference to self for chaining.
+    pub fn reset(&mut self) -> &mut Self {
+        self.method = Method::default();
+        self.host.clear();
+        self.version = HttpVersion::default();
+        self.path.clear();
+        self.querys.clear();
+        self.headers.clear();
+        self.body.clear();
+        self
+    }
+
     /// Parses the first line of HTTP request into method, path, and version components.
     ///
     /// # Arguments
     ///
-    /// - `&str`: The first line string of HTTP request to parse.
+    /// - `&str` - The first line string of HTTP request to parse.
     ///
     /// # Returns
     ///
-    /// - `Result<(RequestMethod, &str, RequestVersion), RequestError>`: A tuple containing:
+    /// - `Result<(RequestMethod, &str, RequestVersion), RequestError>` - A tuple containing:
     ///   - The parsed HTTP method
     ///   - The full path string
     ///   - The parsed HTTP version
@@ -320,12 +339,12 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `&str`: The path string to check.
-    /// - `usize`: The maximum allowed path size.
+    /// - `&str` - The path string to check.
+    /// - `usize` - The maximum allowed path size.
     ///
     /// # Returns
     ///
-    /// - `Result<(), RequestError>`: Ok if valid, or an error if the path is too long.
+    /// - `Result<(), RequestError>` - Ok if valid, or an error if the path is too long.
     #[inline(always)]
     pub(crate) fn check_http_path_size(path: &str, max_size: usize) -> Result<(), RequestError> {
         if path.len() > max_size && max_size != DEFAULT_LOW_SECURITY_MAX_PATH_SIZE {
@@ -341,13 +360,13 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `&str`: The full path string containing the query.
-    /// - `Option<usize>`: The index of the query separator (`?`), if present.
-    /// - `Option<usize>`: The index of the hash separator (`#`), if present.
+    /// - `&str` - The full path string containing the query.
+    /// - `Option<usize>` - The index of the query separator (`?`), if present.
+    /// - `Option<usize>` - The index of the hash separator (`#`), if present.
     ///
     /// # Returns
     ///
-    /// - `&str`: The parsed query string slice, or empty string if no query.
+    /// - `&str` - The parsed query string slice, or empty string if no query.
     #[inline(always)]
     pub(crate) fn get_http_query(
         path: &str,
@@ -368,65 +387,61 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `&str`: The full path string.
-    /// - `Option<usize>`: The index of the query separator (`?`), if present.
-    /// - `Option<usize>`: The index of the hash separator (`#`), if present.
+    /// - `&str` - The full path string.
+    /// - `Option<usize>` - The index of the query separator (`?`), if present.
+    /// - `Option<usize>` - The index of the hash separator (`#`), if present.
     ///
     /// # Returns
     ///
-    /// - `RequestPath`: The request path without query or hash.
+    /// - `&str` - The request path slice without query or hash.
     #[inline(always)]
     pub(crate) fn get_http_path(
         path: &str,
         query_index: Option<usize>,
         hash_index: Option<usize>,
-    ) -> RequestPath {
+    ) -> &str {
         match query_index.or(hash_index) {
-            Some(separator_index) => path[..separator_index].to_owned(),
-            None => path.to_owned(),
+            Some(separator_index) => &path[..separator_index],
+            None => path,
         }
     }
 
-    /// Parses a query string as_ref key-value pairs.
+    /// Parses a query string as_ref key-value pairs into the given map.
     ///
     /// Expects format "key1=value1&key2=value2". Empty values are allowed.
+    /// The target map is expected to be empty; entries are inserted without
+    /// reallocating the map when it already has sufficient capacity.
     ///
     /// # Arguments
     ///
     /// - `&str` - The query string to parse.
-    ///
-    /// # Returns
-    ///
-    /// - `RequestQuerys` - The parsed query parameters.
+    /// - `&mut RequestQuerys` - The map to insert parsed parameters into.
     #[inline(always)]
-    pub(crate) fn get_http_querys(query: &str) -> RequestQuerys {
-        let estimated_capacity: usize = query.matches(AND).count() + 1;
-        let mut query_map: RequestQuerys = HashMapXxHash3_64::with_capacity_and_hasher(
-            estimated_capacity,
-            BuildHasherDefault::default(),
-        );
+    pub(crate) fn fill_http_querys(query: &str, querys: &mut RequestQuerys) {
+        if query.is_empty() {
+            return;
+        }
         for pair in query.split(AND) {
             if let Some((key, value)) = pair.split_once(EQUAL) {
                 if !key.is_empty() {
-                    query_map.insert(key.to_string(), value.to_string());
+                    querys.insert(key.to_string(), value.to_string());
                 }
             } else if !pair.is_empty() {
-                query_map.insert(pair.to_string(), String::new());
+                querys.insert(pair.to_string(), String::new());
             }
         }
-        query_map
     }
 
     /// Checks if the header count exceeds the maximum allowed.
     ///
     /// # Arguments
     ///
-    /// - `usize`: The current number of headers parsed.
-    /// - `usize`: The maximum allowed number of headers.
+    /// - `usize` - The current number of headers parsed.
+    /// - `usize` - The maximum allowed number of headers.
     ///
     /// # Returns
     ///
-    /// - `Result<(), RequestError>`: Returns an error if the limit is exceeded and not in low security mode.
+    /// - `Result<(), RequestError>` - Returns an error if the limit is exceeded and not in low security mode.
     #[inline(always)]
     pub(crate) fn check_http_header_count(
         count: usize,
@@ -444,12 +459,12 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `&str`: The header key to check.
-    /// - `usize`: The maximum allowed length for a header key.
+    /// - `&str` - The header key to check.
+    /// - `usize` - The maximum allowed length for a header key.
     ///
     /// # Returns
     ///
-    /// - `Result<(), RequestError>`: Returns an error if the limit is exceeded and not in low security mode.
+    /// - `Result<(), RequestError>` - Returns an error if the limit is exceeded and not in low security mode.
     #[inline(always)]
     pub(crate) fn check_http_header_key_size(
         key: &str,
@@ -467,12 +482,12 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `&str`: The header value to check.
-    /// - `usize`: The maximum allowed length for a header value.
+    /// - `&str` - The header value to check.
+    /// - `usize` - The maximum allowed length for a header value.
     ///
     /// # Returns
     ///
-    /// - `Result<(), RequestError>`: Returns an error if the limit is exceeded and not in low security mode.
+    /// - `Result<(), RequestError>` - Returns an error if the limit is exceeded and not in low security mode.
     #[inline(always)]
     pub(crate) fn check_http_header_value_size(
         value: &str,
@@ -490,12 +505,12 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `&str`: The Content-Length header value string.
-    /// - `usize`: The maximum allowed body size.
+    /// - `&str` - The Content-Length header value string.
+    /// - `usize` - The maximum allowed body size.
     ///
     /// # Returns
     ///
-    /// - `Result<usize, RequestError>`: The parsed content length or an error.
+    /// - `Result<usize, RequestError>` - The parsed content length or an error.
     #[inline(always)]
     pub(crate) fn check_http_body_size(
         value: &str,
@@ -510,42 +525,41 @@ impl Request {
         Ok(length)
     }
 
-    /// Parses HTTP headers from a buffered reader.
+    /// Parses HTTP headers from a buffered reader into the given map.
     ///
     /// This method reads header lines from the provided buffered reader until an empty line
     /// is encountered, which indicates the end of headers. It checks header count, length,
-    /// and content according to the provided configuration.
+    /// and content according to the provided configuration. The target map and host string
+    /// are expected to be empty; they are filled without reallocating when they already
+    /// have sufficient capacity.
     ///
     /// # Arguments
     ///
-    /// - `&mut AsyncBufReadExt + Unpin`: A mutable reference to a buffered reader implementing `AsyncBufReadExt`.
-    /// - `&RequestConfig`: Configuration for security limits and buffer settings.
+    /// - `&mut AsyncBufReadExt + Unpin` - A mutable reference to a buffered reader implementing `AsyncBufReadExt`.
+    /// - `&RequestConfig` - Configuration for security limits and buffer settings.
+    /// - `&mut RequestHeaders` - The map to insert parsed headers into.
+    /// - `&mut RequestHost` - The string to write the Host header value into.
     ///
     /// # Returns
     ///
-    /// - `Result<(RequestHeaders, RequestHost, usize), RequestError>`: A tuple containing:
-    ///   - The parsed headers as a hash map
-    ///   - The host value parsed from the Host header
-    ///   - The content length parsed from the Content-Length header
-    ///   - Or an error if parsing fails
+    /// - `Result<usize, RequestError>` - The content length parsed from the
+    ///   Content-Length header, or an error if parsing fails.
     pub(crate) async fn get_http_headers<R>(
         reader: &mut R,
         config: &RequestConfig,
-    ) -> Result<(RequestHeaders, RequestHost, usize), RequestError>
+        headers: &mut RequestHeaders,
+        host: &mut RequestHost,
+    ) -> Result<usize, RequestError>
     where
         R: AsyncBufReadExt + Unpin,
     {
-        let buffer_size: usize = config.get_buffer_size();
         let max_header_count: usize = config.get_max_header_count();
         let max_header_key_size: usize = config.get_max_header_key_size();
         let max_header_value_size: usize = config.get_max_header_value_size();
         let max_body_size: usize = config.get_max_body_size();
-        let mut headers: RequestHeaders =
-            HashMapXxHash3_64::with_capacity_and_hasher(B_16, BuildHasherDefault::default());
-        let mut host: RequestHost = String::new();
         let mut content_size: usize = 0;
         let mut header_count: usize = 0;
-        let mut header_line_buffer: String = String::with_capacity(buffer_size);
+        let mut header_line_buffer: String = String::with_capacity(HEADER_LINE_BUFFER_CAPACITY);
         loop {
             header_line_buffer.clear();
             AsyncBufReadExt::read_line(reader, &mut header_line_buffer).await?;
@@ -565,41 +579,52 @@ impl Request {
             }
             let key: String = key_trimmed.to_ascii_lowercase();
             Self::check_http_header_key_size(&key, max_header_key_size)?;
-            let value: String = value_part.trim().to_string();
-            Self::check_http_header_value_size(&value, max_header_value_size)?;
+            let value: &str = value_part.trim();
+            Self::check_http_header_value_size(value, max_header_value_size)?;
             match key.as_str() {
-                HOST => host = value.clone(),
+                HOST => {
+                    host.clear();
+                    host.push_str(value);
+                }
                 CONTENT_LENGTH => {
-                    content_size = Self::check_http_body_size(&value, max_body_size)?;
+                    content_size = Self::check_http_body_size(value, max_body_size)?;
                 }
                 _ => {}
             }
-            headers.entry(key).or_default().push_back(value);
+            headers.entry(key).or_default().push_back(value.to_string());
         }
-        Ok((headers, host, content_size))
+        Ok(content_size)
     }
 
-    /// Reads the request body from the buffered reader.
+    /// Reads the request body from the buffered reader into the given buffer.
+    ///
+    /// The target buffer is cleared and resized to the expected content size,
+    /// retaining its allocation when it already has sufficient capacity.
     ///
     /// # Arguments
     ///
-    /// - `&mut BufReader<&mut TcpStream>`: The buffered reader to read from.
-    /// - `usize`: The expected content size.
+    /// - `&mut AsyncRead + Unpin` - The buffered reader to read from.
+    /// - `&mut RequestBody` - The buffer to read the body bytes into.
+    /// - `usize` - The expected content size.
     ///
     /// # Returns
     ///
-    /// - `Result<RequestBody, RequestError>`: The body bytes or an error.
+    /// - `Result<(), RequestError>` - Ok on success, or an error if reading fails.
     #[inline(always)]
-    pub(crate) async fn get_http_body(
-        reader: &mut BufReader<&mut TcpStream>,
+    pub(crate) async fn fill_http_body<R>(
+        reader: &mut R,
+        body: &mut RequestBody,
         content_size: usize,
-    ) -> Result<RequestBody, RequestError> {
-        let mut body: RequestBody = Vec::with_capacity(content_size);
+    ) -> Result<(), RequestError>
+    where
+        R: AsyncRead + Unpin,
+    {
+        body.clear();
         if content_size > 0 {
             body.resize(content_size, 0);
-            AsyncReadExt::read_exact(reader, &mut body).await?;
+            AsyncReadExt::read_exact(reader, body).await?;
         }
-        Ok(body)
+        Ok(())
     }
 
     /// Tries to get a query parameter value by key.

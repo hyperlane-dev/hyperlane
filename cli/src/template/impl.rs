@@ -24,13 +24,13 @@ impl TemplateConfig {
     ///
     /// # Arguments
     ///
-    /// - `TemplateType`: Type of template component
-    /// - `String`: Name of the component
-    /// - `Option<ModelSubType>`: Optional model subtype for model components
+    /// - `TemplateType` - Type of template component
+    /// - `String` - Name of the component
+    /// - `Option<ModelSubType>` - Optional model subtype for model components
     ///
     /// # Returns
     ///
-    /// - `Self`: Configuration instance
+    /// - `Self` - Configuration instance
     pub fn new(
         template_type: TemplateType,
         component_name: String,
