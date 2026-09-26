@@ -37,7 +37,6 @@ jobs:
           fi
           git remote remove gitee 2>/dev/null || true
           git remote add gitee "https://eastspire:${GITEE_TOKEN}@gitee.com/eastspire/${REPO_NAME}.git"
-          # Retry 8 times (matches crate-cli publish max_retries); exponential backoff 2,4,8,16,32,64,128,256 seconds
           attempt=0
           max_retries=8
           while [ $attempt -le $max_retries ]; do
@@ -67,7 +66,6 @@ jobs:
           fi
           git remote remove gitcode 2>/dev/null || true
           git remote add gitcode "https://oauth2:${GITCODE_TOKEN}@gitcode.com/eastspire/${REPO_NAME}.git"
-          # Retry 8 times (matches crate-cli publish max_retries); exponential backoff 2,4,8,16,32,64,128,256 seconds
           attempt=0
           max_retries=8
           while [ $attempt -le $max_retries ]; do
