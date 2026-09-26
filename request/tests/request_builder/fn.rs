@@ -81,7 +81,7 @@ fn test_sync_post_binary_request() {
 
 #[test]
 fn test_case_insensitive_header_matching() {
-    let mut headers: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut headers: HashMap<String, String> = HashMap::new();
     headers.insert("Content-Type".to_string(), "application/json".to_string());
     headers.insert("User-Agent".to_string(), "test-agent".to_string());
     let _request = RequestBuilder::new()
@@ -94,7 +94,7 @@ fn test_case_insensitive_header_matching() {
 
 #[test]
 fn test_case_insensitive_required_headers() {
-    let mut headers: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut headers: HashMap<String, String> = HashMap::new();
     headers.insert("host".to_string(), "custom-host.com".to_string());
     headers.insert("accept".to_string(), "application/xml".to_string());
     let _request = RequestBuilder::new()
@@ -133,7 +133,7 @@ fn test_socks5_proxy_get_request() {
 
 #[test]
 fn test_readme_sync_get_request() {
-    let mut headers: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut headers: HashMap<String, String> = HashMap::new();
     headers.insert("header-key".to_string(), "header-value".to_string());
     let mut request = RequestBuilder::new()
         .get("https://ltpp.vip/")
@@ -148,8 +148,8 @@ fn test_readme_sync_get_request() {
 
 #[test]
 fn test_readme_sync_post_json_request() {
-    let body = serde_json::json!({ "test": 1 });
-    let mut headers: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let body = json!({ "test": 1 });
+    let mut headers: HashMap<String, String> = HashMap::new();
     headers.insert("header-key".to_string(), "header-value".to_string());
     let mut request = RequestBuilder::new()
         .post("http://code.ltpp.vip")

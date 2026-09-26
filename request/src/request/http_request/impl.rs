@@ -182,7 +182,7 @@ impl HttpRequest {
         let path = self.full_path();
         let header_bytes = self.header_bytes(0);
         let version = self.config.http_version.to_string();
-        let request = parser::r#fn::build_http_request("GET", path, header_bytes, None, version);
+        let request = build_http_request("GET", path, header_bytes, None, version);
         stream
             .write_all(&request)
             .and_then(|_| stream.flush())
@@ -198,8 +198,7 @@ impl HttpRequest {
         let path = self.full_path();
         let header_bytes = self.header_bytes(body_bytes.len());
         let version = self.config.http_version.to_string();
-        let request =
-            parser::r#fn::build_http_request("POST", path, header_bytes, Some(body_bytes), version);
+        let request = build_http_request("POST", path, header_bytes, Some(body_bytes), version);
         stream
             .write_all(&request)
             .and_then(|_| stream.flush())
@@ -233,11 +232,7 @@ impl HttpRequest {
             if n == 0 {
                 break;
             }
-            let new_cap = parser::r#fn::calculate_buffer_capacity(
-                &response_bytes,
-                n,
-                response_bytes.capacity(),
-            );
+            let new_cap = calculate_buffer_capacity(&response_bytes, n, response_bytes.capacity());
             if new_cap > 0 {
                 response_bytes.reserve(new_cap - response_bytes.capacity());
             }
@@ -245,10 +240,10 @@ impl HttpRequest {
             response_bytes.extend_from_slice(&buffer[..n]);
             if !headers_done {
                 let search_start = old_len.saturating_sub(3);
-                if let Some(pos) = parser::r#fn::find_double_crlf(&response_bytes, search_start) {
+                if let Some(pos) = find_double_crlf(&response_bytes, search_start) {
                     headers_done = true;
                     headers_end_pos = pos + 4;
-                    parser::r#fn::parse_response_headers(
+                    parse_response_headers(
                         &response_bytes[..headers_end_pos],
                         &version_bytes,
                         &location_key,
@@ -271,7 +266,7 @@ impl HttpRequest {
         }
         if is_chunked {
             let body_bytes = response_bytes[headers_end_pos..].to_vec();
-            let decoded = parser::r#fn::parse_chunked_body(&body_bytes);
+            let decoded = parse_chunked_body(&body_bytes);
             response_bytes.truncate(headers_end_pos);
             response_bytes.extend_from_slice(&decoded);
         }
@@ -381,7 +376,7 @@ impl HttpRequest {
         let path = self.full_path();
         let header_bytes = self.header_bytes(0);
         let version = self.config.http_version.to_string();
-        let request = parser::r#fn::build_http_request("GET", path, header_bytes, None, version);
+        let request = build_http_request("GET", path, header_bytes, None, version);
         stream
             .write_all(&request)
             .await
@@ -401,8 +396,7 @@ impl HttpRequest {
         let path = self.full_path();
         let header_bytes = self.header_bytes(body_bytes.len());
         let version = self.config.http_version.to_string();
-        let request =
-            parser::r#fn::build_http_request("POST", path, header_bytes, Some(body_bytes), version);
+        let request = build_http_request("POST", path, header_bytes, Some(body_bytes), version);
         stream
             .write_all(&request)
             .await
@@ -441,11 +435,7 @@ impl HttpRequest {
             if n == 0 {
                 break;
             }
-            let new_cap = parser::r#fn::calculate_buffer_capacity(
-                &response_bytes,
-                n,
-                response_bytes.capacity(),
-            );
+            let new_cap = calculate_buffer_capacity(&response_bytes, n, response_bytes.capacity());
             if new_cap > 0 {
                 response_bytes.reserve(new_cap - response_bytes.capacity());
             }
@@ -453,10 +443,10 @@ impl HttpRequest {
             response_bytes.extend_from_slice(&buffer[..n]);
             if !headers_done {
                 let search_start = old_len.saturating_sub(3);
-                if let Some(pos) = parser::r#fn::find_double_crlf(&response_bytes, search_start) {
+                if let Some(pos) = find_double_crlf(&response_bytes, search_start) {
                     headers_done = true;
                     headers_end_pos = pos + 4;
-                    parser::r#fn::parse_response_headers(
+                    parse_response_headers(
                         &response_bytes[..headers_end_pos],
                         &version_bytes,
                         &location_key,
@@ -479,7 +469,7 @@ impl HttpRequest {
         }
         if is_chunked {
             let body_bytes = response_bytes[headers_end_pos..].to_vec();
-            let decoded = parser::r#fn::parse_chunked_body(&body_bytes);
+            let decoded = parse_chunked_body(&body_bytes);
             response_bytes.truncate(headers_end_pos);
             response_bytes.extend_from_slice(&decoded);
         }

@@ -42,11 +42,10 @@ impl Default for HttpResponse {
 impl HttpResponse {
     /// Construct from raw response bytes (status line + headers + body).
     pub fn from_bytes(response: &[u8]) -> Self {
-        let split_lines: Vec<&[u8]> =
-            crate::request::parser::r#fn::split_multi_byte(response, HTTP_BR_BYTES);
+        let split_lines: Vec<&[u8]> = split_multi_byte(response, HTTP_BR_BYTES);
         let mut lines: IntoIter<&[u8]> = split_lines.into_iter();
         let status_line: &[u8] = lines.next().unwrap_or(&[]);
-        let status_parts: Vec<&[u8]> = crate::request::parser::r#fn::split_whitespace(status_line);
+        let status_parts: Vec<&[u8]> = split_whitespace(status_line);
         let version: HttpVersion = status_parts
             .first()
             .and_then(|part: &&[u8]| from_utf8(part).ok())
