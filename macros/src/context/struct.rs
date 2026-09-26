@@ -8,6 +8,6 @@ use super::*;
 pub(crate) struct ContextInput {
     /// The source context variable identifier.
     pub(crate) source_ctx: Ident,
-    /// The optional type annotation (e.g., `: &mut Context` or `: &Context`).
+    /// The optional type annotation.
     pub(crate) ty: Option<Type>,
 }

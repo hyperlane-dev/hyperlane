@@ -154,7 +154,7 @@ impl Lifetime for Context {
     ///
     /// # Returns
     ///
-    /// - `&'static Self`: A reference to the context with a `'static` lifetime.
+    /// - `&'static Self` - A reference to the context with a `'static` lifetime.
     ///
     /// # Safety
     ///
@@ -170,7 +170,7 @@ impl Lifetime for Context {
     ///
     /// # Returns
     ///
-    /// - `&'static mut Self`: A mutable reference to the context with a `'static` lifetime.
+    /// - `&'static mut Self` - A mutable reference to the context with a `'static` lifetime.
     ///
     /// # Safety
     ///
@@ -185,6 +185,20 @@ impl Lifetime for Context {
 
 /// Implementation of methods for `Context` structure.
 impl Context {
+    /// Clears all route parameters while retaining the map's allocated capacity.
+    ///
+    /// Used between keep-alive requests on the same connection to avoid
+    /// reallocating the parameter map for every request.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Self` - A mutable reference to self for chaining.
+    #[inline(always)]
+    pub(crate) fn clear_route_params(&mut self) -> &mut Self {
+        self.route_params.clear();
+        self
+    }
+
     /// Attempts to retrieve a specific route parameter by its name.
     ///
     /// # Arguments

@@ -45,7 +45,7 @@ pub const DOUBLE_BR: &str = "\n\n";
 /// A const byte slice representation of the string `DOUBLE_BR`.
 pub const DOUBLE_BR_BYTES: &[u8] = DOUBLE_BR.as_bytes();
 
-/// A colon followed by a space (`: `).
+/// A colon followed by a space (` - `).
 /// This constant is commonly used in formatted strings, such as
 /// headers or key-value pairs, where a colon and a space are needed.
 pub const COLON_SPACE: &str = ": ";
@@ -223,6 +223,26 @@ pub const ZERO_STR_U8: u8 = ZERO_STR_BYTES[0];
 /// This constant defines the default size for buffers used in I/O
 /// operations, such as reading from a network stream.
 pub const DEFAULT_BUFFER_SIZE: usize = KB_4;
+
+/// The initial capacity of the request-line buffer.
+/// This constant defines the initial string capacity used when reading
+/// the HTTP request line; the string grows automatically for longer lines.
+pub const REQUEST_LINE_BUFFER_CAPACITY: usize = B_128;
+
+/// The initial capacity of the header-line buffer.
+/// This constant defines the initial string capacity used when reading
+/// a single HTTP header line; the string grows automatically for longer lines.
+pub const HEADER_LINE_BUFFER_CAPACITY: usize = B_256;
+
+/// The maximum number of pooled read buffers retained per thread.
+/// This constant caps the thread-local read-buffer pool size to bound
+/// the memory retained for connection reuse.
+pub const MAX_POOLED_READ_BUFFERS: usize = B_64;
+
+/// The maximum byte size of a read buffer eligible for pooling.
+/// This constant prevents oversized buffers from being retained in
+/// the thread-local read-buffer pool.
+pub const MAX_POOLED_READ_BUFFER_SIZE: usize = KB_64;
 
 /// The default maximum path size.
 /// This constant defines the maximum size of the path component

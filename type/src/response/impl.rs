@@ -12,11 +12,11 @@ impl From<std::io::Error> for ResponseError {
     ///
     /// # Arguments
     ///
-    /// - `std::io::Error`: The I/O error to convert.
+    /// - `std::io::Error` - The I/O error to convert.
     ///
     /// # Returns
     ///
-    /// - `ResponseError`: The corresponding response error as `Send`.
+    /// - `ResponseError` - The corresponding response error as `Send`.
     #[inline(always)]
     fn from(error: std::io::Error) -> Self {
         ResponseError::Send(error.to_string())
@@ -30,7 +30,7 @@ impl Display for ResponseError {
     ///
     /// # Arguments
     ///
-    /// - `f`: A mutable reference to a `Formatter` used for writing the formatted string.
+    /// - `f` - A mutable reference to a `Formatter` used for writing the formatted string.
     ///
     /// # Returns
     ///
@@ -76,30 +76,14 @@ impl Response {
     ///
     /// # Arguments
     ///
-    /// - `&mut String`: A mutable reference to the string where the header will be added.
-    /// - `&str`: The header key as a string slice (`&str`).
-    /// - `&str`: The header value as a string slice (`&str`).
+    /// - `&mut String` - A mutable reference to the string where the header will be added.
+    /// - `&str` - The header key as a string slice (`&str`).
+    /// - `&str` - The header value as a string slice (`&str`).
     #[inline(always)]
     fn push_header(response_string: &mut String, key: &str, value: &str) {
         response_string.push_str(key);
         response_string.push_str(COLON);
         response_string.push_str(value);
-        response_string.push_str(HTTP_BR);
-    }
-
-    /// Pushes the first line of an HTTP response (version, status code, and reason phrase) as_ref the response string.
-    /// This corresponds to the status line of the HTTP response.
-    ///
-    /// # Arguments
-    ///
-    /// - `&mut String`: A mutable reference to the string where the first line will be added.
-    #[inline(always)]
-    fn push_http_first_line(&self, response_string: &mut String) {
-        response_string.push_str(&self.get_version().to_string());
-        response_string.push_str(SPACE);
-        response_string.push_str(&self.get_status_code().to_string());
-        response_string.push_str(SPACE);
-        response_string.push_str(self.get_reason_phrase());
         response_string.push_str(HTTP_BR);
     }
 
@@ -536,6 +520,24 @@ impl Response {
         self
     }
 
+    /// Resets the response to its default state while retaining allocated capacity.
+    ///
+    /// This keeps the header map and body allocations so persistent
+    /// (keep-alive) connections avoid repeated allocation per request.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Self` - A mutable reference to self for chaining.
+    pub fn reset(&mut self) -> &mut Self {
+        let http_status: HttpStatus = HttpStatus::default();
+        self.status_code = http_status.code();
+        self.reason_phrase.clear();
+        let _: fmt::Result = write!(self.reason_phrase, "{}", http_status);
+        self.headers.clear();
+        self.body.clear();
+        self
+    }
+
     /// Tries to parse cookies from the `Set-Cookie` header.
     ///
     /// This method retrieves the last `Set-Cookie` header value and parses it
@@ -626,8 +628,6 @@ impl Response {
         if self.reason_phrase.is_empty() {
             self.set_reason_phrase(HttpStatus::phrase(self.get_status_code()));
         }
-        let mut response_string: String = String::with_capacity(DEFAULT_BUFFER_SIZE);
-        self.push_http_first_line(&mut response_string);
         let compress_type_opt: Option<Compress> = self
             .try_get_header_back(CONTENT_ENCODING)
             .map(|data: String| data.parse::<Compress>().unwrap_or_default());
@@ -645,17 +645,42 @@ impl Response {
                 self.set_header_without_check(CONTENT_TYPE, &content_type);
                 content_type
             });
-        let mut body: ResponseBody = self.get_body().clone();
-        if let Some(compress_type) = compress_type_opt
-            && !compress_type.is_unknown()
-        {
-            body = compress_type
-                .encode(&body, DEFAULT_BUFFER_SIZE)
-                .into_owned();
-        }
+        let compressed_body: Option<Vec<u8>> = match compress_type_opt {
+            Some(compress_type) if !compress_type.is_unknown() => Some(
+                compress_type
+                    .encode(self.get_body(), DEFAULT_BUFFER_SIZE)
+                    .into_owned(),
+            ),
+            _ => None,
+        };
+        let body_len: usize = compressed_body
+            .as_ref()
+            .map_or_else(|| self.get_body().len(), Vec::len);
         if !content_type.eq_ignore_ascii_case(TEXT_EVENT_STREAM) {
-            self.set_header_without_check(CONTENT_LENGTH, body.len().to_string());
+            self.set_header_without_check(CONTENT_LENGTH, body_len.to_string());
         }
+        let mut head_size: usize = self.get_reason_phrase().len() + B_16 + HTTP_BR.len();
+        head_size += self
+            .get_headers()
+            .iter()
+            .map(|header_entry: (&String, &VecDeque<String>)| {
+                let (header_key, header_values): (&String, &VecDeque<String>) = header_entry;
+                header_values
+                    .iter()
+                    .map(|header_value: &String| {
+                        header_key.len() + COLON.len() + header_value.len() + HTTP_BR.len()
+                    })
+                    .sum::<usize>()
+            })
+            .sum::<usize>();
+        let mut response_string: String = String::with_capacity(head_size + body_len);
+        let _: fmt::Result = write!(
+            response_string,
+            "{} {} {}{HTTP_BR}",
+            self.get_version(),
+            self.get_status_code(),
+            self.get_reason_phrase()
+        );
         self.get_headers()
             .iter()
             .for_each(|header_entry: (&String, &VecDeque<String>)| {
@@ -666,7 +691,10 @@ impl Response {
             });
         response_string.push_str(HTTP_BR);
         let mut response_bytes: Vec<u8> = response_string.into_bytes();
-        response_bytes.extend_from_slice(&body);
+        match &compressed_body {
+            Some(body) => response_bytes.extend_from_slice(body),
+            None => response_bytes.extend_from_slice(self.get_body()),
+        }
         response_bytes
     }
 }

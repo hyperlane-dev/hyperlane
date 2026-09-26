@@ -4,7 +4,7 @@ use super::*;
 ///
 /// # Returns
 ///
-/// - `Args`: Parsed arguments
+/// - `Args` - Parsed arguments
 pub fn parse_args() -> Args {
     let raw_args: Vec<String> = args().collect();
     let mut command: CommandType = CommandType::Help;

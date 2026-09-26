@@ -26,6 +26,7 @@ use std::{
     future::Future,
     hash::{Hash, Hasher},
     io::{self, Write, stderr, stdout},
+    mem,
     pin::Pin,
     sync::Arc,
 };

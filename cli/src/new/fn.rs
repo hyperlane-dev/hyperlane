@@ -4,11 +4,11 @@ use super::*;
 ///
 /// # Arguments
 ///
-/// - `&str`: Project name to validate
+/// - `&str` - Project name to validate
 ///
 /// # Returns
 ///
-/// - `Result<(), NewError>`: Ok if valid, error otherwise
+/// - `Result<(), NewError>` - Ok if valid, error otherwise
 fn validate_project_name(name: &str) -> Result<(), NewError> {
     if name.is_empty() {
         return Err(NewError::InvalidName(
@@ -32,7 +32,7 @@ fn validate_project_name(name: &str) -> Result<(), NewError> {
 ///
 /// # Returns
 ///
-/// - `Result<(), NewError>`: Ok if git is available, error otherwise
+/// - `Result<(), NewError>` - Ok if git is available, error otherwise
 async fn check_git_available() -> Result<(), NewError> {
     let output: std::process::Output = Command::new("git")
         .arg("--version")
@@ -52,11 +52,11 @@ async fn check_git_available() -> Result<(), NewError> {
 ///
 /// # Arguments
 ///
-/// - `&NewProjectConfig`: Project configuration containing template URL and project name
+/// - `&NewProjectConfig` - Project configuration containing template URL and project name
 ///
 /// # Returns
 ///
-/// - `Result<(), NewError>`: Success or error
+/// - `Result<(), NewError>` - Success or error
 async fn git_clone(config: &NewProjectConfig) -> Result<(), NewError> {
     let project_path: PathBuf = PathBuf::from(&config.project_name);
     if project_path.exists() {
@@ -83,11 +83,11 @@ async fn git_clone(config: &NewProjectConfig) -> Result<(), NewError> {
 ///
 /// # Arguments
 ///
-/// - `&str`: Name of the project to create
+/// - `&str` - Name of the project to create
 ///
 /// # Returns
 ///
-/// - `Result<(), NewError>`: Success or error
+/// - `Result<(), NewError>` - Success or error
 pub async fn execute_new(project_name: &str) -> Result<(), NewError> {
     validate_project_name(project_name)?;
     check_git_available().await?;

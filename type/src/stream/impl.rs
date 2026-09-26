@@ -112,7 +112,7 @@ impl Lifetime for Stream {
     ///
     /// # Returns
     ///
-    /// - `&'static Self`: A reference to the stream with a `'static` lifetime.
+    /// - `&'static Self` - A reference to the stream with a `'static` lifetime.
     ///
     /// # Safety
     ///
@@ -128,7 +128,7 @@ impl Lifetime for Stream {
     ///
     /// # Returns
     ///
-    /// - `&'static mut Self`: A mutable reference to the stream with a `'static` lifetime.
+    /// - `&'static mut Self` - A mutable reference to the stream with a `'static` lifetime.
     ///
     /// # Safety
     ///
@@ -138,6 +138,115 @@ impl Lifetime for Stream {
     unsafe fn leak_mut(&self) -> &'static mut Self {
         let address: usize = self.into();
         address.into()
+    }
+}
+
+/// Creates a new `PooledReader` wrapping the given stream and buffer.
+impl<'a> PooledReader<'a> {
+    /// Creates a new `PooledReader` over the given stream.
+    ///
+    /// # Arguments
+    ///
+    /// - `&'a mut TcpStream` - The TCP stream to read from.
+    /// - `Vec<u8>` - The read buffer; its full length is used as capacity.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - A reader with an empty valid-data region.
+    pub(crate) fn new(stream: &'a mut TcpStream, buffer: Vec<u8>) -> Self {
+        Self {
+            stream,
+            buffer,
+            start: 0,
+            end: 0,
+        }
+    }
+}
+
+/// Returns the read buffer to the thread-local pool when the reader is dropped.
+impl Drop for PooledReader<'_> {
+    /// Releases the buffer back to the pool for reuse by later requests.
+    fn drop(&mut self) {
+        let buffer: Vec<u8> = mem::take(&mut self.buffer);
+        return_read_buffer(buffer);
+    }
+}
+
+/// Implements non-blocking buffered reads for `PooledReader`.
+///
+/// Buffered bytes are served first; once drained, reads are delegated
+/// directly to the underlying stream.
+impl AsyncRead for PooledReader<'_> {
+    /// Polls to read data into the provided buffer.
+    ///
+    /// # Arguments
+    ///
+    /// - `Pin<&mut Self>` - The pinned reader.
+    /// - `&mut Context<'_>` - The task context.
+    /// - `&mut ReadBuf<'_>` - The destination buffer.
+    ///
+    /// # Returns
+    ///
+    /// - `Poll<io::Result<()>>` - Ready when data was read or an error occurred.
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        let this: &mut Self = self.get_mut();
+        if this.start < this.end {
+            let available: usize = this.end - this.start;
+            let amount: usize = available.min(buf.remaining());
+            let end: usize = this.start + amount;
+            buf.put_slice(&this.buffer[this.start..end]);
+            this.start = end;
+            return Poll::Ready(Ok(()));
+        }
+        Pin::new(&mut *this.stream).poll_read(cx, buf)
+    }
+}
+
+/// Implements buffered-read support for `PooledReader`.
+///
+/// The internal buffer is refilled from the stream only when fully
+/// consumed, so a single socket read serves multiple line parses.
+impl AsyncBufRead for PooledReader<'_> {
+    /// Polls to fill the internal buffer and returns the available data.
+    ///
+    /// # Arguments
+    ///
+    /// - `Pin<&mut Self>` - The pinned reader.
+    /// - `&mut Context<'_>` - The task context.
+    ///
+    /// # Returns
+    ///
+    /// - `Poll<io::Result<&[u8]>>` - Ready with the unconsumed bytes, or an error.
+    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+        let this: &mut Self = self.get_mut();
+        if this.start >= this.end {
+            this.start = 0;
+            this.end = 0;
+            let mut read_buf: ReadBuf<'_> = ReadBuf::new(&mut this.buffer);
+            match Pin::new(&mut *this.stream).poll_read(cx, &mut read_buf) {
+                Poll::Ready(Ok(())) => {
+                    this.end = read_buf.filled().len();
+                }
+                Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+                Poll::Pending => return Poll::Pending,
+            }
+        }
+        Poll::Ready(Ok(&this.buffer[this.start..this.end]))
+    }
+
+    /// Marks the given number of bytes as consumed.
+    ///
+    /// # Arguments
+    ///
+    /// - `Pin<&mut Self>` - The pinned reader.
+    /// - `usize` - The number of bytes to consume.
+    fn consume(self: Pin<&mut Self>, amount: usize) {
+        let this: &mut Self = self.get_mut();
+        this.start = (this.start + amount).min(this.end);
     }
 }
 
@@ -159,41 +268,74 @@ impl Stream {
         !self.get_closed() && keep_alive
     }
 
-    /// Parses the HTTP request content from the stream.
+    /// Parses the HTTP request content from the stream into the given request.
     ///
-    /// This is an internal helper function that performs the actual parsing.
+    /// The request is reset first, then filled in place so its existing
+    /// allocations are reused across keep-alive requests.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut Request` - The request object to fill.
     ///
     /// # Returns
     ///
-    /// - `Result<Request, RequestError>`: The parsed request or an error.
-    async fn get_http_from_stream(&mut self) -> Result<Request, RequestError> {
+    /// - `Result<(), RequestError>` - Ok on success, or an error if parsing fails.
+    async fn fill_http_from_stream(&mut self, request: &mut Request) -> Result<(), RequestError> {
+        request.reset();
         let config: RequestConfig = *self.get_request_config();
         let buffer_size: usize = config.get_buffer_size();
         let max_path_size: usize = config.get_max_path_size();
-        let reader: &mut BufReader<&mut TcpStream> =
-            &mut BufReader::with_capacity(buffer_size, self.get_mut_stream());
-        let mut line: String = String::with_capacity(buffer_size);
-        AsyncBufReadExt::read_line(reader, &mut line).await?;
+        let buffer: Vec<u8> = take_read_buffer(buffer_size);
+        let mut reader: PooledReader<'_> = PooledReader::new(self.get_mut_stream(), buffer);
+        let mut line: String = String::with_capacity(REQUEST_LINE_BUFFER_CAPACITY);
+        AsyncBufReadExt::read_line(&mut reader, &mut line).await?;
         let (method, path, version): (RequestMethod, &str, RequestVersion) =
             Request::get_http_first_line(&line)?;
         Request::check_http_path_size(path, max_path_size)?;
         let hash_index: Option<usize> = path.find(HASH);
         let query_index: Option<usize> = path.find(QUERY);
         let query: &str = Request::get_http_query(path, query_index, hash_index);
-        let querys: RequestQuerys = Request::get_http_querys(query);
-        let path: RequestPath = Request::get_http_path(path, query_index, hash_index);
-        let (headers, host, content_size): (RequestHeaders, RequestHost, usize) =
-            Request::get_http_headers(reader, &config).await?;
-        let body: RequestBody = Request::get_http_body(reader, content_size).await?;
-        Ok(Request {
-            method,
-            host,
-            version,
-            path,
-            querys,
-            headers,
-            body,
-        })
+        Request::fill_http_querys(query, &mut request.querys);
+        let path_slice: &str = Request::get_http_path(path, query_index, hash_index);
+        request.path.push_str(path_slice);
+        let content_size: usize = Request::get_http_headers(
+            &mut reader,
+            &config,
+            &mut request.headers,
+            &mut request.host,
+        )
+        .await?;
+        request.method = method;
+        request.version = version;
+        Request::fill_http_body(&mut reader, &mut request.body, content_size).await?;
+        Ok(())
+    }
+
+    /// Parses an HTTP request from a TCP stream into the given request.
+    ///
+    /// The request is reset and filled in place, reusing its allocations.
+    /// If the timeout is DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS, no timeout is applied.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut Request` - The request object to reset and fill.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<(), RequestError>` - Ok on success, or an error if parsing fails.
+    pub async fn try_fill_http_request(
+        &mut self,
+        request: &mut Request,
+    ) -> Result<(), RequestError> {
+        if self.get_closed() {
+            return Err(RequestError::ServerClosedConnection(HttpStatus::BadRequest));
+        }
+        let timeout_ms: u64 = self.get_request_config().get_read_timeout_ms();
+        if timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
+            return self.fill_http_from_stream(request).await;
+        }
+        let duration: Duration = Duration::from_millis(timeout_ms);
+        timeout(duration, self.fill_http_from_stream(request)).await?
     }
 
     /// Parses an HTTP request from a TCP stream.
@@ -205,15 +347,9 @@ impl Stream {
     ///
     /// - `Result<Request, RequestError>` - The parsed request or an error.
     pub async fn try_get_http_request(&mut self) -> Result<Request, RequestError> {
-        if self.get_closed() {
-            return Err(RequestError::ServerClosedConnection(HttpStatus::BadRequest));
-        }
-        let timeout_ms: u64 = self.get_request_config().get_read_timeout_ms();
-        if timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
-            return self.get_http_from_stream().await;
-        }
-        let duration: Duration = Duration::from_millis(timeout_ms);
-        timeout(duration, self.get_http_from_stream()).await?
+        let mut request: Request = Request::default();
+        self.try_fill_http_request(&mut request).await?;
+        Ok(request)
     }
 
     /// Parses a WebSocket request from a TCP stream.
@@ -223,7 +359,7 @@ impl Stream {
     ///
     /// # Returns
     ///
-    /// - `Result<Request, RequestError>`: The parsed WebSocket request or an error.
+    /// - `Result<Request, RequestError>` - The parsed WebSocket request or an error.
     pub async fn try_get_websocket_request(&mut self) -> Result<RequestBody, RequestError> {
         if self.get_closed() {
             return Err(RequestError::ServerClosedConnection(HttpStatus::BadRequest));
@@ -286,13 +422,13 @@ impl Stream {
     ///
     /// # Arguments
     ///
-    /// - `&mut [u8]`: The buffer to read data into.
-    /// - `Option<Duration>`: The optional timeout duration. If Some, timeout is applied; if None, no timeout.
-    /// - `&mut bool`: Mutable reference to track if we got a client response.
+    /// - `&mut [u8]` - The buffer to read data into.
+    /// - `Option<Duration>` - The optional timeout duration. If Some, timeout is applied; if None, no timeout.
+    /// - `&mut bool` - Mutable reference to track if we got a client response.
     ///
     /// # Returns
     ///
-    /// - `Result<Option<usize>, RequestError>`: The number of bytes read, None for timeout/ping, or an error.
+    /// - `Result<Option<usize>, RequestError>` - The number of bytes read, None for timeout/ping, or an error.
     pub(crate) async fn get_websocket_from_stream(
         &mut self,
         buffer: &mut [u8],

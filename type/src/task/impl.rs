@@ -6,7 +6,7 @@ impl Default for Task {
     ///
     /// # Returns
     ///
-    /// - `Self`: The default instance.
+    /// - `Self` - The default instance.
     #[inline(always)]
     fn default() -> Self {
         let worker_count: usize = Handle::try_current()
@@ -31,11 +31,11 @@ impl Task {
     ///
     /// # Arguments
     ///
-    /// - `usize`: The number of worker threads to spawn.
+    /// - `usize` - The number of worker threads to spawn.
     ///
     /// # Returns
     ///
-    /// - `Self`: The new instance.
+    /// - `Self` - The new instance.
     pub fn new(worker_count: usize) -> Self {
         let mut pool: Vec<UnboundedSender<AsyncTask>> = Vec::with_capacity(worker_count);
         let counter: Arc<AtomicUsize> = Arc::new(AtomicUsize::new(0));
@@ -83,13 +83,13 @@ impl Task {
     ///
     /// # Arguments
     ///
-    /// - `Option<usize>`: An optional index to force selection of a specific worker.
+    /// - `Option<usize>` - An optional index to force selection of a specific worker.
     ///   If None, the worker is selected using round-robin distribution.
-    /// - `Future<Output = ()> + Send + 'static`: The future to spawn on the task pool.
+    /// - `Future<Output = ()> + Send + 'static` - The future to spawn on the task pool.
     ///
     /// # Returns
     ///
-    /// - `bool`: true if the task was successfully sent, false otherwise.
+    /// - `bool` - true if the task was successfully sent, false otherwise.
     pub fn try_spawn_local<F>(&self, index_opt: Option<usize>, hook: F) -> bool
     where
         F: Future<Output = ()> + Send + 'static,
