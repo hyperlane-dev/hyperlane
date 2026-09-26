@@ -160,17 +160,18 @@ jobs:
         run: |
           set -e
           crate sync
-          if git diff --quiet Cargo.toml; then
+          crate fmt
+          if git diff --quiet; then
             echo "sync_changed=false" >> $GITHUB_OUTPUT
-            echo "Workspace dependency refs already in sync"
+            echo "Workspace already in sync and formatted"
           else
             echo "sync_changed=true" >> $GITHUB_OUTPUT
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add Cargo.toml
-            git commit -m "chore: sync workspace member dependency refs"
+            git add -A
+            git commit -m "chore: sync workspace member deps and apply crate fmt"
             git push origin HEAD:master
-            echo "Committed and pushed Cargo.toml sync"
+            echo "Committed and pushed sync + fmt"
           fi
           SYNCED_VERSION="$(grep -E '^version[[:space:]]*=[[:space:]]*"' Cargo.toml | head -1 | sed -E 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/')"
           SYNCED_TAG="v${SYNCED_VERSION}"
