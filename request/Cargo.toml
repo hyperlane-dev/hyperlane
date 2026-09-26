@@ -14,14 +14,14 @@ exclude.workspace = true
 [dependencies]
 http-type = { workspace = true }
 
-futures = { workspace = true }
-rustls = { workspace = true }
 serde = { workspace = true }
+rustls = { workspace = true }
+futures = { workspace = true }
 serde_json = { workspace = true }
-tokio-rustls = { workspace = true }
-tokio-tungstenite = { workspace = true }
 tungstenite = { workspace = true }
+tokio-rustls = { workspace = true }
 webpki-roots = { workspace = true }
+tokio-tungstenite = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
