@@ -21,6 +21,7 @@ serde_json = { workspace = true }
 tungstenite = { workspace = true }
 tokio-rustls = { workspace = true }
 webpki-roots = { workspace = true }
+lombok-macros = { workspace = true }
 tokio-tungstenite = { workspace = true }
 
 [dev-dependencies]

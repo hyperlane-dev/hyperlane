@@ -1,16 +1,6 @@
 use super::*;
 
-/// Implementation of ProxyTunnelStream methods.
 impl ProxyTunnelStream {
-    /// Creates a new ProxyTunnelStream from an async read/write stream.
-    ///
-    /// # Arguments
-    ///
-    /// - `BoxAsyncReadWrite` - The async stream to wrap.
-    ///
-    /// # Returns
-    ///
-    /// - `ProxyTunnelStream` - The new proxy tunnel stream.
     pub(crate) fn new(stream: BoxAsyncReadWrite, pre_read_data: Vec<u8>) -> Self {
         Self {
             inner: stream,
@@ -19,9 +9,6 @@ impl ProxyTunnelStream {
     }
 }
 
-/// AsyncRead implementation for ProxyTunnelStream.
-///
-/// Delegates all operations to the underlying stream.
 impl AsyncRead for ProxyTunnelStream {
     fn poll_read(
         mut self: Pin<&mut Self>,
@@ -38,9 +25,6 @@ impl AsyncRead for ProxyTunnelStream {
     }
 }
 
-/// AsyncWrite implementation for ProxyTunnelStream.
-///
-/// Delegates all operations to the underlying stream.
 impl AsyncWrite for ProxyTunnelStream {
     fn poll_write(
         mut self: Pin<&mut Self>,
@@ -67,17 +51,7 @@ impl AsyncWrite for ProxyTunnelStream {
 
 impl Unpin for ProxyTunnelStream {}
 
-/// Implementation of SyncProxyTunnelStream methods.
 impl SyncProxyTunnelStream {
-    /// Creates a new SyncProxyTunnelStream from a sync read/write stream.
-    ///
-    /// # Arguments
-    ///
-    /// - `BoxReadWrite` - The sync stream to wrap.
-    ///
-    /// # Returns
-    ///
-    /// - `SyncProxyTunnelStream` - The new sync proxy tunnel stream.
     pub(crate) fn new(stream: BoxReadWrite, pre_read_data: Vec<u8>) -> Self {
         Self {
             inner: stream,
@@ -86,9 +60,6 @@ impl SyncProxyTunnelStream {
     }
 }
 
-/// Read implementation for SyncProxyTunnelStream.
-///
-/// Delegates all operations to the underlying stream.
 impl Read for SyncProxyTunnelStream {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         if !self.pre_read_data.is_empty() {
@@ -101,9 +72,6 @@ impl Read for SyncProxyTunnelStream {
     }
 }
 
-/// Write implementation for SyncProxyTunnelStream.
-///
-/// Delegates all operations to the underlying stream.
 impl Write for SyncProxyTunnelStream {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         self.inner.write(buf)

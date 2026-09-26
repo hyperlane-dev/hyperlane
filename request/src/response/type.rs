@@ -1,10 +1,18 @@
 use super::*;
 
-/// A type alias for a boxed dynamic trait object implementing the `ResponseTrait` trait.
-///
-/// This alias defines a `ResponseTrait` as a `Box` containing any type that implements the
-/// `ResponseTrait` trait, with associated types `OutputText` set to `HttpResponseText`
-/// and `OutputBinary` set to `HttpResponseBinary`. It allows for flexible handling of
-/// HTTP responses that can be either in text or binary format.
-pub type BoxResponseTrait =
-    Box<dyn ResponseTrait<OutputText = HttpResponseText, OutputBinary = HttpResponseBinary>>;
+/// HTTP response headers — single-value `HashMap<String, String>`.
+pub type HttpResponseHeaders = HashMapXxHash3_64<String, String>;
+
+/// Raw response body bytes (alias for `Vec<u8>` to match `http-type`).
+pub type ResponseBody = Vec<u8>;
+
+/// Raw bytes of the full serialized HTTP response.
+pub type ResponseData = Vec<u8>;
+
+/// UTF-8 form of the full serialized HTTP response.
+pub type ResponseDataString = String;
+
+/// Construct an empty response header map.
+pub fn new_response_headers() -> HttpResponseHeaders {
+    hash_map_xx_hash3_64()
+}
