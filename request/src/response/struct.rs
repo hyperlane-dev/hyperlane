@@ -145,12 +145,12 @@ impl HttpResponse {
 
     /// Was the response a 2xx success?
     pub fn is_success(&self) -> bool {
-        (200..300).contains(&self.status_code)
+        (200..300).contains(&self.get_status_code())
     }
 
     /// Was the response a 3xx redirect?
     pub fn is_redirect(&self) -> bool {
-        (300..400).contains(&self.status_code)
+        (300..400).contains(&self.get_status_code())
     }
 
     /// Look up a single header value (case-insensitive).
@@ -161,27 +161,27 @@ impl HttpResponse {
 
     /// Get the response body as a UTF-8 string (lossy on invalid bytes).
     pub fn text(&self) -> String {
-        String::from_utf8_lossy(&self.body).into_owned()
+        String::from_utf8_lossy(self.get_body()).into_owned()
     }
 
     /// Get the response body as raw bytes.
     pub fn bytes(&self) -> &[u8] {
-        &self.body
+        self.get_body()
     }
 
     /// Decode the body using the headers' Content-Encoding (gzip / deflate /
     /// br). Returns a fresh response with the decoded body — the original is
     /// untouched. `buffer_size` controls the chunk size for streaming decoders.
     pub fn decode(&self, buffer_size: usize) -> HttpResponse {
-        let flat_headers: HttpResponseHeaders = self.headers.clone();
+        let flat_headers: HttpResponseHeaders = self.get_headers().clone();
         let decoded: ResponseBody = Compress::from(&flat_headers)
-            .decode(&self.body, buffer_size)
+            .decode(self.get_body(), buffer_size)
             .into_owned();
         HttpResponse {
-            version: self.version.clone(),
-            status_code: self.status_code,
-            reason_phrase: self.reason_phrase.clone(),
-            headers: self.headers.clone(),
+            version: self.get_version().clone(),
+            status_code: self.get_status_code(),
+            reason_phrase: self.get_reason_phrase().clone(),
+            headers: self.get_headers().clone(),
             body: decoded,
         }
     }

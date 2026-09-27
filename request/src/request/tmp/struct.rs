@@ -7,27 +7,16 @@ use super::*;
 /// implementation detail of the client state machine.
 ///
 /// Fields are private; access through the methods on [`HttpRequest`].
-#[derive(Clone, Debug)]
+#[derive(Clone, Data, Debug)]
 pub struct Tmp {
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
     pub(crate) visit_url: HashSet<String>,
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
     pub(crate) root_cert: RootCertStore,
-}
-
-impl Tmp {
-    /// Borrow `visit_url` set.
-    pub(crate) fn visit_url_ref(&self) -> &HashSet<String> {
-        &self.visit_url
-    }
-
-    /// Mutable borrow of `visit_url` set.
-    pub(crate) fn visit_url_mut(&mut self) -> &mut HashSet<String> {
-        &mut self.visit_url
-    }
-
-    /// Clone the `root_cert` store.
-    pub(crate) fn root_cert_clone(&self) -> RootCertStore {
-        self.root_cert.clone()
-    }
 }
 
 impl Default for Tmp {

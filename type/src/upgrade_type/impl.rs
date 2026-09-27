@@ -22,7 +22,7 @@ impl Display for UpgradeType {
     ///
     /// # Arguments
     ///
-    /// - `&mut Formatter<'_>`: A mutable reference to a `Formatter` used for writing the formatted string.
+    /// - `&mut Formatter<'_>` - A mutable reference to a `Formatter` used for writing the formatted string.
     ///
     /// # Returns
     ///
@@ -51,12 +51,12 @@ impl FromStr for UpgradeType {
     ///
     /// # Arguments
     ///
-    /// - `&str`: The string slice to parse.
+    /// - `&str` - The string slice to parse.
     ///
     /// # Returns
     ///
-    /// - `Ok(UpgradeType)`: The parsed `UpgradeType` variant.
-    /// - `Err(())`: If parsing fails (though this implementation always returns `Ok`).
+    /// - `Ok(UpgradeType)` - The parsed `UpgradeType` variant.
+    /// - `Err(())` - If parsing fails (though this implementation always returns `Ok`).
     #[inline(always)]
     fn from_str(from_str: &str) -> Result<Self, Self::Err> {
         match from_str.to_ascii_lowercase().as_str() {

@@ -4,11 +4,11 @@ use super::*;
 ///
 /// # Arguments
 ///
-/// - `&TemplateType`: The template type
+/// - `&TemplateType` - The template type
 ///
 /// # Returns
 ///
-/// - `String`: Directory name
+/// - `String` - Directory name
 fn get_directory_name(template_type: &TemplateType) -> String {
     match template_type {
         TemplateType::Controller => "controller".to_string(),
@@ -27,11 +27,11 @@ fn get_directory_name(template_type: &TemplateType) -> String {
 ///
 /// # Arguments
 ///
-/// - `&ModelSubType`: The model subtype
+/// - `&ModelSubType` - The model subtype
 ///
 /// # Returns
 ///
-/// - `String`: Directory name
+/// - `String` - Directory name
 fn get_model_sub_type_name(sub_type: &ModelSubType) -> String {
     match sub_type {
         ModelSubType::Application => "application".to_string(),
@@ -44,11 +44,11 @@ fn get_model_sub_type_name(sub_type: &ModelSubType) -> String {
 ///
 /// # Arguments
 ///
-/// - `&Path`: Path to the directory
+/// - `&Path` - Path to the directory
 ///
 /// # Returns
 ///
-/// - `Result<(), TemplateError>`: Success or error
+/// - `Result<(), TemplateError>` - Success or error
 async fn ensure_directory(path: &Path) -> Result<(), TemplateError> {
     if !path.exists() {
         create_dir_all(path).await?;
@@ -60,12 +60,12 @@ async fn ensure_directory(path: &Path) -> Result<(), TemplateError> {
 ///
 /// # Arguments
 ///
-/// - `&Path`: Path to mod.rs file
-/// - `&[&str]`: List of modules to include
+/// - `&Path` - Path to mod.rs file
+/// - `&[&str]` - List of modules to include
 ///
 /// # Returns
 ///
-/// - `Result<(), TemplateError>`: Success or error
+/// - `Result<(), TemplateError>` - Success or error
 async fn write_mod_rs(path: &Path, modules: &[&str]) -> Result<(), TemplateError> {
     let mut content: String = String::new();
     for module in modules {
@@ -112,11 +112,11 @@ async fn write_mod_rs(path: &Path, modules: &[&str]) -> Result<(), TemplateError
 ///
 /// # Arguments
 ///
-/// - `&Path`: Path to mod.rs file
+/// - `&Path` - Path to mod.rs file
 ///
 /// # Returns
 ///
-/// - `Result<(), TemplateError>`: Success or error
+/// - `Result<(), TemplateError>` - Success or error
 async fn write_empty_mod_rs(path: &Path) -> Result<(), TemplateError> {
     write(path, "\n").await?;
     Ok(())
@@ -126,12 +126,12 @@ async fn write_empty_mod_rs(path: &Path) -> Result<(), TemplateError> {
 ///
 /// # Arguments
 ///
-/// - `&Path`: Target directory path
-/// - `&str`: Name of the component
+/// - `&Path` - Target directory path
+/// - `&str` - Name of the component
 ///
 /// # Returns
 ///
-/// - `Result<(), TemplateError>`: Success or error
+/// - `Result<(), TemplateError>` - Success or error
 async fn create_controller_template(
     target_dir: &Path,
     _component_name: &str,
@@ -152,12 +152,12 @@ async fn create_controller_template(
 ///
 /// # Arguments
 ///
-/// - `&Path`: Target directory path
-/// - `&str`: Name of the component
+/// - `&Path` - Target directory path
+/// - `&str` - Name of the component
 ///
 /// # Returns
 ///
-/// - `Result<(), TemplateError>`: Success or error
+/// - `Result<(), TemplateError>` - Success or error
 async fn create_view_template(
     target_dir: &Path,
     _component_name: &str,
@@ -178,12 +178,12 @@ async fn create_view_template(
 ///
 /// # Arguments
 ///
-/// - `&Path`: Target directory path
-/// - `&str`: Name of the component
+/// - `&Path` - Target directory path
+/// - `&str` - Name of the component
 ///
 /// # Returns
 ///
-/// - `Result<(), TemplateError>`: Success or error
+/// - `Result<(), TemplateError>` - Success or error
 async fn create_service_template(
     target_dir: &Path,
     _component_name: &str,
@@ -202,12 +202,12 @@ async fn create_service_template(
 ///
 /// # Arguments
 ///
-/// - `&Path`: Target directory path
-/// - `&str`: Name of the component
+/// - `&Path` - Target directory path
+/// - `&str` - Name of the component
 ///
 /// # Returns
 ///
-/// - `Result<(), TemplateError>`: Success or error
+/// - `Result<(), TemplateError>` - Success or error
 async fn create_domain_template(
     target_dir: &Path,
     _component_name: &str,
@@ -226,12 +226,12 @@ async fn create_domain_template(
 ///
 /// # Arguments
 ///
-/// - `&Path`: Target directory path
-/// - `&str`: Name of the component
+/// - `&Path` - Target directory path
+/// - `&str` - Name of the component
 ///
 /// # Returns
 ///
-/// - `Result<(), TemplateError>`: Success or error
+/// - `Result<(), TemplateError>` - Success or error
 async fn create_mapper_template(
     target_dir: &Path,
     _component_name: &str,
@@ -262,12 +262,12 @@ async fn create_mapper_template(
 ///
 /// # Arguments
 ///
-/// - `&Path`: Target directory path
-/// - `&str`: Name of the component
+/// - `&Path` - Target directory path
+/// - `&str` - Name of the component
 ///
 /// # Returns
 ///
-/// - `Result<(), TemplateError>`: Success or error
+/// - `Result<(), TemplateError>` - Success or error
 async fn create_utils_template(
     target_dir: &Path,
     _component_name: &str,
@@ -284,12 +284,12 @@ async fn create_utils_template(
 ///
 /// # Arguments
 ///
-/// - `&Path`: Target directory path
-/// - `&str`: Name of the component
+/// - `&Path` - Target directory path
+/// - `&str` - Name of the component
 ///
 /// # Returns
 ///
-/// - `Result<(), TemplateError>`: Success or error
+/// - `Result<(), TemplateError>` - Success or error
 async fn create_exception_template(
     target_dir: &Path,
     _component_name: &str,
@@ -304,12 +304,12 @@ async fn create_exception_template(
 ///
 /// # Arguments
 ///
-/// - `&Path`: Target directory path
-/// - `&str`: Name of the component
+/// - `&Path` - Target directory path
+/// - `&str` - Name of the component
 ///
 /// # Returns
 ///
-/// - `Result<(), TemplateError>`: Success or error
+/// - `Result<(), TemplateError>` - Success or error
 async fn create_repository_template(
     target_dir: &Path,
     _component_name: &str,
@@ -328,13 +328,13 @@ async fn create_repository_template(
 ///
 /// # Arguments
 ///
-/// - `&Path`: Target directory path
-/// - `&str`: Name of the component
-/// - `&ModelSubType`: Model subtype
+/// - `&Path` - Target directory path
+/// - `&str` - Name of the component
+/// - `&ModelSubType` - Model subtype
 ///
 /// # Returns
 ///
-/// - `Result<(), TemplateError>`: Success or error
+/// - `Result<(), TemplateError>` - Success or error
 async fn create_model_template(
     target_dir: &Path,
     _component_name: &str,
@@ -354,13 +354,13 @@ async fn create_model_template(
 ///
 /// # Arguments
 ///
-/// - `&TemplateType`: Type of template component
-/// - `&str`: Name of the component
-/// - `model_sub_type`: Optional model subtype
+/// - `&TemplateType` - Type of template component
+/// - `&str` - Name of the component
+/// - `model_sub_type` - Optional model subtype
 ///
 /// # Returns
 ///
-/// - `Result<(), TemplateError>`: Success or error
+/// - `Result<(), TemplateError>` - Success or error
 pub async fn execute_template(
     template_type: TemplateType,
     component_name: &str,
@@ -416,11 +416,11 @@ pub async fn execute_template(
 ///
 /// # Arguments
 ///
-/// - `&Path`: Path to format
+/// - `&Path` - Path to format
 ///
 /// # Returns
 ///
-/// - `Result<(), io::Error>`: Success or error
+/// - `Result<(), io::Error>` - Success or error
 async fn format_generated_path(path: &Path) -> Result<(), io::Error> {
     let mut cmd: Command = Command::new("cargo");
     cmd.arg("fmt").arg("--").arg(path);

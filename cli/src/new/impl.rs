@@ -5,11 +5,11 @@ impl NewProjectConfig {
     ///
     /// # Arguments
     ///
-    /// - `String`: Name of the project
+    /// - `String` - Name of the project
     ///
     /// # Returns
     ///
-    /// - `Self`: Configuration instance
+    /// - `Self` - Configuration instance
     pub fn new(project_name: String) -> Self {
         Self {
             project_name,

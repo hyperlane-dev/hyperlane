@@ -4,7 +4,7 @@ use super::*;
 ///
 /// # Returns
 ///
-/// - `Result<(), io::Error>`: Success or error
+/// - `Result<(), io::Error>` - Success or error
 async fn run_cargo_run() -> Result<(), io::Error> {
     let output: std::process::Output = Command::new("cargo")
         .arg("run")
@@ -45,7 +45,7 @@ async fn run_cargo_run() -> Result<(), io::Error> {
 ///
 /// # Returns
 ///
-/// - `Result<(), io::Error>`: Success or error
+/// - `Result<(), io::Error>` - Success or error
 pub async fn execute_watch() -> Result<(), io::Error> {
     let src_path: PathBuf = PathBuf::from("src");
     if !src_path.exists() {

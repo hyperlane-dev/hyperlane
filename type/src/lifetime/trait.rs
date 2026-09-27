@@ -9,7 +9,7 @@ pub trait Lifetime {
     ///
     /// # Returns
     ///
-    /// - `&'static Self`: A reference to the instance with a `'static` lifetime.
+    /// - `&'static Self` - A reference to the instance with a `'static` lifetime.
     ///
     /// # Safety
     ///
@@ -21,7 +21,7 @@ pub trait Lifetime {
     ///
     /// # Returns
     ///
-    /// - `&'static mut Self`: A mutable reference to the instance with a `'static` lifetime.
+    /// - `&'static mut Self` - A mutable reference to the instance with a `'static` lifetime.
     ///
     /// # Safety
     ///

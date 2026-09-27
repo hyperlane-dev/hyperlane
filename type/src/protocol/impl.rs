@@ -11,10 +11,10 @@ impl Protocol {
     /// Performs a case-insensitive comparison against the HTTP protocol identifier.
     ///
     /// # Arguments
-    /// - `&str`: A string slice representing the protocol to check.
+    /// - `&str` - A string slice representing the protocol to check.
     ///
     /// # Returns
-    /// - `bool`: Returns `true` if the protocol is HTTP (case-insensitive), `false` otherwise.
+    /// - `bool` - Returns `true` if the protocol is HTTP (case-insensitive), `false` otherwise.
     #[inline(always)]
     pub fn is_http(protocol: &str) -> bool {
         matches!(protocol.to_lowercase().as_str(), HTTP_LOWERCASE)
@@ -25,10 +25,10 @@ impl Protocol {
     /// Performs a case-insensitive comparison against the HTTPS protocol identifier.
     ///
     /// # Arguments
-    /// - `&str`: A string slice representing the protocol to check.
+    /// - `&str` - A string slice representing the protocol to check.
     ///
     /// # Returns
-    /// - `bool`: Returns `true` if the protocol is HTTPS (case-insensitive), `false` otherwise.
+    /// - `bool` - Returns `true` if the protocol is HTTPS (case-insensitive), `false` otherwise.
     #[inline(always)]
     pub fn is_https(protocol: &str) -> bool {
         matches!(protocol.to_lowercase().as_str(), HTTPS_LOWERCASE)
@@ -40,10 +40,10 @@ impl Protocol {
     /// and returns the corresponding standard port number.
     ///
     /// # Arguments
-    /// - `&str`: A string slice representing the protocol to lookup.
+    /// - `&str` - A string slice representing the protocol to lookup.
     ///
     /// # Returns
-    /// - `u16`: The default port number for the protocol.
+    /// - `u16` - The default port number for the protocol.
     #[inline(always)]
     pub fn get_port(protocol: &str) -> u16 {
         match protocol.to_lowercase().as_str() {

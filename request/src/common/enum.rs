@@ -10,7 +10,7 @@ use super::*;
 /// `Request` / `Response` design in `hyperlane-core` — see
 /// `hyperlane-standards §8.1`. Higher-level framing (json vs text vs binary)
 /// lives in the builder, not in the data type.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Eq, Getter, PartialEq, Serialize)]
 pub struct Body {
     /// Raw body bytes.
     pub bytes: Vec<u8>,
@@ -30,13 +30,22 @@ impl Body {
     }
 
     /// View body as `&[u8]`.
-    pub fn as_slice(&self) -> &[u8] {
+    ///
+    /// # Returns
+    ///
+    /// - `&[u8]` - The raw body bytes.
+    pub fn get_bytes_ref(&self) -> &[u8] {
         &self.bytes
+    }
+
+    /// View body as `&[u8]`.
+    pub fn as_slice(&self) -> &[u8] {
+        self.get_bytes()
     }
 
     /// Try to view body as UTF-8 string.
     pub fn as_str(&self) -> Option<&str> {
-        std::str::from_utf8(&self.bytes).ok()
+        std::str::from_utf8(self.get_bytes()).ok()
     }
 }
 
