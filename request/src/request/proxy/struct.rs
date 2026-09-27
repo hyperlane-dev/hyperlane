@@ -82,7 +82,13 @@ impl Proxy {
 /// pre-read bytes that are returned before delegating to the inner stream.
 #[derive(Data)]
 pub struct ProxyTunnelStream {
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
     pub(super) inner: BoxAsyncReadWrite,
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
     pub(super) pre_read_data: Vec<u8>,
 }
 
@@ -90,6 +96,12 @@ pub struct ProxyTunnelStream {
 /// pre-read bytes that are returned before delegating to the inner stream.
 #[derive(Data)]
 pub struct SyncProxyTunnelStream {
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
     pub(super) inner: BoxReadWrite,
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
     pub(super) pre_read_data: Vec<u8>,
 }

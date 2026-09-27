@@ -30,6 +30,9 @@ use super::*;
 /// ```
 #[derive(Clone, Data, Debug, Default)]
 pub struct RequestBuilder {
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
     request: HttpRequest,
 }
 

@@ -9,7 +9,13 @@ use super::*;
 /// Fields are private; access through the methods on [`HttpRequest`].
 #[derive(Clone, Data, Debug)]
 pub struct Tmp {
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
     pub(crate) visit_url: HashSet<String>,
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
     pub(crate) root_cert: RootCertStore,
 }
 
