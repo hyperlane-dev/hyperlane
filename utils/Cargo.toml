@@ -1,0 +1,80 @@
+[package]
+name = "hyperlane-utils"
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A library providing utils for hyperlane."""
+keywords = ["http", "request", "response", "tcp", "redirect"]
+categories = ["network-programming", "web-programming"]
+exclude.workspace = true
+
+[dependencies]
+hyperlane-macros = { workspace = true }
+hyperlane-plugin-websocket = { workspace = true }
+
+aes = { workspace = true }
+hex = { workspace = true }
+log = { workspace = true }
+md5 = { workspace = true }
+rsa = { workspace = true }
+url = { workspace = true }
+rand = { workspace = true }
+sha2 = { workspace = true }
+sqlx = { workspace = true }
+uuid = { workspace = true }
+ahash = { workspace = true }
+redis = { workspace = true }
+regex = { workspace = true }
+rinja = { workspace = true }
+snafu = { workspace = true }
+which = { workspace = true }
+base64 = { workspace = true }
+chrono = { workspace = true }
+cipher = { workspace = true }
+lettre = { workspace = true }
+utoipa = { workspace = true }
+dotenvy = { workspace = true }
+futures = { workspace = true }
+reqwest = { workspace = true }
+scraper = { workspace = true }
+sea-orm = { workspace = true }
+sysinfo = { workspace = true }
+chunkify = { workspace = true }
+num_cpus = { workspace = true }
+future-fn = { workspace = true }
+getrandom = { workspace = true }
+once_cell = { workspace = true }
+simd-json = { workspace = true }
+twox-hash = { workspace = true }
+serde_with = { workspace = true }
+serde_yaml = { workspace = true }
+hot-restart = { workspace = true }
+jwt-service = { workspace = true }
+tracing-log = { workspace = true }
+urlencoding = { workspace = true }
+clonelicious = { workspace = true }
+color-output = { workspace = true }
+jsonwebtoken = { workspace = true }
+rust_decimal = { workspace = true }
+serde-xml-rs = { workspace = true }
+ed25519-dalek = { workspace = true }
+hyperlane-log = { workspace = true }
+lombok-macros = { workspace = true }
+file-operation = { workspace = true }
+server-manager = { workspace = true }
+utoipa-rapidoc = { workspace = true }
+bytemuck_derive = { workspace = true }
+compare_version = { workspace = true }
+instrument-level = { workspace = true }
+rustls-pki-types = { workspace = true }
+serde_urlencoded = { workspace = true }
+bin-encode-decode = { workspace = true }
+recoverable-spawn = { workspace = true }
+utoipa-swagger-ui = { workspace = true }
+tracing-subscriber = { workspace = true }
+hyperlane-broadcast = { workspace = true }
+std-macro-extensions = { workspace = true }
+recoverable-thread-pool = { workspace = true }
