@@ -219,7 +219,7 @@ impl Response {
     where
         K: AsRef<str>,
     {
-        self.headers.contains_key(key.as_ref())
+        self.get_headers().contains_key(key.as_ref())
     }
 
     /// Checks if a header contains a specific value.
@@ -238,7 +238,7 @@ impl Response {
         K: AsRef<str>,
         V: AsRef<str>,
     {
-        if let Some(values) = self.headers.get(key.as_ref()) {
+        if let Some(values) = self.get_headers().get(key.as_ref()) {
             values.contains(&value.as_ref().to_owned())
         } else {
             false
@@ -450,7 +450,7 @@ impl Response {
         if self.should_skip_header(&key) {
             return self;
         }
-        self.headers
+        self.get_mut_headers()
             .entry(key)
             .or_default()
             .push_back(value.as_ref().to_owned());
@@ -473,7 +473,7 @@ impl Response {
     where
         K: AsRef<str>,
     {
-        let _: bool = self.headers.remove(key.as_ref()).is_some();
+        let _: bool = self.get_mut_headers().remove(key.as_ref()).is_some();
         self
     }
 
@@ -498,10 +498,10 @@ impl Response {
         V: AsRef<str>,
     {
         let key: ResponseHeadersKey = key.as_ref().to_owned();
-        if let Some(values) = self.headers.get_mut(&key) {
+        if let Some(values) = self.get_mut_headers().get_mut(&key) {
             values.retain(|data: &String| data != &value.as_ref().to_owned());
             if values.is_empty() {
-                self.headers.remove(&key);
+                self.get_mut_headers().remove(&key);
             }
         }
         self
@@ -516,7 +516,7 @@ impl Response {
     /// - `&mut Self` - A mutable reference to self for chaining.
     #[inline(always)]
     pub fn clear_headers(&mut self) -> &mut Self {
-        self.headers.clear();
+        self.get_mut_headers().clear();
         self
     }
 
@@ -530,11 +530,11 @@ impl Response {
     /// - `&mut Self` - A mutable reference to self for chaining.
     pub fn reset(&mut self) -> &mut Self {
         let http_status: HttpStatus = HttpStatus::default();
-        self.status_code = http_status.code();
-        self.reason_phrase.clear();
-        let _: fmt::Result = write!(self.reason_phrase, "{}", http_status);
-        self.headers.clear();
-        self.body.clear();
+        self.set_status_code(http_status.code());
+        self.get_mut_reason_phrase().clear();
+        let _: fmt::Result = write!(self.get_mut_reason_phrase(), "{}", http_status);
+        self.get_mut_headers().clear();
+        self.get_mut_body().clear();
         self
     }
 
@@ -625,7 +625,7 @@ impl Response {
     ///
     /// - `ResponseData` - The complete HTTP response bytes.
     pub fn build(&mut self) -> ResponseData {
-        if self.reason_phrase.is_empty() {
+        if self.get_reason_phrase().is_empty() {
             self.set_reason_phrase(HttpStatus::phrase(self.get_status_code()));
         }
         let compress_type_opt: Option<Compress> = self

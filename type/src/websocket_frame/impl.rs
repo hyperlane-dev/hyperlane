@@ -487,7 +487,7 @@ impl WebSocketFrame {
     /// - `bool` - `true` if the opcode is `Continuation`, otherwise `false`.
     #[inline(always)]
     pub fn is_continuation_opcode(&self) -> bool {
-        self.opcode.is_continuation()
+        self.get_opcode().is_continuation()
     }
 
     /// Checks if the opcode is a text frame.
@@ -497,7 +497,7 @@ impl WebSocketFrame {
     /// - `bool` - `true` if the opcode is `Text`, otherwise `false`.
     #[inline(always)]
     pub fn is_text_opcode(&self) -> bool {
-        self.opcode.is_text()
+        self.get_opcode().is_text()
     }
 
     /// Checks if the opcode is a binary frame.
@@ -507,7 +507,7 @@ impl WebSocketFrame {
     /// - `bool` - `true` if the opcode is `Binary`, otherwise `false`.
     #[inline(always)]
     pub fn is_binary_opcode(&self) -> bool {
-        self.opcode.is_binary()
+        self.get_opcode().is_binary()
     }
 
     /// Checks if the opcode is a close frame.
@@ -517,7 +517,7 @@ impl WebSocketFrame {
     /// - `bool` - `true` if the opcode is `Close`, otherwise `false`.
     #[inline(always)]
     pub fn is_close_opcode(&self) -> bool {
-        self.opcode.is_close()
+        self.get_opcode().is_close()
     }
 
     /// Checks if the opcode is a ping frame.
@@ -527,7 +527,7 @@ impl WebSocketFrame {
     /// - `bool` - `true` if the opcode is `Ping`, otherwise `false`.
     #[inline(always)]
     pub fn is_ping_opcode(&self) -> bool {
-        self.opcode.is_ping()
+        self.get_opcode().is_ping()
     }
 
     /// Checks if the opcode is a pong frame.
@@ -537,7 +537,7 @@ impl WebSocketFrame {
     /// - `bool` - `true` if the opcode is `Pong`, otherwise `false`.
     #[inline(always)]
     pub fn is_pong_opcode(&self) -> bool {
-        self.opcode.is_pong()
+        self.get_opcode().is_pong()
     }
 
     /// Checks if the opcode is a reserved frame.
@@ -547,7 +547,7 @@ impl WebSocketFrame {
     /// - `bool` - `true` if the opcode is `Reserved(_)`, otherwise `false`.
     #[inline(always)]
     pub fn is_reserved_opcode(&self) -> bool {
-        self.opcode.is_reserved()
+        self.get_opcode().is_reserved()
     }
 
     /// Handles a decoded WebSocket Text or Binary frame and accumulates payload data.

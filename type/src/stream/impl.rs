@@ -161,13 +161,72 @@ impl<'a> PooledReader<'a> {
             end: 0,
         }
     }
+
+    /// Returns a mutable reborrow of the underlying TCP stream.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut TcpStream` - A mutable reborrow of the wrapped stream.
+    pub(crate) fn get_stream_mut(&mut self) -> &mut TcpStream {
+        &mut *self.stream
+    }
+
+    /// Returns the start offset of the valid-data region.
+    ///
+    /// # Returns
+    ///
+    /// - `usize` - The start offset.
+    pub(crate) fn get_start(&self) -> usize {
+        self.start
+    }
+
+    /// Sets the start offset of the valid-data region.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - The new start offset.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Self` - A mutable reference to self for chaining.
+    pub(crate) fn set_start(&mut self, value: usize) -> &mut Self {
+        self.start = value;
+        self
+    }
+
+    /// Returns the end offset of the valid-data region.
+    ///
+    /// # Returns
+    ///
+    /// - `usize` - The end offset.
+    pub(crate) fn get_end(&self) -> usize {
+        self.end
+    }
+
+    /// Returns the raw buffer as an immutable slice.
+    ///
+    /// # Returns
+    ///
+    /// - `&[u8]` - The whole buffer; valid data is the `start..end` range.
+    pub(crate) fn get_buffer_ref(&self) -> &[u8] {
+        &self.buffer
+    }
+
+    /// Returns the raw buffer as a mutable vector.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Vec<u8>` - The whole buffer for refill operations.
+    pub(crate) fn get_buffer_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.buffer
+    }
 }
 
 /// Returns the read buffer to the thread-local pool when the reader is dropped.
 impl Drop for PooledReader<'_> {
     /// Releases the buffer back to the pool for reuse by later requests.
     fn drop(&mut self) {
-        let buffer: Vec<u8> = mem::take(&mut self.buffer);
+        let buffer: Vec<u8> = mem::take(self.get_buffer_mut());
         return_read_buffer(buffer);
     }
 }
@@ -194,15 +253,15 @@ impl AsyncRead for PooledReader<'_> {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         let this: &mut Self = self.get_mut();
-        if this.start < this.end {
-            let available: usize = this.end - this.start;
+        if this.get_start() < this.get_end() {
+            let available: usize = this.get_end() - this.get_start();
             let amount: usize = available.min(buf.remaining());
-            let end: usize = this.start + amount;
-            buf.put_slice(&this.buffer[this.start..end]);
-            this.start = end;
+            let end: usize = this.get_start() + amount;
+            buf.put_slice(&this.get_buffer_ref()[this.get_start()..end]);
+            this.set_start(end);
             return Poll::Ready(Ok(()));
         }
-        Pin::new(&mut *this.stream).poll_read(cx, buf)
+        Pin::new(this.get_stream_mut()).poll_read(cx, buf)
     }
 }
 
@@ -223,19 +282,25 @@ impl AsyncBufRead for PooledReader<'_> {
     /// - `Poll<io::Result<&[u8]>>` - Ready with the unconsumed bytes, or an error.
     fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
         let this: &mut Self = self.get_mut();
-        if this.start >= this.end {
-            this.start = 0;
-            this.end = 0;
-            let mut read_buf: ReadBuf<'_> = ReadBuf::new(&mut this.buffer);
-            match Pin::new(&mut *this.stream).poll_read(cx, &mut read_buf) {
+        let PooledReader {
+            stream,
+            buffer,
+            start,
+            end,
+        } = this;
+        if *start >= *end {
+            *start = 0;
+            *end = 0;
+            let mut read_buf: ReadBuf<'_> = ReadBuf::new(buffer);
+            match Pin::new(&mut **stream).poll_read(cx, &mut read_buf) {
                 Poll::Ready(Ok(())) => {
-                    this.end = read_buf.filled().len();
+                    *end = read_buf.filled().len();
                 }
                 Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
                 Poll::Pending => return Poll::Pending,
             }
         }
-        Poll::Ready(Ok(&this.buffer[this.start..this.end]))
+        Poll::Ready(Ok(&buffer[*start..*end]))
     }
 
     /// Marks the given number of bytes as consumed.
@@ -246,7 +311,8 @@ impl AsyncBufRead for PooledReader<'_> {
     /// - `usize` - The number of bytes to consume.
     fn consume(self: Pin<&mut Self>, amount: usize) {
         let this: &mut Self = self.get_mut();
-        this.start = (this.start + amount).min(this.end);
+        let new_start: usize = (this.get_start() + amount).min(this.get_end());
+        this.set_start(new_start);
     }
 }
 
@@ -295,19 +361,15 @@ impl Stream {
         let hash_index: Option<usize> = path.find(HASH);
         let query_index: Option<usize> = path.find(QUERY);
         let query: &str = Request::get_http_query(path, query_index, hash_index);
-        Request::fill_http_querys(query, &mut request.querys);
+        Request::fill_http_querys(query, request.get_mut_querys());
         let path_slice: &str = Request::get_http_path(path, query_index, hash_index);
-        request.path.push_str(path_slice);
-        let content_size: usize = Request::get_http_headers(
-            &mut reader,
-            &config,
-            &mut request.headers,
-            &mut request.host,
-        )
-        .await?;
-        request.method = method;
-        request.version = version;
-        Request::fill_http_body(&mut reader, &mut request.body, content_size).await?;
+        request.get_mut_path().push_str(path_slice);
+        let Request { headers, host, .. } = request;
+        let content_size: usize =
+            Request::get_http_headers(&mut reader, &config, headers, host).await?;
+        request.set_method(method);
+        request.set_version(version);
+        Request::fill_http_body(&mut reader, request.get_mut_body(), content_size).await?;
         Ok(())
     }
 

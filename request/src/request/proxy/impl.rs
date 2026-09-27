@@ -15,13 +15,13 @@ impl AsyncRead for ProxyTunnelStream {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
-        if !self.pre_read_data.is_empty() {
-            let len: usize = std::cmp::min(self.pre_read_data.len(), buf.remaining());
-            buf.put_slice(&self.pre_read_data[..len]);
-            self.pre_read_data.drain(..len);
+        if !self.get_pre_read_data_ref().is_empty() {
+            let len: usize = std::cmp::min(self.get_pre_read_data_ref().len(), buf.remaining());
+            buf.put_slice(&self.get_pre_read_data_ref()[..len]);
+            self.get_pre_read_data_mut().drain(..len);
             return Poll::Ready(Ok(()));
         }
-        Pin::new(&mut self.inner).poll_read(cx, buf)
+        Pin::new(self.get_inner_mut()).poll_read(cx, buf)
     }
 }
 
@@ -31,21 +31,21 @@ impl AsyncWrite for ProxyTunnelStream {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, std::io::Error>> {
-        Pin::new(&mut self.inner).poll_write(cx, buf)
+        Pin::new(self.get_inner_mut()).poll_write(cx, buf)
     }
 
     fn poll_flush(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), std::io::Error>> {
-        Pin::new(&mut self.inner).poll_flush(cx)
+        Pin::new(self.get_inner_mut()).poll_flush(cx)
     }
 
     fn poll_shutdown(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), std::io::Error>> {
-        Pin::new(&mut self.inner).poll_shutdown(cx)
+        Pin::new(self.get_inner_mut()).poll_shutdown(cx)
     }
 }
 
@@ -62,22 +62,22 @@ impl SyncProxyTunnelStream {
 
 impl Read for SyncProxyTunnelStream {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        if !self.pre_read_data.is_empty() {
-            let len: usize = std::cmp::min(self.pre_read_data.len(), buf.len());
-            buf[..len].copy_from_slice(&self.pre_read_data[..len]);
-            self.pre_read_data.drain(..len);
+        if !self.get_pre_read_data_ref().is_empty() {
+            let len: usize = std::cmp::min(self.get_pre_read_data_ref().len(), buf.len());
+            buf[..len].copy_from_slice(&self.get_pre_read_data_ref()[..len]);
+            self.get_pre_read_data_mut().drain(..len);
             return Ok(len);
         }
-        self.inner.read(buf)
+        self.get_inner_mut().read(buf)
     }
 }
 
 impl Write for SyncProxyTunnelStream {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.inner.write(buf)
+        self.get_inner_mut().write(buf)
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        self.inner.flush()
+        self.get_inner_mut().flush()
     }
 }

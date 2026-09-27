@@ -82,13 +82,13 @@ impl HttpRequest {
     /// Remove a header by key.
     pub fn remove_header<K: AsRef<str>>(&mut self, key: K) -> &mut Self {
         let normalized = Self::normalize_header_key(key.as_ref());
-        self.headers.remove(&normalized);
+        self.get_headers_mut().remove(&normalized);
         self
     }
 
     /// Clear all headers.
     pub fn clear_headers(&mut self) -> &mut Self {
-        self.headers.clear();
+        self.get_headers_mut().clear();
         self
     }
 
@@ -127,6 +127,15 @@ impl HttpRequest {
     /// Get a reference to the request headers map.
     pub fn get_headers_ref(&self) -> &HashMap<String, String> {
         &self.headers
+    }
+
+    /// Returns a mutable reference to the headers map.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut HashMap<String, String>` - The mutable headers map.
+    pub fn get_headers_mut(&mut self) -> &mut HashMap<String, String> {
+        &mut self.headers
     }
 
     /// Get a clone of the body.

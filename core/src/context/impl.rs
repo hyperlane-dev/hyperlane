@@ -195,7 +195,7 @@ impl Context {
     /// - `&mut Self` - A mutable reference to self for chaining.
     #[inline(always)]
     pub(crate) fn clear_route_params(&mut self) -> &mut Self {
-        self.route_params.clear();
+        self.get_mut_route_params().clear();
         self
     }
 
