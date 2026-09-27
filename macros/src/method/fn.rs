@@ -17,7 +17,7 @@ pub(crate) fn create_method_check(
         let check_fn: proc_macro2::Ident = Ident::new(&format!("is_{method_str}"), context.span());
         quote! {
             if !#context.get_request().get_method().#check_fn() {
-                return ::hyperlane_core::Status::Continue;
+                return ::hyperlane::Status::Continue;
             }
         }
     }
@@ -61,7 +61,7 @@ pub(crate) fn methods_macro(
                 |_: &Ident, _: &Ident| {
                     quote! {
                         if !(#(#method_checks)||*) {
-                            return ::hyperlane_core::Status::Continue;
+                            return ::hyperlane::Status::Continue;
                         }
                     }
                 },

@@ -29,7 +29,7 @@ pub(crate) fn generate_http_stream(
                     #context.set_request(#variable_name.clone());
                     #(#stmts)*
                 }
-                ::hyperlane_core::Status::Continue
+                ::hyperlane::Status::Continue
             }
         }
         None => {
@@ -38,7 +38,7 @@ pub(crate) fn generate_http_stream(
                     #context.set_request(_request);
                     #(#stmts)*
                 }
-                ::hyperlane_core::Status::Continue
+                ::hyperlane::Status::Continue
             }
         }
     }
@@ -73,7 +73,7 @@ pub(crate) fn generate_websocket_stream(
                     #context.get_mut_request().set_body(#variable_name.clone());
                     #(#stmts)*
                 }
-                ::hyperlane_core::Status::Continue
+                ::hyperlane::Status::Continue
             }
         }
         None => {
@@ -82,7 +82,7 @@ pub(crate) fn generate_websocket_stream(
                     #context.get_mut_request().set_body(_body);
                     #(#stmts)*
                 }
-                ::hyperlane_core::Status::Continue
+                ::hyperlane::Status::Continue
             }
         }
     }

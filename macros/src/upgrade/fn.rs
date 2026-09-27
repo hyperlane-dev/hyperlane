@@ -18,7 +18,7 @@ pub(crate) fn create_protocol_check(
             Ident::new(&format!("is_{upgrade_type_str}"), context.span());
         quote! {
             if !#context.get_request().get_upgrade_type().#check_fn() {
-                return ::hyperlane_core::Status::Continue;
+                return ::hyperlane::Status::Continue;
             }
         }
     }

@@ -22,7 +22,7 @@ pub(crate) fn request_body_macro(
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
         let statements = multi_body.variables.iter().map(|variable: &syn::Ident| {
             quote! {
-                let #variable: &::hyperlane_core::RequestBody = #new_context.get_request().get_body();
+                let #variable: &::hyperlane::RequestBody = #new_context.get_request().get_body();
             }
         });
         quote! {
@@ -53,7 +53,7 @@ pub(crate) fn request_body_json_result_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_body_json.params.iter().map(|(variable, type_name): &(syn::Ident, syn::Type)| {
             quote! {
-                let #variable: Result<#type_name, ::hyperlane_core::serde_json::Error> = #context.get_request().try_get_body_json::<#type_name>();
+                let #variable: Result<#type_name, ::hyperlane::serde_json::Error> = #context.get_request().try_get_body_json::<#type_name>();
             }
         });
         quote! {
@@ -179,7 +179,7 @@ pub(crate) fn attributes_macro(
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
         let statements = multi_attrs.variables.iter().map(|variable: &syn::Ident| {
             quote! {
-                let #variable: &::hyperlane_core::ThreadSafeAttributeStore = #new_context.get_attributes();
+                let #variable: &::hyperlane::ThreadSafeAttributeStore = #new_context.get_attributes();
             }
         });
         quote! {
@@ -209,7 +209,7 @@ pub(crate) fn try_get_task_panic_data_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_task_panic_data.variables.iter().map(|variable: &syn::Ident| {
             quote! {
-                let #variable: Option<::hyperlane_core::PanicData> = #context.try_get_task_panic_data();
+                let #variable: Option<::hyperlane::PanicData> = #context.try_get_task_panic_data();
             }
         });
         quote! {
@@ -242,7 +242,7 @@ pub(crate) fn task_panic_data_macro(
             .iter()
             .map(|variable: &syn::Ident| {
                 quote! {
-                    let #variable: ::hyperlane_core::PanicData = #context.get_task_panic_data();
+                    let #variable: ::hyperlane::PanicData = #context.get_task_panic_data();
                 }
             });
         quote! {
@@ -272,7 +272,7 @@ pub(crate) fn try_get_request_error_data_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_error_data.variables.iter().map(|variable: &syn::Ident| {
             quote! {
-                let #variable: Option<::hyperlane_core::RequestError> = #context.try_get_request_error_data();
+                let #variable: Option<::hyperlane::RequestError> = #context.try_get_request_error_data();
             }
         });
         quote! {
@@ -300,11 +300,14 @@ pub(crate) fn request_error_data_macro(
 ) -> TokenStream {
     let multi_error_data: MultiRequestErrorData = parse_macro_input!(attr as MultiRequestErrorData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_error_data.variables.iter().map(|variable: &syn::Ident| {
-            quote! {
-                let #variable: ::hyperlane_core::RequestError = #context.get_request_error_data();
-            }
-        });
+        let statements = multi_error_data
+            .variables
+            .iter()
+            .map(|variable: &syn::Ident| {
+                quote! {
+                    let #variable: ::hyperlane::RequestError = #context.get_request_error_data();
+                }
+            });
         quote! {
             #(#statements)*
         }
@@ -400,7 +403,7 @@ pub(crate) fn route_params_macro(
             .iter()
             .map(|variable: &syn::Ident| {
                 quote! {
-                    let #variable: &::hyperlane_core::RouteParams = #new_context.get_route_params();
+                    let #variable: &::hyperlane::RouteParams = #new_context.get_route_params();
                 }
             });
         quote! {
@@ -430,7 +433,7 @@ pub(crate) fn try_get_request_query_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_query.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
-                let #variable: Option<::hyperlane_core::RequestQuerysValue> = #context.get_request().try_get_query(#key_name);
+                let #variable: Option<::hyperlane::RequestQuerysValue> = #context.get_request().try_get_query(#key_name);
             }
         });
         quote! {
@@ -460,7 +463,7 @@ pub(crate) fn request_query_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_query.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
-                let #variable: ::hyperlane_core::RequestQuerysValue = #context.get_request().get_query(#key_name);
+                let #variable: ::hyperlane::RequestQuerysValue = #context.get_request().get_query(#key_name);
             }
         });
         quote! {
@@ -491,7 +494,7 @@ pub(crate) fn request_querys_macro(
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
         let statements = multi_querys.variables.iter().map(|variable: &syn::Ident| {
             quote! {
-                let #variable: &::hyperlane_core::RequestQuerys = #new_context.get_request().get_querys();
+                let #variable: &::hyperlane::RequestQuerys = #new_context.get_request().get_querys();
             }
         });
         quote! {
@@ -521,7 +524,7 @@ pub(crate) fn try_get_request_header_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_header.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
-                let #variable: Option<::hyperlane_core::RequestHeadersValueItem> = #context.get_request().try_get_header_back(#key_name);
+                let #variable: Option<::hyperlane::RequestHeadersValueItem> = #context.get_request().try_get_header_back(#key_name);
             }
         });
         quote! {
@@ -551,7 +554,7 @@ pub(crate) fn request_header_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_header.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
-                let #variable: ::hyperlane_core::RequestHeadersValueItem = #context.get_request().get_header_back(#key_name);
+                let #variable: ::hyperlane::RequestHeadersValueItem = #context.get_request().get_header_back(#key_name);
             }
         });
         quote! {
@@ -582,7 +585,7 @@ pub(crate) fn request_headers_macro(
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
         let statements = multi_headers.variables.iter().map(|variable: &syn::Ident| {
             quote! {
-                let #variable: &::hyperlane_core::RequestHeaders = #new_context.get_request().get_headers();
+                let #variable: &::hyperlane::RequestHeaders = #new_context.get_request().get_headers();
             }
         });
         quote! {
@@ -612,7 +615,7 @@ pub(crate) fn try_get_request_cookie_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_cookie.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
-                let #variable: Option<::hyperlane_core::CookieValue> = #context.get_request().try_get_cookie(#key_name);
+                let #variable: Option<::hyperlane::CookieValue> = #context.get_request().try_get_cookie(#key_name);
             }
         });
         quote! {
@@ -642,7 +645,7 @@ pub(crate) fn request_cookie_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_cookie.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
-                let #variable: ::hyperlane_core::CookieValue = #context.get_request().get_cookie(#key_name);
+                let #variable: ::hyperlane::CookieValue = #context.get_request().get_cookie(#key_name);
             }
         });
         quote! {
@@ -672,7 +675,7 @@ pub(crate) fn request_cookies_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_cookies.variables.iter().map(|variable: &syn::Ident| {
             quote! {
-                let #variable: ::hyperlane_core::Cookies = #context.get_request().get_cookies();
+                let #variable: ::hyperlane::Cookies = #context.get_request().get_cookies();
             }
         });
         quote! {
@@ -704,7 +707,7 @@ pub(crate) fn request_version_macro(
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
         let statements = multi_version.variables.iter().map(|variable: &syn::Ident| {
             quote! {
-                let #variable: &::hyperlane_core::RequestVersion = #new_context.get_request().get_version();
+                let #variable: &::hyperlane::RequestVersion = #new_context.get_request().get_version();
             }
         });
         quote! {
@@ -735,7 +738,7 @@ pub(crate) fn request_path_macro(
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
         let statements = multi_path.variables.iter().map(|variable: &syn::Ident| {
             quote! {
-                let #variable: &::hyperlane_core::RequestPath = #new_context.get_request().get_path();
+                let #variable: &::hyperlane::RequestPath = #new_context.get_request().get_path();
             }
         });
         quote! {

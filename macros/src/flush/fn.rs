@@ -13,7 +13,7 @@ use super::*;
 pub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |_: &Ident, stream: &Ident| {
         quote! {
-            let _: ::std::result::Result<(), ::hyperlane_core::ResponseError> = #stream.try_flush().await;
+            let _: ::std::result::Result<(), ::hyperlane::ResponseError> = #stream.try_flush().await;
         }
     })
 }

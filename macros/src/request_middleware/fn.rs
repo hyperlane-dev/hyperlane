@@ -24,8 +24,8 @@ pub(crate) fn request_middleware_macro(attr: TokenStream, item: TokenStream) -> 
     let struct_name: &Ident = &input_struct.ident;
     let gen_code: proc_macro2::TokenStream = quote! {
         #input_struct
-        ::hyperlane_core::inventory::submit! {
-            ::hyperlane_core::HookType::RequestMiddleware(#order, || ::hyperlane_core::Hook::factory::<#struct_name>())
+        ::hyperlane::inventory::submit! {
+            ::hyperlane::HookType::RequestMiddleware(#order, || ::hyperlane::Hook::factory::<#struct_name>())
         }
     };
     gen_code.into()

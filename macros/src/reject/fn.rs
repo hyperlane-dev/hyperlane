@@ -24,7 +24,7 @@ pub(crate) fn reject_macro(
     inject(position, item, |_: &Ident, _: &Ident| {
         quote! {
             if #condition {
-                return ::hyperlane_core::Status::Continue;
+                return ::hyperlane::Status::Continue;
             }
         }
     })

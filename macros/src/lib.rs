@@ -64,7 +64,7 @@ use {
 /// Using no parameters:
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_ws_upgrade_type")]
@@ -87,7 +87,7 @@ use {
 /// Using variable name to store request data:
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_ws_upgrade_type")]
@@ -139,7 +139,7 @@ pub fn try_get_websocket_request(attr: TokenStream, item: TokenStream) -> TokenS
 /// Using no parameters:
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/try_get_http_request")]
@@ -158,7 +158,7 @@ pub fn try_get_websocket_request(attr: TokenStream, item: TokenStream) -> TokenS
 /// Using with variable name:
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/try_get_http_request")]
@@ -194,7 +194,7 @@ pub fn try_get_http_request(attr: TokenStream, item: TokenStream) -> TokenStream
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_get_method")]
@@ -233,7 +233,7 @@ pub fn is_get_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_post_method")]
@@ -272,7 +272,7 @@ pub fn is_post_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_put_method")]
@@ -311,7 +311,7 @@ pub fn is_put_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_delete_method")]
@@ -350,7 +350,7 @@ pub fn is_delete_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_patch_method")]
@@ -389,7 +389,7 @@ pub fn is_patch_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_head_method")]
@@ -428,7 +428,7 @@ pub fn is_head_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_options_method")]
@@ -467,7 +467,7 @@ pub fn is_options_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_connect_method")]
@@ -506,7 +506,7 @@ pub fn is_connect_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_trace_method")]
@@ -546,7 +546,7 @@ pub fn is_trace_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_unknown_method")]
@@ -589,7 +589,7 @@ pub fn is_unknown_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/methods")]
@@ -632,7 +632,7 @@ pub fn methods(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_http0_9_version")]
@@ -671,7 +671,7 @@ pub fn is_http0_9_version(_attr: TokenStream, item: TokenStream) -> TokenStream 
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_http1_0_version")]
@@ -710,7 +710,7 @@ pub fn is_http1_0_version(_attr: TokenStream, item: TokenStream) -> TokenStream 
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_http1_1_version")]
@@ -749,7 +749,7 @@ pub fn is_http1_1_version(_attr: TokenStream, item: TokenStream) -> TokenStream 
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_http2_version")]
@@ -788,7 +788,7 @@ pub fn is_http2_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_http3_version")]
@@ -827,7 +827,7 @@ pub fn is_http3_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_http1_1_or_higher_version")]
@@ -866,7 +866,7 @@ pub fn is_http1_1_or_higher_version(_attr: TokenStream, item: TokenStream) -> To
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/http")]
@@ -905,7 +905,7 @@ pub fn is_http_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_unknown_version")]
@@ -944,7 +944,7 @@ pub fn is_unknown_version(_attr: TokenStream, item: TokenStream) -> TokenStream 
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_ws_upgrade_type")]
@@ -987,7 +987,7 @@ pub fn is_ws_upgrade_type(_attr: TokenStream, item: TokenStream) -> TokenStream 
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_h2c_upgrade_type")]
@@ -1026,7 +1026,7 @@ pub fn is_h2c_upgrade_type(_attr: TokenStream, item: TokenStream) -> TokenStream
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_tls_upgrade_type")]
@@ -1065,7 +1065,7 @@ pub fn is_tls_upgrade_type(_attr: TokenStream, item: TokenStream) -> TokenStream
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_unknown_upgrade_type")]
@@ -1104,7 +1104,7 @@ pub fn is_unknown_upgrade_type(_attr: TokenStream, item: TokenStream) -> TokenSt
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// const CUSTOM_STATUS_CODE: i32 = 200;
@@ -1145,7 +1145,7 @@ pub fn response_status_code(attr: TokenStream, item: TokenStream) -> TokenStream
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// const CUSTOM_REASON: &str = "Accepted";
@@ -1187,7 +1187,7 @@ pub fn response_reason_phrase(attr: TokenStream, item: TokenStream) -> TokenStre
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// const CUSTOM_HEADER_NAME: &str = "X-Custom-Header";
@@ -1244,7 +1244,7 @@ pub fn response_header(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// const RESPONSE_DATA: &str = "{\"status\": \"success\"}";
@@ -1284,7 +1284,7 @@ pub fn response_body(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/clear_response_headers")]
@@ -1326,7 +1326,7 @@ pub fn clear_response_headers(_attr: TokenStream, item: TokenStream) -> TokenStr
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[request_middleware]
@@ -1369,7 +1369,7 @@ pub fn response_version(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/closed")]
@@ -1407,7 +1407,7 @@ pub fn closed(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/is_unknown_method")]
@@ -1445,7 +1445,7 @@ pub fn filter(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[response_middleware(2)]
@@ -1483,7 +1483,7 @@ pub fn reject(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/host")]
@@ -1523,7 +1523,7 @@ pub fn host(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/reject_host")]
@@ -1565,7 +1565,7 @@ pub fn reject_host(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/referer")]
@@ -1607,7 +1607,7 @@ pub fn referer(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/reject_referer")]
@@ -1649,7 +1649,7 @@ pub fn reject_referer(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// struct PrologueHooks;
@@ -1690,7 +1690,7 @@ pub fn reject_referer(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Advanced Usage with Method Expressions
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/hooks_expression")]
@@ -1726,7 +1726,7 @@ pub fn prologue_hooks(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// struct EpilogueHooks;
@@ -1767,7 +1767,7 @@ pub fn prologue_hooks(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Advanced Usage with Method Expressions
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/hooks_expression")]
@@ -1803,7 +1803,7 @@ pub fn epilogue_hooks(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/request_body")]
@@ -1831,7 +1831,7 @@ pub fn epilogue_hooks(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Multi-Parameter Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/multi_body")]
@@ -1864,7 +1864,7 @@ pub fn request_body(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 /// use serde::{Deserialize, Serialize};
 ///
@@ -1899,7 +1899,7 @@ pub fn request_body(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Multi-Parameter Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 /// use serde::{Deserialize, Serialize};
 ///
@@ -1943,7 +1943,7 @@ pub fn request_body_json_result(attr: TokenStream, item: TokenStream) -> TokenSt
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 /// use serde::{Deserialize, Serialize};
 ///
@@ -1978,7 +1978,7 @@ pub fn request_body_json_result(attr: TokenStream, item: TokenStream) -> TokenSt
 /// # Multi-Parameter Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 /// use serde::{Deserialize, Serialize};
 ///
@@ -2026,7 +2026,7 @@ pub fn request_body_json(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 /// use serde::{Deserialize, Serialize};
 ///
@@ -2066,7 +2066,7 @@ pub fn request_body_json(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Multi-Parameter Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/try_get_attribute")]
@@ -2098,7 +2098,7 @@ pub fn try_get_attribute(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 /// use serde::{Deserialize, Serialize};
 ///
@@ -2138,7 +2138,7 @@ pub fn try_get_attribute(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Multi-Parameter Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/attribute")]
@@ -2173,7 +2173,7 @@ pub fn attribute(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/attributes")]
@@ -2204,7 +2204,7 @@ pub fn attribute(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Multi-Parameter Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/multi_attrs")]
@@ -2236,7 +2236,7 @@ pub fn attributes(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/try_get_task_panic_data")]
@@ -2267,7 +2267,7 @@ pub fn attributes(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Multi-Parameter Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/try_get_task_panic_data")]
@@ -2299,7 +2299,7 @@ pub fn try_get_task_panic_data(attr: TokenStream, item: TokenStream) -> TokenStr
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/task_panic_data")]
@@ -2330,7 +2330,7 @@ pub fn try_get_task_panic_data(attr: TokenStream, item: TokenStream) -> TokenStr
 /// # Multi-Parameter Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/task_panic_data")]
@@ -2366,7 +2366,7 @@ pub fn task_panic_data(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/try_get_request_error_data")]
@@ -2397,7 +2397,7 @@ pub fn task_panic_data(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Multi-Parameter Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/try_get_request_error_data")]
@@ -2429,7 +2429,7 @@ pub fn try_get_request_error_data(attr: TokenStream, item: TokenStream) -> Token
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/request_error_data")]
@@ -2460,7 +2460,7 @@ pub fn try_get_request_error_data(attr: TokenStream, item: TokenStream) -> Token
 /// # Multi-Parameter Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/request_error_data")]
@@ -2496,7 +2496,7 @@ pub fn request_error_data(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/try_get_route_param/:test")]
@@ -2527,7 +2527,7 @@ pub fn request_error_data(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Multi-Parameter Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/multi_param/:id/:name")]
@@ -2559,7 +2559,7 @@ pub fn try_get_route_param(attr: TokenStream, item: TokenStream) -> TokenStream 
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/route_param/:test")]
@@ -2591,7 +2591,7 @@ pub fn try_get_route_param(attr: TokenStream, item: TokenStream) -> TokenStream 
 /// # Multi-Parameter Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/multi_param/:id/:name")]
@@ -2626,7 +2626,7 @@ pub fn route_param(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/route_params/:test")]
@@ -2657,7 +2657,7 @@ pub fn route_param(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Multi-Parameter Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/multi_params/:id")]
@@ -2689,7 +2689,7 @@ pub fn route_params(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/try_get_request_query")]
@@ -2735,7 +2735,7 @@ pub fn try_get_request_query(attr: TokenStream, item: TokenStream) -> TokenStrea
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/request_query")]
@@ -2784,7 +2784,7 @@ pub fn request_query(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/request_querys")]
@@ -2830,7 +2830,7 @@ pub fn request_querys(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/try_get_request_header")]
@@ -2874,7 +2874,7 @@ pub fn try_get_request_header(attr: TokenStream, item: TokenStream) -> TokenStre
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/request_header")]
@@ -2921,7 +2921,7 @@ pub fn request_header(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/request_headers")]
@@ -2965,7 +2965,7 @@ pub fn request_headers(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/cookie")]
@@ -3008,7 +3008,7 @@ pub fn try_get_request_cookie(attr: TokenStream, item: TokenStream) -> TokenStre
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/cookie")]
@@ -3054,7 +3054,7 @@ pub fn request_cookie(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/cookies")]
@@ -3085,7 +3085,7 @@ pub fn request_cookie(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Multi-Parameter Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/multi_cookies")]
@@ -3114,7 +3114,7 @@ pub fn request_cookies(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/request_version")]
@@ -3154,7 +3154,7 @@ pub fn request_version(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/request_path")]
@@ -3193,7 +3193,7 @@ pub fn request_path(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust,no_run
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[hyperlane(server: Server)]
@@ -3210,7 +3210,7 @@ pub fn request_path(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Using in impl block method:
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// struct ServerInitializer;
@@ -3251,7 +3251,7 @@ pub fn hyperlane(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/response")]
@@ -3291,7 +3291,7 @@ pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[request_middleware]
@@ -3331,7 +3331,7 @@ pub fn request_middleware(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[response_middleware]
@@ -3366,7 +3366,7 @@ pub fn response_middleware(attr: TokenStream, item: TokenStream) -> TokenStream 
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[task_panic]
@@ -3404,7 +3404,7 @@ pub fn task_panic(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[request_error]
@@ -3438,7 +3438,7 @@ pub fn request_error(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/prologue_macros")]
@@ -3466,7 +3466,7 @@ pub fn prologue_macros(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[response_middleware(2)]
@@ -3497,7 +3497,7 @@ pub fn epilogue_macros(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Using without arguments (default from context):
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/try_send")]
@@ -3524,7 +3524,7 @@ pub fn epilogue_macros(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Using with a data expression:
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/try_send_with_data")]
@@ -3558,7 +3558,7 @@ pub fn try_send(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Using without arguments (default from context):
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/send")]
@@ -3585,7 +3585,7 @@ pub fn try_send(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Using with a data expression:
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/send_with_data")]
@@ -3620,7 +3620,7 @@ pub fn send(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/try_flush")]
@@ -3659,7 +3659,7 @@ pub fn try_flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/flush")]
@@ -3697,7 +3697,7 @@ pub fn flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Generates a context reference binding statement.
 ///
 /// This function-like procedural macro generates a let statement that converts
-/// a context pointer into a reference to `::hyperlane_core::Context`.
+/// a context pointer into a reference to `::hyperlane::Context`.
 /// The conversion is performed through the `Into` trait with an intermediate
 /// conversion to usize.
 ///
@@ -3713,13 +3713,13 @@ pub fn flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Returns
 ///
 /// - `TokenStream` - A let statement binding the specified variable name
-///   to a `&mut ::hyperlane_core::Context` or `&::hyperlane_core::Context` obtained through pointer conversion.
+///   to a `&mut ::hyperlane::Context` or `&::hyperlane::Context` obtained through pointer conversion.
 ///
 /// # Examples
 ///
 /// With explicit type annotation for mutable reference:
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/context_mut")]
@@ -3745,7 +3745,7 @@ pub fn flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// With explicit type annotation for immutable reference:
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/context_ref")]
@@ -3757,21 +3757,21 @@ pub fn flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     }
 ///
 ///     async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
-///         let new_ctx: &::hyperlane_core::Context = unsafe { context!(ctx: &::hyperlane_core::Context) };
+///         let new_ctx: &::hyperlane::Context = unsafe { context!(ctx: &::hyperlane::Context) };
 ///         let _ = new_ctx.get_request();
 ///         Status::Continue
 ///     }
 /// }
 ///
 /// async fn example(_: &mut Stream, ctx: &mut Context) {
-///     let new_ctx: &::hyperlane_core::Context = unsafe { context!(ctx: &::hyperlane_core::Context) };
+///     let new_ctx: &::hyperlane::Context = unsafe { context!(ctx: &::hyperlane::Context) };
 ///     let _ = new_ctx.get_request();
 /// }
 /// ```
 ///
 /// Without type annotation (defaults to immutable):
 /// ```rust
-/// use hyperlane_core::*;
+/// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[route("/context_default")]

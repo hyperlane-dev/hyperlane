@@ -29,9 +29,9 @@ pub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStre
         });
         if type_name == SERVER_TYPE_KEY {
             init_statements.push(quote! {
-                let mut hooks: Vec<::hyperlane_core::HookType> = ::hyperlane_core::inventory::iter().cloned().collect();
-                ::hyperlane_core::HookType::assert_unique_order(hooks.clone());
-                hooks.sort_by_key(|hook: &::hyperlane_core::HookType| hook.try_get_order());
+                let mut hooks: Vec<::hyperlane::HookType> = ::hyperlane::inventory::iter().cloned().collect();
+                ::hyperlane::HookType::assert_unique_order(hooks.clone());
+                hooks.sort_by_key(|hook: &::hyperlane::HookType| hook.try_get_order());
                 for hook in hooks {
                     #var_name.handle_hook(hook.clone());
                 }

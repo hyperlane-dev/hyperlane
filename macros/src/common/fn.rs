@@ -121,9 +121,9 @@ pub(crate) fn inject(
     }
 }
 
-/// Checks if a type matches `::hyperlane_core::Context`.
+/// Checks if a type matches `::hyperlane::Context`.
 ///
-/// This function checks if the given type is a reference to `::hyperlane_core::Context`.
+/// This function checks if the given type is a reference to `::hyperlane::Context`.
 ///
 /// # Arguments
 ///
@@ -131,7 +131,7 @@ pub(crate) fn inject(
 ///
 /// # Returns
 ///
-/// - `bool` - Returns `true` if the type is `&::hyperlane_core::Context` or `&mut Context`, `false` otherwise.
+/// - `bool` - Returns `true` if the type is `&::hyperlane::Context` or `&mut Context`, `false` otherwise.
 fn is_context_type(ty: &Type) -> bool {
     if let Type::Reference(type_ref) = ty
         && let Type::Path(type_path) = &*type_ref.elem
@@ -153,9 +153,9 @@ fn is_context_type(ty: &Type) -> bool {
     false
 }
 
-/// Checks if a type matches `::hyperlane_core::Stream`.
+/// Checks if a type matches `::hyperlane::Stream`.
 ///
-/// This function checks if the given type is a reference to `::hyperlane_core::Stream`.
+/// This function checks if the given type is a reference to `::hyperlane::Stream`.
 ///
 /// # Arguments
 ///
@@ -163,7 +163,7 @@ fn is_context_type(ty: &Type) -> bool {
 ///
 /// # Returns
 ///
-/// - `bool` - Returns `true` if the type is `&::hyperlane_core::Stream` or `&mut Stream`, `false` otherwise.
+/// - `bool` - Returns `true` if the type is `&::hyperlane::Stream` or `&mut Stream`, `false` otherwise.
 fn is_stream_type(ty: &Type) -> bool {
     if let Type::Reference(type_ref) = ty
         && let Type::Path(type_path) = &*type_ref.elem
@@ -188,7 +188,7 @@ fn is_stream_type(ty: &Type) -> bool {
 /// Parses context identifier from function signature by searching all parameters.
 ///
 /// This function iterates through all function parameters and returns the first one
-/// that has type `::hyperlane_core::Context`. It supports:
+/// that has type `::hyperlane::Context`. It supports:
 /// 1. Methods with self: Searches from the second parameter onwards
 /// 2. Functions without self: Searches from the first parameter onwards
 /// 3. Context parameter can be at any position
@@ -221,14 +221,14 @@ pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<Ident
     }
     Err(syn::Error::new_spanned(
         &sig.inputs,
-        "expected at least one parameter of type &::hyperlane_core::Context",
+        "expected at least one parameter of type &::hyperlane::Context",
     ))
 }
 
 /// Parses stream identifier from function signature by searching all parameters.
 ///
 /// This function iterates through all function parameters and returns the first one
-/// that has type `::hyperlane_core::Stream`. It supports:
+/// that has type `::hyperlane::Stream`. It supports:
 /// 1. Methods with self: Searches from the second parameter onwards
 /// 2. Functions without self: Searches from the first parameter onwards
 /// 3. Stream parameter can be at any position
@@ -261,7 +261,7 @@ pub(crate) fn parse_stream_from_signature(sig: &Signature) -> syn::Result<Ident>
     }
     Err(syn::Error::new_spanned(
         &sig.inputs,
-        "expected at least one parameter of type &::hyperlane_core::Stream",
+        "expected at least one parameter of type &::hyperlane::Stream",
     ))
 }
 

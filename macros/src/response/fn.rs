@@ -23,7 +23,7 @@ pub(crate) fn response_status_code_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_mut_context(false, context);
         quote! {
-            #new_context.get_mut_response().set_status_code(::hyperlane_core::ResponseStatusCode::from(#value as usize));
+            #new_context.get_mut_response().set_status_code(::hyperlane::ResponseStatusCode::from(#value as usize));
         }
     })
 }

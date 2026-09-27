@@ -17,7 +17,7 @@ pub(crate) fn create_version_check(
         let check_fn: proc_macro2::Ident = Ident::new(&format!("is_{version_str}"), context.span());
         quote! {
             if !#context.get_request().get_version().#check_fn() {
-                return ::hyperlane_core::Status::Continue;
+                return ::hyperlane::Status::Continue;
             }
         }
     }

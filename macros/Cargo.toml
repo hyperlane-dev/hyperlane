@@ -15,11 +15,11 @@ exclude.workspace = true
 proc-macro = true
 
 [dependencies]
-hyperlane-core = { workspace = true }
-
 syn = { workspace = true }
 quote = { workspace = true }
 proc-macro2 = { workspace = true }
 
 [dev-dependencies]
+hyperlane = { path = ".." }
+
 serde = { workspace = true }

@@ -21,8 +21,8 @@ pub(crate) fn referer_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_referer.referer_values.iter().map(|referer_value: &syn::Expr| {
             quote! {
-                if #context.get_request().try_get_header_back(::hyperlane_core::REFERER).map_or(true, |referer_header: ::hyperlane_core::RequestHeadersValueItem| referer_header != #referer_value) {
-                    return ::hyperlane_core::Status::Continue;
+                if #context.get_request().try_get_header_back(::hyperlane::REFERER).map_or(true, |referer_header: ::hyperlane::RequestHeadersValueItem| referer_header != #referer_value) {
+                    return ::hyperlane::Status::Continue;
                 }
             }
         });
@@ -53,8 +53,8 @@ pub(crate) fn reject_referer_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_referer.referer_values.iter().map(|referer_value: &syn::Expr| {
             quote! {
-                if #context.get_request().try_get_header_back(::hyperlane_core::REFERER).map_or(false, |referer_header: ::hyperlane_core::RequestHeadersValueItem| referer_header == #referer_value) {
-                    return ::hyperlane_core::Status::Continue;
+                if #context.get_request().try_get_header_back(::hyperlane::REFERER).map_or(false, |referer_header: ::hyperlane::RequestHeadersValueItem| referer_header == #referer_value) {
+                    return ::hyperlane::Status::Continue;
                 }
             }
         });
