@@ -14,9 +14,9 @@ exclude.workspace = true
 [dependencies]
 http-type = { workspace = true }
 
-inventory = { workspace = true }
-lombok-macros = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true }
+inventory = { workspace = true }
+lombok-macros = { workspace = true }
 [dev-dependencies]
 tokio = { workspace = true }
