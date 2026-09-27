@@ -165,7 +165,7 @@ impl HttpRequest {
         tcp.set_write_timeout(Some(timeout))
             .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         if self.is_https() {
-            let roots = self.get_tmp_ref().get_root_cert();
+            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -293,10 +293,10 @@ impl HttpRequest {
         if !self.get_config_ref().redirect {
             return Err(RequestError::Request("Redirect Not Enabled".to_string()));
         }
-        if self.get_tmp_ref().get_visit_url_ref().contains(&url) {
+        if self.get_tmp_ref().get_visit_url().contains(&url) {
             return Err(RequestError::Request("Redirect URL Dead Loop".to_string()));
         }
-        self.get_tmp_mut().get_visit_url_mut().insert(url.clone());
+        self.get_tmp_mut().get_mut_visit_url().insert(url.clone());
         if self.get_config_ref().max_redirect_times == 0 {
             return Err(RequestError::Request(
                 "Max Redirect Times Exceeded".to_string(),
@@ -356,7 +356,7 @@ impl HttpRequest {
             .await
             .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         if self.is_https() {
-            let roots = self.get_tmp_ref().get_root_cert();
+            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -496,10 +496,10 @@ impl HttpRequest {
         if !self.get_config_ref().redirect {
             return Err(RequestError::Request("Redirect Not Enabled".to_string()));
         }
-        if self.get_tmp_ref().get_visit_url_ref().contains(&url) {
+        if self.get_tmp_ref().get_visit_url().contains(&url) {
             return Err(RequestError::Request("Redirect URL Dead Loop".to_string()));
         }
-        self.get_tmp_mut().get_visit_url_mut().insert(url.clone());
+        self.get_tmp_mut().get_mut_visit_url().insert(url.clone());
         if self.get_config_ref().max_redirect_times == 0 {
             return Err(RequestError::Request(
                 "Max Redirect Times Exceeded".to_string(),
@@ -540,7 +540,7 @@ impl HttpRequest {
         tcp.set_write_timeout(Some(timeout))
             .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         let mut proxy_stream: BoxReadWrite = if proxy.proxy_type == ProxyType::Https {
-            let roots = self.get_tmp_ref().get_root_cert();
+            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -589,7 +589,7 @@ impl HttpRequest {
             Vec::new()
         };
         if self.is_https() {
-            let roots = self.get_tmp_ref().get_root_cert();
+            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -694,7 +694,7 @@ impl HttpRequest {
             _ => return Err(RequestError::Request("Internal Server Error".to_string())),
         }
         if self.is_https() {
-            let roots = self.get_tmp_ref().get_root_cert();
+            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -739,7 +739,7 @@ impl HttpRequest {
             .await
             .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         let mut proxy_stream: BoxAsyncReadWrite = if proxy.proxy_type == ProxyType::Https {
-            let roots = self.get_tmp_ref().get_root_cert();
+            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -794,7 +794,7 @@ impl HttpRequest {
             Vec::new()
         };
         if self.is_https() {
-            let roots = self.get_tmp_ref().get_root_cert();
+            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -909,7 +909,7 @@ impl HttpRequest {
             _ => return Err(RequestError::Request("Internal Server Error".to_string())),
         }
         if self.is_https() {
-            let roots = self.get_tmp_ref().get_root_cert();
+            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();

@@ -28,7 +28,7 @@ use super::*;
 ///     .build();
 /// let _resp = req.send_async().await;
 /// ```
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Data, Debug, Default)]
 pub struct RequestBuilder {
     request: HttpRequest,
 }
@@ -50,33 +50,33 @@ impl RequestBuilder {
 
     /// Shortcut for `method(Method::Get)` + `url(url)`.
     pub fn get(&mut self, url: impl Into<String>) -> &mut Self {
-        self.get_request_mut().set_method(Method::Get);
-        self.get_request_mut().set_url(url);
+        self.get_mut_request().set_method(Method::Get);
+        self.get_mut_request().set_url(url);
         self
     }
 
     /// Shortcut for `method(Method::Post)` + `url(url)`.
     pub fn post(&mut self, url: impl Into<String>) -> &mut Self {
-        self.get_request_mut().set_method(Method::Post);
-        self.get_request_mut().set_url(url);
+        self.get_mut_request().set_method(Method::Post);
+        self.get_mut_request().set_url(url);
         self
     }
 
     /// Set HTTP method explicitly (`Method::Get` / `Method::Post` / etc.).
     pub fn method(&mut self, method: Method) -> &mut Self {
-        self.get_request_mut().set_method(method);
+        self.get_mut_request().set_method(method);
         self
     }
 
     /// Set URL.
     pub fn url(&mut self, url: impl Into<String>) -> &mut Self {
-        self.get_request_mut().set_url(url);
+        self.get_mut_request().set_url(url);
         self
     }
 
     /// Set a single header (last write wins on duplicate keys).
     pub fn header<K: AsRef<str>, V: AsRef<str>>(&mut self, key: K, value: V) -> &mut Self {
-        self.get_request_mut().set_header(key, value);
+        self.get_mut_request().set_header(key, value);
         self
     }
 
@@ -87,32 +87,32 @@ impl RequestBuilder {
         V: AsRef<str>,
     {
         for (k, v) in headers {
-            self.get_request_mut().set_header(k, v);
+            self.get_mut_request().set_header(k, v);
         }
         self
     }
 
     /// Remove a header by key.
     pub fn remove_header<K: AsRef<str>>(&mut self, key: K) -> &mut Self {
-        self.get_request_mut().remove_header(key);
+        self.get_mut_request().remove_header(key);
         self
     }
 
     /// Clear all headers.
     pub fn clear_headers(&mut self) -> &mut Self {
-        self.get_request_mut().clear_headers();
+        self.get_mut_request().clear_headers();
         self
     }
 
     /// Set raw body bytes.
     pub fn body<B: Into<Vec<u8>>>(&mut self, bytes: B) -> &mut Self {
-        self.get_request_mut().set_body(Body::from_bytes(bytes));
+        self.get_mut_request().set_body(Body::from_bytes(bytes));
         self
     }
 
     /// Set UTF-8 text body (will be encoded per `Content-Type` on send).
     pub fn body_text<T: Into<String>>(&mut self, text: T) -> &mut Self {
-        self.get_request_mut()
+        self.get_mut_request()
             .set_body(Body::from_bytes(text.into().into_bytes()));
         self
     }
@@ -120,26 +120,26 @@ impl RequestBuilder {
     /// Set JSON body (serialised via `serde_json`).
     pub fn body_json<V: serde::Serialize>(&mut self, value: &V) -> &mut Self {
         if let Ok(bytes) = serde_json::to_vec(value) {
-            self.get_request_mut().set_body(Body::from_bytes(bytes));
+            self.get_mut_request().set_body(Body::from_bytes(bytes));
         }
         self
     }
 
     /// Set request timeout in milliseconds.
     pub fn timeout(&mut self, ms: u64) -> &mut Self {
-        self.get_request_mut().get_config_mut().set_timeout(ms);
+        self.get_mut_request().get_config_mut().set_timeout(ms);
         self
     }
 
     /// Set per-read buffer size.
     pub fn buffer_size(&mut self, n: usize) -> &mut Self {
-        self.get_request_mut().get_config_mut().set_buffer_size(n);
+        self.get_mut_request().get_config_mut().set_buffer_size(n);
         self
     }
 
     /// Force HTTP/1.1.
     pub fn http1_1_only(&mut self) -> &mut Self {
-        self.get_request_mut()
+        self.get_mut_request()
             .get_config_mut()
             .set_http_version(HttpVersion::Http1_1);
         self
@@ -147,7 +147,7 @@ impl RequestBuilder {
 
     /// Force HTTP/2.
     pub fn http2_only(&mut self) -> &mut Self {
-        self.get_request_mut()
+        self.get_mut_request()
             .get_config_mut()
             .set_http_version(HttpVersion::Http2);
         self
@@ -155,19 +155,19 @@ impl RequestBuilder {
 
     /// Enable auto-follow of 3xx redirects.
     pub fn redirect(&mut self) -> &mut Self {
-        self.get_request_mut().get_config_mut().set_redirect(true);
+        self.get_mut_request().get_config_mut().set_redirect(true);
         self
     }
 
     /// Disable auto-follow of 3xx redirects (default).
     pub fn no_redirect(&mut self) -> &mut Self {
-        self.get_request_mut().get_config_mut().set_redirect(false);
+        self.get_mut_request().get_config_mut().set_redirect(false);
         self
     }
 
     /// Maximum number of redirects to follow (default `DEFAULT_MAX_REDIRECT_TIMES`).
     pub fn max_redirect_times(&mut self, n: usize) -> &mut Self {
-        self.get_request_mut()
+        self.get_mut_request()
             .get_config_mut()
             .set_max_redirect_times(n);
         self
@@ -175,13 +175,13 @@ impl RequestBuilder {
 
     /// Enable automatic response body decompression (gzip / deflate / br).
     pub fn decode(&mut self) -> &mut Self {
-        self.get_request_mut().get_config_mut().set_decode(true);
+        self.get_mut_request().get_config_mut().set_decode(true);
         self
     }
 
     /// Disable automatic response body decompression.
     pub fn no_decode(&mut self) -> &mut Self {
-        self.get_request_mut().get_config_mut().set_decode(false);
+        self.get_mut_request().get_config_mut().set_decode(false);
         self
     }
 
@@ -191,7 +191,7 @@ impl RequestBuilder {
     /// Construct via [`Proxy::http`] / [`Proxy::https`] / [`Proxy::socks5`]
     /// and optionally chain `.auth(user, pass)`.
     pub fn proxy(&mut self, proxy: Proxy) -> &mut Self {
-        self.get_request_mut()
+        self.get_mut_request()
             .get_config_mut()
             .set_proxy(Some(proxy));
         self
@@ -199,12 +199,12 @@ impl RequestBuilder {
 
     /// Clear the proxy (use direct connection).
     pub fn no_proxy(&mut self) -> &mut Self {
-        self.get_request_mut().get_config_mut().set_proxy(None);
+        self.get_mut_request().get_config_mut().set_proxy(None);
         self
     }
 
     /// Finalise the builder and return the [`HttpRequest`].
     pub fn build(&mut self) -> HttpRequest {
-        std::mem::take(self.get_request_mut())
+        std::mem::take(self.get_mut_request())
     }
 }

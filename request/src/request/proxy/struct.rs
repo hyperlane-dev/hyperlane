@@ -30,7 +30,7 @@ pub enum ProxyType {
 /// let p = Proxy::https("proxy.example.com", 7890);
 /// let auth = Proxy::socks5("127.0.0.1", 1080).auth("user", "pass");
 /// ```
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Data, Debug, Eq, PartialEq)]
 pub struct Proxy {
     /// Proxy protocol family.
     pub proxy_type: ProxyType,
@@ -67,34 +67,6 @@ impl Proxy {
         self
     }
 
-    /// Sets the proxy username.
-    ///
-    /// # Arguments
-    ///
-    /// - `Option<String>` - The username, or None to clear.
-    ///
-    /// # Returns
-    ///
-    /// - `&mut Self` - A mutable reference to self for chaining.
-    pub fn set_username(&mut self, value: Option<String>) -> &mut Self {
-        self.username = value;
-        self
-    }
-
-    /// Sets the proxy password.
-    ///
-    /// # Arguments
-    ///
-    /// - `Option<String>` - The password, or None to clear.
-    ///
-    /// # Returns
-    ///
-    /// - `&mut Self` - A mutable reference to self for chaining.
-    pub fn set_password(&mut self, value: Option<String>) -> &mut Self {
-        self.password = value;
-        self
-    }
-
     fn new<H: AsRef<str>>(proxy_type: ProxyType, host: H, port: u16) -> Self {
         Self {
             proxy_type,
@@ -108,6 +80,7 @@ impl Proxy {
 
 /// Async tunnel stream wrapping another async stream, with a buffer of
 /// pre-read bytes that are returned before delegating to the inner stream.
+#[derive(Data)]
 pub struct ProxyTunnelStream {
     pub(super) inner: BoxAsyncReadWrite,
     pub(super) pre_read_data: Vec<u8>,
@@ -115,65 +88,8 @@ pub struct ProxyTunnelStream {
 
 /// Sync tunnel stream wrapping another sync stream, with a buffer of
 /// pre-read bytes that are returned before delegating to the inner stream.
+#[derive(Data)]
 pub struct SyncProxyTunnelStream {
     pub(super) inner: BoxReadWrite,
     pub(super) pre_read_data: Vec<u8>,
-}
-
-impl ProxyTunnelStream {
-    /// Returns the inner stream mutably.
-    ///
-    /// # Returns
-    ///
-    /// - `&mut BoxAsyncReadWrite` - The mutable inner stream.
-    pub(crate) fn get_inner_mut(&mut self) -> &mut BoxAsyncReadWrite {
-        &mut self.inner
-    }
-
-    /// Returns the buffered pre-read bytes.
-    ///
-    /// # Returns
-    ///
-    /// - `&[u8]` - The pre-read bytes not yet consumed.
-    pub(crate) fn get_pre_read_data_ref(&self) -> &[u8] {
-        &self.pre_read_data
-    }
-
-    /// Returns the buffered pre-read bytes mutably.
-    ///
-    /// # Returns
-    ///
-    /// - `&mut Vec<u8>` - The mutable pre-read buffer.
-    pub(crate) fn get_pre_read_data_mut(&mut self) -> &mut Vec<u8> {
-        &mut self.pre_read_data
-    }
-}
-
-impl SyncProxyTunnelStream {
-    /// Returns the inner stream mutably.
-    ///
-    /// # Returns
-    ///
-    /// - `&mut BoxReadWrite` - The mutable inner stream.
-    pub(crate) fn get_inner_mut(&mut self) -> &mut BoxReadWrite {
-        &mut self.inner
-    }
-
-    /// Returns the buffered pre-read bytes.
-    ///
-    /// # Returns
-    ///
-    /// - `&[u8]` - The pre-read bytes not yet consumed.
-    pub(crate) fn get_pre_read_data_ref(&self) -> &[u8] {
-        &self.pre_read_data
-    }
-
-    /// Returns the buffered pre-read bytes mutably.
-    ///
-    /// # Returns
-    ///
-    /// - `&mut Vec<u8>` - The mutable pre-read buffer.
-    pub(crate) fn get_pre_read_data_mut(&mut self) -> &mut Vec<u8> {
-        &mut self.pre_read_data
-    }
 }
