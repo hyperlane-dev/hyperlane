@@ -11,7 +11,6 @@ pub struct Context {
     /// The outgoing HTTP response.
     pub(super) response: Response,
     /// Parameters extracted from the route path.
-    #[get_mut(skip)]
     pub(super) route_params: RouteParams,
     /// A collection of custom attributes for sharing data within the request lifecycle.
     pub(super) attributes: ThreadSafeAttributeStore,

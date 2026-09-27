@@ -283,13 +283,13 @@ impl Request {
     ///
     /// - `&mut Self` - A mutable reference to self for chaining.
     pub fn reset(&mut self) -> &mut Self {
-        self.method = Method::default();
-        self.host.clear();
-        self.version = HttpVersion::default();
-        self.path.clear();
-        self.querys.clear();
-        self.headers.clear();
-        self.body.clear();
+        self.set_method(Method::default());
+        self.get_mut_host().clear();
+        self.set_version(HttpVersion::default());
+        self.get_mut_path().clear();
+        self.get_mut_querys().clear();
+        self.get_mut_headers().clear();
+        self.get_mut_body().clear();
         self
     }
 
@@ -864,7 +864,7 @@ impl Request {
     where
         K: AsRef<str>,
     {
-        self.headers.contains_key(key.as_ref())
+        self.get_headers().contains_key(key.as_ref())
     }
 
     /// Checks if a header contains a specific value.
@@ -883,7 +883,7 @@ impl Request {
         K: AsRef<str>,
         V: AsRef<str>,
     {
-        if let Some(values) = self.headers.get(key.as_ref()) {
+        if let Some(values) = self.get_headers().get(key.as_ref()) {
             values.iter().any(|data: &String| data == value.as_ref())
         } else {
             false

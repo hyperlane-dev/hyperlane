@@ -15,17 +15,29 @@ pub struct Tmp {
 
 impl Tmp {
     /// Borrow `visit_url` set.
-    pub(crate) fn visit_url_ref(&self) -> &HashSet<String> {
+    ///
+    /// # Returns
+    ///
+    /// - `&HashSet<String>` - The visited URL set.
+    pub(crate) fn get_visit_url_ref(&self) -> &HashSet<String> {
         &self.visit_url
     }
 
     /// Mutable borrow of `visit_url` set.
-    pub(crate) fn visit_url_mut(&mut self) -> &mut HashSet<String> {
+    ///
+    /// # Returns
+    ///
+    /// - `&mut HashSet<String>` - The mutable visited URL set.
+    pub(crate) fn get_visit_url_mut(&mut self) -> &mut HashSet<String> {
         &mut self.visit_url
     }
 
     /// Clone the `root_cert` store.
-    pub(crate) fn root_cert_clone(&self) -> RootCertStore {
+    ///
+    /// # Returns
+    ///
+    /// - `RootCertStore` - A cloned root certificate store.
+    pub(crate) fn get_root_cert(&self) -> RootCertStore {
         self.root_cert.clone()
     }
 }

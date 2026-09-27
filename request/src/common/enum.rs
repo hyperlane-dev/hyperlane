@@ -30,13 +30,22 @@ impl Body {
     }
 
     /// View body as `&[u8]`.
-    pub fn as_slice(&self) -> &[u8] {
+    ///
+    /// # Returns
+    ///
+    /// - `&[u8]` - The raw body bytes.
+    pub fn get_bytes_ref(&self) -> &[u8] {
         &self.bytes
+    }
+
+    /// View body as `&[u8]`.
+    pub fn as_slice(&self) -> &[u8] {
+        self.get_bytes_ref()
     }
 
     /// Try to view body as UTF-8 string.
     pub fn as_str(&self) -> Option<&str> {
-        std::str::from_utf8(&self.bytes).ok()
+        std::str::from_utf8(self.get_bytes_ref()).ok()
     }
 }
 

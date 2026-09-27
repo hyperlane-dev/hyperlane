@@ -187,7 +187,7 @@ impl CookieBuilder {
     /// The `CookieBuilder` instance for method chaining.
     #[inline(always)]
     pub fn secure(&mut self) -> &mut Self {
-        self.secure = Some(true);
+        *self.get_mut_secure() = Some(true);
         self
     }
 
@@ -200,7 +200,7 @@ impl CookieBuilder {
     /// The `CookieBuilder` instance for method chaining.
     #[inline(always)]
     pub fn http_only(&mut self) -> &mut Self {
-        self.http_only = Some(true);
+        *self.get_mut_http_only() = Some(true);
         self
     }
 
@@ -214,7 +214,7 @@ impl CookieBuilder {
     /// The `CookieBuilder` instance for method chaining.
     #[inline(always)]
     pub fn disable_secure(&mut self) -> &mut Self {
-        self.secure = Some(false);
+        *self.get_mut_secure() = Some(false);
         self
     }
 
@@ -228,7 +228,7 @@ impl CookieBuilder {
     /// The `CookieBuilder` instance for method chaining.
     #[inline(always)]
     pub fn disable_http_only(&mut self) -> &mut Self {
-        self.http_only = Some(false);
+        *self.get_mut_http_only() = Some(false);
         self
     }
 
