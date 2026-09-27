@@ -8,7 +8,6 @@ use super::*;
 #[derive(Clone, Debug, DisplayDebug, Getter)]
 pub struct RoutePattern(
     /// The collection of segments that make up the route pattern.
-    #[get]
     pub(super) RouteSegmentList,
 );
 
@@ -24,19 +23,16 @@ pub struct RoutePattern(
 pub struct RouteMatcher {
     /// A hash map for storing and quickly retrieving handlers for static route.
     /// These are route without any variable path segments.
-    #[get]
     #[set(skip)]
     #[debug(skip)]
     pub(super) static_route: ServerHookMap,
     /// A layered map of dynamic routes grouped by segment count.
     /// Routes are organized by path segment count for efficient filtering during matching.
-    #[get]
     #[set(skip)]
     #[debug(skip)]
     pub(super) dynamic_route: ServerHookPatternRoute,
     /// A layered map of regex routes grouped by segment count.
     /// Routes with tail regex patterns can match paths with more segments.
-    #[get]
     #[set(skip)]
     #[debug(skip)]
     pub(super) regex_route: ServerHookPatternRoute,
