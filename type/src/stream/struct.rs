@@ -18,7 +18,7 @@ pub struct Stream {
 /// This reader batches socket reads into an internal buffer to reduce
 /// syscall count, and returns its buffer to a thread-local pool on drop
 /// so keep-alive requests avoid repeated buffer allocation.
-#[derive(Data)]
+#[derive(Data, New)]
 pub(crate) struct PooledReader<'a> {
     /// The underlying TCP stream being read.
     #[get(pub(crate))]
@@ -34,10 +34,12 @@ pub(crate) struct PooledReader<'a> {
     #[get(pub(crate))]
     #[get_mut(pub(crate))]
     #[set(pub(crate))]
+    #[new(skip)]
     pub(super) start: usize,
     /// The index one past the last valid byte in the buffer.
     #[get(pub(crate))]
     #[get_mut(pub(crate))]
     #[set(pub(crate))]
+    #[new(skip)]
     pub(super) end: usize,
 }

@@ -1,9 +1,5 @@
 use super::*;
 
-thread_local! {
-    static READ_BUFFER_POOL: RefCell<Vec<Vec<u8>>> = const { RefCell::new(Vec::new()) };
-}
-
 /// Takes a read buffer from the thread-local pool or allocates a new one.
 ///
 /// # Arguments

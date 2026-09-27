@@ -525,34 +525,32 @@ impl Request {
         Ok(length)
     }
 
-    /// Parses HTTP headers from a buffered reader into the given map.
+    /// Parses HTTP headers from a buffered reader into this request.
     ///
     /// This method reads header lines from the provided buffered reader until an empty line
     /// is encountered, which indicates the end of headers. It checks header count, length,
-    /// and content according to the provided configuration. The target map and host string
-    /// are expected to be empty; they are filled without reallocating when they already
-    /// have sufficient capacity.
+    /// and content according to the provided configuration. The request's headers map and
+    /// host string are expected to be empty; they are filled without reallocating when they
+    /// already have sufficient capacity.
     ///
     /// # Arguments
     ///
     /// - `&mut AsyncBufReadExt + Unpin` - A mutable reference to a buffered reader implementing `AsyncBufReadExt`.
     /// - `&RequestConfig` - Configuration for security limits and buffer settings.
-    /// - `&mut RequestHeaders` - The map to insert parsed headers into.
-    /// - `&mut RequestHost` - The string to write the Host header value into.
     ///
     /// # Returns
     ///
     /// - `Result<usize, RequestError>` - The content length parsed from the
     ///   Content-Length header, or an error if parsing fails.
     pub(crate) async fn get_http_headers<R>(
+        &mut self,
         reader: &mut R,
         config: &RequestConfig,
-        headers: &mut RequestHeaders,
-        host: &mut RequestHost,
     ) -> Result<usize, RequestError>
     where
         R: AsyncBufReadExt + Unpin,
     {
+        let Request { headers, host, .. } = self;
         let max_header_count: usize = config.get_max_header_count();
         let max_header_key_size: usize = config.get_max_header_key_size();
         let max_header_value_size: usize = config.get_max_header_value_size();
