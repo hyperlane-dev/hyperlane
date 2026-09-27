@@ -22,7 +22,7 @@ exclude = ["target", "Cargo.lock", "sh", ".github", "logs", "img", "**/*.log"]
 
 [workspace]
 resolver = "2"
-members = ["compress", "constant", "type", "request", "core", "macros", "cli", "plugin/websocket", "utils"]
+members = ["compress", "constant", "type", "request", "core", "macros", "cli", "plugin/websocket"]
 
 [workspace.dependencies]
 hyperlane = { path = ".", version = "21.7.8" }
@@ -30,7 +30,6 @@ http-type = { path = "type", version = "21.7.8" }
 hyperlane-cli = { path = "cli", version = "21.7.8" }
 hyperlane-core = { path = "core", version = "21.7.8" }
 http-request = { path = "request", version = "21.7.8" }
-hyperlane-utils = { path = "utils", version = "21.7.8" }
 http-compress = { path = "compress", version = "21.7.8" }
 http-constant = { path = "constant", version = "21.7.8" }
 hyperlane-macros = { path = "macros", version = "21.7.8" }
