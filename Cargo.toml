@@ -67,6 +67,7 @@ tokio-rustls = { version = "0.26.5", default-features = false, features = [
     "ring",
     "tls12",
 ] }
+
 [dependencies]
 hyperlane-core = { workspace = true }
 hyperlane-macros = { workspace = true }

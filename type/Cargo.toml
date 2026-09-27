@@ -23,6 +23,7 @@ serde_json = { workspace = true }
 serde-xml-rs = { workspace = true }
 lombok-macros = { workspace = true }
 serde_urlencoded = { workspace = true }
+
 [dev-dependencies]
 url = { workspace = true }
 serde = { workspace = true }
