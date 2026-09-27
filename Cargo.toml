@@ -12,7 +12,7 @@ categories = ["network-programming", "web-programming"]
 exclude.workspace = true
 
 [workspace.package]
-version = "21.7.7"
+version = "21.7.8"
 readme = "README.md"
 edition = "2024"
 authors = ["root@ltpp.vip"]
@@ -25,13 +25,13 @@ resolver = "2"
 members = ["compress", "constant", "type", "request", "core", "macros", "cli"]
 
 [workspace.dependencies]
-http-type = { path = "type", version = "21.7.7" }
-hyperlane-cli = { path = "cli", version = "21.7.7" }
-hyperlane-core = { path = "core", version = "21.7.7" }
-http-request = { path = "request", version = "21.7.7" }
-http-compress = { path = "compress", version = "21.7.7" }
-http-constant = { path = "constant", version = "21.7.7" }
-hyperlane-macros = { path = "macros", version = "21.7.7" }
+http-type = { path = "type", version = "21.7.8" }
+hyperlane-cli = { path = "cli", version = "21.7.8" }
+hyperlane-core = { path = "core", version = "21.7.8" }
+http-request = { path = "request", version = "21.7.8" }
+http-compress = { path = "compress", version = "21.7.8" }
+http-constant = { path = "constant", version = "21.7.8" }
+hyperlane-macros = { path = "macros", version = "21.7.8" }
 
 hex = "0.4.3"
 url = "2.5.8"
@@ -48,9 +48,9 @@ serde-xml-rs = "0.8.2"
 serde_json = "1.0.151"
 tungstenite = "0.30.0"
 webpki-roots = "1.0.9"
-lombok-macros = "2.1.0"
 proc-macro2 = "1.0.107"
-color-output = "10.0.10"
+color-output = "10.1.11"
+lombok-macros = "10.1.11"
 serde_urlencoded = "0.7.1"
 tokio-tungstenite = "0.30.0"
 syn = { version = "3.0.6", features = ["full"] }
