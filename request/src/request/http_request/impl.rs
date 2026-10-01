@@ -1,36 +1,42 @@
 use super::*;
 
-/// Blanket AsyncRead+AsyncWrite+Unpin+Send for any compatible stream.
-pub(crate) trait AsyncReadWrite: AsyncRead + AsyncWrite + Unpin + Send {}
-/// Blanket Read+Write for any compatible stream.
-pub(crate) trait ReadWrite: Read + Write {}
-
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> AsyncReadWrite for T {}
 impl<T: Read + Write> ReadWrite for T {}
 
-/// Boxed dynamic async stream.
-pub(crate) type BoxAsyncReadWrite = Box<dyn AsyncReadWrite>;
-/// Boxed dynamic sync stream.
-pub(crate) type BoxReadWrite = Box<dyn ReadWrite>;
-
 impl HttpRequest {
     /// Send the HTTP request synchronously, returning the parsed response.
+    ///
+    /// # Returns
+    ///
+    /// - `RequestResult` - The parsed HTTP response, or a `RequestError` on failure.
     pub fn send(&mut self) -> RequestResult {
         self.send_sync()
     }
 
     /// Send the HTTP request asynchronously, returning the parsed response.
+    ///
+    /// # Returns
+    ///
+    /// - `RequestResult` - The parsed HTTP response, or a `RequestError` on failure.
     pub async fn send_async(&mut self) -> RequestResult {
         self.send_async_impl().await
     }
 
     /// Parse the configured URL into a [`HttpUrlComponents`].
+    ///
+    /// # Returns
+    ///
+    /// - `Result<HttpUrlComponents, RequestError>` - The parsed URL components, or a `RequestError` when the URL is malformed.
     pub(crate) fn parse_url(&self) -> Result<HttpUrlComponents, RequestError> {
         HttpUrlComponents::parse(self.get_url_ref())
             .map_err(|e: ::http_type::HttpUrlError| RequestError::Request(e.to_string()))
     }
 
     /// `Host` + path (including query string) for the request line.
+    ///
+    /// # Returns
+    ///
+    /// - `String` - The request path, with the query string appended when present.
     pub(crate) fn full_path(&self) -> String {
         let url_obj = self.parse_url().unwrap_or_default();
         let query = url_obj.query.unwrap_or_default();
@@ -43,12 +49,28 @@ impl HttpRequest {
     }
 
     /// Lower-case the protocol ("http" / "https").
+    ///
+    /// # Arguments
+    ///
+    /// - `&RequestConfig` - The configuration whose HTTP version is lower-cased.
+    ///
+    /// # Returns
+    ///
+    /// - `String` - The lower-cased protocol name.
     pub(crate) fn protocol_lower(config: &RequestConfig) -> String {
         config.http_version.to_string().to_ascii_lowercase()
     }
 
     /// Build the wire-format header bytes, with `Host`, `Content-Length`,
     /// `Accept`, `User-Agent` auto-filled if missing.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - The length of the encoded request body.
+    ///
+    /// # Returns
+    ///
+    /// - `Vec<u8>` - The wire-format request header bytes.
     pub(crate) fn header_bytes(&self, body_length: usize) -> Vec<u8> {
         let mut header: HashMap<String, String> = self.get_headers();
         let host_value: String = self
@@ -83,6 +105,16 @@ impl HttpRequest {
         out
     }
 
+    /// Check whether a header map already contains a key, comparing case-insensitively.
+    ///
+    /// # Arguments
+    ///
+    /// - `&HashMap<String, String>` - The header map to search.
+    /// - `&str` - The header key to look for.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` when the map contains the key, `false` otherwise.
     fn header_has_key(header: &HashMap<String, String>, target_key: &str) -> bool {
         let target = target_key.to_ascii_lowercase();
         header.keys().any(|k: &String| k == &target)
@@ -90,6 +122,10 @@ impl HttpRequest {
 
     /// Encode `self.body` according to the `Content-Type` header.
     /// Returns empty bytes if no recognised content type.
+    ///
+    /// # Returns
+    ///
+    /// - `Vec<u8>` - The encoded request body, empty when the content type is unrecognised.
     pub(crate) fn body_bytes(&self) -> Vec<u8> {
         let ct = self
             .headers
@@ -108,6 +144,10 @@ impl HttpRequest {
     }
 
     /// Synchronous send.
+    ///
+    /// # Returns
+    ///
+    /// - `RequestResult` - The parsed HTTP response, or a `RequestError` on failure.
     pub(crate) fn send_sync(&mut self) -> RequestResult {
         let url_obj = self.parse_url()?;
         let host: String = url_obj.host.clone().unwrap_or_default();
@@ -124,6 +164,10 @@ impl HttpRequest {
     }
 
     /// Asynchronous send.
+    ///
+    /// # Returns
+    ///
+    /// - `RequestResult` - The parsed HTTP response, or a `RequestError` on failure.
     async fn send_async_impl(&mut self) -> RequestResult {
         let url_obj = self.parse_url()?;
         let host: String = url_obj.host.clone().unwrap_or_default();
@@ -139,6 +183,15 @@ impl HttpRequest {
         }
     }
 
+    /// Resolve the effective TCP port, falling back to the protocol default.
+    ///
+    /// # Arguments
+    ///
+    /// - `u16` - The port parsed from the URL, `0` when the URL omits one.
+    ///
+    /// # Returns
+    ///
+    /// - `u16` - The port from the URL, or the protocol default when it is `0`.
     fn resolve_port(&self, port: u16) -> u16 {
         if port != 0 {
             return port;
@@ -147,12 +200,27 @@ impl HttpRequest {
         Protocol::get_port(&protocol)
     }
 
+    /// Check whether the request uses the HTTPS protocol.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` when the configured protocol is `https`, `false` otherwise.
     fn is_https(&self) -> bool {
         Self::protocol_lower(self.get_config_ref()) == HTTPS_LOWERCASE
     }
 
     // ---------- sync stream plumbing ----------
 
+    /// Open a synchronous stream to the target host, directly or through a proxy.
+    ///
+    /// # Arguments
+    ///
+    /// - `String` - The target host name or IP address.
+    /// - `u16` - The target TCP port.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<BoxReadWrite, RequestError>` - The connected stream, TLS-wrapped for HTTPS, or a `RequestError` on failure.
     fn open_sync_stream(&self, host: String, port: u16) -> Result<BoxReadWrite, RequestError> {
         if let Some(proxy) = &self.get_config_ref().proxy {
             return self.open_sync_proxy_stream(host, port, proxy);
@@ -179,6 +247,15 @@ impl HttpRequest {
         }
     }
 
+    /// Write a GET request to the stream and read the response.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut BoxReadWrite` - The connected stream used to write the request and read the response.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<HttpResponse, RequestError>` - The parsed response, or a `RequestError` on I/O or parse failure.
     fn send_get_request_sync(
         &mut self,
         stream: &mut BoxReadWrite,
@@ -194,6 +271,15 @@ impl HttpRequest {
         self.read_response_sync(stream)
     }
 
+    /// Write a POST request with the encoded body to the stream and read the response.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut BoxReadWrite` - The connected stream used to write the request and read the response.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<HttpResponse, RequestError>` - The parsed response, or a `RequestError` on I/O or parse failure.
     fn send_post_request_sync(
         &mut self,
         stream: &mut BoxReadWrite,
@@ -210,6 +296,15 @@ impl HttpRequest {
         self.read_response_sync(stream)
     }
 
+    /// Read a full response from the stream, handling content-length and chunked bodies.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut BoxReadWrite` - The connected stream to read the response from.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<HttpResponse, RequestError>` - The parsed response, or a `RequestError` on I/O or parse failure.
     fn read_response_sync(
         &mut self,
         stream: &mut BoxReadWrite,
@@ -289,6 +384,15 @@ impl HttpRequest {
         self.handle_redirect(url)
     }
 
+    /// Follow a redirect by recording the visit and re-issuing the request.
+    ///
+    /// # Arguments
+    ///
+    /// - `String` - The absolute redirect target URL taken from the `Location` header.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<HttpResponse, RequestError>` - The response of the redirect target, or a `RequestError` when redirects are disabled, looping, or exhausted.
     fn handle_redirect(&mut self, url: String) -> Result<HttpResponse, RequestError> {
         if !self.get_config_ref().redirect {
             return Err(RequestError::Request("Redirect Not Enabled".to_string()));
@@ -307,6 +411,15 @@ impl HttpRequest {
         self.send_sync()
     }
 
+    /// Check whether a chunked response body has received its terminating zero-length chunk.
+    ///
+    /// # Arguments
+    ///
+    /// - `&[u8]` - The raw chunked body bytes received so far.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` when the terminating chunk is present, `false` while more bytes are needed.
     fn is_chunked_response_complete(body_bytes: &[u8]) -> bool {
         let mut pos = 0;
         while pos < body_bytes.len() {
@@ -344,6 +457,16 @@ impl HttpRequest {
 
     // ---------- async stream plumbing ----------
 
+    /// Open an asynchronous stream to the target host, directly or through a proxy.
+    ///
+    /// # Arguments
+    ///
+    /// - `String` - The target host name or IP address.
+    /// - `u16` - The target TCP port.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<BoxAsyncReadWrite, RequestError>` - The connected stream, TLS-wrapped for HTTPS, or a `RequestError` on failure.
     async fn open_async_stream(
         &self,
         host: String,
@@ -373,6 +496,15 @@ impl HttpRequest {
         }
     }
 
+    /// Write a GET request to the stream and read the response.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut BoxAsyncReadWrite` - The connected stream used to write the request and read the response.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<HttpResponse, RequestError>` - The parsed response, or a `RequestError` on I/O or parse failure.
     async fn send_get_request_async(
         &mut self,
         stream: &mut BoxAsyncReadWrite,
@@ -392,6 +524,15 @@ impl HttpRequest {
         self.read_response_async(stream).await
     }
 
+    /// Write a POST request with the encoded body to the stream and read the response.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut BoxAsyncReadWrite` - The connected stream used to write the request and read the response.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<HttpResponse, RequestError>` - The parsed response, or a `RequestError` on I/O or parse failure.
     async fn send_post_request_async(
         &mut self,
         stream: &mut BoxAsyncReadWrite,
@@ -412,6 +553,15 @@ impl HttpRequest {
         self.read_response_async(stream).await
     }
 
+    /// Read a full response from the stream, handling content-length and chunked bodies.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut BoxAsyncReadWrite` - The connected stream to read the response from.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<HttpResponse, RequestError>` - The parsed response, or a `RequestError` on I/O or parse failure.
     async fn read_response_async(
         &mut self,
         stream: &mut BoxAsyncReadWrite,
@@ -492,6 +642,15 @@ impl HttpRequest {
         self.handle_redirect_async(url).await
     }
 
+    /// Follow a redirect by recording the visit and re-issuing the request.
+    ///
+    /// # Arguments
+    ///
+    /// - `String` - The absolute redirect target URL taken from the `Location` header.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<HttpResponse, RequestError>` - The response of the redirect target, or a `RequestError` when redirects are disabled, looping, or exhausted.
     async fn handle_redirect_async(&mut self, url: String) -> Result<HttpResponse, RequestError> {
         if !self.get_config_ref().redirect {
             return Err(RequestError::Request("Redirect Not Enabled".to_string()));
@@ -512,6 +671,17 @@ impl HttpRequest {
 
     // ---------- proxy: sync ----------
 
+    /// Open a synchronous stream to the target through the configured proxy.
+    ///
+    /// # Arguments
+    ///
+    /// - `String` - The target host name or IP address.
+    /// - `u16` - The target TCP port.
+    /// - `&Proxy` - The proxy configuration selecting the HTTP or SOCKS5 handshake.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<BoxReadWrite, RequestError>` - The tunnelled stream, or a `RequestError` when the handshake fails.
     fn open_sync_proxy_stream(
         &self,
         target_host: String,
@@ -526,6 +696,17 @@ impl HttpRequest {
         }
     }
 
+    /// Open a synchronous stream to the target through an HTTP or HTTPS proxy.
+    ///
+    /// # Arguments
+    ///
+    /// - `String` - The target host name or IP address.
+    /// - `u16` - The target TCP port.
+    /// - `&Proxy` - The proxy configuration selecting the HTTP or SOCKS5 handshake.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<BoxReadWrite, RequestError>` - The tunnelled stream, or a `RequestError` when the handshake fails.
     fn open_sync_http_proxy(
         &self,
         target_host: String,
@@ -603,6 +784,17 @@ impl HttpRequest {
         Ok(Box::new(SyncProxyTunnelStream::new(proxy_stream, pre_read)))
     }
 
+    /// Open a synchronous stream to the target through a SOCKS5 proxy.
+    ///
+    /// # Arguments
+    ///
+    /// - `String` - The target host name or IP address.
+    /// - `u16` - The target TCP port.
+    /// - `&Proxy` - The proxy configuration selecting the HTTP or SOCKS5 handshake.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<BoxReadWrite, RequestError>` - The tunnelled stream, or a `RequestError` when the handshake fails.
     fn open_sync_socks5_proxy(
         &self,
         target_host: String,
@@ -711,6 +903,17 @@ impl HttpRequest {
 
     // ---------- proxy: async ----------
 
+    /// Open an asynchronous stream to the target through the configured proxy.
+    ///
+    /// # Arguments
+    ///
+    /// - `String` - The target host name or IP address.
+    /// - `u16` - The target TCP port.
+    /// - `&Proxy` - The proxy configuration selecting the HTTP or SOCKS5 handshake.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<BoxAsyncReadWrite, RequestError>` - The tunnelled stream, or a `RequestError` when the handshake fails.
     async fn open_async_proxy_stream(
         &self,
         target_host: String,
@@ -729,6 +932,17 @@ impl HttpRequest {
         }
     }
 
+    /// Open an asynchronous stream to the target through an HTTP or HTTPS proxy.
+    ///
+    /// # Arguments
+    ///
+    /// - `String` - The target host name or IP address.
+    /// - `u16` - The target TCP port.
+    /// - `&Proxy` - The proxy configuration selecting the HTTP or SOCKS5 handshake.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<BoxAsyncReadWrite, RequestError>` - The tunnelled stream, or a `RequestError` when the handshake fails.
     async fn open_async_http_proxy(
         &self,
         target_host: String,
@@ -812,6 +1026,17 @@ impl HttpRequest {
         }
     }
 
+    /// Open an asynchronous stream to the target through a SOCKS5 proxy.
+    ///
+    /// # Arguments
+    ///
+    /// - `String` - The target host name or IP address.
+    /// - `u16` - The target TCP port.
+    /// - `&Proxy` - The proxy configuration selecting the HTTP or SOCKS5 handshake.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<BoxAsyncReadWrite, RequestError>` - The tunnelled stream, or a `RequestError` when the handshake fails.
     async fn open_async_socks5_proxy(
         &self,
         target_host: String,
@@ -926,5 +1151,268 @@ impl HttpRequest {
         } else {
             Ok(Box::new(tcp))
         }
+    }
+}
+
+impl HttpRequest {
+    /// Create a GET request for `url`.
+    ///
+    /// # Arguments
+    ///
+    /// - `T` - The request URL, converted into an owned `String`.
+    pub fn get<T: Into<String>>(url: T) -> Self {
+        Self {
+            method: Method::Get,
+            url: url.into(),
+            headers: HashMap::new(),
+            body: Body::default(),
+            config: RequestConfig::default(),
+            tmp: Tmp::default(),
+        }
+    }
+
+    /// Create a POST request for `url`.
+    ///
+    /// # Arguments
+    ///
+    /// - `T` - The request URL, converted into an owned `String`.
+    pub fn post<T: Into<String>>(url: T) -> Self {
+        Self {
+            method: Method::Post,
+            url: url.into(),
+            headers: HashMap::new(),
+            body: Body::default(),
+            config: RequestConfig::default(),
+            tmp: Tmp::default(),
+        }
+    }
+
+    /// Builder-style: set method.
+    ///
+    /// # Arguments
+    ///
+    /// - `Method` - The HTTP method to use for the request.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Self` - The request itself, for chaining.
+    pub fn set_method(&mut self, method: Method) -> &mut Self {
+        self.method = method;
+        self
+    }
+
+    /// Builder-style: set URL.
+    ///
+    /// # Arguments
+    ///
+    /// - `T` - The request URL, converted into an owned `String`.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Self` - The request itself, for chaining.
+    pub fn set_url<T: Into<String>>(&mut self, url: T) -> &mut Self {
+        self.url = url.into();
+        self
+    }
+
+    /// Builder-style: set a single header (case-insensitive on read; the
+    /// last value wins for repeated keys).
+    ///
+    /// # Arguments
+    ///
+    /// - `K` - The header name, normalised to lowercase.
+    /// - `V` - The header value, stored as an owned `String`.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Self` - The request itself, for chaining.
+    pub fn set_header<K: AsRef<str>, V: AsRef<str>>(&mut self, key: K, value: V) -> &mut Self {
+        let normalized = Self::normalize_header_key(key.as_ref());
+        self.headers.insert(normalized, value.as_ref().to_owned());
+        self
+    }
+
+    /// Remove a header by key.
+    ///
+    /// # Arguments
+    ///
+    /// - `K` - The header name to remove, matched case-insensitively.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Self` - The request itself, for chaining.
+    pub fn remove_header<K: AsRef<str>>(&mut self, key: K) -> &mut Self {
+        let normalized = Self::normalize_header_key(key.as_ref());
+        self.get_mut_headers().remove(&normalized);
+        self
+    }
+
+    /// Clear all headers.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Self` - The request itself, for chaining.
+    pub fn clear_headers(&mut self) -> &mut Self {
+        self.get_mut_headers().clear();
+        self
+    }
+
+    /// Set body (raw bytes).
+    ///
+    /// # Arguments
+    ///
+    /// - `Body` - The body payload to send.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Self` - The request itself, for chaining.
+    pub fn set_body(&mut self, body: Body) -> &mut Self {
+        self.body = body;
+        self
+    }
+
+    /// Set a single config field by mutating the embedded `RequestConfig`.
+    ///
+    /// # Arguments
+    ///
+    /// - `RequestConfig` - The configuration replacing the current one.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Self` - The request itself, for chaining.
+    pub fn set_config(&mut self, config: RequestConfig) -> &mut Self {
+        self.config = config;
+        self
+    }
+
+    /// Get a copy of the HTTP method.
+    ///
+    /// # Returns
+    ///
+    /// - `Method` - A clone of the configured HTTP method.
+    pub fn get_method(&self) -> Method {
+        self.method.clone()
+    }
+
+    /// Get a clone of the URL string.
+    ///
+    /// # Returns
+    ///
+    /// - `String` - A clone of the configured URL.
+    pub fn get_url(&self) -> String {
+        self.url.clone()
+    }
+
+    /// Get a reference to the URL string.
+    ///
+    /// # Returns
+    ///
+    /// - `&str` - A borrowed slice of the configured URL.
+    pub fn get_url_ref(&self) -> &str {
+        self.url.as_str()
+    }
+
+    /// Get a clone of the request headers map.
+    ///
+    /// # Returns
+    ///
+    /// - `HashMap<String, String>` - A clone of the configured header map.
+    pub fn get_headers(&self) -> HashMap<String, String> {
+        self.headers.clone()
+    }
+
+    /// Get a reference to the request headers map.
+    ///
+    /// # Returns
+    ///
+    /// - `&HashMap<String, String>` - A borrowed reference to the configured header map.
+    pub fn get_headers_ref(&self) -> &HashMap<String, String> {
+        &self.headers
+    }
+
+    /// Returns a mutable reference to the headers map.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut HashMap<String, String>` - The mutable headers map.
+    pub fn get_headers_mut(&mut self) -> &mut HashMap<String, String> {
+        &mut self.headers
+    }
+
+    /// Get a clone of the body.
+    ///
+    /// # Returns
+    ///
+    /// - `Body` - A clone of the configured body.
+    pub fn get_body(&self) -> Body {
+        self.body.clone()
+    }
+
+    /// Get a reference to the body.
+    ///
+    /// # Returns
+    ///
+    /// - `&Body` - A borrowed reference to the configured body.
+    pub fn get_body_ref(&self) -> &Body {
+        &self.body
+    }
+
+    /// Get a clone of the request config.
+    ///
+    /// # Returns
+    ///
+    /// - `RequestConfig` - A clone of the configured request options.
+    pub fn get_config(&self) -> RequestConfig {
+        self.config.clone()
+    }
+
+    /// Get a reference to the request config.
+    ///
+    /// # Returns
+    ///
+    /// - `&RequestConfig` - A borrowed reference to the configured request options.
+    pub fn get_config_ref(&self) -> &RequestConfig {
+        &self.config
+    }
+
+    /// Get a mutable reference to the request config.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut RequestConfig` - A mutable reference to the configured request options.
+    pub fn get_config_mut(&mut self) -> &mut RequestConfig {
+        &mut self.config
+    }
+
+    /// Get a reference to the internal scratch `Tmp`.
+    ///
+    /// # Returns
+    ///
+    /// - `&Tmp` - A borrowed reference to the internal redirect-tracking state.
+    pub(crate) fn get_tmp_ref(&self) -> &Tmp {
+        &self.tmp
+    }
+
+    /// Get a mutable reference to the internal scratch `Tmp`.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Tmp` - A mutable reference to the internal redirect-tracking state.
+    pub(crate) fn get_tmp_mut(&mut self) -> &mut Tmp {
+        &mut self.tmp
+    }
+
+    /// Normalize a header key to lowercase so `set_header` /
+    /// `remove_header` lookups are case-insensitive.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - The header key to normalise.
+    ///
+    /// # Returns
+    ///
+    /// - `String` - The lower-cased header key.
+    fn normalize_header_key(key: &str) -> String {
+        key.to_ascii_lowercase()
     }
 }

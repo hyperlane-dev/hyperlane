@@ -1,6 +1,7 @@
 mod r#const;
-mod r#enum;
+mod r#impl;
+mod r#struct;
 
-pub use {r#const::*, r#enum::*};
+pub use {r#const::*, r#struct::*};
 
 use super::*;

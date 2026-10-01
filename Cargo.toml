@@ -76,18 +76,18 @@ serde_json = "1.0.151"
 tungstenite = "0.30.0"
 webpki-roots = "1.0.9"
 clonelicious = "2.2.28"
-proc-macro2 = "1.0.107"
 color-output = "10.2.2"
+proc-macro2 = "1.0.107"
 hyperlane-log = "4.0.16"
-file-operation = "0.8.32"
 lombok-macros = "10.2.2"
+file-operation = "0.8.32"
 server-manager = "5.0.24"
 bytemuck_derive = "1.11.0"
 compare_version = "2.0.14"
 serde_urlencoded = "0.7.1"
+tokio-broadcast = "10.2.2"
 instrument-level = "1.0.21"
 rustls-pki-types = "1.15.1"
-tokio-broadcast = "10.2.2"
 bin-encode-decode = "1.1.51"
 recoverable-spawn = "3.9.30"
 tokio-tungstenite = "0.30.0"
@@ -125,9 +125,9 @@ tracing-subscriber = { version = "0.3.23", features = [
     "env-filter",
 ] }
 sqlx = { version = "0.8.6", features = [
-    "runtime-tokio",
     "mysql",
     "postgres",
+    "runtime-tokio",
 ] }
 notify = { version = "8.2.0", default-features = false, features = [
     "macos_fsevent",
@@ -141,36 +141,36 @@ tokio-rustls = { version = "0.26.6", default-features = false, features = [
     "tls12",
 ] }
 utoipa-swagger-ui = { version = "9.0.2", features = [
-    "debug-embed",
     "vendored",
     "actix-web",
+    "debug-embed",
 ] }
 reqwest = { version = "0.13.4", features = [
-    "json",
-    "stream",
-    "multipart",
-    "cookies",
     "gzip",
+    "json",
     "socks",
+    "stream",
+    "cookies",
     "blocking",
+    "multipart",
 ] }
 sea-orm = { version = "1.1.20", features = [
     "sqlx-mysql",
-    "sqlx-postgres",
     "sqlx-sqlite",
+    "sqlx-postgres",
     "runtime-tokio-rustls",
 ] }
 rsa = { version = "0.9.10", default-features = false, features = [
-    "std",
     "pem",
-    "u64_digit",
-    "hazmat",
-    "getrandom",
-    "nightly",
-    "serde",
-    "sha2",
+    "std",
     "sha1",
+    "sha2",
     "pkcs5",
+    "serde",
+    "hazmat",
+    "nightly",
+    "getrandom",
+    "u64_digit",
 ] }
 uuid = { version = "1.24.0", features = [
     "v1",
@@ -180,18 +180,18 @@ uuid = { version = "1.24.0", features = [
     "v6",
     "v7",
     "v8",
-    "serde",
-    "fast-rng",
-    "macro-diagnostics",
-    "arbitrary",
-    "bytemuck",
-    "rng-rand",
-    "rng-getrandom",
-    "rng",
     "md5",
+    "rng",
     "sha1",
     "borsh",
+    "serde",
+    "bytemuck",
+    "fast-rng",
+    "rng-rand",
     "zerocopy",
+    "arbitrary",
+    "rng-getrandom",
+    "macro-diagnostics",
 ] }
 
 [dependencies]

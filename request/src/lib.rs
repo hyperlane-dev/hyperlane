@@ -18,7 +18,7 @@ pub use http_type::{
 
 pub use std::{
     collections::{HashMap, HashSet, VecDeque},
-    fmt::{self, Display, Formatter},
+    fmt::{self, Debug, Display, Formatter},
     io::{Read, Write},
     net::{Ipv4Addr, Ipv6Addr, TcpStream},
     pin::Pin,
@@ -41,5 +41,5 @@ pub use {
     webpki_roots::TLS_SERVER_ROOTS,
 };
 
-use common::*;
-use lombok_macros::*;
+pub use common::*;
+pub use lombok_macros::*;

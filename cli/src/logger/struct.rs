@@ -1,4 +1,4 @@
-use lombok_macros::{Data, New};
+use super::*;
 
 /// Custom logger implementation for the hyperlane-cli.
 ///

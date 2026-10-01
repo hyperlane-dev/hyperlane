@@ -21,6 +21,7 @@ pub(crate) use std::{
 };
 
 pub(crate) use {
+    lombok_macros::*,
     notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher, recommended_watcher},
     std::ffi::OsStr,
     tokio::{

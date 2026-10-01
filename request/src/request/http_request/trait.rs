@@ -1,15 +1,5 @@
 use super::*;
 
-/// Combines AsyncRead and AsyncWrite traits with Unpin and Send bounds.
-///
-/// Provides a unified trait for asynchronous read/write operations.
-pub(crate) trait AsyncReadWrite: AsyncRead + AsyncWrite + Unpin + Send {}
-
-/// Combines Read and Write traits.
-///
-/// Provides a unified trait for synchronous read/write operations.
-pub(crate) trait ReadWrite: Read + Write {}
-
 /// Asynchronous HTTP request trait.
 ///
 /// Defines the interface for sending asynchronous HTTP requests.
@@ -40,3 +30,8 @@ pub trait RequestTrait: Send + Debug {
     /// - `Self::RequestResult` - The result of the synchronous request.
     fn send(&mut self) -> Self::RequestResult;
 }
+
+/// Blanket AsyncRead+AsyncWrite+Unpin+Send for any compatible stream.
+pub(crate) trait AsyncReadWrite: AsyncRead + AsyncWrite + Unpin + Send {}
+/// Blanket Read+Write for any compatible stream.
+pub(crate) trait ReadWrite: Read + Write {}

@@ -9,3 +9,5 @@ pub use {::log, color_output::*};
 pub(crate) use {r#const::*, r#static::*};
 
 pub(crate) use log::SetLoggerError;
+
+use super::*;

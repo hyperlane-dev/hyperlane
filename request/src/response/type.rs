@@ -11,8 +11,3 @@ pub type ResponseData = Vec<u8>;
 
 /// UTF-8 form of the full serialized HTTP response.
 pub type ResponseDataString = String;
-
-/// Construct an empty response header map.
-pub fn new_response_headers() -> HttpResponseHeaders {
-    hash_map_xx_hash3_64()
-}

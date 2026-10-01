@@ -1,20 +1,5 @@
 use super::*;
 
-/// Proxy protocol family.
-///
-/// Distinguishes the wire format used to reach the proxy server:
-/// plain `HTTP CONNECT` for HTTP proxies, TLS-wrapped `HTTP CONNECT` for
-/// HTTPS proxies, and SOCKS5 handshake for SOCKS5 proxies.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ProxyType {
-    /// HTTP proxy (plain TCP, CONNECT method).
-    Http,
-    /// HTTPS proxy (TLS-wrapped CONNECT method).
-    Https,
-    /// SOCKS5 proxy.
-    Socks5,
-}
-
 /// Proxy configuration for an outgoing HTTP / WebSocket request.
 ///
 /// `Proxy` is a value type with no `Arc<RwLock>` wrapping — exactly like
@@ -42,40 +27,6 @@ pub struct Proxy {
     pub username: Option<String>,
     /// Optional password for proxy auth.
     pub password: Option<String>,
-}
-
-impl Proxy {
-    /// Plain HTTP proxy.
-    pub fn http<H: AsRef<str>>(host: H, port: u16) -> Self {
-        Self::new(ProxyType::Http, host, port)
-    }
-
-    /// HTTPS proxy (TLS-wrapped).
-    pub fn https<H: AsRef<str>>(host: H, port: u16) -> Self {
-        Self::new(ProxyType::Https, host, port)
-    }
-
-    /// SOCKS5 proxy.
-    pub fn socks5<H: AsRef<str>>(host: H, port: u16) -> Self {
-        Self::new(ProxyType::Socks5, host, port)
-    }
-
-    /// Attach username / password to this proxy.
-    pub fn auth<U: AsRef<str>, P: AsRef<str>>(mut self, username: U, password: P) -> Self {
-        self.set_username(Some(username.as_ref().to_owned()));
-        self.set_password(Some(password.as_ref().to_owned()));
-        self
-    }
-
-    fn new<H: AsRef<str>>(proxy_type: ProxyType, host: H, port: u16) -> Self {
-        Self {
-            proxy_type,
-            host: host.as_ref().to_owned(),
-            port,
-            username: None,
-            password: None,
-        }
-    }
 }
 
 /// Async tunnel stream wrapping another async stream, with a buffer of

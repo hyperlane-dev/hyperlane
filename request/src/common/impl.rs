@@ -1,21 +1,5 @@
 use super::*;
 
-/// HTTP request body content.
-///
-/// Holds the raw bytes of the request body. Use [`RequestBuilder::body`] /
-/// [`RequestBuilder::body_json`] / [`RequestBuilder::body_text`] on the builder
-/// to populate; users normally do not construct `Body` directly.
-///
-/// `Body` is intentionally a single-value type (`Vec<u8>`) to match the
-/// `Request` / `Response` design in `hyperlane-core` — see
-/// `hyperlane-standards §8.1`. Higher-level framing (json vs text vs binary)
-/// lives in the builder, not in the data type.
-#[derive(Clone, Debug, Default, Eq, Getter, PartialEq, Serialize)]
-pub struct Body {
-    /// Raw body bytes.
-    pub bytes: Vec<u8>,
-}
-
 impl Body {
     /// Empty body.
     pub const fn empty() -> Self {
@@ -23,6 +7,10 @@ impl Body {
     }
 
     /// Construct from any `Into<Vec<u8>>`.
+    ///
+    /// # Arguments
+    ///
+    /// - `B` - The raw bytes to store, converted into the owned `Vec<u8>`.
     pub fn from_bytes<B: Into<Vec<u8>>>(bytes: B) -> Self {
         Self {
             bytes: bytes.into(),
@@ -39,17 +27,38 @@ impl Body {
     }
 
     /// View body as `&[u8]`.
+    ///
+    /// # Returns
+    ///
+    /// - `&[u8]` - The raw body bytes.
     pub fn as_slice(&self) -> &[u8] {
         self.get_bytes()
     }
 
     /// Try to view body as UTF-8 string.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<&str>` - The body decoded as UTF-8, or `None` when the bytes
+    ///   are not valid UTF-8.
     pub fn as_str(&self) -> Option<&str> {
         std::str::from_utf8(self.get_bytes()).ok()
     }
 }
 
 impl Display for Body {
+    /// Formats the `Body` as its UTF-8 text, falling back to the debug
+    /// representation of the raw bytes when the body is not valid UTF-8.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut Formatter<'_>` - A mutable reference to a `Formatter` used for
+    ///   writing the formatted string.
+    ///
+    /// # Returns
+    ///
+    /// - `fmt::Result` - A `fmt::Result` indicating whether the formatting was
+    ///   successful.
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.as_str() {
             Some(s) => f.write_str(s),
