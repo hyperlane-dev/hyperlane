@@ -74,7 +74,7 @@ impl<'a> From<usize> for &'a mut Context {
     ///
     /// # Returns
     ///
-    /// - `&mut Context` - A mutable reference to the `Context` at the given address.
+    /// - `&'a mut Context` - A mutable reference to the `Context` at the given address.
     ///
     /// # Safety
     ///
@@ -126,7 +126,7 @@ impl AsRef<Context> for Context {
     ///
     /// # Returns
     ///
-    /// - `&Context` - A reference to the `Context` instance.
+    /// - `&Self` - A reference to the `Context` instance.
     #[inline(always)]
     fn as_ref(&self) -> &Self {
         let address: usize = self.into();
@@ -140,7 +140,7 @@ impl AsMut<Context> for Context {
     ///
     /// # Returns
     ///
-    /// - `&mut Context` - A mutable reference to the `Context` instance.
+    /// - `&mut Self` - A mutable reference to the `Context` instance.
     #[inline(always)]
     fn as_mut(&mut self) -> &mut Self {
         let address: usize = self.into();
@@ -203,7 +203,7 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The name of the route parameter to retrieve.
+    /// - `T` - The name of the route parameter to retrieve.
     ///
     /// # Returns
     ///
@@ -220,7 +220,7 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The name of the route parameter to retrieve.
+    /// - `T` - The name of the route parameter to retrieve.
     ///
     /// # Returns
     ///
@@ -241,15 +241,16 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The key of the attribute to retrieve.
+    /// - `K` - The key of the attribute to retrieve.
     ///
     /// # Returns
     ///
     /// - `Option<V>` - The attribute value if it exists and can be cast to the specified type.
     #[inline(always)]
-    pub fn try_get_attribute<V>(&self, key: impl AsRef<str>) -> Option<V>
+    pub fn try_get_attribute<V, K>(&self, key: K) -> Option<V>
     where
         V: AnySendSyncClone,
+        K: AsRef<str>,
     {
         self.get_attributes()
             .get(&Attribute::External(key.as_ref().to_owned()).to_string())
@@ -261,19 +262,20 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The key of the attribute to retrieve.
+    /// - `K` - The key of the attribute to retrieve.
     ///
     /// # Returns
     ///
-    /// - `AnySendSyncClone` - The attribute value if it exists and can be cast to the specified type.
+    /// - `V` - The attribute value if it exists and can be cast to the specified type.
     ///
     /// # Panics
     ///
     /// - If the attribute is not found.
     #[inline(always)]
-    pub fn get_attribute<V>(&self, key: impl AsRef<str>) -> V
+    pub fn get_attribute<V, K>(&self, key: K) -> V
     where
         V: AnySendSyncClone,
+        K: AsRef<str>,
     {
         self.try_get_attribute(key).unwrap()
     }
@@ -282,8 +284,8 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The key of the attribute to set.
-    /// - `AnySendSyncClone` - The value of the attribute.
+    /// - `K` - The key of the attribute to set.
+    /// - `V` - The value of the attribute.
     ///
     /// # Returns
     ///
@@ -305,7 +307,7 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The key of the attribute to remove.
+    /// - `K` - The key of the attribute to remove.
     ///
     /// # Returns
     ///
@@ -359,7 +361,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `AnySendSyncClone` - The attribute value if it exists and can be cast to the specified type.
+    /// - `V` - The attribute value if it exists and can be cast to the specified type.
     ///
     /// # Panics
     ///
@@ -377,7 +379,7 @@ impl Context {
     /// # Arguments
     ///
     /// - `InternalAttribute` - The internal attribute key to set.
-    /// - `AnySendSyncClone` - The value of the attribute.
+    /// - `V` - The value of the attribute.
     ///
     /// # Returns
     ///

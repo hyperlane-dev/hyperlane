@@ -5,7 +5,7 @@ impl FileExtension {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The string to parse.
+    /// - `F` - The string to parse, which requires the `AsRef<str>` bound.
     ///
     /// # Returns
     ///
@@ -22,7 +22,7 @@ impl FileExtension {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The full path to the file.
+    /// - `F` - The full path to the file, which requires the `AsRef<str>` bound.
     ///
     /// # Returns
     ///
@@ -2100,7 +2100,7 @@ impl FromStr for FileExtension {
             FILE_EXTENSION_WEBA => Ok(Self::FileExtensionWeba),
             FILE_EXTENSION_WEBM => Ok(Self::FileExtensionWebm),
             FILE_EXTENSION_WEBP => Ok(Self::FileExtensionWebp),
-            "wasm" => Ok(Self::FileExtensionWasm),
+            FILE_EXTENSION_WASM => Ok(Self::FileExtensionWasm),
             FILE_EXTENSION_WG => Ok(Self::FileExtensionWg),
             FILE_EXTENSION_WGT => Ok(Self::FileExtensionWgt),
             FILE_EXTENSION_WKS => Ok(Self::FileExtensionWks),
@@ -3179,7 +3179,7 @@ impl Display for FileExtension {
             Self::FileExtensionWeba => FILE_EXTENSION_WEBA,
             Self::FileExtensionWebm => FILE_EXTENSION_WEBM,
             Self::FileExtensionWebp => FILE_EXTENSION_WEBP,
-            Self::FileExtensionWasm => "wasm",
+            Self::FileExtensionWasm => FILE_EXTENSION_WASM,
             Self::FileExtensionWg => FILE_EXTENSION_WG,
             Self::FileExtensionWgt => FILE_EXTENSION_WGT,
             Self::FileExtensionWks => FILE_EXTENSION_WKS,

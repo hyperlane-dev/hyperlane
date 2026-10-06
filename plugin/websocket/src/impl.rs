@@ -144,7 +144,11 @@ impl BroadcastTypeTrait for &u16 {}
 /// Allows references to `u32` to be used as broadcast identifiers.
 impl BroadcastTypeTrait for &u32 {}
 
-/// Allows references to `u64` to be used as
+/// Implements `BroadcastTypeTrait` for `&u64`.
+///
+/// This allows references to `u64` to be used as a broadcast identifier.
+impl BroadcastTypeTrait for &u64 {}
+
 /// Implements `BroadcastTypeTrait` for `&u128`.
 ///
 /// This allows references to `u128` to be used as a broadcast identifier.
@@ -261,6 +265,7 @@ impl<B> Default for BroadcastType<B>
 where
     B: BroadcastTypeTrait,
 {
+    /// Returns the default `BroadcastType`, which is `BroadcastType::Unknown`.
     #[inline(always)]
     fn default() -> Self {
         BroadcastType::Unknown
@@ -315,7 +320,8 @@ where
     ///
     /// # Arguments
     ///
-    /// - `&mut Context` - The context object to associate with the WebSocket.
+    /// - `&'a mut Stream` - The stream object serving this WebSocket.
+    /// - `&'a mut Context` - The context object to associate with the WebSocket.
     ///
     /// # Returns
     ///
@@ -358,7 +364,7 @@ where
     ///
     /// # Arguments
     ///
-    /// - `&mut Context` - The context object to associate with the WebSocket.
+    /// - `&'a mut Context` - The context object to associate with the WebSocket.
     ///
     /// # Returns
     ///
@@ -384,6 +390,11 @@ where
         self
     }
 
+    /// Returns a mutable reference to the stream served by this configuration.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Stream` - A mutable reference to the stream.
     #[inline(always)]
     pub fn get_stream(&mut self) -> &mut Stream {
         self.stream
@@ -605,6 +616,19 @@ impl WebSocket {
         Self::default()
     }
 
+    /// Returns a shared reference to the internal broadcast map.
+    ///
+    /// Hand-written accessor: the `WebSocket` struct does not derive the lombok
+    /// `Data` macro, and §17.3 forbids reading `self.broadcast_map` directly.
+    ///
+    /// # Returns
+    ///
+    /// - `&BroadcastMap<Vec<u8>>` - A shared reference to the internal broadcast map.
+    #[inline(always)]
+    pub fn get_broadcast_map(&self) -> &BroadcastMap<Vec<u8>> {
+        &self.broadcast_map
+    }
+
     /// Subscribes to a broadcast type or inserts a new one if it doesn't exist.
     ///
     /// # Type Parameters
@@ -629,7 +653,7 @@ impl WebSocket {
         B: BroadcastTypeTrait,
     {
         let key: String = BroadcastType::get_key(broadcast_type);
-        self.broadcast_map.subscribe_or_insert(&key, capacity)
+        self.get_broadcast_map().subscribe_or_insert(&key, capacity)
     }
 
     /// Subscribes to a point-to-point broadcast.
@@ -640,8 +664,8 @@ impl WebSocket {
     ///
     /// # Arguments
     ///
-    /// - `&BroadcastTypeTrait` - The first identifier for the point-to-point communication.
-    /// - `&BroadcastTypeTrait` - The second identifier for the point-to-point communication.
+    /// - `&B` - The first identifier for the point-to-point communication.
+    /// - `&B` - The second identifier for the point-to-point communication.
     /// - `Capacity` - The capacity for the broadcast sender.
     ///
     /// # Returns
@@ -671,7 +695,7 @@ impl WebSocket {
     ///
     /// # Arguments
     ///
-    /// - `&BroadcastTypeTrait` - The identifier for the group.
+    /// - `&B` - The identifier for the group.
     /// - `Capacity` - The capacity for the broadcast sender.
     ///
     /// # Returns
@@ -704,7 +728,7 @@ impl WebSocket {
         B: BroadcastTypeTrait,
     {
         let key: String = BroadcastType::get_key(broadcast_type);
-        self.broadcast_map.receiver_count(&key).unwrap_or(0)
+        self.get_broadcast_map().receiver_count(&key).unwrap_or(0)
     }
 
     /// Calculates the receiver count before a connection is established.
@@ -744,7 +768,7 @@ impl WebSocket {
     ///
     /// # Arguments
     ///
-    /// - `BroadcastType<BroadcastTypeTrait>` - The broadcast type for which to get the receiver count.
+    /// - `BroadcastType<B>` - The broadcast type for which to get the receiver count.
     ///
     /// # Returns
     ///
@@ -767,8 +791,8 @@ impl WebSocket {
     ///
     /// # Arguments
     ///
-    /// - `BroadcastType<BroadcastTypeTrait>` - The broadcast type to which to send the data.
-    /// - `Into<Vec<u8>>` - The data to send.
+    /// - `BroadcastType<B>` - The broadcast type to which to send the data.
+    /// - `T` - The data to send.
     ///
     /// # Returns
     ///
@@ -784,7 +808,7 @@ impl WebSocket {
         B: BroadcastTypeTrait,
     {
         let key: String = BroadcastType::get_key(broadcast_type);
-        self.broadcast_map.try_send(&key, data.into())
+        self.get_broadcast_map().try_send(&key, data.into())
     }
 
     /// Sends data to all active receivers for a given broadcast type.
@@ -798,8 +822,8 @@ impl WebSocket {
     ///
     /// # Arguments
     ///
-    /// - `BroadcastType<BroadcastTypeTrait>` - The broadcast type to which to send the data.
-    /// - `Into<Vec<u8>>` - The data to send.
+    /// - `BroadcastType<B>` - The broadcast type to which to send the data.
+    /// - `T` - The data to send.
     ///
     /// # Returns
     ///
@@ -828,7 +852,7 @@ impl WebSocket {
     ///
     /// # Arguments
     ///
-    /// - `WebSocketConfig<BroadcastTypeTrait>` - The WebSocket configuration containing the configuration for this WebSocket instance.
+    /// - `WebSocketConfig<'_, B>` - The WebSocket configuration containing the configuration for this WebSocket instance.
     ///
     /// # Panics
     ///
@@ -870,7 +894,7 @@ impl WebSocket {
                         closed_hook(stream, ctx).await;
                     }
                     let body: ResponseBody = ctx.get_response().get_body().clone();
-                    let is_err: bool = self.broadcast_map.try_send(&key, body).is_err();
+                    let is_err: bool = self.get_broadcast_map().try_send(&key, body).is_err();
                     if is_err || sended_hook(stream, ctx).await.is_reject() || is_reject {
                         break;
                     }

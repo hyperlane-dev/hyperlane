@@ -1,7 +1,7 @@
 use super::*;
 
 /// Implements the `std::error::Error` trait for `HttpUrlError`.
-impl std::error::Error for HttpUrlError {}
+impl Error for HttpUrlError {}
 
 /// Implements the `Display` trait for `HttpUrlError`, allowing it to be formatted as a string.
 impl Display for HttpUrlError {
@@ -49,11 +49,11 @@ impl HttpUrlComponents {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The URL string to parse.
+    /// - `U` - The URL string to parse, which requires the `AsRef<str>` bound.
     ///
     /// # Returns
     ///
-    /// - `Result<HttpUrlComponents, HttpUrlError>` - Either the parsed components or an error.
+    /// - `Result<Self, HttpUrlError>` - Either the parsed components or an error.
     #[inline]
     pub fn parse<U>(url: U) -> Result<Self, HttpUrlError>
     where

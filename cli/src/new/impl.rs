@@ -13,7 +13,7 @@ impl NewProjectConfig {
     pub fn new(project_name: String) -> Self {
         Self {
             project_name,
-            template_url: "https://github.com/hyperlane-dev/hyperlane-quick-start".to_string(),
+            template_url: DEFAULT_TEMPLATE_URL.to_string(),
         }
     }
 }

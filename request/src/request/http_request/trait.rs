@@ -11,8 +11,8 @@ pub trait AsyncRequestTrait: Send + Debug {
     ///
     /// # Returns
     ///
-    /// - `Pin<Box<dyn Future<Output = Self::RequestResult> + Send + '_>>` -
-    ///   A pinned boxed future representing the asynchronous operation.
+    /// - `Pin<Box<dyn Future<Output = Self::RequestResult> + Send + '_>>`: a pinned
+    ///   boxed future representing the asynchronous operation.
     fn send(&mut self) -> Pin<Box<dyn Future<Output = Self::RequestResult> + Send + '_>>;
 }
 

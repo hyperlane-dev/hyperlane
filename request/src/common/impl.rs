@@ -42,7 +42,7 @@ impl Body {
     /// - `Option<&str>` - The body decoded as UTF-8, or `None` when the bytes
     ///   are not valid UTF-8.
     pub fn as_str(&self) -> Option<&str> {
-        std::str::from_utf8(self.get_bytes()).ok()
+        from_utf8(self.get_bytes()).ok()
     }
 }
 

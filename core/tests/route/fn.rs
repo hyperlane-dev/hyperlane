@@ -3,24 +3,24 @@ use super::*;
 #[tokio::test]
 #[should_panic(expected = "EmptyPattern")]
 async fn empty_route() {
-    let _server: &Server = Server::default().route::<TestRoute>(EMPTY_STR);
+    let _server: &Server = Server::default().route::<TestRoute, &str>(EMPTY_STR);
 }
 
 #[tokio::test]
 #[should_panic(expected = "DuplicatePattern")]
 async fn duplicate_route() {
     let _server: &Server = Server::default()
-        .route::<TestRoute>(ROOT_PATH)
-        .route::<TestRoute>(ROOT_PATH);
+        .route::<TestRoute, &str>(ROOT_PATH)
+        .route::<TestRoute, &str>(ROOT_PATH);
 }
 
 #[test]
 fn get_route() {
     let mut server: Server = Server::default();
     server
-        .route::<TestRoute>(ROOT_PATH)
-        .route::<TestRoute>("/dynamic/{routing}")
-        .route::<TestRoute>("/regex/{file:^.*$}");
+        .route::<TestRoute, &str>(ROOT_PATH)
+        .route::<TestRoute, &str>("/dynamic/{routing}")
+        .route::<TestRoute, &str>("/regex/{file:^.*$}");
     let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     for key in route_matcher.get_static_route().keys() {
         println!("Static route: {key}");
@@ -40,10 +40,10 @@ fn get_route() {
 #[test]
 fn segment_count_optimization() {
     let mut server: Server = Server::default();
-    server.route::<TestRoute>("/users/{id}");
-    server.route::<TestRoute>("/users/{id}/posts");
-    server.route::<TestRoute>("/users/{id}/posts/{post_id}");
-    server.route::<TestRoute>("/api/v1/users/{id}");
+    server.route::<TestRoute, &str>("/users/{id}");
+    server.route::<TestRoute, &str>("/users/{id}/posts");
+    server.route::<TestRoute, &str>("/users/{id}/posts/{post_id}");
+    server.route::<TestRoute, &str>("/api/v1/users/{id}");
     let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert!(
         route_matcher.get_dynamic_route().contains_key(&2),
@@ -65,9 +65,9 @@ fn segment_count_optimization() {
 #[test]
 fn regex_route_segment_count() {
     let mut server: Server = Server::default();
-    server.route::<TestRoute>("/files/{path:.*}");
-    server.route::<TestRoute>("/api/{version:\\d+}/users");
-    server.route::<TestRoute>("/api/{version:\\d+}/posts/{id:\\d+}");
+    server.route::<TestRoute, &str>("/files/{path:.*}");
+    server.route::<TestRoute, &str>("/api/{version:\\d+}/users");
+    server.route::<TestRoute, &str>("/api/{version:\\d+}/posts/{id:\\d+}");
     let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert!(
         route_matcher.get_regex_route().contains_key(&2),
@@ -86,11 +86,11 @@ fn regex_route_segment_count() {
 #[test]
 fn mixed_route_types() {
     let mut server: Server = Server::default();
-    server.route::<TestRoute>("/");
-    server.route::<TestRoute>("/about");
-    server.route::<TestRoute>("/users/{id}");
-    server.route::<TestRoute>("/posts/{slug}");
-    server.route::<TestRoute>("/files/{path:.*}");
+    server.route::<TestRoute, &str>("/");
+    server.route::<TestRoute, &str>("/about");
+    server.route::<TestRoute, &str>("/users/{id}");
+    server.route::<TestRoute, &str>("/posts/{slug}");
+    server.route::<TestRoute, &str>("/files/{path:.*}");
     let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert_eq!(route_matcher.get_static_route().len(), 2);
     assert!(route_matcher.get_dynamic_route().contains_key(&2));
@@ -104,7 +104,7 @@ fn large_dynamic_routes() {
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/{{id}}");
-        server.route::<TestRoute>(&path);
+        server.route::<TestRoute, &String>(&path);
     }
     let insert_duration: Duration = start_insert.elapsed();
     println!(
@@ -137,7 +137,7 @@ fn large_regex_routes() {
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/{{id:[0-9]+}}");
-        server.route::<TestRoute>(&path);
+        server.route::<TestRoute, &String>(&path);
     }
     let insert_duration: Duration = start_insert.elapsed();
     println!(
@@ -170,7 +170,7 @@ fn large_tail_regex_routes() {
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/{{path:.*}}");
-        server.route::<TestRoute>(&path);
+        server.route::<TestRoute, &String>(&path);
     }
     let insert_duration: Duration = start_insert.elapsed();
     println!(

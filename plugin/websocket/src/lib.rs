@@ -1,4 +1,4 @@
-//! A WebSocket plugin for the Hyperlane framework.
+//! hyperlane-plugin-websocket
 //!
 //! A WebSocket plugin for the Hyperlane framework,
 //! providing robust WebSocket communication capabilities and integrating
@@ -10,9 +10,9 @@ mod r#impl;
 mod r#struct;
 mod r#trait;
 
-pub use {r#enum::*, r#struct::*};
+pub use {r#enum::*, r#struct::*, r#trait::*};
 
-use {r#const::*, r#trait::*};
+use r#const::*;
 
 use std::{
     convert::Infallible,

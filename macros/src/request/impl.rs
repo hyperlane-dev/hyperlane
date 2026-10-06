@@ -12,6 +12,15 @@ use super::*;
 ///
 /// - `syn::Result<RequestMethods>` - Parsed RequestMethods or error.
 impl Parse for RequestMethods {
+    /// Parses the input token stream into a RequestMethods structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `syn::Result<Self>` - The parsed RequestMethods, or an error for invalid input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(RequestMethods {
             methods: Punctuated::parse_separated_nonempty(input)?,
@@ -32,6 +41,15 @@ impl Parse for RequestMethods {
 ///
 /// - `syn::Result<MultiRequestBodyData>` - Parsed MultiRequestBodyData or error.
 impl Parse for MultiRequestBodyData {
+    /// Parses the input token stream into a MultiRequestBodyData structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `syn::Result<Self>` - The parsed MultiRequestBodyData, or an error for invalid input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
@@ -62,6 +80,15 @@ impl Parse for MultiRequestBodyData {
 ///
 /// - `syn::Result<MultiRequestBodyJsonData>` - Parsed MultiRequestBodyJsonData or error.
 impl Parse for MultiRequestBodyJsonData {
+    /// Parses the input token stream into a MultiRequestBodyJsonData structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `syn::Result<Self>` - The parsed MultiRequestBodyJsonData, or an error for invalid input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut params: Vec<(Ident, Type)> = Vec::new();
         loop {
@@ -94,6 +121,15 @@ impl Parse for MultiRequestBodyJsonData {
 ///
 /// - `syn::Result<MultiAttributeData>` - Parsed MultiAttributeData or error.
 impl Parse for MultiAttributeData {
+    /// Parses the input token stream into a MultiAttributeData structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `syn::Result<Self>` - The parsed MultiAttributeData, or an error for invalid input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut params: Vec<(Expr, Ident, Type)> = Vec::new();
         loop {
@@ -128,6 +164,15 @@ impl Parse for MultiAttributeData {
 ///
 /// - `syn::Result<MultiAttributesData>` - Parsed MultiAttributesData or error.
 impl Parse for MultiAttributesData {
+    /// Parses the input token stream into a MultiAttributesData structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `syn::Result<Self>` - The parsed MultiAttributesData, or an error for invalid input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
@@ -158,6 +203,15 @@ impl Parse for MultiAttributesData {
 ///
 /// - `syn::Result<MultiRouteParamData>` - Parsed MultiRouteParamData or error.
 impl Parse for MultiRouteParamData {
+    /// Parses the input token stream into a MultiRouteParamData structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `syn::Result<Self>` - The parsed MultiRouteParamData, or an error for invalid input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut params: Vec<(Expr, Ident)> = Vec::new();
         loop {
@@ -190,6 +244,15 @@ impl Parse for MultiRouteParamData {
 ///
 /// - `syn::Result<MultiRouteParamsData>` - Parsed MultiRouteParamsData or error.
 impl Parse for MultiRouteParamsData {
+    /// Parses the input token stream into a MultiRouteParamsData structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `syn::Result<Self>` - The parsed MultiRouteParamsData, or an error for invalid input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
@@ -220,6 +283,15 @@ impl Parse for MultiRouteParamsData {
 ///
 /// - `syn::Result<MultiQueryData>` - Parsed MultiQueryData or error.
 impl Parse for MultiQueryData {
+    /// Parses the input token stream into a MultiQueryData structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `syn::Result<Self>` - The parsed MultiQueryData, or an error for invalid input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut params: Vec<(Expr, Ident)> = Vec::new();
         loop {
@@ -252,6 +324,15 @@ impl Parse for MultiQueryData {
 ///
 /// - `syn::Result<MultiQuerysData>` - Parsed MultiQuerysData or error.
 impl Parse for MultiQuerysData {
+    /// Parses the input token stream into a MultiQuerysData structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `syn::Result<Self>` - The parsed MultiQuerysData, or an error for invalid input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
@@ -282,6 +363,15 @@ impl Parse for MultiQuerysData {
 ///
 /// - `syn::Result<MultiHeaderData>` - Parsed MultiHeaderData or error.
 impl Parse for MultiHeaderData {
+    /// Parses the input token stream into a MultiHeaderData structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `syn::Result<Self>` - The parsed MultiHeaderData, or an error for invalid input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut params: Vec<(Expr, Ident)> = Vec::new();
         loop {
@@ -314,6 +404,15 @@ impl Parse for MultiHeaderData {
 ///
 /// - `syn::Result<MultiHeadersData>` - Parsed MultiHeadersData or error.
 impl Parse for MultiHeadersData {
+    /// Parses the input token stream into a MultiHeadersData structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `syn::Result<Self>` - The parsed MultiHeadersData, or an error for invalid input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
@@ -344,6 +443,15 @@ impl Parse for MultiHeadersData {
 ///
 /// - `syn::Result<MultiCookieData>` - Parsed MultiCookieData or error.
 impl Parse for MultiCookieData {
+    /// Parses the input token stream into a MultiCookieData structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `syn::Result<Self>` - The parsed MultiCookieData, or an error for invalid input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut params: Vec<(Expr, Ident)> = Vec::new();
         loop {
@@ -376,6 +484,15 @@ impl Parse for MultiCookieData {
 ///
 /// - `syn::Result<MultiCookiesData>` - Parsed MultiCookiesData or error.
 impl Parse for MultiCookiesData {
+    /// Parses the input token stream into a MultiCookiesData structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `syn::Result<Self>` - The parsed MultiCookiesData, or an error for invalid input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
@@ -406,6 +523,15 @@ impl Parse for MultiCookiesData {
 ///
 /// - `syn::Result<MultiRequestVersionData>` - Parsed MultiRequestVersionData or error.
 impl Parse for MultiRequestVersionData {
+    /// Parses the input token stream into a MultiRequestVersionData structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `syn::Result<Self>` - The parsed MultiRequestVersionData, or an error for invalid input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
@@ -436,6 +562,15 @@ impl Parse for MultiRequestVersionData {
 ///
 /// - `syn::Result<MultiRequestPathData>` - Parsed MultiRequestPathData or error.
 impl Parse for MultiRequestPathData {
+    /// Parses the input token stream into a MultiRequestPathData structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `syn::Result<Self>` - The parsed MultiRequestPathData, or an error for invalid input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
@@ -466,6 +601,15 @@ impl Parse for MultiRequestPathData {
 ///
 /// - `syn::Result<MultiPanicData>` - Parsed MultiPanicData or error.
 impl Parse for MultiPanicData {
+    /// Parses the input token stream into a MultiPanicData structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `syn::Result<Self>` - The parsed MultiPanicData, or an error for invalid input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
@@ -496,6 +640,15 @@ impl Parse for MultiPanicData {
 ///
 /// - `syn::Result<MultiRequestErrorData>` - Parsed MultiRequestErrorData or error.
 impl Parse for MultiRequestErrorData {
+    /// Parses the input token stream into a MultiRequestErrorData structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `syn::Result<Self>` - The parsed MultiRequestErrorData, or an error for invalid input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {

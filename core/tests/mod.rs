@@ -7,6 +7,7 @@ mod server;
 use hyperlane_core::*;
 
 use std::{
+    io,
     net::TcpListener,
     sync::{Arc, OnceLock},
     time::{Duration, Instant},

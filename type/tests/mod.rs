@@ -29,8 +29,10 @@ use http_type::*;
 
 use std::{
     collections::VecDeque,
-    io::ErrorKind,
+    io::{self, ErrorKind},
+    mem,
     num::ParseIntError,
+    ptr,
     rc::Rc,
     sync::{
         Arc,

@@ -11,18 +11,16 @@ use super::*;
 /// - `Result<(), NewError>` - Ok if valid, error otherwise
 fn validate_project_name(name: &str) -> Result<(), NewError> {
     if name.is_empty() {
-        return Err(NewError::InvalidName(
-            "Project name cannot be empty".to_string(),
-        ));
+        return Err(NewError::InvalidName(ERROR_PROJECT_NAME_EMPTY.to_string()));
     }
     if name.contains('/') || name.contains('\\') || name.contains(':') {
         return Err(NewError::InvalidName(
-            "Project name contains invalid characters".to_string(),
+            ERROR_PROJECT_NAME_INVALID_CHARACTERS.to_string(),
         ));
     }
     if name.starts_with('.') || name.starts_with('-') {
         return Err(NewError::InvalidName(
-            "Project name cannot start with '.' or '-'".to_string(),
+            ERROR_PROJECT_NAME_INVALID_PREFIX.to_string(),
         ));
     }
     Ok(())
@@ -34,13 +32,13 @@ fn validate_project_name(name: &str) -> Result<(), NewError> {
 ///
 /// - `Result<(), NewError>` - Ok if git is available, error otherwise
 async fn check_git_available() -> Result<(), NewError> {
-    let output: std::process::Output = Command::new("git")
-        .arg("--version")
+    let output: Output = Command::new("git")
+        .arg(GIT_FLAG_VERSION)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .output()
         .await
-        .map_err(|_: std::io::Error| NewError::GitNotFound)?;
+        .map_err(|_: io::Error| NewError::GitNotFound)?;
     if output.status.success() {
         Ok(())
     } else {
@@ -62,8 +60,8 @@ async fn git_clone(config: &NewProjectConfig) -> Result<(), NewError> {
     if project_path.exists() {
         return Err(NewError::ProjectExists(config.project_name.clone()));
     }
-    let output: std::process::Output = Command::new("git")
-        .arg("clone")
+    let output: Output = Command::new("git")
+        .arg(GIT_SUBCOMMAND_CLONE)
         .arg(&config.template_url)
         .arg(&config.project_name)
         .stdout(Stdio::piped())

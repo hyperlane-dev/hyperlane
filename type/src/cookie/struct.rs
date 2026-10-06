@@ -16,6 +16,7 @@ pub struct CookieBuilder {
     #[set(skip)]
     pub(super) expires: Option<String>,
     /// Optional maximum age in seconds.
+    #[get(type(copy))]
     #[set(skip)]
     pub(super) max_age: Option<i64>,
     /// Optional domain scope for the cookie.
@@ -25,9 +26,11 @@ pub struct CookieBuilder {
     #[set(skip)]
     pub(super) path: Option<String>,
     /// Optional flag indicating secure (HTTPS-only) transmission.
+    #[get(type(copy))]
     #[set(skip)]
     pub(super) secure: Option<bool>,
     /// Optional flag preventing JavaScript access.
+    #[get(type(copy))]
     #[set(skip)]
     pub(super) http_only: Option<bool>,
     /// Optional SameSite policy setting.

@@ -14,13 +14,15 @@ pub use {command::*, config::*, help::*, logger::*, new::*, template::*, version
 
 pub(crate) use std::{
     env::args,
+    fmt::Arguments,
     io,
     path::{Path, PathBuf},
-    process::Stdio,
+    process::{Output, Stdio},
     str::FromStr,
 };
 
 pub(crate) use {
+    log::SetLoggerError,
     lombok_macros::*,
     notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher, recommended_watcher},
     std::ffi::OsStr,

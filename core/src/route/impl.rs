@@ -52,7 +52,7 @@ impl Hash for RoutePattern {
     ///
     /// # Arguments
     ///
-    /// - `&mut Hasher` - The hasher to use.
+    /// - `&mut H` - The hasher to use.
     #[inline(always)]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.get_0().hash(state);
@@ -255,7 +255,7 @@ impl Hash for RouteSegment {
     ///
     /// # Arguments
     ///
-    /// - `&mut Hasher` - The hasher to use.
+    /// - `&mut H` - The hasher to use.
     #[inline(always)]
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
@@ -460,12 +460,12 @@ impl RoutePattern {
                         path_segments[idx..].join(DEFAULT_HTTP_PATH)
                     } else {
                         {
-                            let val = path_segments.get(idx)?;
+                            let val: &&str = path_segments.get(idx)?;
                             val.to_string()
                         }
                     };
                     {
-                        let mat = regex.find(&segment_value)?;
+                        let mat: regex::Match<'_> = regex.find(&segment_value)?;
                         if mat.start() != 0 || mat.end() != segment_value.len() {
                             return None;
                         }
@@ -612,8 +612,14 @@ impl RouteMatcher {
     ///
     /// # Arguments
     ///
+    /// - `&'a self` - The route table to search.
     /// - `&mut Context` - The request context (for storing route params).
     /// - `&str` - The request path to resolve.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<&'a ServerHookHandler>`: The matched handler, or `None` when no
+    ///   route matched.
     pub fn try_resolve_route<'a>(
         &'a self,
         ctx: &mut Context,

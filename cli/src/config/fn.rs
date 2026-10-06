@@ -16,13 +16,13 @@ pub fn parse_args() -> Args {
     while i < raw_args.len() {
         let arg: &str = raw_args[i].as_str();
         match arg {
-            "-h" | "--help" => {
+            "-h" | FLAG_LONG_HELP => {
                 command = CommandType::Help;
             }
-            "-v" | "--version" => {
+            "-v" | FLAG_LONG_VERSION => {
                 command = CommandType::Version;
             }
-            "watch" if (command == CommandType::Help || command == CommandType::Version) => {
+            COMMAND_WATCH if (command == CommandType::Help || command == CommandType::Version) => {
                 command = CommandType::Watch;
             }
             "new" if (command == CommandType::Help || command == CommandType::Version) => {
@@ -37,7 +37,9 @@ pub fn parse_args() -> Args {
                     i -= 1;
                 }
             }
-            "template" if (command == CommandType::Help || command == CommandType::Version) => {
+            COMMAND_TEMPLATE
+                if (command == CommandType::Help || command == CommandType::Version) =>
+            {
                 command = CommandType::Template;
                 i += 1;
                 if i < raw_args.len()

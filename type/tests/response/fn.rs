@@ -157,7 +157,7 @@ fn response_error_display() {
 
 #[test]
 fn response_error_from_io() {
-    let io_error: std::io::Error = std::io::Error::other("test error");
+    let io_error: io::Error = io::Error::other("test error");
     let response_error: ResponseError = ResponseError::from(io_error);
     assert!(matches!(response_error, ResponseError::Send(_)));
 }

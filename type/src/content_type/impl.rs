@@ -6,7 +6,7 @@ impl ContentType {
     ///
     /// # Arguments
     ///
-    /// - `&(Serialize + Display)` - Data to serialize
+    /// - `&T` - Data to serialize, which requires the `Serialize` and `Display` bounds
     ///
     /// # Returns
     ///
@@ -22,7 +22,7 @@ impl ContentType {
     ///
     /// # Arguments
     ///
-    /// - `&(Serialize + Display)` - Data to serialize
+    /// - `&T` - Data to serialize, which requires the `Serialize` and `Display` bounds
     ///
     /// # Returns
     ///
@@ -38,7 +38,8 @@ impl ContentType {
     ///
     /// # Arguments
     ///
-    /// - `&(Serialize + Debug + Clone + Default + Display)` - Data to format
+    /// - `&T` - Data to format, which requires the `Serialize`, `Debug`, `Clone`, `Default` and
+    ///   `Display` bounds
     ///
     /// # Returns
     ///
@@ -54,7 +55,8 @@ impl ContentType {
     ///
     /// # Arguments
     ///
-    /// - `&(Serialize + Debug + Clone + Default)` - Data to format
+    /// - `&T` - Data to format, which requires the `Serialize`, `Debug`, `Clone` and `Default`
+    ///   bounds
     ///
     /// # Returns
     ///
@@ -64,9 +66,9 @@ impl ContentType {
         T: Serialize + Debug + Clone + Default,
     {
         let mut html: String = String::with_capacity(64);
-        html.push_str("<table><tr><td>");
+        html.push_str(HTML_TABLE_OPEN);
         html.push_str(&format!("{data:?}"));
-        html.push_str("</td></tr></table>");
+        html.push_str(HTML_TABLE_CLOSE);
         html
     }
 
@@ -74,7 +76,7 @@ impl ContentType {
     ///
     /// # Arguments
     ///
-    /// - `&(Serialize + Display)` - Data to serialize
+    /// - `&T` - Data to serialize, which requires the `Serialize` and `Display` bounds
     ///
     /// # Returns
     ///
@@ -90,7 +92,8 @@ impl ContentType {
     ///
     /// # Arguments
     ///
-    /// - `&(Serialize + Debug + Clone + Default + Display)` - Data to format
+    /// - `&T` - Data to format, which requires the `Serialize`, `Debug`, `Clone`, `Default` and
+    ///   `Display` bounds
     ///
     /// # Returns
     ///
@@ -106,7 +109,8 @@ impl ContentType {
     ///
     /// # Arguments
     ///
-    /// - `&(Serialize + Debug + Clone + Default + Display)` - Data to format
+    /// - `&T` - Data to format, which requires the `Serialize`, `Debug`, `Clone`, `Default` and
+    ///   `Display` bounds
     ///
     /// # Returns
     ///
@@ -129,8 +133,8 @@ impl ContentType {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - Content type
-    /// - `AsRef<str>` - Charset
+    /// - `T` - Content type, which requires the `AsRef<str>` bound
+    /// - `S` - Charset, which requires the `AsRef<str>` bound
     ///
     /// # Returns
     ///
@@ -159,8 +163,8 @@ impl ContentType {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - Content type
-    /// - `AsRef<str>` - Charset declaration
+    /// - `T` - Content type, which requires the `AsRef<str>` bound
+    /// - `S` - Charset declaration, which requires the `AsRef<str>` bound
     ///
     /// # Returns
     ///

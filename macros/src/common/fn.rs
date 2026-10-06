@@ -5,15 +5,15 @@ use super::*;
 /// # Arguments
 ///
 /// - `TokenStream` - The input token stream to process.
-/// - `FnOnce(&Ident, &Ident) -> TokenStream2` - Function to generate code inserted before, receiving context and stream idents.
+/// - `F` - Function to generate code inserted before, receiving context and stream idents.
 ///
 /// # Returns
 ///
 /// - `TokenStream` - The expanded token stream with inserted code.
-fn inject_at_start(
-    input: TokenStream,
-    before_fn: impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream,
-) -> TokenStream {
+fn inject_at_start<F>(input: TokenStream, before_fn: F) -> TokenStream
+where
+    F: FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream,
+{
     let input_fn: ItemFn = parse_macro_input!(input as ItemFn);
     let vis: &Visibility = &input_fn.vis;
     let sig: &Signature = &input_fn.sig;
@@ -44,11 +44,15 @@ fn inject_at_start(
 /// # Arguments
 ///
 /// - `TokenStream` - The input `TokenStream` to process.
-/// - `FnOnce(&Ident, &Ident) -> TokenStream2` - A closure that takes context and stream identifiers and returns a `TokenStream` to be inserted at the end of the method.
-fn inject_at_end(
-    input: TokenStream,
-    after_fn: impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream,
-) -> TokenStream {
+/// - `F` - A closure that takes context and stream identifiers and returns a `TokenStream` to be inserted at the end of the method.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream with inserted code.
+fn inject_at_end<F>(input: TokenStream, after_fn: F) -> TokenStream
+where
+    F: FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream,
+{
     let input_fn: ItemFn = parse_macro_input!(input as ItemFn);
     let vis: &Visibility = &input_fn.vis;
     let sig: &Signature = &input_fn.sig;
@@ -105,16 +109,15 @@ fn inject_at_end(
 ///
 /// - `Position` - The position at which to inject the code (`Prologue` or `Epilogue`).
 /// - `TokenStream` - The input `TokenStream` of the method to modify.
-/// - `FnOnce(&Ident, &Ident) -> TokenStream2` - A closure that generates the code to be injected, based on the method's context and stream identifiers.
+/// - `F` - A closure that generates the code to be injected, based on the method's context and stream identifiers.
 ///
 /// # Returns
 ///
 /// - `TokenStream` - Returns the modified `TokenStream` with the injected code.
-pub(crate) fn inject(
-    position: Position,
-    input: TokenStream,
-    hook: impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream,
-) -> TokenStream {
+pub(crate) fn inject<F>(position: Position, input: TokenStream, hook: F) -> TokenStream
+where
+    F: FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream,
+{
     match position {
         Position::Prologue => inject_at_start(input, hook),
         Position::Epilogue => inject_at_end(input, hook),
@@ -141,12 +144,14 @@ fn is_context_type(ty: &Type) -> bool {
             let segments: Vec<&syn::PathSegment> = path.segments.iter().collect();
             if segments.len() >= 2 {
                 let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
-                if last_two[0].ident == "hyperlane" && last_two[1].ident == "Context" {
+                if last_two[0].ident == HYPERLANE_CRATE_NAME
+                    && last_two[1].ident == CONTEXT_TYPE_NAME
+                {
                     return true;
                 }
             }
         }
-        if path.segments.len() == 1 && path.segments[0].ident == "Context" {
+        if path.segments.len() == 1 && path.segments[0].ident == CONTEXT_TYPE_NAME {
             return true;
         }
     }
@@ -173,12 +178,14 @@ fn is_stream_type(ty: &Type) -> bool {
             let segments: Vec<&syn::PathSegment> = path.segments.iter().collect();
             if segments.len() >= 2 {
                 let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
-                if last_two[0].ident == "hyperlane" && last_two[1].ident == "Stream" {
+                if last_two[0].ident == HYPERLANE_CRATE_NAME
+                    && last_two[1].ident == STREAM_TYPE_NAME
+                {
                     return true;
                 }
             }
         }
-        if path.segments.len() == 1 && path.segments[0].ident == "Stream" {
+        if path.segments.len() == 1 && path.segments[0].ident == STREAM_TYPE_NAME {
             return true;
         }
     }
@@ -212,7 +219,7 @@ pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<Ident
                 _ => {
                     return Err(syn::Error::new_spanned(
                         &pat_type.pat,
-                        "expected identifier for context parameter",
+                        EXPECTED_IDENTIFIER_FOR_CONTEXT_PARAMETER,
                     ));
                 }
             };
@@ -221,7 +228,7 @@ pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<Ident
     }
     Err(syn::Error::new_spanned(
         &sig.inputs,
-        "expected at least one parameter of type &::hyperlane::Context",
+        EXPECTED_CONTEXT_PARAMETER,
     ))
 }
 
@@ -252,7 +259,7 @@ pub(crate) fn parse_stream_from_signature(sig: &Signature) -> syn::Result<Ident>
                 _ => {
                     return Err(syn::Error::new_spanned(
                         &pat_type.pat,
-                        "expected identifier for stream parameter",
+                        EXPECTED_IDENTIFIER_FOR_STREAM_PARAMETER,
                     ));
                 }
             };
@@ -261,7 +268,7 @@ pub(crate) fn parse_stream_from_signature(sig: &Signature) -> syn::Result<Ident>
     }
     Err(syn::Error::new_spanned(
         &sig.inputs,
-        "expected at least one parameter of type &::hyperlane::Stream",
+        EXPECTED_STREAM_PARAMETER,
     ))
 }
 
@@ -279,7 +286,7 @@ pub(crate) fn parse_stream_from_signature(sig: &Signature) -> syn::Result<Ident>
 ///
 /// # Returns
 ///
-/// - `TokenStream` - A `TokenStream2` representing `Some(isize)` for supported literals, or `None` otherwise.
+/// - `proc_macro2::TokenStream` - A token stream representing `Some(isize)` for supported literals, or `None` otherwise.
 pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> proc_macro2::TokenStream {
     match opt_expr {
         Some(expr) => match expr {
@@ -294,7 +301,7 @@ pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> proc_macro2::TokenStream
                 lit: Lit::Str(lit_str),
                 ..
             }) => {
-                let value: isize = lit_str.value().parse().expect("Cannot parse to isize");
+                let value: isize = lit_str.value().parse().expect(CANNOT_PARSE_TO_ISIZE);
                 quote! { Some(#value) }
             }
             _ => quote! { None },
@@ -312,7 +319,7 @@ pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> proc_macro2::TokenStream
 ///
 /// # Returns
 ///
-/// - `TokenStream2` - The token stream calling `#context.leak_mut()`.
+/// - `proc_macro2::TokenStream` - The token stream calling `#context.leak_mut()`.
 ///
 /// # Safety
 ///
@@ -334,11 +341,12 @@ pub(crate) fn leak_mut_context(is_unsafe_error: bool, context: &Ident) -> proc_m
 ///
 /// # Arguments
 ///
+/// - `bool` - Whether to use `unsafe` or not.
 /// - `&Ident` - The context variable identifier.
 ///
 /// # Returns
 ///
-/// - `TokenStream2` - The token stream calling `#context.leak()`.
+/// - `proc_macro2::TokenStream` - The token stream calling `#context.leak()`.
 ///
 /// # Safety
 ///

@@ -47,14 +47,18 @@ pub(crate) fn methods_macro(
     let sig: &Signature = &input_fn.sig;
     match parse_context_from_signature(sig) {
         Ok(context) => {
-            let method_checks = methods.methods.iter().map(|method: &syn::Ident| {
-                let method_str: String = method.to_string();
-                let check_fn: proc_macro2::Ident =
-                    Ident::new(&format!("is_{method_str}"), method.span());
-                quote! {
-                    #context.get_request().get_method().#check_fn()
-                }
-            });
+            let method_checks: Vec<proc_macro2::TokenStream> = methods
+                .methods
+                .iter()
+                .map(|method: &syn::Ident| {
+                    let method_str: String = method.to_string();
+                    let check_fn: proc_macro2::Ident =
+                        Ident::new(&format!("is_{method_str}"), method.span());
+                    quote! {
+                        #context.get_request().get_method().#check_fn()
+                    }
+                })
+                .collect();
             inject(
                 position,
                 TokenStream::from(quote! { #input_fn }),

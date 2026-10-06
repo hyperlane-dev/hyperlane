@@ -2,23 +2,23 @@ use super::*;
 
 /// Implements the `std::error::Error` trait for `ResponseError`.
 /// This allows `ResponseError` to be treated as a standard Rust error type.
-impl std::error::Error for ResponseError {}
+impl Error for ResponseError {}
 
 /// Converts an I/O error to a `ResponseError`.
 ///
 /// Maps I/O errors to `Send` variant with the error message.
-impl From<std::io::Error> for ResponseError {
+impl From<io::Error> for ResponseError {
     /// Converts an I/O error to a `ResponseError`.
     ///
     /// # Arguments
     ///
-    /// - `std::io::Error` - The I/O error to convert.
+    /// - `io::Error` - The I/O error to convert.
     ///
     /// # Returns
     ///
     /// - `ResponseError` - The corresponding response error as `Send`.
     #[inline(always)]
-    fn from(error: std::io::Error) -> Self {
+    fn from(error: io::Error) -> Self {
         ResponseError::Send(error.to_string())
     }
 }
@@ -30,7 +30,7 @@ impl Display for ResponseError {
     ///
     /// # Arguments
     ///
-    /// - `f` - A mutable reference to a `Formatter` used for writing the formatted string.
+    /// - `&mut Formatter<'_>` - The formatter used for writing the formatted string.
     ///
     /// # Returns
     ///
@@ -58,6 +58,7 @@ impl Display for ResponseError {
 ///
 /// Returns a new `Response` instance with all fields initialized to their default values.
 impl Default for Response {
+    /// Builds the default `Response` with all fields set to their defaults.
     #[inline(always)]
     fn default() -> Self {
         let http_status: HttpStatus = HttpStatus::default();
@@ -91,7 +92,7 @@ impl Response {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header's key (must implement AsRef<str>).
+    /// - `K` - The header's key, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -108,7 +109,7 @@ impl Response {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header's key (must implement AsRef<str>).
+    /// - `K` - The header's key, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -129,7 +130,7 @@ impl Response {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header's key (must implement AsRef<str>).
+    /// - `K` - The header's key, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -148,7 +149,7 @@ impl Response {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header's key (must implement AsRef<str>).
+    /// - `K` - The header's key, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -169,7 +170,7 @@ impl Response {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header's key (must implement AsRef<str>).
+    /// - `K` - The header's key, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -188,7 +189,7 @@ impl Response {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header's key (must implement AsRef<str>).
+    /// - `K` - The header's key, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -209,7 +210,7 @@ impl Response {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header key to check (must implement AsRef<str>).
+    /// - `K` - The header key to check, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -226,8 +227,8 @@ impl Response {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header key to check (must implement AsRef<str>).
-    /// - `AsRef<str>` - The value to search for (must implement AsRef<str>).
+    /// - `K` - The header key to check, which must implement `AsRef<str>`.
+    /// - `V` - The value to search for, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -259,7 +260,7 @@ impl Response {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header key to count (must implement AsRef<str>).
+    /// - `K` - The header key to count, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -278,7 +279,7 @@ impl Response {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header key to count (must implement AsRef<str>).
+    /// - `K` - The header key to count, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -329,9 +330,7 @@ impl Response {
     /// This method first retrieves the body content as a byte slice using `self.get_body()`.
     /// It then attempts to deserialize the byte slice as_ref the specified type `T` using `json_from_slice`.
     ///
-    /// # Arguments
-    ///
-    /// - `DeserializeOwned` - The target type to deserialize as_ref (must implement DeserializeOwned).
+    /// The target type `T` is a type parameter of this method and must implement `DeserializeOwned`.
     ///
     /// # Returns
     ///
@@ -348,9 +347,7 @@ impl Response {
     /// This method first retrieves the body content as a byte slice using `self.get_body()`.
     /// It then attempts to deserialize the byte slice as_ref the specified type `T` using `json_from_slice`.
     ///
-    /// # Arguments
-    ///
-    /// - `DeserializeOwned` - The target type to deserialize as_ref (must implement DeserializeOwned).
+    /// The target type `T` is a type parameter of this method and must implement `DeserializeOwned`.
     ///
     /// # Returns
     ///
@@ -368,8 +365,13 @@ impl Response {
 
     /// Determines whether the header should be skipped during setting.
     ///
-    /// - Returns `true` if the header is empty or not allowed.
-    /// - Returns `false` if the header can be set.
+    /// # Arguments
+    ///
+    /// - `&ResponseHeadersKey` - The header key to inspect.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if the header is empty or not allowed, `false` if the header can be set.
     #[inline(always)]
     fn should_skip_header(&self, key: &ResponseHeadersKey) -> bool {
         key.trim().is_empty() || key == CONTENT_LENGTH
@@ -381,8 +383,8 @@ impl Response {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header key (must implement AsRef<str>).
-    /// - `AsRef<str>` - The header value (must implement AsRef<String>).
+    /// - `K` - The header key, which must implement `AsRef<str>`.
+    /// - `V` - The header value, which must implement `AsRef<String>`.
     ///
     /// # Returns
     ///
@@ -405,8 +407,8 @@ impl Response {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header key (must implement AsRef<str>).
-    /// - `AsRef<str>` - The header value (must implement AsRef<String>).
+    /// - `K` - The header key, which must implement `AsRef<str>`.
+    /// - `V` - The header value, which must implement `AsRef<String>`.
     ///
     /// # Returns
     ///
@@ -434,8 +436,8 @@ impl Response {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header key (must implement AsRef<str>).
-    /// - `AsRef<str>` - The header value (must implement AsRef<String>).
+    /// - `K` - The header key, which must implement `AsRef<str>`.
+    /// - `V` - The header value, which must implement `AsRef<String>`.
     ///
     /// # Returns
     ///
@@ -463,7 +465,7 @@ impl Response {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header key to remove (must implement AsRef<str>).
+    /// - `K` - The header key to remove, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -485,8 +487,8 @@ impl Response {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header key (must implement AsRef<str>).
-    /// - `AsRef<str>` - The value to remove (must implement AsRef<String>).
+    /// - `K` - The header key, which must implement `AsRef<str>`.
+    /// - `V` - The value to remove, which must implement `AsRef<String>`.
     ///
     /// # Returns
     ///
@@ -576,7 +578,7 @@ impl Response {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The cookie key (implements AsRef<str>).
+    /// - `K` - The cookie key, which implements `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -597,7 +599,7 @@ impl Response {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The cookie key (implements AsRef<str>).
+    /// - `K` - The cookie key, which implements `AsRef<str>`.
     ///
     /// # Returns
     ///

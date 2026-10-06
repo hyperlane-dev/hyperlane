@@ -13,6 +13,15 @@ use super::*;
 ///
 /// - `syn::Result<MultiHostData>` - Parsed MultiHostData or error.
 impl Parse for MultiHostData {
+    /// Parses the input token stream into a MultiHostData structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `syn::Result<Self>` - The parsed MultiHostData, or an error for invalid input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut host_values: Vec<Expr> = Vec::new();
         loop {

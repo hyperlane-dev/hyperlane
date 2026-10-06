@@ -28,6 +28,7 @@ use std::{
     io::{self, Write, stderr, stdout},
     mem,
     pin::Pin,
+    ptr,
     sync::Arc,
 };
 

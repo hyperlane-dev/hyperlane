@@ -3,6 +3,14 @@ use super::*;
 /// Checks if a type is a mutable reference type.
 ///
 /// Returns true if the type is `&mut T`, false otherwise (including `&T` and other types).
+///
+/// # Arguments
+///
+/// - `&Type` - The type to inspect for mutable reference syntax.
+///
+/// # Returns
+///
+/// - `bool` - Whether the type is a mutable reference.
 pub(crate) fn is_mutable_reference_type(ty: &Type) -> bool {
     if let Type::Reference(type_ref) = ty {
         type_ref.mutability.is_some()

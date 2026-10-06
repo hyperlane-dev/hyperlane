@@ -162,14 +162,12 @@ impl WebSocketFrame {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<[u8]>` - The raw data to decode into a WebSocket frame.
+    /// - `D` - The raw data to decode into a WebSocket frame, which requires the `AsRef<[u8]>` bound.
     ///
     /// # Returns
     ///
-    /// - `Option<(WebSocketFrame, usize)>`
-    ///     - `Some((WebSocketFrame, usize))` - If the frame is successfully decoded, returns the decoded frame
-    ///       and the number of bytes consumed from the input slice.
-    ///     - `None` - If the frame is incomplete or malformed.
+    /// - `Option<(WebSocketFrame, usize)>` - `Some((frame, consumed))` when the frame is
+    ///   successfully decoded, otherwise `None` when the frame is incomplete or malformed.
     pub fn decode_ws_frame<D>(data: D) -> Option<(WebSocketFrame, usize)>
     where
         D: AsRef<[u8]>,
@@ -235,7 +233,8 @@ impl WebSocketFrame {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<[u8]>` - A reference to a response body (payload) as a byte slice.
+    /// - `D` - A reference to a response body (payload) as a byte slice, which requires the
+    ///   `AsRef<[u8]>` bound.
     ///
     /// # Returns
     ///
@@ -250,7 +249,7 @@ impl WebSocketFrame {
         let mut frames_list: Vec<ResponseBody> =
             Vec::with_capacity((total_len / MAX_FRAME_SIZE) + 1);
         let mut is_first_frame: bool = true;
-        let is_valid_utf8: bool = std::str::from_utf8(data_ref).is_ok();
+        let is_valid_utf8: bool = from_utf8(data_ref).is_ok();
         let base_opcode: WebSocketOpcode = if is_valid_utf8 {
             WebSocketOpcode::Text
         } else {
@@ -301,11 +300,11 @@ impl WebSocketFrame {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<[u8]>` - The input data to be hashed.
+    /// - `D` - The input data to be hashed, which requires the `AsRef<[u8]>` bound.
     ///
     /// # Returns
     ///
-    /// - `[u8; 20]` - A 20-byte array representing the SHA-1 hash of the input data.
+    /// A 20-byte array representing the SHA-1 hash of the input data.
     pub fn sha1<D>(data: D) -> [u8; 20]
     where
         D: AsRef<[u8]>,
@@ -377,7 +376,8 @@ impl WebSocketFrame {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The client-provided key (typically from the `Sec-WebSocket-Key` header).
+    /// - `K` - The client-provided key (typically from the `Sec-WebSocket-Key` header), which
+    ///   requires the `AsRef<str>` bound.
     ///
     /// # Returns
     ///
@@ -403,11 +403,12 @@ impl WebSocketFrame {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The client-provided key (typically from the `Sec-WebSocket-Key` header).
+    /// - `K` - The client-provided key (typically from the `Sec-WebSocket-Key` header), which
+    ///   requires the `AsRef<str>` bound.
     ///
     /// # Returns
     ///
-    /// - `Option<String>` - An optional string representing the generated WebSocket accept key (typically for the `Sec-WebSocket-Accept` header).
+    /// - `String` - The generated WebSocket accept key (typically for the `Sec-WebSocket-Accept` header).
     ///
     /// # Panics
     ///
@@ -429,7 +430,7 @@ impl WebSocketFrame {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<[u8]>` - The data to encode in base64.
+    /// - `D` - The data to encode in base64, which requires the `AsRef<[u8]>` bound.
     ///
     /// # Returns
     ///
@@ -463,7 +464,7 @@ impl WebSocketFrame {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<[u8]>` - The data to encode in base64.
+    /// - `D` - The data to encode in base64, which requires the `AsRef<[u8]>` bound.
     ///
     /// # Returns
     ///

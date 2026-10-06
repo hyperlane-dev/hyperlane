@@ -26,14 +26,14 @@ impl AsyncRead for ProxyTunnelStream {
     ///
     /// # Returns
     ///
-    /// - `Poll<std::io::Result<()>>` - The poll outcome carrying any read error.
+    /// - `Poll<io::Result<()>>` - The poll outcome carrying any read error.
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
-    ) -> Poll<std::io::Result<()>> {
+    ) -> Poll<io::Result<()>> {
         if !self.get_pre_read_data().is_empty() {
-            let len: usize = std::cmp::min(self.get_pre_read_data().len(), buf.remaining());
+            let len: usize = cmp::min(self.get_pre_read_data().len(), buf.remaining());
             buf.put_slice(&self.get_pre_read_data()[..len]);
             self.get_mut_pre_read_data().drain(..len);
             return Poll::Ready(Ok(()));
@@ -53,12 +53,12 @@ impl AsyncWrite for ProxyTunnelStream {
     ///
     /// # Returns
     ///
-    /// - `Poll<Result<usize, std::io::Error>>` - The poll outcome carrying the written byte count or any error.
+    /// - `Poll<Result<usize, io::Error>>` - The poll outcome carrying the written byte count or any error.
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
-    ) -> Poll<Result<usize, std::io::Error>> {
+    ) -> Poll<Result<usize, io::Error>> {
         Pin::new(self.get_mut_inner()).poll_write(cx, buf)
     }
 
@@ -71,11 +71,8 @@ impl AsyncWrite for ProxyTunnelStream {
     ///
     /// # Returns
     ///
-    /// - `Poll<Result<(), std::io::Error>>` - The poll outcome carrying any flush error.
-    fn poll_flush(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<(), std::io::Error>> {
+    /// - `Poll<Result<(), io::Error>>` - The poll outcome carrying any flush error.
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         Pin::new(self.get_mut_inner()).poll_flush(cx)
     }
 
@@ -88,11 +85,11 @@ impl AsyncWrite for ProxyTunnelStream {
     ///
     /// # Returns
     ///
-    /// - `Poll<Result<(), std::io::Error>>` - The poll outcome carrying any shutdown error.
+    /// - `Poll<Result<(), io::Error>>` - The poll outcome carrying any shutdown error.
     fn poll_shutdown(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-    ) -> Poll<Result<(), std::io::Error>> {
+    ) -> Poll<Result<(), io::Error>> {
         Pin::new(self.get_mut_inner()).poll_shutdown(cx)
     }
 }
@@ -123,10 +120,10 @@ impl Read for SyncProxyTunnelStream {
     ///
     /// # Returns
     ///
-    /// - `std::io::Result<usize>` - The read outcome carrying the number of bytes read or any error.
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+    /// - `io::Result<usize>` - The read outcome carrying the number of bytes read or any error.
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if !self.get_pre_read_data().is_empty() {
-            let len: usize = std::cmp::min(self.get_pre_read_data().len(), buf.len());
+            let len: usize = cmp::min(self.get_pre_read_data().len(), buf.len());
             buf[..len].copy_from_slice(&self.get_pre_read_data()[..len]);
             self.get_mut_pre_read_data().drain(..len);
             return Ok(len);
@@ -144,8 +141,8 @@ impl Write for SyncProxyTunnelStream {
     ///
     /// # Returns
     ///
-    /// - `std::io::Result<usize>` - The write outcome carrying the number of bytes written or any error.
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+    /// - `io::Result<usize>` - The write outcome carrying the number of bytes written or any error.
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.get_mut_inner().write(buf)
     }
 
@@ -153,8 +150,8 @@ impl Write for SyncProxyTunnelStream {
     ///
     /// # Returns
     ///
-    /// - `std::io::Result<()>` - The flush outcome carrying any flush error.
-    fn flush(&mut self) -> std::io::Result<()> {
+    /// - `io::Result<()>` - The flush outcome carrying any flush error.
+    fn flush(&mut self) -> io::Result<()> {
         self.get_mut_inner().flush()
     }
 }

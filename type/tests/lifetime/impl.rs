@@ -7,8 +7,8 @@ impl Lifetime for TestLifetimeStruct {
     }
     unsafe fn leak_mut(&self) -> &'static mut Self {
         let mut boxed: Box<Self> = Box::new(Self { value: self.value });
-        let reference: *mut Self = std::ptr::addr_of_mut!(*boxed);
-        std::mem::forget(boxed);
+        let reference: *mut Self = ptr::addr_of_mut!(*boxed);
+        mem::forget(boxed);
         unsafe { &mut *reference }
     }
 }

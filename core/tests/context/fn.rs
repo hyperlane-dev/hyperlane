@@ -111,6 +111,6 @@ fn run_set_func() {
         assert_eq!(msg, PARAM);
     };
     ctx.set_attribute(KEY, func);
-    let hyperlane = ctx.get_attribute::<&(dyn Fn(&str) + Send + Sync)>(KEY);
+    let hyperlane = ctx.get_attribute::<&(dyn Fn(&str) + Send + Sync), &str>(KEY);
     hyperlane(PARAM);
 }

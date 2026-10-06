@@ -6,7 +6,7 @@ use super::*;
 ///
 /// - `Result<(), io::Error>` - Success or error
 async fn run_cargo_run() -> Result<(), io::Error> {
-    let output: std::process::Output = Command::new("cargo")
+    let output: Output = Command::new(CARGO_RUN_PROGRAM)
         .arg("run")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -49,9 +49,7 @@ async fn run_cargo_run() -> Result<(), io::Error> {
 pub async fn execute_watch() -> Result<(), io::Error> {
     let src_path: PathBuf = PathBuf::from("src");
     if !src_path.exists() {
-        return Err(io::Error::other(
-            "src directory not found in current directory",
-        ));
+        return Err(io::Error::other(ERROR_SRC_DIRECTORY_NOT_FOUND));
     }
     run_cargo_run().await?;
     let (tx, mut rx): (Sender<Event>, Receiver<Event>) = channel(Event::new(EventKind::Any));

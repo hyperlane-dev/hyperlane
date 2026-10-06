@@ -220,6 +220,15 @@ pub fn try_get_http_request(attr: TokenStream, item: TokenStream) -> TokenStream
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_get_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_get_method_handler(item, Position::Prologue)
@@ -259,6 +268,15 @@ pub fn is_get_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_post_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_post_method_handler(item, Position::Prologue)
@@ -298,6 +316,15 @@ pub fn is_post_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_put_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_put_method_handler(item, Position::Prologue)
@@ -337,6 +364,15 @@ pub fn is_put_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_delete_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_delete_method_handler(item, Position::Prologue)
@@ -376,6 +412,15 @@ pub fn is_delete_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_patch_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_patch_method_handler(item, Position::Prologue)
@@ -415,6 +460,15 @@ pub fn is_patch_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_head_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_head_method_handler(item, Position::Prologue)
@@ -454,6 +508,15 @@ pub fn is_head_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_options_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_options_method_handler(item, Position::Prologue)
@@ -493,6 +556,15 @@ pub fn is_options_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_connect_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_connect_method_handler(item, Position::Prologue)
@@ -532,6 +604,15 @@ pub fn is_connect_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_trace_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_trace_method_handler(item, Position::Prologue)
@@ -576,6 +657,15 @@ pub fn is_trace_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_unknown_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_unknown_method_handler(item, Position::Prologue)
@@ -619,6 +709,15 @@ pub fn is_unknown_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro accepts a comma-separated list of HTTP method names (lowercase) and should be
 /// applied to async functions that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn methods(attr: TokenStream, item: TokenStream) -> TokenStream {
     methods_macro(attr, item, Position::Prologue)
@@ -658,6 +757,15 @@ pub fn methods(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_http0_9_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_http0_9_version_macro(item, Position::Prologue)
@@ -697,6 +805,15 @@ pub fn is_http0_9_version(_attr: TokenStream, item: TokenStream) -> TokenStream 
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_http1_0_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_http1_0_version_macro(item, Position::Prologue)
@@ -736,6 +853,15 @@ pub fn is_http1_0_version(_attr: TokenStream, item: TokenStream) -> TokenStream 
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_http1_1_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_http1_1_version_macro(item, Position::Prologue)
@@ -775,6 +901,15 @@ pub fn is_http1_1_version(_attr: TokenStream, item: TokenStream) -> TokenStream 
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_http2_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_http2_version_macro(item, Position::Prologue)
@@ -814,6 +949,15 @@ pub fn is_http2_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_http3_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_http3_version_macro(item, Position::Prologue)
@@ -853,6 +997,15 @@ pub fn is_http3_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_http1_1_or_higher_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_http1_1_or_higher_version_macro(item, Position::Prologue)
@@ -892,6 +1045,15 @@ pub fn is_http1_1_or_higher_version(_attr: TokenStream, item: TokenStream) -> To
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_http_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_http_version_macro(item, Position::Prologue)
@@ -931,6 +1093,15 @@ pub fn is_http_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_unknown_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_unknown_version_macro(item, Position::Prologue)
@@ -974,6 +1145,15 @@ pub fn is_unknown_version(_attr: TokenStream, item: TokenStream) -> TokenStream 
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_ws_upgrade_type(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_ws_upgrade_type_macro(item, Position::Prologue)
@@ -1013,6 +1193,15 @@ pub fn is_ws_upgrade_type(_attr: TokenStream, item: TokenStream) -> TokenStream 
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_h2c_upgrade_type(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_h2c_upgrade_type_macro(item, Position::Prologue)
@@ -1052,6 +1241,15 @@ pub fn is_h2c_upgrade_type(_attr: TokenStream, item: TokenStream) -> TokenStream
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_tls_upgrade_type(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_tls_upgrade_type_macro(item, Position::Prologue)
@@ -1091,6 +1289,15 @@ pub fn is_tls_upgrade_type(_attr: TokenStream, item: TokenStream) -> TokenStream
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn is_unknown_upgrade_type(_attr: TokenStream, item: TokenStream) -> TokenStream {
     is_unknown_upgrade_type_macro(item, Position::Prologue)
@@ -1132,6 +1339,15 @@ pub fn is_unknown_upgrade_type(_attr: TokenStream, item: TokenStream) -> TokenSt
 ///
 /// The macro accepts a numeric HTTP status code or a global constant
 /// and should be applied to async functions that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn response_status_code(attr: TokenStream, item: TokenStream) -> TokenStream {
     response_status_code_macro(attr, item, Position::Prologue)
@@ -1173,6 +1389,15 @@ pub fn response_status_code(attr: TokenStream, item: TokenStream) -> TokenStream
 ///
 /// The macro accepts a string literal or global constant for the reason phrase and should be
 /// applied to async functions that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn response_reason_phrase(attr: TokenStream, item: TokenStream) -> TokenStream {
     response_reason_phrase_macro(attr, item, Position::Prologue)
@@ -1231,6 +1456,15 @@ pub fn response_reason_phrase(attr: TokenStream, item: TokenStream) -> TokenStre
 /// The macro accepts header name and header value, both can be string literals or global constants.
 /// Use `"key", "value"` for setting headers and `"key" => "value"` for replacing headers.
 /// Should be applied to async functions that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn response_header(attr: TokenStream, item: TokenStream) -> TokenStream {
     response_header_macro(attr, item, Position::Prologue)
@@ -1272,6 +1506,15 @@ pub fn response_header(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro accepts a string literal or global constant for the response body and should be
 /// applied to async functions that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn response_body(attr: TokenStream, item: TokenStream) -> TokenStream {
     response_body_macro(attr, item, Position::Prologue)
@@ -1313,6 +1556,15 @@ pub fn response_body(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// The macro should be applied to async functions that accept a `&mut Context` parameter.   
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn clear_response_headers(_attr: TokenStream, item: TokenStream) -> TokenStream {
     clear_response_headers_macro(item, Position::Prologue)
@@ -1356,6 +1608,15 @@ pub fn clear_response_headers(_attr: TokenStream, item: TokenStream) -> TokenStr
 ///
 /// The macro accepts a variable or code block for the response version and should be
 /// applied to async functions that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn response_version(attr: TokenStream, item: TokenStream) -> TokenStream {
     response_version_macro(attr, item, Position::Prologue)
@@ -1395,6 +1656,15 @@ pub fn response_version(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn closed(_attr: TokenStream, item: TokenStream) -> TokenStream {
     closed_macro(item, Position::Prologue)
@@ -1433,6 +1703,15 @@ pub fn closed(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// #[filter(true)]
 /// async fn standalone_filter_handler(_: &mut Stream, ctx: &mut Context) -> Status { Status::Continue }
 /// ```
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn filter(attr: TokenStream, item: TokenStream) -> TokenStream {
     filter_macro(attr, item, Position::Prologue)
@@ -1470,6 +1749,15 @@ pub fn filter(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// #[reject(false)]
 /// async fn standalone_reject_handler(_: &mut Stream, ctx: &mut Context) -> Status { Status::Continue }
 /// ```
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn reject(attr: TokenStream, item: TokenStream) -> TokenStream {
     reject_macro(attr, item, Position::Prologue)
@@ -1510,6 +1798,15 @@ pub fn reject(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro accepts a string literal specifying the expected host value and should be
 /// applied to async functions that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn host(attr: TokenStream, item: TokenStream) -> TokenStream {
     host_macro(attr, item, Position::Prologue)
@@ -1552,6 +1849,15 @@ pub fn host(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn reject_host(attr: TokenStream, item: TokenStream) -> TokenStream {
     reject_host_macro(attr, item, Position::Prologue)
@@ -1594,6 +1900,15 @@ pub fn reject_host(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro accepts a string literal specifying the expected referer value and should be
 /// applied to async functions that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn referer(attr: TokenStream, item: TokenStream) -> TokenStream {
     referer_macro(attr, item, Position::Prologue)
@@ -1636,6 +1951,15 @@ pub fn referer(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro accepts a string literal specifying the referer value to filter out and should be
 /// applied to async functions that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn reject_referer(attr: TokenStream, item: TokenStream) -> TokenStream {
     reject_referer_macro(attr, item, Position::Prologue)
@@ -1713,6 +2037,15 @@ pub fn reject_referer(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     async fn method_hook(_: &mut Stream, ctx: &mut Context) -> Status { Status::Continue }
 /// }
 /// ```
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn prologue_hooks(attr: TokenStream, item: TokenStream) -> TokenStream {
     prologue_hooks_macro(attr, item, Position::Prologue)
@@ -1790,6 +2123,15 @@ pub fn prologue_hooks(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     async fn method_hook(_: &mut Stream, ctx: &mut Context) -> Status { Status::Continue }
 /// }
 /// ```
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn epilogue_hooks(attr: TokenStream, item: TokenStream) -> TokenStream {
     epilogue_hooks_macro(attr, item, Position::Epilogue)
@@ -1850,6 +2192,15 @@ pub fn epilogue_hooks(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro accepts one or more variable names separated by commas.
 /// Each variable will be available in the function scope as a `RequestBody` type.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn request_body(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_body_macro(attr, item, Position::Prologue)
@@ -1929,6 +2280,15 @@ pub fn request_body(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro accepts one or more `variable_name: Type` pairs separated by commas.
 /// Each variable will be available in the function scope as a `Result<Type, serde_json::Error>`.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn request_body_json_result(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_body_json_result_macro(attr, item, Position::Prologue)
@@ -2012,6 +2372,15 @@ pub fn request_body_json_result(attr: TokenStream, item: TokenStream) -> TokenSt
 /// # Panics
 ///
 /// This macro will panic if the request body does not exist or JSON parsing fails.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn request_body_json(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_body_json_macro(attr, item, Position::Prologue)
@@ -2084,6 +2453,15 @@ pub fn request_body_json(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// The macro accepts multiple `key => variable_name: Type` tuples separated by commas.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn try_get_attribute(attr: TokenStream, item: TokenStream) -> TokenStream {
     try_get_attribute_macro(attr, item, Position::Prologue)
@@ -2160,6 +2538,15 @@ pub fn try_get_attribute(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Panics
 ///
 /// This macro will panic if the requested attribute does not exist in the request context.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn attribute(attr: TokenStream, item: TokenStream) -> TokenStream {
     attribute_macro(attr, item, Position::Prologue)
@@ -2222,6 +2609,15 @@ pub fn attribute(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// The macro accepts multiple variable names separated by commas.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn attributes(attr: TokenStream, item: TokenStream) -> TokenStream {
     attributes_macro(attr, item, Position::Prologue)
@@ -2285,6 +2681,15 @@ pub fn attributes(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// The macro accepts multiple variable names separated by commas.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn try_get_task_panic_data(attr: TokenStream, item: TokenStream) -> TokenStream {
     try_get_task_panic_data_macro(attr, item, Position::Prologue)
@@ -2352,6 +2757,15 @@ pub fn try_get_task_panic_data(attr: TokenStream, item: TokenStream) -> TokenStr
 /// # Panics
 ///
 /// This macro will panic if no panic data exists in the request context.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn task_panic_data(attr: TokenStream, item: TokenStream) -> TokenStream {
     task_panic_data_macro(attr, item, Position::Prologue)
@@ -2415,6 +2829,15 @@ pub fn task_panic_data(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// The macro accepts multiple variable names separated by commas.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn try_get_request_error_data(attr: TokenStream, item: TokenStream) -> TokenStream {
     try_get_request_error_data_macro(attr, item, Position::Prologue)
@@ -2482,6 +2905,15 @@ pub fn try_get_request_error_data(attr: TokenStream, item: TokenStream) -> Token
 /// # Panics
 ///
 /// This macro will panic if no request error data exists in the request context.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn request_error_data(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_error_data_macro(attr, item, Position::Prologue)
@@ -2545,6 +2977,15 @@ pub fn request_error_data(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// The macro accepts multiple `"key" => variable_name` pairs separated by commas.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn try_get_route_param(attr: TokenStream, item: TokenStream) -> TokenStream {
     try_get_route_param_macro(attr, item, Position::Prologue)
@@ -2613,6 +3054,15 @@ pub fn try_get_route_param(attr: TokenStream, item: TokenStream) -> TokenStream 
 /// # Panics
 ///
 /// This macro will panic if the requested route parameter does not exist in the URL path.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn route_param(attr: TokenStream, item: TokenStream) -> TokenStream {
     route_param_macro(attr, item, Position::Prologue)
@@ -2675,6 +3125,15 @@ pub fn route_param(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// The macro accepts multiple variable names separated by commas.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn route_params(attr: TokenStream, item: TokenStream) -> TokenStream {
     route_params_macro(attr, item, Position::Prologue)
@@ -2721,6 +3180,15 @@ pub fn route_params(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// The variable will be available as an `Option<RequestQuerysValue>` in the function scope.
 ///
 /// Supports multiple parameters: `#[try_get_request_query("k1" => v1, "k2" => v2)]`
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn try_get_request_query(attr: TokenStream, item: TokenStream) -> TokenStream {
     try_get_request_query_macro(attr, item, Position::Prologue)
@@ -2771,6 +3239,15 @@ pub fn try_get_request_query(attr: TokenStream, item: TokenStream) -> TokenStrea
 /// # Panics
 ///
 /// This macro will panic if the requested query parameter does not exist in the URL query string.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn request_query(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_query_macro(attr, item, Position::Prologue)
@@ -2816,6 +3293,15 @@ pub fn request_query(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// The variable will be available as a collection in the function scope.
 ///
 /// Supports multiple parameters: `#[request_querys(querys1, querys2)]`
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn request_querys(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_querys_macro(attr, item, Position::Prologue)
@@ -2860,6 +3346,15 @@ pub fn request_querys(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro accepts a request header name-to-variable mapping in the format `HEADER_NAME => variable_name`
 /// or `"Header-Name" => variable_name`. The variable will be available as an `Option<RequestHeadersValueItem>`.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn try_get_request_header(attr: TokenStream, item: TokenStream) -> TokenStream {
     try_get_request_header_macro(attr, item, Position::Prologue)
@@ -2908,6 +3403,15 @@ pub fn try_get_request_header(attr: TokenStream, item: TokenStream) -> TokenStre
 /// # Panics
 ///
 /// This macro will panic if the requested header does not exist in the HTTP request headers.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn request_header(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_header_macro(attr, item, Position::Prologue)
@@ -2951,6 +3455,15 @@ pub fn request_header(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro accepts a variable name that will contain all HTTP request headers.
 /// The variable will be available as a RequestHeaders type in the function scope.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn request_headers(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_headers_macro(attr, item, Position::Prologue)
@@ -2994,6 +3507,15 @@ pub fn request_headers(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// For specific cookie extraction, the variable will be available as `Option<String>`.
 /// For all cookies extraction, the variable will be available as `String`.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn try_get_request_cookie(attr: TokenStream, item: TokenStream) -> TokenStream {
     try_get_request_cookie_macro(attr, item, Position::Prologue)
@@ -3041,6 +3563,15 @@ pub fn try_get_request_cookie(attr: TokenStream, item: TokenStream) -> TokenStre
 /// # Panics
 ///
 /// This macro will panic if the requested cookie does not exist in the HTTP request headers.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn request_cookie(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_cookie_macro(attr, item, Position::Prologue)
@@ -3101,6 +3632,15 @@ pub fn request_cookie(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status { Status::Continue }
 /// }
 /// ```
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn request_cookies(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_cookies_macro(attr, item, Position::Prologue)
@@ -3141,6 +3681,15 @@ pub fn request_cookies(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro accepts a variable name that will contain the HTTP request version.
 /// The variable will be available as a RequestVersion type in the function scope.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn request_version(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_version_macro(attr, item, Position::Prologue)
@@ -3181,6 +3730,15 @@ pub fn request_version(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro accepts a variable name that will contain the HTTP request path.
 /// The variable will be available as a RequestPath type in the function scope.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn request_path(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_path_macro(attr, item, Position::Prologue)
@@ -3238,6 +3796,15 @@ pub fn request_path(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro accepts a `variable_name: Type` pair.
 /// The variable will be available as an instance of the specified type in the function scope.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn hyperlane(attr: TokenStream, item: TokenStream) -> TokenStream {
     hyperlane_macro(attr, item)
@@ -3274,6 +3841,15 @@ pub fn hyperlane(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Dependencies
 ///
 /// This macro depends on the `#[hyperlane(server: Server)]` macro to define the server instance.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
     route_macro(attr, item)
@@ -3314,6 +3890,15 @@ pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Dependencies
 ///
 /// This macro depends on the `#[hyperlane(server: Server)]` macro to define the server instance.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn request_middleware(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_middleware_macro(attr, item)
@@ -3349,6 +3934,15 @@ pub fn request_middleware(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Dependencies
 ///
 /// This macro depends on the `#[hyperlane(server: Server)]` macro to define the server instance.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn response_middleware(attr: TokenStream, item: TokenStream) -> TokenStream {
     response_middleware_macro(attr, item)
@@ -3387,6 +3981,15 @@ pub fn response_middleware(attr: TokenStream, item: TokenStream) -> TokenStream 
 /// # Dependencies
 ///
 /// This macro depends on the `#[hyperlane(server: Server)]` macro to define the server instance.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn task_panic(attr: TokenStream, item: TokenStream) -> TokenStream {
     task_panic_macro(attr, item)
@@ -3425,6 +4028,15 @@ pub fn task_panic(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Dependencies
 ///
 /// This macro depends on the `#[hyperlane(server: Server)]` macro to define the server instance.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn request_error(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_error_macro(attr, item)
@@ -3453,6 +4065,15 @@ pub fn request_error(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status { Status::Continue }
 /// }
 /// ```
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn prologue_macros(attr: TokenStream, item: TokenStream) -> TokenStream {
     prologue_macros_macro(attr, item)
@@ -3481,6 +4102,15 @@ pub fn prologue_macros(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status { Status::Continue }
 /// }
 /// ```
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn epilogue_macros(attr: TokenStream, item: TokenStream) -> TokenStream {
     epilogue_macros_macro(attr, item)
@@ -3542,6 +4172,15 @@ pub fn epilogue_macros(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro accepts an optional data expression. If omitted, it defaults to sending
 /// the response built from the context.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn try_send(attr: TokenStream, item: TokenStream) -> TokenStream {
     try_send_macro(attr, item, Position::Epilogue)
@@ -3607,6 +4246,15 @@ pub fn try_send(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Panics
 ///
 /// This macro will panic if the send operation fails.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn send(attr: TokenStream, item: TokenStream) -> TokenStream {
     send_macro(attr, item, Position::Epilogue)
@@ -3646,6 +4294,15 @@ pub fn send(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The macro takes no parameters and should be applied directly to async functions
 /// that accept a `&mut Context` parameter.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn try_flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
     try_flush_macro(item, Position::Prologue)
@@ -3689,6 +4346,15 @@ pub fn try_flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Panics
 ///
 /// This macro will panic if the flush operation fails.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
 #[proc_macro_attribute]
 pub fn flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
     flush_macro(item, Position::Prologue)

@@ -153,7 +153,7 @@ impl HttpResponse {
     ///
     /// - `Option<&str>` - The header value, or `None` when the header is absent.
     pub fn get_header<K: AsRef<str>>(&self, key: K) -> Option<&str> {
-        let normalized = key.as_ref().to_ascii_lowercase();
+        let normalized: String = key.as_ref().to_ascii_lowercase();
         self.headers.get(&normalized).map(String::as_str)
     }
 

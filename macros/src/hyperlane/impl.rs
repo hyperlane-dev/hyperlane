@@ -14,6 +14,15 @@ use super::*;
 ///
 /// A `syn::Result` containing the parsed `MultiHyperlaneAttr` or an error.
 impl Parse for MultiHyperlaneAttr {
+    /// Parses the input token stream into a MultiHyperlaneAttr structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Self>` - The parsed MultiHyperlaneAttr, or an error for invalid input.
     fn parse(input: ParseStream) -> Result<Self> {
         let mut params: Vec<(Ident, Ident)> = Vec::new();
         loop {

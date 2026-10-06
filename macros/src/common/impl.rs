@@ -10,7 +10,7 @@ impl Parse for OrderAttr {
     ///
     /// # Arguments
     ///
-    /// - `input` - The token stream to parse.
+    /// - `ParseStream` - The token stream to parse.
     ///
     /// # Returns
     ///

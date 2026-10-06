@@ -110,9 +110,8 @@ impl Hook {
 
     /// Creates a new `ServerHookHandler` from a trait object.
     ///
-    /// # Arguments
-    ///
-    /// - `ServerHook` - The trait object implementing `ServerHook`.
+    /// The hook implementation is chosen by the caller through the type
+    /// parameter `R`, so this function takes no runtime argument.
     ///
     /// # Returns
     ///
@@ -154,23 +153,23 @@ impl PartialEq for HookType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (HookType::TaskPanic(order1, factory1), HookType::TaskPanic(order2, factory2)) => {
-                order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2)
+                order1 == order2 && ptr::fn_addr_eq(*factory1, *factory2)
             }
             (
                 HookType::RequestError(order1, factory1),
                 HookType::RequestError(order2, factory2),
-            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
+            ) => order1 == order2 && ptr::fn_addr_eq(*factory1, *factory2),
             (
                 HookType::RequestMiddleware(order1, factory1),
                 HookType::RequestMiddleware(order2, factory2),
-            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
+            ) => order1 == order2 && ptr::fn_addr_eq(*factory1, *factory2),
             (HookType::Route(path1, factory1), HookType::Route(path2, factory2)) => {
-                path1 == path2 && std::ptr::fn_addr_eq(*factory1, *factory2)
+                path1 == path2 && ptr::fn_addr_eq(*factory1, *factory2)
             }
             (
                 HookType::ResponseMiddleware(order1, factory1),
                 HookType::ResponseMiddleware(order2, factory2),
-            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
+            ) => order1 == order2 && ptr::fn_addr_eq(*factory1, *factory2),
             _ => false,
         }
     }
@@ -190,7 +189,7 @@ impl Hash for HookType {
     ///
     /// # Arguments
     ///
-    /// - `&mut Hasher` - The hasher to use.
+    /// - `&mut H` - The hasher to use.
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
@@ -248,6 +247,15 @@ impl HookType {
         }
     }
 
+    /// Returns the hook factory carried by this `HookType`, when it has one.
+    ///
+    /// Route hooks store a pattern instead of a factory, so `None` is
+    /// returned for them.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<ServerHookHandlerFactory>` - `Some(factory)` for the hook
+    ///   variants that carry one, otherwise `None`.
     #[inline(always)]
     pub fn try_get_hook(&self) -> Option<ServerHookHandlerFactory> {
         match *self {

@@ -23,7 +23,7 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The configuration.
+    /// - `C` - The configuration.
     ///
     /// # Returns
     ///

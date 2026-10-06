@@ -2,9 +2,8 @@ use super::*;
 
 /// Creates a new `HashSetXxHash3_64` with the default hasher.
 ///
-/// # Arguments
-///
-/// - `K: Eq + Hash` - The type of the elements in the hash set.
+/// The element type is fixed by the return type and must satisfy the `Eq`
+/// and `Hash` bounds.
 ///
 /// # Returns
 ///

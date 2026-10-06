@@ -42,6 +42,7 @@ use std::{
     any::Any,
     cell::{RefCell, RefMut},
     collections::{HashMap, HashSet, VecDeque},
+    error::Error,
     fmt::{self, Debug, Display, Formatter, Write},
     hash::Hash,
     io::{self, ErrorKind},
@@ -51,7 +52,7 @@ use std::{
     pin::Pin,
     rc::Rc,
     result::Result,
-    str::{FromStr, SplitWhitespace},
+    str::{FromStr, SplitWhitespace, from_utf8},
     sync::{
         Arc,
         atomic::{self, AtomicBool, AtomicUsize},

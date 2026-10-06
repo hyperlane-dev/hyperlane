@@ -4,6 +4,15 @@ use super::*;
 ///
 /// Parses header key, operation and value from input stream.
 impl Parse for ResponseHeaderData {
+    /// Parses the input token stream into a ResponseHeaderData structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `syn::Result<Self>` - The parsed ResponseHeaderData, or an error for invalid input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let key: Expr = input.parse()?;
         let operation: HeaderOperation = if input.peek(Token![=>]) {
@@ -13,10 +22,7 @@ impl Parse for ResponseHeaderData {
             input.parse::<Token![,]>()?;
             HeaderOperation::Add
         } else {
-            return Err(syn::Error::new(
-                input.span(),
-                "Expected either ',' for add operation or '=>' for set operation",
-            ));
+            return Err(syn::Error::new(input.span(), EXPECTED_ADD_OR_SET_OPERATION));
         };
         let value: Expr = input.parse()?;
         Ok(ResponseHeaderData {
@@ -31,6 +37,15 @@ impl Parse for ResponseHeaderData {
 ///
 /// Parses response body expression from input stream.
 impl Parse for ResponseBodyData {
+    /// Parses the input token stream into a ResponseBodyData structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `syn::Result<Self>` - The parsed ResponseBodyData, or an error for invalid input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let body: Expr = input.parse()?;
         Ok(ResponseBodyData { body })
