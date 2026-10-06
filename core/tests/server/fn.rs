@@ -146,7 +146,7 @@ fn server_send_sync() {
 #[tokio::test]
 async fn server_clone_across_threads() {
     let mut server: Server = Server::default();
-    server.route::<TestSendRoute>("/test");
+    server.route::<TestSendRoute, &str>("/test");
     let server_clone: Server = server.clone();
     let handle: JoinHandle<&'static str> = spawn(async move {
         let _server_in_thread: Server = server_clone;
@@ -159,7 +159,7 @@ async fn server_clone_across_threads() {
 #[tokio::test]
 async fn server_share_across_threads() {
     let mut server: Server = Server::default();
-    server.route::<TestSendRoute>("/test");
+    server.route::<TestSendRoute, &str>("/test");
     let server: Arc<Server> = Arc::new(server);
     let server1: Arc<Server> = server.clone();
     let server2: Arc<Server> = server.clone();
@@ -190,12 +190,12 @@ async fn main() {
     server.request_middleware::<RequestMiddleware>();
     server.request_middleware::<UpgradeMiddleware>();
     server.response_middleware::<ResponseMiddleware>();
-    server.route::<RootRoute>("/");
-    server.route::<SseRoute>("/sse");
-    server.route::<WebsocketRoute>("/websocket");
-    server.route::<GetAllRoutes>("/get/all/routes");
-    server.route::<DynamicRoute>("/dynamic/{routing}");
-    server.route::<DynamicRoute>("/regex/{file:^.*$}");
+    server.route::<RootRoute, &str>("/");
+    server.route::<SseRoute, &str>("/sse");
+    server.route::<WebsocketRoute, &str>("/websocket");
+    server.route::<GetAllRoutes, &str>("/get/all/routes");
+    server.route::<DynamicRoute, &str>("/dynamic/{routing}");
+    server.route::<DynamicRoute, &str>("/regex/{file:^.*$}");
     let _: Result<(), Server> = SERVER_REF.set(server.clone());
     let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
     let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
@@ -284,7 +284,7 @@ async fn client_format_bind_address_concatenates_host_and_port() {
 
 #[tokio::test]
 async fn client_try_flush_stdout_returns_ok() {
-    let result: std::io::Result<()> = Server::try_flush_stdout();
+    let result: io::Result<()> = Server::try_flush_stdout();
     assert!(result.is_ok());
 }
 
@@ -295,7 +295,7 @@ async fn client_flush_stdout_does_not_panic() {
 
 #[tokio::test]
 async fn client_try_flush_stderr_returns_ok() {
-    let result: std::io::Result<()> = Server::try_flush_stderr();
+    let result: io::Result<()> = Server::try_flush_stderr();
     assert!(result.is_ok());
 }
 
@@ -306,7 +306,7 @@ async fn client_flush_stderr_does_not_panic() {
 
 #[tokio::test]
 async fn client_try_flush_stdout_and_stderr_returns_ok() {
-    let result: std::io::Result<()> = Server::try_flush_stdout_and_stderr();
+    let result: io::Result<()> = Server::try_flush_stdout_and_stderr();
     assert!(result.is_ok());
 }
 
@@ -328,7 +328,7 @@ async fn client_handle_hook_dispatches_to_correct_handler_list() {
 #[tokio::test]
 async fn client_route_basic_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute>("/");
+        register.route::<RootRoute, &str>("/");
     })
     .await;
     let request: &[u8] = b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
@@ -340,7 +340,7 @@ async fn client_route_basic_serial_e2e() {
 #[tokio::test]
 async fn client_dynamic_route_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<DynamicRoute>("/dynamic/:id");
+        register.route::<DynamicRoute, &str>("/dynamic/:id");
     })
     .await;
     let request: &[u8] =
@@ -353,7 +353,7 @@ async fn client_dynamic_route_serial_e2e() {
 #[tokio::test]
 async fn client_regex_route_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<WebsocketRoute>("/ws");
+        register.route::<WebsocketRoute, &str>("/ws");
     })
     .await;
     let request: &[u8] = b"GET /ws HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
@@ -365,7 +365,7 @@ async fn client_regex_route_serial_e2e() {
 #[tokio::test]
 async fn client_request_error_404_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute>("/");
+        register.route::<RootRoute, &str>("/");
         register.request_error::<RequestErrorHook>();
     })
     .await;
@@ -378,7 +378,7 @@ async fn client_request_error_404_serial_e2e() {
 #[tokio::test]
 async fn client_request_middleware_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute>("/");
+        register.route::<RootRoute, &str>("/");
         register.request_middleware::<RequestMiddleware>();
     })
     .await;
@@ -391,7 +391,7 @@ async fn client_request_middleware_serial_e2e() {
 #[tokio::test]
 async fn client_response_middleware_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute>("/");
+        register.route::<RootRoute, &str>("/");
         register.response_middleware::<ResponseMiddleware>();
     })
     .await;
@@ -404,7 +404,7 @@ async fn client_response_middleware_serial_e2e() {
 #[tokio::test]
 async fn client_task_panic_handler_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<DynamicRoute>("/panic/:msg");
+        register.route::<DynamicRoute, &str>("/panic/:msg");
         register.task_panic::<TaskPanicHook>();
     })
     .await;
@@ -418,7 +418,7 @@ async fn client_task_panic_handler_serial_e2e() {
 #[tokio::test]
 async fn client_two_servers_on_distinct_ports_serial_e2e() {
     let (control_a, port_a) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute>("/");
+        register.route::<RootRoute, &str>("/");
     })
     .await;
     let request: &[u8] = b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
@@ -426,7 +426,7 @@ async fn client_two_servers_on_distinct_ports_serial_e2e() {
     control_a.shutdown().await;
     control_a.wait().await;
     let (control_b, port_b) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute>("/");
+        register.route::<RootRoute, &str>("/");
     })
     .await;
     assert_ne!(port_a, port_b);
@@ -438,11 +438,11 @@ async fn client_two_servers_on_distinct_ports_serial_e2e() {
 #[tokio::test]
 async fn client_concurrent_servers_on_distinct_ports_e2e() {
     let (control_a, port_a) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute>("/");
+        register.route::<RootRoute, &str>("/");
     })
     .await;
     let (control_b, port_b) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute>("/");
+        register.route::<RootRoute, &str>("/");
     })
     .await;
     assert_ne!(port_a, port_b);

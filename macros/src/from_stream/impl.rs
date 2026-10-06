@@ -24,12 +24,14 @@ impl Parse for FromStreamData {
     /// 2. No parameters: variable_name will be None
     ///
     /// # Arguments
+    ///
     /// - `ParseStream` - The ParseStream containing the token stream to be parsed
     ///
     /// # Returns
-    /// Returns `syn::Result<Self>` where:
-    /// - Ok(FromStreamData) contains the successfully parsed data with variable name
-    /// - Err(syn::Error) contains an appropriate error message for invalid input
+    ///
+    /// - `syn::Result<Self>` - `Ok(FromStreamData)` contains the successfully parsed data
+    ///   with variable name, `Err(syn::Error)` contains an appropriate error message
+    ///   for invalid input.
     ///
     /// # Errors
     /// The function returns errors in the following cases:
@@ -42,7 +44,7 @@ impl Parse for FromStreamData {
             if !input.is_empty() {
                 return Err(syn::Error::new(
                     input.span(),
-                    "expected at most one parameter",
+                    EXPECTED_AT_MOST_ONE_PARAMETER,
                 ));
             }
             Some(expr)

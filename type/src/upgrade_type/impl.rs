@@ -55,8 +55,8 @@ impl FromStr for UpgradeType {
     ///
     /// # Returns
     ///
-    /// - `Ok(UpgradeType)` - The parsed `UpgradeType` variant.
-    /// - `Err(())` - If parsing fails (though this implementation always returns `Ok`).
+    /// - `Result<Self, Self::Err>` - The parsed `UpgradeType` variant; this
+    ///   implementation always returns `Ok`.
     #[inline(always)]
     fn from_str(from_str: &str) -> Result<Self, Self::Err> {
         match from_str.to_ascii_lowercase().as_str() {

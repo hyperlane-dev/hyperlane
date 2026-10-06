@@ -17,9 +17,11 @@ pub use http_type::{
 };
 
 pub use std::{
+    cmp,
     collections::{HashMap, HashSet, VecDeque},
     fmt::{self, Debug, Display, Formatter},
-    io::{Read, Write},
+    io::{self, Read, Write},
+    mem,
     net::{Ipv4Addr, Ipv6Addr, TcpStream},
     pin::Pin,
     str::from_utf8,

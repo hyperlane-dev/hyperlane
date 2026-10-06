@@ -3,17 +3,26 @@ use super::*;
 impl FromStr for TemplateType {
     type Err = TemplateError;
 
+    /// Parses a lowercase template type name.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - The template type name to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Self, Self::Err>` - The parsed template type or an error.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "controller" => Ok(Self::Controller),
-            "domain" => Ok(Self::Domain),
-            "exception" => Ok(Self::Exception),
-            "mapper" => Ok(Self::Mapper),
-            "model" => Ok(Self::Model),
-            "repository" => Ok(Self::Repository),
-            "service" => Ok(Self::Service),
-            "utils" => Ok(Self::Utils),
-            "view" => Ok(Self::View),
+            TEMPLATE_TYPE_CONTROLLER => Ok(Self::Controller),
+            TEMPLATE_TYPE_DOMAIN => Ok(Self::Domain),
+            TEMPLATE_TYPE_EXCEPTION => Ok(Self::Exception),
+            TEMPLATE_TYPE_MAPPER => Ok(Self::Mapper),
+            TEMPLATE_TYPE_MODEL => Ok(Self::Model),
+            TEMPLATE_TYPE_REPOSITORY => Ok(Self::Repository),
+            TEMPLATE_TYPE_SERVICE => Ok(Self::Service),
+            TEMPLATE_TYPE_UTILS => Ok(Self::Utils),
+            TEMPLATE_TYPE_VIEW => Ok(Self::View),
             _ => Err(TemplateError::InvalidTemplateType(s.to_string())),
         }
     }
@@ -40,7 +49,7 @@ impl TemplateConfig {
             template_type,
             component_name,
             model_sub_type,
-            base_directory: "./application".to_string(),
+            base_directory: TEMPLATE_CONFIG_BASE_DIRECTORY.to_string(),
         }
     }
 }
@@ -48,11 +57,20 @@ impl TemplateConfig {
 impl FromStr for ModelSubType {
     type Err = TemplateError;
 
+    /// Parses a lowercase model sub type name.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - The model sub type name to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Self, Self::Err>` - The parsed model sub type or an error.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "application" => Ok(Self::Application),
-            "request" => Ok(Self::Request),
-            "response" => Ok(Self::Response),
+            MODEL_SUB_TYPE_APPLICATION => Ok(Self::Application),
+            MODEL_SUB_TYPE_REQUEST => Ok(Self::Request),
+            MODEL_SUB_TYPE_RESPONSE => Ok(Self::Response),
             _ => Err(TemplateError::InvalidModelSubType(s.to_string())),
         }
     }

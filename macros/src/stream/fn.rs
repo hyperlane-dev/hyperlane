@@ -14,14 +14,14 @@ use super::*;
 ///
 /// # Returns
 ///
-/// - `TokenStream2` - The generated loop code as a token stream.
+/// - `proc_macro2::TokenStream` - The generated loop code as a token stream.
 pub(crate) fn generate_http_stream(
     stream: &Ident,
     context: &Ident,
     data: &FromStreamData,
     stmts: &[Stmt],
 ) -> proc_macro2::TokenStream {
-    let method_ident: Ident = Ident::new("try_get_http_request", Span::call_site());
+    let method_ident: Ident = Ident::new(TRY_GET_HTTP_REQUEST_METHOD_NAME, Span::call_site());
     match data.variable_name.clone() {
         Some(variable_name) => {
             quote! {
@@ -58,14 +58,14 @@ pub(crate) fn generate_http_stream(
 ///
 /// # Returns
 ///
-/// - `TokenStream2` - The generated loop code as a token stream.
+/// - `proc_macro2::TokenStream` - The generated loop code as a token stream.
 pub(crate) fn generate_websocket_stream(
     stream: &Ident,
     context: &Ident,
     data: &FromStreamData,
     stmts: &[Stmt],
 ) -> proc_macro2::TokenStream {
-    let method_ident: Ident = Ident::new("try_get_websocket_request", Span::call_site());
+    let method_ident: Ident = Ident::new(TRY_GET_WEBSOCKET_REQUEST_METHOD_NAME, Span::call_site());
     match data.variable_name.clone() {
         Some(variable_name) => {
             quote! {
@@ -139,8 +139,8 @@ pub(crate) fn try_get_http_request_macro(attr: TokenStream, item: TokenStream) -
 ///
 /// # Arguments
 ///
-/// - `attr` - The attribute containing the variable name.
-/// - `item` - The input token stream to process.
+/// - `TokenStream` - The attribute containing the variable name.
+/// - `TokenStream` - The input token stream to process.
 ///
 /// # Returns
 ///

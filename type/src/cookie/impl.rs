@@ -6,8 +6,8 @@ impl CookieBuilder {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The cookie name type.
-    /// - `AsRef<str>` - The cookie value type.
+    /// - `N` - The cookie name, which requires the `AsRef<str>` bound.
+    /// - `V` - The cookie value, which requires the `AsRef<str>` bound.
     ///
     /// # Returns
     ///
@@ -38,7 +38,7 @@ impl CookieBuilder {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The `Set-Cookie` header string to parse.
+    /// - `C` - The `Set-Cookie` header string to parse, which requires the `AsRef<str>` bound.
     ///
     /// # Returns
     ///
@@ -110,7 +110,7 @@ impl CookieBuilder {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The expiration date string.
+    /// - `E` - The expiration date, which requires the `AsRef<str>` bound.
     ///
     /// # Returns
     ///
@@ -128,7 +128,7 @@ impl CookieBuilder {
     ///
     /// # Arguments
     ///
-    /// - `Into<i64>` - The maximum age in seconds.
+    /// - `M` - The maximum age in seconds, which requires the `Into<i64>` bound.
     ///
     /// # Returns
     ///
@@ -146,7 +146,7 @@ impl CookieBuilder {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The domain for the cookie.
+    /// - `D` - The domain for the cookie, which requires the `AsRef<str>` bound.
     ///
     /// # Returns
     ///
@@ -164,7 +164,7 @@ impl CookieBuilder {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The path for the cookie.
+    /// - `T` - The path for the cookie, which requires the `AsRef<str>` bound.
     ///
     /// # Returns
     ///
@@ -236,7 +236,7 @@ impl CookieBuilder {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The `SameSite` policy.
+    /// - `T` - The `SameSite` policy, which requires the `AsRef<str>` bound.
     ///
     /// # Returns
     ///
@@ -299,7 +299,7 @@ impl Cookie {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The `Cookie` header string to parse.
+    /// - `C` - The `Cookie` header string to parse, which requires the `AsRef<str>` bound.
     ///
     /// # Returns
     ///

@@ -173,7 +173,7 @@ impl AsRef<Server> for Server {
     ///
     /// # Returns
     ///
-    /// - `&Server` - A reference to the `Server` instance.
+    /// - `&Self` - A reference to the `Server` instance.
     #[inline(always)]
     fn as_ref(&self) -> &Self {
         let address: usize = self.into();
@@ -187,7 +187,7 @@ impl AsMut<Server> for Server {
     ///
     /// # Returns
     ///
-    /// - `&mut Server` - A mutable reference to the `Server` instance.
+    /// - `&mut Self` - A mutable reference to the `Server` instance.
     #[inline(always)]
     fn as_mut(&mut self) -> &mut Self {
         let address: usize = self.into();
@@ -320,7 +320,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The configuration.
+    /// - `C` - The configuration.
     ///
     /// # Returns
     ///
@@ -406,15 +406,16 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The route path pattern.
+    /// - `P` - The route path pattern.
     ///
     /// # Returns
     ///
     /// - `&mut Self` - Reference to self for method chaining.
     #[inline(always)]
-    pub fn route<S>(&mut self, path: impl AsRef<str>) -> &mut Self
+    pub fn route<S, P>(&mut self, path: P) -> &mut Self
     where
         S: ServerHook,
+        P: AsRef<str>,
     {
         self.get_mut_route_matcher()
             .add(path.as_ref(), Hook::factory::<S>())
@@ -461,7 +462,7 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The host address.
+    /// - `H` - The host address.
     /// - `u16` - The port number.
     ///
     /// # Returns
@@ -541,9 +542,9 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `usize` - The address of the stream.
-    /// - `usize` - The address of the context.
-    /// - `Future<Output = ()> + Send + 'static` - The hook to execute.
+    /// - `&'static self` - The server instance whose task-panic hooks are used.
+    /// - `usize` - The addresses of the stream and of the context.
+    /// - `F` - The hook to execute.
     ///
     /// # Safety
     ///
@@ -585,10 +586,10 @@ impl Server {
     fn configure_stream(&self, stream: &TcpStream) {
         let config: &ServerConfig = self.get_server_config();
         if let Some(nodelay) = config.try_get_nodelay() {
-            let _: Result<(), std::io::Error> = stream.set_nodelay(*nodelay);
+            let _: Result<(), io::Error> = stream.set_nodelay(nodelay);
         }
         if let Some(ttl) = config.try_get_ttl() {
-            let _: Result<(), std::io::Error> = stream.set_ttl(*ttl);
+            let _: Result<(), io::Error> = stream.set_ttl(ttl);
         }
     }
 
@@ -780,6 +781,7 @@ impl Server {
     ///
     /// # Arguments
     ///
+    /// - `&'static self` - The server instance that owns the accept loop.
     /// - `&TcpListener` - A reference to the `TcpListener` to accept connections from.
     async fn tcp_accept(&'static self, tcp_listener: &TcpListener) {
         loop {
@@ -812,7 +814,7 @@ impl Server {
         let bind_address: &String = self.get_server_config().get_address();
         let tcp_listener: TcpListener = TcpListener::bind(&bind_address)
             .await
-            .map_err(|error: std::io::Error| Box::new(ServerError::from(error)))?;
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
         let server: &'static Self = unsafe { self.leak() };
         let (wait_sender, wait_receiver) = channel(());
         let (shutdown_sender, mut shutdown_receiver) = channel(());

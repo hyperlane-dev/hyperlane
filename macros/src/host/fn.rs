@@ -15,13 +15,17 @@ use super::*;
 pub(crate) fn host_macro(attr: TokenStream, item: TokenStream, position: Position) -> TokenStream {
     let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_host.host_values.iter().map(|host_value: &syn::Expr| {
-            quote! {
-                if #context.get_request().get_host() != #host_value {
-                    return ::hyperlane::Status::Continue;
+        let statements: Vec<proc_macro2::TokenStream> = multi_host
+            .host_values
+            .iter()
+            .map(|host_value: &syn::Expr| {
+                quote! {
+                    if #context.get_request().get_host() != #host_value {
+                        return ::hyperlane::Status::Continue;
+                    }
                 }
-            }
-        });
+            })
+            .collect();
         quote! {
             #(#statements)*
         }
@@ -47,13 +51,17 @@ pub(crate) fn reject_host_macro(
 ) -> TokenStream {
     let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_host.host_values.iter().map(|host_value: &syn::Expr| {
-            quote! {
-                if #context.get_request().get_host() == #host_value {
-                    return ::hyperlane::Status::Continue;
+        let statements: Vec<proc_macro2::TokenStream> = multi_host
+            .host_values
+            .iter()
+            .map(|host_value: &syn::Expr| {
+                quote! {
+                    if #context.get_request().get_host() == #host_value {
+                        return ::hyperlane::Status::Continue;
+                    }
                 }
-            }
-        });
+            })
+            .collect();
         quote! {
             #(#statements)*
         }

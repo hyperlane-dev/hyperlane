@@ -32,7 +32,7 @@ impl<'a> From<usize> for &'a mut Stream {
     ///
     /// # Returns
     ///
-    /// - `&mut Stream` - A mutable reference to the `Stream` at the given address.
+    /// - `&'a mut Stream` - A mutable reference to the `Stream` at the given address.
     ///
     /// # Safety
     ///
@@ -84,7 +84,7 @@ impl AsRef<Stream> for Stream {
     ///
     /// # Returns
     ///
-    /// - `&Stream` - A reference to the `Stream` instance.
+    /// - `&Self` - A reference to the `Stream` instance.
     #[inline(always)]
     fn as_ref(&self) -> &Self {
         let address: usize = self.into();
@@ -98,7 +98,7 @@ impl AsMut<Stream> for Stream {
     ///
     /// # Returns
     ///
-    /// - `&mut Stream` - A mutable reference to the `Stream` instance.
+    /// - `&mut Self` - A mutable reference to the `Stream` instance.
     #[inline(always)]
     fn as_mut(&mut self) -> &mut Self {
         let address: usize = self.into();
@@ -337,7 +337,7 @@ impl Stream {
     ///
     /// # Returns
     ///
-    /// - `Result<Request, RequestError>` - The parsed WebSocket request or an error.
+    /// - `Result<RequestBody, RequestError>` - The parsed WebSocket request or an error.
     pub async fn try_get_websocket_request(&mut self) -> Result<RequestBody, RequestError> {
         if self.get_closed() {
             return Err(RequestError::ServerClosedConnection(HttpStatus::BadRequest));
@@ -440,7 +440,7 @@ impl Stream {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<[u8]>` - The data to send (must implement AsRef<[u8]>).
+    /// - `D` - The data to send, which must implement `AsRef<[u8]>`.
     ///
     /// # Returns
     ///
@@ -459,7 +459,7 @@ impl Stream {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<[u8]>` - The data to send (must implement AsRef<[u8]>).
+    /// - `D` - The data to send, which must implement `AsRef<[u8]>`.
     ///
     /// # Panics
     ///
@@ -475,7 +475,8 @@ impl Stream {
     ///
     /// # Arguments
     ///
-    /// - `IntoIterator<Item = AsRef<[u8]>>` - The data list to send.
+    /// - `I` - The data list to send, which must implement `IntoIterator<Item = D>` with
+    ///   `D` requiring the `AsRef<[u8]>` bound.
     ///
     /// # Returns
     ///
@@ -499,7 +500,8 @@ impl Stream {
     ///
     /// # Arguments
     ///
-    /// - `IntoIterator<Item = AsRef<[u8]>>` - The data list to send.
+    /// - `I` - The data list to send, which must implement `IntoIterator<Item = D>` with
+    ///   `D` requiring the `AsRef<[u8]>` bound.
     ///
     /// # Panics
     ///

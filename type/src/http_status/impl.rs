@@ -12,7 +12,7 @@ impl HttpStatus {
     ///
     /// # Returns
     ///
-    /// - `u16` - The numeric status code.
+    /// - `ResponseStatusCode` - The numeric status code.
     pub fn code(&self) -> ResponseStatusCode {
         match self {
             Self::Continue => 100,
@@ -87,7 +87,7 @@ impl HttpStatus {
     ///
     /// # Arguments
     ///
-    /// - `u16` - The numeric HTTP status code.
+    /// - `ResponseStatusCode` - The numeric HTTP status code.
     ///
     /// # Returns
     ///
@@ -166,7 +166,7 @@ impl HttpStatus {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The string to compare against.
+    /// - `C` - The string to compare against, which requires the `AsRef<str>` bound.
     ///
     /// # Returns
     ///
@@ -185,7 +185,7 @@ impl Display for HttpStatus {
     ///
     /// # Arguments
     ///
-    /// - `&mut Formatter` - The formatter to write to.
+    /// - `&mut Formatter<'_>` - The formatter to write to.
     ///
     /// # Returns
     ///
@@ -275,7 +275,7 @@ impl FromStr for HttpStatus {
     ///
     /// # Returns
     ///
-    /// - `Result<HttpStatus, ()>` - The parsed status or error.
+    /// - `Result<Self, Self::Err>` - The parsed status or error.
     fn from_str(code_str: &str) -> Result<Self, Self::Err> {
         if let Ok(code) = code_str.parse::<ResponseStatusCode>() {
             match code {

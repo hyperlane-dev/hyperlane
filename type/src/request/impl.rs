@@ -1,7 +1,7 @@
 use super::*;
 
 /// Implements the `std::error::Error` trait for `RequestError`.
-impl std::error::Error for RequestError {}
+impl Error for RequestError {}
 
 /// Provides a default value for `RequestError`.
 impl Default for RequestError {
@@ -18,18 +18,18 @@ impl Default for RequestError {
 ///
 /// Maps connection reset and aborted errors to `ClientDisconnected`,
 /// all other I/O errors are mapped to `ReadConnection`.
-impl From<std::io::Error> for RequestError {
+impl From<io::Error> for RequestError {
     /// Converts an I/O error to a `RequestError`.
     ///
     /// # Arguments
     ///
-    /// - `std::io::Error` - The I/O error to convert.
+    /// - `io::Error` - The I/O error to convert.
     ///
     /// # Returns
     ///
     /// - `RequestError` - The corresponding request error.
     #[inline(always)]
-    fn from(error: std::io::Error) -> Self {
+    fn from(error: io::Error) -> Self {
         let kind: ErrorKind = error.kind();
         if kind == ErrorKind::ConnectionReset || kind == ErrorKind::ConnectionAborted {
             return RequestError::ClientDisconnected(HttpStatus::BadRequest);
@@ -200,7 +200,7 @@ impl RequestConfig {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The configuration.
+    /// - `C` - The configuration, which requires the `AsRef<str>` bound.
     ///
     /// # Returns
     ///
@@ -259,6 +259,7 @@ impl RequestConfig {
 ///
 /// Returns a new `Request` instance with all fields initialized to their default values.
 impl Default for Request {
+    /// Builds the default `Request` with all fields set to their defaults.
     #[inline(always)]
     fn default() -> Self {
         Self {
@@ -535,7 +536,8 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `&mut AsyncBufReadExt + Unpin` - A mutable reference to a buffered reader implementing `AsyncBufReadExt`.
+    /// - `&mut R` - A mutable reference to a buffered reader, which requires the
+    ///   `AsyncBufReadExt + Unpin` bound.
     /// - `&RequestConfig` - Configuration for security limits and buffer settings.
     ///
     /// # Returns
@@ -601,7 +603,7 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `&mut AsyncRead + Unpin` - The buffered reader to read from.
+    /// - `&mut R` - The buffered reader to read from, which requires the `AsyncRead + Unpin` bound.
     /// - `&mut RequestBody` - The buffer to read the body bytes into.
     /// - `usize` - The expected content size.
     ///
@@ -631,7 +633,7 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The query parameter key (implements AsRef<str>).
+    /// - `K` - The query parameter key, which implements `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -650,7 +652,7 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The query parameter key (implements AsRef<str>).
+    /// - `K` - The query parameter key, which implements `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -671,7 +673,7 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header's key (must implement AsRef<str>).
+    /// - `K` - The header's key, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -688,7 +690,7 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header's key (must implement AsRef<str>).
+    /// - `K` - The header's key, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -709,7 +711,7 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header's key (must implement AsRef<str>).
+    /// - `K` - The header's key, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -728,7 +730,7 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header's key (must implement AsRef<str>).
+    /// - `K` - The header's key, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -749,7 +751,7 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header's key (must implement AsRef<str>).
+    /// - `K` - The header's key, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -768,7 +770,7 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header's key (must implement AsRef<str>).
+    /// - `K` - The header's key, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -789,7 +791,7 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header's key (must implement AsRef<str>).
+    /// - `K` - The header's key, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -808,7 +810,7 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header's key (must implement AsRef<str>).
+    /// - `K` - The header's key, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -852,7 +854,7 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header key to check (must implement AsRef<str>).
+    /// - `K` - The header key to check, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -869,8 +871,8 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The header key to check (must implement AsRef<str>).
-    /// - `AsRef<str>` - The value to search for (must implement AsRef<str>).
+    /// - `K` - The header key to check, which must implement `AsRef<str>`.
+    /// - `V` - The value to search for, which must implement `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -926,7 +928,7 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The cookie key (implements AsRef<str>).
+    /// - `K` - The cookie key, which implements `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -947,7 +949,7 @@ impl Request {
     ///
     /// # Arguments
     ///
-    /// - `AsRef<str>` - The cookie key (implements AsRef<str>).
+    /// - `K` - The cookie key, which implements `AsRef<str>`.
     ///
     /// # Returns
     ///
@@ -999,9 +1001,7 @@ impl Request {
     /// This method first retrieves the body content as a byte slice using `self.get_body()`.
     /// It then attempts to deserialize the byte slice as_ref the specified type `T` using `json_from_slice`.
     ///
-    /// # Arguments
-    ///
-    /// - `DeserializeOwned` - The target type to deserialize as_ref (must implement DeserializeOwned).
+    /// The target type `T` is a type parameter of this method and must implement `DeserializeOwned`.
     ///
     /// # Returns
     ///
@@ -1019,9 +1019,7 @@ impl Request {
     /// This method first retrieves the body content as a byte slice using `self.get_body()`.
     /// It then attempts to deserialize the byte slice as_ref the specified type `T` using `json_from_slice`.
     ///
-    /// # Arguments
-    ///
-    /// - `DeserializeOwned` - The target type to deserialize as_ref (must implement DeserializeOwned).
+    /// The target type `T` is a type parameter of this method and must implement `DeserializeOwned`.
     ///
     /// # Returns
     ///

@@ -12,7 +12,7 @@ categories = ["network-programming", "web-programming"]
 exclude.workspace = true
 
 [workspace.package]
-version = "21.10.0"
+version = "21.11.0"
 readme = "README.md"
 edition = "2024"
 authors = ["root@ltpp.vip"]
@@ -25,15 +25,15 @@ resolver = "2"
 members = ["compress", "constant", "type", "request", "core", "macros", "cli", "plugin/websocket"]
 
 [workspace.dependencies]
-hyperlane = { path = ".", version = "21.10.0" }
-http-type = { path = "type", version = "21.10.0" }
-hyperlane-cli = { path = "cli", version = "21.10.0" }
-hyperlane-core = { path = "core", version = "21.10.0" }
-http-request = { path = "request", version = "21.10.0" }
-http-compress = { path = "compress", version = "21.10.0" }
-http-constant = { path = "constant", version = "21.10.0" }
-hyperlane-macros = { path = "macros", version = "21.10.0" }
-hyperlane-plugin-websocket = { path = "plugin/websocket", version = "21.10.0" }
+hyperlane = { path = ".", version = "21.11.0" }
+http-type = { path = "type", version = "21.11.0" }
+hyperlane-cli = { path = "cli", version = "21.11.0" }
+hyperlane-core = { path = "core", version = "21.11.0" }
+http-request = { path = "request", version = "21.11.0" }
+http-compress = { path = "compress", version = "21.11.0" }
+http-constant = { path = "constant", version = "21.11.0" }
+hyperlane-macros = { path = "macros", version = "21.11.0" }
+hyperlane-plugin-websocket = { path = "plugin/websocket", version = "21.11.0" }
 
 hex = "0.4.3"
 md5 = "0.8.1"

@@ -8,6 +8,15 @@ use super::*;
 ///
 /// Expected format: `ctx` or `ctx: &mut Context` or `ctx: &Context`
 impl Parse for ContextInput {
+    /// Parses the input token stream into a ContextInput structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Self>` - The parsed ContextInput, or an error for invalid input.
     fn parse(input: ParseStream) -> Result<Self> {
         let source_ctx: Ident = input.parse()?;
         let ty: Option<Type> = if input.peek(Token![:]) {

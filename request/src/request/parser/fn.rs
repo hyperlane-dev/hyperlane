@@ -2,6 +2,15 @@ use super::*;
 
 /// Split on a multi-byte delimiter, returning each slice. Used to split an
 /// HTTP response into status line / headers / body.
+///
+/// # Arguments
+///
+/// - `&'a [u8]` - The buffer to split.
+/// - `&'a [u8]` - The multi-byte delimiter to split on.
+///
+/// # Returns
+///
+/// - `Vec<&'a [u8]>`: The delimiter-separated slices, including any trailing remainder.
 pub(crate) fn split_multi_byte<'a>(data: &'a [u8], delimiter: &'a [u8]) -> Vec<&'a [u8]> {
     let mut result: Vec<&[u8]> = Vec::new();
     let mut start: usize = 0;
@@ -18,6 +27,14 @@ pub(crate) fn split_multi_byte<'a>(data: &'a [u8], delimiter: &'a [u8]) -> Vec<&
 }
 
 /// Split on whitespace (space or tab).
+///
+/// # Arguments
+///
+/// - `&[u8]` - The buffer to split.
+///
+/// # Returns
+///
+/// - `Vec<&[u8]>`: The non-empty whitespace-separated slices.
 pub(crate) fn split_whitespace(input: &[u8]) -> Vec<&[u8]> {
     let mut parts: Vec<&[u8]> = Vec::new();
     let mut start: usize = 0;
@@ -37,6 +54,18 @@ pub(crate) fn split_whitespace(input: &[u8]) -> Vec<&[u8]> {
 
 /// Build the raw HTTP request line + headers + optional body into a single
 /// `Vec<u8>` suitable for writing to the wire.
+///
+/// # Arguments
+///
+/// - `&str` - The HTTP method token.
+/// - `String` - The request path, with any query string already appended.
+/// - `Vec<u8>` - The wire-format header block bytes.
+/// - `Option<Vec<u8>>` - The wire-format body bytes, or `None` when there is no body.
+/// - `String` - The HTTP version token.
+///
+/// # Returns
+///
+/// - `Vec<u8>`: The complete request bytes, ready to write to the wire.
 pub(crate) fn build_http_request(
     method: &str,
     path: String,
@@ -66,6 +95,14 @@ pub(crate) fn build_http_request(
 ///
 /// Walks the `chunk-size CRLF chunk-data CRLF` sequence until it sees a
 /// terminating zero-size chunk.
+///
+/// # Arguments
+///
+/// - `&[u8]` - The raw chunked body bytes.
+///
+/// # Returns
+///
+/// - `Vec<u8>`: The concatenated payload of every decoded chunk.
 pub(crate) fn parse_chunked_body(body_bytes: &[u8]) -> Vec<u8> {
     let mut result: Vec<u8> = Vec::new();
     let mut pos: usize = 0;
@@ -82,7 +119,7 @@ pub(crate) fn parse_chunked_body(body_bytes: &[u8]) -> Vec<u8> {
             Some(p) => &chunk_size_str[..p],
             None => chunk_size_str,
         };
-        let chunk_size: usize = match std::str::from_utf8(chunk_size_str) {
+        let chunk_size: usize = match from_utf8(chunk_size_str) {
             Ok(s) => match usize::from_str_radix(s.trim(), 16) {
                 Ok(n) => n,
                 Err(_) => break,
@@ -104,6 +141,15 @@ pub(crate) fn parse_chunked_body(body_bytes: &[u8]) -> Vec<u8> {
 }
 
 /// Locate `\r\n\r\n` (end of response headers) starting at `start`.
+///
+/// # Arguments
+///
+/// - `&[u8]` - The buffer to search.
+/// - `usize` - The offset at which the search starts.
+///
+/// # Returns
+///
+/// - `Option<usize>`: The absolute offset of the terminator, or `None` when absent.
 pub(crate) fn find_double_crlf(data: &[u8], start: usize) -> Option<usize> {
     let search_data: &[u8] = &data[start..];
     for i in 0..search_data.len().saturating_sub(3) {
@@ -119,6 +165,15 @@ pub(crate) fn find_double_crlf(data: &[u8], start: usize) -> Option<usize> {
 }
 
 /// Find a byte-pattern in a haystack, ASCII-case-insensitive.
+///
+/// # Arguments
+///
+/// - `&[u8]` - The haystack to search.
+/// - `&[u8]` - The byte pattern to look for.
+///
+/// # Returns
+///
+/// - `Option<usize>`: The offset of the first match, or `None` when absent.
 pub(crate) fn find_pattern_case_insensitive(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     if needle.is_empty() || haystack.len() < needle.len() {
         return None;
@@ -141,6 +196,15 @@ pub(crate) fn find_pattern_case_insensitive(haystack: &[u8], needle: &[u8]) -> O
 }
 
 /// Locate the next `\r\n` after `start`.
+///
+/// # Arguments
+///
+/// - `&[u8]` - The buffer to search.
+/// - `usize` - The offset at which the search starts.
+///
+/// # Returns
+///
+/// - `Option<usize>`: The absolute offset of the terminator, or `None` when absent.
 pub(crate) fn find_crlf(data: &[u8], start: usize) -> Option<usize> {
     let search_data: &[u8] = &data[start..];
     for i in 0..search_data.len().saturating_sub(1) {
@@ -152,6 +216,14 @@ pub(crate) fn find_crlf(data: &[u8], start: usize) -> Option<usize> {
 }
 
 /// Extract `Content-Length` value from response bytes (0 if missing).
+///
+/// # Arguments
+///
+/// - `&[u8]` - The raw response header bytes.
+///
+/// # Returns
+///
+/// - `usize`: The declared body length, or `0` when the header is missing.
 pub(crate) fn get_content_length(response_bytes: &[u8]) -> usize {
     if let Some(pos) = find_pattern_case_insensitive(response_bytes, CONTENT_LENGTH_PATTERN) {
         let value_start: usize = pos + CONTENT_LENGTH_PATTERN.len();
@@ -169,6 +241,14 @@ pub(crate) fn get_content_length(response_bytes: &[u8]) -> usize {
 }
 
 /// Does the response use `Transfer-Encoding: chunked`?
+///
+/// # Arguments
+///
+/// - `&[u8]` - The raw response header bytes.
+///
+/// # Returns
+///
+/// - `bool`: `true` when the body is chunked, `false` otherwise.
 pub(crate) fn is_chunked_encoding(headers_bytes: &[u8]) -> bool {
     if let Some(pos) = find_pattern_case_insensitive(headers_bytes, TRANSFER_ENCODING_PATTERN) {
         let value_start: usize = pos + TRANSFER_ENCODING_PATTERN.len();
@@ -186,6 +266,14 @@ pub(crate) fn is_chunked_encoding(headers_bytes: &[u8]) -> bool {
 }
 
 /// Parse a byte slice as a decimal `usize` (skipping leading whitespace).
+///
+/// # Arguments
+///
+/// - `&[u8]` - The ASCII digits to parse.
+///
+/// # Returns
+///
+/// - `usize`: The parsed value, truncated at the first non-digit byte.
 pub(crate) fn parse_decimal_bytes(bytes: &[u8]) -> usize {
     let mut result: usize = 0;
     let mut started: bool = false;
@@ -203,6 +291,14 @@ pub(crate) fn parse_decimal_bytes(bytes: &[u8]) -> usize {
 }
 
 /// Parse the 3-byte ASCII status code from the response status line.
+///
+/// # Arguments
+///
+/// - `&[u8]` - The status-line bytes following the HTTP version.
+///
+/// # Returns
+///
+/// - `usize`: The status code, or `0` when the slice is not three digits.
 pub(crate) fn parse_status_code(status_bytes: &[u8]) -> usize {
     if status_bytes.len() != 3 {
         return 0;
@@ -219,6 +315,16 @@ pub(crate) fn parse_status_code(status_bytes: &[u8]) -> usize {
 }
 
 /// Calculate the next buffer capacity for growing the response buffer.
+///
+/// # Arguments
+///
+/// - `&[u8]` - The response bytes accumulated so far.
+/// - `usize` - The number of bytes just read.
+/// - `usize` - The current capacity of the response buffer.
+///
+/// # Returns
+///
+/// - `usize`: The new capacity to reserve, or `0` when no growth is needed.
 pub(crate) fn calculate_buffer_capacity(
     response_bytes: &[u8],
     n: usize,
@@ -242,6 +348,19 @@ pub(crate) fn calculate_buffer_capacity(
 /// the `Content-Length`, the redirect URL (if any), and whether the body is
 /// chunked. All three out-params are populated; only `redirect_url` may be
 /// `None`.
+///
+/// # Arguments
+///
+/// - `&[u8]` - The raw response header bytes.
+/// - `&[u8]` - The lower-cased HTTP version bytes used to locate the status line.
+/// - `&[u8]` - The lower-cased `Location` header name, including its colon.
+/// - `&mut usize` - Receives the declared content length.
+/// - `&mut Option<Vec<u8>>` - Receives the redirect target, or stays `None`.
+/// - `&mut bool` - Receives whether the body is chunked.
+///
+/// # Returns
+///
+/// - `Result<(), RequestError>`: `Ok(())` once the out-parameters are populated.
 pub(crate) fn parse_response_headers(
     headers_bytes: &[u8],
     http_version_bytes: &[u8],
@@ -263,7 +382,7 @@ pub(crate) fn parse_response_headers(
             {
                 let start: usize = location_pos + location_sign_key.len();
                 if let Some(end_pos) = find_crlf(headers_bytes, start) {
-                    let mut url_vec = Vec::with_capacity(end_pos - start);
+                    let mut url_vec: Vec<u8> = Vec::with_capacity(end_pos - start);
                     url_vec.extend_from_slice(&headers_bytes[start..end_pos]);
                     *redirect_url = Some(url_vec);
                 }

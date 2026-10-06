@@ -10,7 +10,9 @@ pub struct ServerConfig {
     #[set(type(AsRef<str>))]
     pub(super) address: String,
     /// The `TCP_NODELAY` option for sockets.
+    #[get(type(copy))]
     pub(super) nodelay: Option<bool>,
     /// The `IP_TTL` option for sockets.
+    #[get(type(copy))]
     pub(super) ttl: Option<u32>,
 }

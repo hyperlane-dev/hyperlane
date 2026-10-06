@@ -9,13 +9,13 @@ use super::*;
 ///
 /// # Arguments
 ///
-/// - `data` - A reference to a byte slice (`&[u8]`) containing the data to be compressed.
-/// - `buffer_size` - The buffer size to use for the buffered writer. A larger buffer size can
+/// - `&'_ [u8]` - A reference to a byte slice containing the data to be compressed.
+/// - `usize` - The buffer size to use for the buffered writer. A larger buffer size can
 ///   improve performance for larger datasets.
 ///
 /// # Returns
 ///
-/// - `Cow<[u8]>` - The compressed data as a `Cow<[u8]>`. If compression is successful, the
+/// - `Cow<'_, [u8]>` - The compressed data. If compression is successful, the
 ///   compressed data is returned as an owned `Vec<u8>`. If an error occurs, an empty owned `Vec<u8>`
 ///   is returned.
 pub fn encode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
@@ -26,11 +26,7 @@ pub fn encode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
         return Cow::Owned(Vec::new());
     }
     match buffered_writer.into_inner() {
-        Ok(encoder) => Cow::Owned(
-            encoder
-                .finish()
-                .unwrap_or_else(|_: std::io::Error| Vec::new()),
-        ),
+        Ok(encoder) => Cow::Owned(encoder.finish().unwrap_or_else(|_: io::Error| Vec::new())),
         Err(_) => Cow::Owned(Vec::new()),
     }
 }
@@ -39,12 +35,12 @@ pub fn encode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
 ///
 /// # Arguments
 ///
-/// - `&[u8]` - The compressed data to decode.
+/// - `&'_ [u8]` - A reference to a byte slice containing the compressed data to decode.
 /// - `usize` - The buffer size for decompression.
 ///
 /// # Returns
 ///
-/// - `Cow<[u8]>` - The decompressed data.
+/// - `Cow<'_, [u8]>` - The decompressed data.
 pub fn decode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
     let decoder: DeflateDecoder<&[u8]> = DeflateDecoder::new(data);
     let mut buffered_reader: BufReader<DeflateDecoder<&[u8]>> =

@@ -323,6 +323,6 @@ impl RequestBuilder {
     ///
     /// - `HttpRequest` - The finalised request, leaving the builder empty.
     pub fn build(&mut self) -> HttpRequest {
-        std::mem::take(self.get_mut_request())
+        mem::take(self.get_mut_request())
     }
 }

@@ -20,11 +20,11 @@ pub(crate) fn request_body_macro(
     let multi_body: MultiRequestBodyData = parse_macro_input!(attr as MultiRequestBodyData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_body.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_body.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: &::hyperlane::RequestBody = #new_context.get_request().get_body();
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -51,11 +51,11 @@ pub(crate) fn request_body_json_result_macro(
     let multi_body_json: MultiRequestBodyJsonData =
         parse_macro_input!(attr as MultiRequestBodyJsonData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_body_json.params.iter().map(|(variable, type_name): &(syn::Ident, syn::Type)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_body_json.params.iter().map(|(variable, type_name): &(syn::Ident, syn::Type)| {
             quote! {
                 let #variable: Result<#type_name, ::hyperlane::serde_json::Error> = #context.get_request().try_get_body_json::<#type_name>();
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -82,11 +82,11 @@ pub(crate) fn request_body_json_macro(
     let multi_body_json: MultiRequestBodyJsonData =
         parse_macro_input!(attr as MultiRequestBodyJsonData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_body_json.params.iter().map(|(variable, type_name): &(syn::Ident, syn::Type)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_body_json.params.iter().map(|(variable, type_name): &(syn::Ident, syn::Type)| {
             quote! {
                 let #variable: #type_name = #context.get_request().get_body_json::<#type_name>();
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -112,13 +112,17 @@ pub(crate) fn try_get_attribute_macro(
 ) -> TokenStream {
     let multi_attr: MultiAttributeData = parse_macro_input!(attr as MultiAttributeData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_attr.params.iter().map(
-            |(key_name, variable, type_name): &(syn::Expr, syn::Ident, syn::Type)| {
-                quote! {
-                    let #variable: Option<#type_name> = #context.try_get_attribute(&#key_name);
-                }
-            },
-        );
+        let statements: Vec<proc_macro2::TokenStream> = multi_attr
+            .params
+            .iter()
+            .map(
+                |(key_name, variable, type_name): &(syn::Expr, syn::Ident, syn::Type)| {
+                    quote! {
+                        let #variable: Option<#type_name> = #context.try_get_attribute(&#key_name);
+                    }
+                },
+            )
+            .collect();
         quote! {
             #(#statements)*
         }
@@ -144,13 +148,17 @@ pub(crate) fn attribute_macro(
 ) -> TokenStream {
     let multi_attr: MultiAttributeData = parse_macro_input!(attr as MultiAttributeData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_attr.params.iter().map(
-            |(key_name, variable, type_name): &(syn::Expr, syn::Ident, syn::Type)| {
-                quote! {
-                    let #variable: #type_name = #context.get_attribute(&#key_name);
-                }
-            },
-        );
+        let statements: Vec<proc_macro2::TokenStream> = multi_attr
+            .params
+            .iter()
+            .map(
+                |(key_name, variable, type_name): &(syn::Expr, syn::Ident, syn::Type)| {
+                    quote! {
+                        let #variable: #type_name = #context.get_attribute(&#key_name);
+                    }
+                },
+            )
+            .collect();
         quote! {
             #(#statements)*
         }
@@ -177,11 +185,11 @@ pub(crate) fn attributes_macro(
     let multi_attrs: MultiAttributesData = parse_macro_input!(attr as MultiAttributesData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_attrs.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_attrs.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: &::hyperlane::ThreadSafeAttributeStore = #new_context.get_attributes();
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -207,11 +215,11 @@ pub(crate) fn try_get_task_panic_data_macro(
 ) -> TokenStream {
     let multi_task_panic_data: MultiPanicData = parse_macro_input!(attr as MultiPanicData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_task_panic_data.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_task_panic_data.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: Option<::hyperlane::PanicData> = #context.try_get_task_panic_data();
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -237,14 +245,15 @@ pub(crate) fn task_panic_data_macro(
 ) -> TokenStream {
     let multi_task_panic_data: MultiPanicData = parse_macro_input!(attr as MultiPanicData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_task_panic_data
+        let statements: Vec<proc_macro2::TokenStream> = multi_task_panic_data
             .variables
             .iter()
             .map(|variable: &syn::Ident| {
                 quote! {
                     let #variable: ::hyperlane::PanicData = #context.get_task_panic_data();
                 }
-            });
+            })
+            .collect();
         quote! {
             #(#statements)*
         }
@@ -270,11 +279,11 @@ pub(crate) fn try_get_request_error_data_macro(
 ) -> TokenStream {
     let multi_error_data: MultiRequestErrorData = parse_macro_input!(attr as MultiRequestErrorData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_error_data.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_error_data.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: Option<::hyperlane::RequestError> = #context.try_get_request_error_data();
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -300,14 +309,15 @@ pub(crate) fn request_error_data_macro(
 ) -> TokenStream {
     let multi_error_data: MultiRequestErrorData = parse_macro_input!(attr as MultiRequestErrorData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_error_data
+        let statements: Vec<proc_macro2::TokenStream> = multi_error_data
             .variables
             .iter()
             .map(|variable: &syn::Ident| {
                 quote! {
                     let #variable: ::hyperlane::RequestError = #context.get_request_error_data();
                 }
-            });
+            })
+            .collect();
         quote! {
             #(#statements)*
         }
@@ -333,11 +343,15 @@ pub(crate) fn try_get_route_param_macro(
 ) -> TokenStream {
     let multi_param: MultiRouteParamData = parse_macro_input!(attr as MultiRouteParamData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_param.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
-            quote! {
-                let #variable: Option<std::string::String> = #context.try_get_route_param(#key_name);
-            }
-        });
+        let statements: Vec<proc_macro2::TokenStream> = multi_param
+            .params
+            .iter()
+            .map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+                quote! {
+                    let #variable: Option<String> = #context.try_get_route_param(#key_name);
+                }
+            })
+            .collect();
         quote! {
             #(#statements)*
         }
@@ -363,15 +377,15 @@ pub(crate) fn route_param_macro(
 ) -> TokenStream {
     let multi_param: MultiRouteParamData = parse_macro_input!(attr as MultiRouteParamData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements =
-            multi_param
-                .params
-                .iter()
-                .map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
-                    quote! {
-                        let #variable: std::string::String = #context.get_route_param(#key_name);
-                    }
-                });
+        let statements: Vec<proc_macro2::TokenStream> = multi_param
+            .params
+            .iter()
+            .map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+                quote! {
+                    let #variable: String = #context.get_route_param(#key_name);
+                }
+            })
+            .collect();
         quote! {
             #(#statements)*
         }
@@ -398,14 +412,15 @@ pub(crate) fn route_params_macro(
     let multi_route_params: MultiRouteParamsData = parse_macro_input!(attr as MultiRouteParamsData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_route_params
+        let statements: Vec<proc_macro2::TokenStream> = multi_route_params
             .variables
             .iter()
             .map(|variable: &syn::Ident| {
                 quote! {
                     let #variable: &::hyperlane::RouteParams = #new_context.get_route_params();
                 }
-            });
+            })
+            .collect();
         quote! {
             #(#statements)*
         }
@@ -431,11 +446,11 @@ pub(crate) fn try_get_request_query_macro(
 ) -> TokenStream {
     let multi_query: MultiQueryData = parse_macro_input!(attr as MultiQueryData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_query.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_query.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
                 let #variable: Option<::hyperlane::RequestQuerysValue> = #context.get_request().try_get_query(#key_name);
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -461,11 +476,11 @@ pub(crate) fn request_query_macro(
 ) -> TokenStream {
     let multi_query: MultiQueryData = parse_macro_input!(attr as MultiQueryData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_query.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_query.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
                 let #variable: ::hyperlane::RequestQuerysValue = #context.get_request().get_query(#key_name);
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -492,11 +507,11 @@ pub(crate) fn request_querys_macro(
     let multi_querys: MultiQuerysData = parse_macro_input!(attr as MultiQuerysData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_querys.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_querys.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: &::hyperlane::RequestQuerys = #new_context.get_request().get_querys();
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -522,11 +537,11 @@ pub(crate) fn try_get_request_header_macro(
 ) -> TokenStream {
     let multi_header: MultiHeaderData = parse_macro_input!(attr as MultiHeaderData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_header.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_header.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
                 let #variable: Option<::hyperlane::RequestHeadersValueItem> = #context.get_request().try_get_header_back(#key_name);
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -552,11 +567,11 @@ pub(crate) fn request_header_macro(
 ) -> TokenStream {
     let multi_header: MultiHeaderData = parse_macro_input!(attr as MultiHeaderData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_header.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_header.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
                 let #variable: ::hyperlane::RequestHeadersValueItem = #context.get_request().get_header_back(#key_name);
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -583,11 +598,11 @@ pub(crate) fn request_headers_macro(
     let multi_headers: MultiHeadersData = parse_macro_input!(attr as MultiHeadersData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_headers.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_headers.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: &::hyperlane::RequestHeaders = #new_context.get_request().get_headers();
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -613,11 +628,11 @@ pub(crate) fn try_get_request_cookie_macro(
 ) -> TokenStream {
     let multi_cookie: MultiCookieData = parse_macro_input!(attr as MultiCookieData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_cookie.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_cookie.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
                 let #variable: Option<::hyperlane::CookieValue> = #context.get_request().try_get_cookie(#key_name);
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -643,11 +658,11 @@ pub(crate) fn request_cookie_macro(
 ) -> TokenStream {
     let multi_cookie: MultiCookieData = parse_macro_input!(attr as MultiCookieData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_cookie.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_cookie.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
                 let #variable: ::hyperlane::CookieValue = #context.get_request().get_cookie(#key_name);
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -673,11 +688,15 @@ pub(crate) fn request_cookies_macro(
 ) -> TokenStream {
     let multi_cookies: MultiCookiesData = parse_macro_input!(attr as MultiCookiesData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_cookies.variables.iter().map(|variable: &syn::Ident| {
-            quote! {
-                let #variable: ::hyperlane::Cookies = #context.get_request().get_cookies();
-            }
-        });
+        let statements: Vec<proc_macro2::TokenStream> = multi_cookies
+            .variables
+            .iter()
+            .map(|variable: &syn::Ident| {
+                quote! {
+                    let #variable: ::hyperlane::Cookies = #context.get_request().get_cookies();
+                }
+            })
+            .collect();
         quote! {
             #(#statements)*
         }
@@ -705,11 +724,11 @@ pub(crate) fn request_version_macro(
         parse_macro_input!(attr as MultiRequestVersionData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_version.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_version.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: &::hyperlane::RequestVersion = #new_context.get_request().get_version();
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -736,11 +755,11 @@ pub(crate) fn request_path_macro(
     let multi_path: MultiRequestPathData = parse_macro_input!(attr as MultiRequestPathData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_path.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_path.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: &::hyperlane::RequestPath = #new_context.get_request().get_path();
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }

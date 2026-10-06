@@ -4,6 +4,7 @@ use hyperlane_cli::*;
 
 use std::process::exit;
 
+/// Parses the command line arguments and dispatches the selected sub-command.
 #[tokio::main]
 async fn main() {
     Logger::init(log::LevelFilter::Info);

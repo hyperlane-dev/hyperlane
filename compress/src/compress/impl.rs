@@ -17,7 +17,7 @@ impl FromStr for Compress {
     ///
     /// # Arguments
     ///
-    /// - `data` - The string to parse, which should be a compression algorithm name.
+    /// - `&str` - The string to parse, which should be a compression algorithm name.
     ///
     /// # Returns
     ///
@@ -39,6 +39,18 @@ impl FromStr for Compress {
 /// This allows the `Compress` enum variants to be formatted as strings,
 /// typically used for outputting the `Content-Encoding` header value.
 impl fmt::Display for Compress {
+    /// Formats the `Compress` value as its `Content-Encoding` header token.
+    ///
+    /// `Compress::Unknown` formats as the empty string, since it has no
+    /// `Content-Encoding` representation.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut fmt::Formatter<'_>` - The formatter to write the value into.
+    ///
+    /// # Returns
+    ///
+    /// - `fmt::Result` - The result of the formatting operation.
     #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let display_str: &str = match *self {
@@ -60,8 +72,7 @@ impl Compress {
     ///
     /// # Returns
     ///
-    /// - `true` if the instance is of type `Unknown`.
-    /// - `false` otherwise.
+    /// - `bool`: `true` if the instance is of type `Unknown`, `false` otherwise.
     #[inline(always)]
     pub fn is_unknown(&self) -> bool {
         *self == Self::Unknown
@@ -74,12 +85,13 @@ impl Compress {
     ///
     /// # Arguments
     ///
-    /// - `header` - The HTTP header from which the compression type is to be extracted.
+    /// - `&HashMap<String, String, BuildHasherDefault<XxHash3_64>>` - The HTTP header from which
+    ///   the compression type is to be extracted.
     ///
     /// # Returns
     ///
-    /// - The `Compress` value corresponding to the `Content-Encoding` header, or `Compress::Unknown`
-    ///   if the header does not match any known compression types.
+    /// - `Self` - The `Compress` value corresponding to the `Content-Encoding` header, or
+    ///   `Compress::Unknown` if the header does not match any known compression types.
     #[inline(always)]
     pub fn from(header: &HashMap<String, String, BuildHasherDefault<XxHash3_64>>) -> Self {
         header
@@ -97,16 +109,16 @@ impl Compress {
     /// - `Br` - Decompresses using Brotli compression.
     /// - `Unknown` - Returns the input data as-is (no decompression performed).
     ///
-    /// # Parameters
+    /// # Arguments
     ///
-    /// - `data` - A reference to a byte slice (`&[u8]`) containing the compressed data to be decoded.
-    /// - `buffer_size` - The buffer size to use for the decompression process. A larger buffer size can
+    /// - `&'a [u8]` - A reference to a byte slice containing the compressed data to be decoded.
+    /// - `usize` - The buffer size to use for the decompression process. A larger buffer size can
     ///   improve performance for larger datasets.
     ///
     /// # Returns
     ///
-    /// - `Cow<[u8]>` - The decompressed data as a `Cow<[u8]>`. If the compression algorithm
-    ///   is `Unknown`, the original data is returned unchanged, as a borrowed reference. Otherwise,
+    /// - `Cow<'a, [u8]>` - The decompressed data. If the compression algorithm
+    ///   is `Unknown`, the original data is returned unchanged, as an owned buffer. Otherwise,
     ///   the decompressed data is returned as an owned `Vec<u8>`.
     pub fn decode<'a>(&self, data: &'a [u8], buffer_size: usize) -> Cow<'a, [u8]> {
         match self {
@@ -126,22 +138,22 @@ impl Compress {
     /// - `Br` - Compresses using Brotli compression.
     /// - `Unknown` - Returns the input data as-is (no compression performed).
     ///
-    /// # Parameters
+    /// # Arguments
     ///
-    /// - `data` - A reference to a byte slice (`&[u8]`) containing the data to be compressed.
-    /// - `buffer_size` - The buffer size to use for the compression process. A larger buffer size can
+    /// - `&'a [u8]` - A reference to a byte slice containing the data to be compressed.
+    /// - `usize` - The buffer size to use for the compression process. A larger buffer size can
     ///   improve performance for larger datasets.
     ///
     /// # Returns
     ///
-    /// - `Cow<[u8]>` - The compressed data as a `Cow<[u8]>`. If the compression algorithm
-    ///   is `Unknown`, the original data is returned unchanged, as a borrowed reference. Otherwise,
+    /// - `Cow<'a, [u8]>` - The compressed data. If the compression algorithm
+    ///   is `Unknown`, the original data is returned unchanged, as an owned buffer. Otherwise,
     ///   the compressed data is returned as an owned `Vec<u8>`.
     pub fn encode<'a>(&self, data: &'a [u8], buffer_size: usize) -> Cow<'a, [u8]> {
         match self {
             Self::Gzip => gzip::encode(data, buffer_size),
             Self::Deflate => deflate::encode(data, buffer_size),
-            Self::Br => brotli::encode(data),
+            Self::Br => brotli::encode(data, buffer_size),
             Self::Unknown => Cow::Owned(data.to_vec()),
         }
     }

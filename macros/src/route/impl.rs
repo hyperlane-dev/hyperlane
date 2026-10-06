@@ -5,6 +5,15 @@ use super::*;
 /// This implementation defines how to parse a `TokenStream` into a `RouteAttr` struct,
 /// extracting the path expression from the input.
 impl Parse for RouteAttr {
+    /// Parses the input token stream into a RouteAttr structure.
+    ///
+    /// # Arguments
+    ///
+    /// - `ParseStream` - The token stream to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Self>` - The parsed RouteAttr, or an error for invalid input.
     fn parse(input: ParseStream) -> Result<Self> {
         let first_expr: Expr = input.parse()?;
         Ok(RouteAttr { path: first_expr })

@@ -50,3 +50,68 @@ fn test_new_project_config_debug() {
     let debug_str: String = format!("{config:?}");
     assert!(debug_str.contains("test"));
 }
+
+#[test]
+fn test_new_project_config_fields_are_mutable() {
+    let mut config: NewProjectConfig = NewProjectConfig::new("first".to_string());
+    config.project_name = "second".to_string();
+    config.template_url = "https://example.test/repo".to_string();
+    assert_eq!(config.project_name, "second");
+    assert_eq!(config.template_url, "https://example.test/repo");
+}
+
+#[test]
+fn test_new_project_config_new_keeps_given_name() {
+    let config: NewProjectConfig = NewProjectConfig::new(String::new());
+    assert_eq!(config.project_name, "");
+    assert!(config.template_url.starts_with("https://"));
+}
+
+#[tokio::test]
+async fn test_execute_new_rejects_empty_project_name() {
+    let result: Result<(), NewError> = execute_new("").await;
+    assert!(result.is_err());
+    let error: NewError = result.unwrap_err();
+    assert!(error.to_string().contains("Invalid project name"));
+    assert!(error.to_string().contains("empty"));
+}
+
+#[tokio::test]
+async fn test_execute_new_rejects_path_separators() {
+    let slash: Result<(), NewError> = execute_new("a/b").await;
+    assert!(
+        slash
+            .unwrap_err()
+            .to_string()
+            .contains("invalid characters")
+    );
+    let backslash: Result<(), NewError> = execute_new("a\\b").await;
+    assert!(
+        backslash
+            .unwrap_err()
+            .to_string()
+            .contains("invalid characters")
+    );
+    let colon: Result<(), NewError> = execute_new("a:b").await;
+    assert!(
+        colon
+            .unwrap_err()
+            .to_string()
+            .contains("invalid characters")
+    );
+}
+
+#[tokio::test]
+async fn test_execute_new_rejects_dot_and_dash_prefix() {
+    let dot: Result<(), NewError> = execute_new(".hidden").await;
+    assert!(dot.unwrap_err().to_string().contains("cannot start"));
+    let dash: Result<(), NewError> = execute_new("-flag").await;
+    assert!(dash.unwrap_err().to_string().contains("cannot start"));
+}
+
+#[tokio::test]
+async fn test_execute_new_name_check_precedes_git_probe() {
+    let result: Result<(), NewError> = execute_new("..").await;
+    let error: NewError = result.unwrap_err();
+    assert!(matches!(error, NewError::InvalidName(message) if message.contains("cannot start")));
+}

@@ -18,12 +18,12 @@ use std::{
     borrow::Cow,
     collections::HashMap,
     fmt,
-    io::{BufReader, BufWriter, Read, prelude::*},
+    io::{self, BufReader, BufWriter, Read, prelude::*},
     str::FromStr,
 };
 
 use {
-    ::brotli::Decompressor,
+    ::brotli::{CompressorWriter, Decompressor},
     core::hash::BuildHasherDefault,
     flate2::{
         Compression,

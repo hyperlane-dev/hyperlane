@@ -85,7 +85,8 @@ impl Task {
     ///
     /// - `Option<usize>` - An optional index to force selection of a specific worker.
     ///   If None, the worker is selected using round-robin distribution.
-    /// - `Future<Output = ()> + Send + 'static` - The future to spawn on the task pool.
+    /// - `F` - The future to spawn on the task pool, which requires the
+    ///   `Future<Output = ()> + Send + 'static` bound.
     ///
     /// # Returns
     ///

@@ -79,6 +79,6 @@ pub trait ServerHook: Send + Sync + 'static {
     ///
     /// # Returns
     ///
-    /// - `Status` - `Status::Continue` if the pipeline should proceed, `Status::Reject` if the pipeline should be aborted.
+    /// - `impl Future<Output = Status>` - `Status::Continue` if the pipeline should proceed, `Status::Reject` if the pipeline should be aborted.
     fn handle(self, stream: &mut Stream, ctx: &mut Context) -> impl Future<Output = Status> + Send;
 }

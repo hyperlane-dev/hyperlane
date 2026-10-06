@@ -23,7 +23,7 @@ fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) 
     let (macro_name, macro_attr) = match macro_meta {
         Meta::Path(path) => (
             path.get_ident()
-                .expect("Macro path should have an identifier")
+                .expect(MACRO_PATH_SHOULD_HAVE_IDENTIFIER)
                 .to_string(),
             TokenStream::new(),
         ),
@@ -31,7 +31,7 @@ fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) 
             meta_list
                 .path
                 .get_ident()
-                .expect("Macro path should have an identifier")
+                .expect(MACRO_PATH_SHOULD_HAVE_IDENTIFIER)
                 .to_string(),
             meta_list.tokens.clone().into(),
         ),
@@ -70,7 +70,7 @@ fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) 
 pub(crate) fn prologue_macros_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let metas: Punctuated<Meta, Comma> = Punctuated::<Meta, Token![,]>::parse_terminated
         .parse(attr)
-        .expect("Failed to parse macro attributes");
+        .expect(FAILED_TO_PARSE_MACRO_ATTRIBUTES);
     let mut current_stream: TokenStream = item;
     for meta in metas.iter().rev() {
         current_stream = apply_macro(meta, current_stream, Position::Prologue);
@@ -94,7 +94,7 @@ pub(crate) fn prologue_macros_macro(attr: TokenStream, item: TokenStream) -> Tok
 pub(crate) fn epilogue_macros_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let metas: Punctuated<Meta, Comma> = Punctuated::<Meta, Token![,]>::parse_terminated
         .parse(attr)
-        .expect("Failed to parse macro attributes");
+        .expect(FAILED_TO_PARSE_MACRO_ATTRIBUTES);
     let mut current_stream: TokenStream = item;
     for meta in metas.iter() {
         current_stream = apply_macro(meta, current_stream, Position::Epilogue);

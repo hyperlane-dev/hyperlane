@@ -83,11 +83,14 @@ pub(crate) fn prologue_hooks_macro(
         position,
         item,
         |context: &syn::Ident, stream: &syn::Ident| {
-            let hook_calls = functions.iter().map(|function_expr: &syn::Expr| {
-                quote! {
-                    let _ = #function_expr(#stream, #context).await;
-                }
-            });
+            let hook_calls: Vec<proc_macro2::TokenStream> = functions
+                .iter()
+                .map(|function_expr: &syn::Expr| {
+                    quote! {
+                        let _ = #function_expr(#stream, #context).await;
+                    }
+                })
+                .collect();
             quote! {
                 #(#hook_calls)*
             }
@@ -117,11 +120,14 @@ pub(crate) fn epilogue_hooks_macro(
         position,
         item,
         |context: &syn::Ident, stream: &syn::Ident| {
-            let hook_calls = functions.iter().map(|function_expr: &syn::Expr| {
-                quote! {
-                    let _ = #function_expr(#stream, #context).await;
-                }
-            });
+            let hook_calls: Vec<proc_macro2::TokenStream> = functions
+                .iter()
+                .map(|function_expr: &syn::Expr| {
+                    quote! {
+                        let _ = #function_expr(#stream, #context).await;
+                    }
+                })
+                .collect();
             quote! {
                 #(#hook_calls)*
             }

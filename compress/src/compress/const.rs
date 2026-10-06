@@ -12,3 +12,9 @@ pub const CONTENT_ENCODING_BROTLI: &str = "br";
 
 /// An empty string.
 pub const EMPTY_STR: &str = "";
+
+/// The default brotli compression quality.
+pub const BROTLI_DEFAULT_QUALITY: u32 = 5;
+
+/// The default brotli sliding window size, in bits.
+pub const BROTLI_DEFAULT_WINDOW_BITS: u32 = 22;

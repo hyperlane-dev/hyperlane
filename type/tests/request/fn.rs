@@ -214,10 +214,10 @@ fn request_error_default() {
 
 #[test]
 fn request_error_from_io_error() {
-    let io_error: std::io::Error = std::io::Error::new(ErrorKind::ConnectionReset, "reset");
+    let io_error: io::Error = io::Error::new(ErrorKind::ConnectionReset, "reset");
     let request_error: RequestError = RequestError::from(io_error);
     assert!(matches!(request_error, RequestError::ClientDisconnected(_)));
-    let io_error: std::io::Error = std::io::Error::other("other");
+    let io_error: io::Error = io::Error::other("other");
     let request_error: RequestError = RequestError::from(io_error);
     assert!(matches!(request_error, RequestError::ReadConnection(_)));
 }

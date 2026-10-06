@@ -1,6 +1,39 @@
 use super::*;
 
 #[test]
+fn test_parse_args_defaults_to_help_without_command_tokens() {
+    let recognised: bool = args().any(|item: String| {
+        matches!(
+            item.as_str(),
+            "-h" | "--help" | "-v" | "--version" | "watch" | "new" | "template"
+        )
+    });
+    if recognised {
+        return;
+    }
+    let args: Args = parse_args();
+    assert_eq!(args.command, CommandType::Help);
+    assert!(args.project_name.is_none());
+    assert!(args.template_type.is_none());
+    assert!(args.model_sub_type.is_none());
+    assert!(args.component_name.is_none());
+}
+
+#[test]
+fn test_parse_args_returns_populated_args() {
+    let args: Args = parse_args();
+    let command: CommandType = args.command;
+    assert!(matches!(
+        command,
+        CommandType::Watch
+            | CommandType::New
+            | CommandType::Template
+            | CommandType::Help
+            | CommandType::Version
+    ));
+}
+
+#[test]
 fn test_args_default_values() {
     let args: Args = Args {
         command: CommandType::Help,
