@@ -205,9 +205,6 @@ pub const STATUS_CODE_102: &str = "102";
 /// HTTP status code 103 as string: Early Hints
 pub const STATUS_CODE_103: &str = "103";
 
-/// HTTP status code 200 as string: OK
-pub const STATUS_CODE_200: &str = "200";
-
 /// HTTP status code 201 as string: Created
 pub const STATUS_CODE_201: &str = "201";
 
@@ -217,14 +214,8 @@ pub const STATUS_CODE_202: &str = "202";
 /// HTTP status code 203 as string: Non-Authoritative Information
 pub const STATUS_CODE_203: &str = "203";
 
-/// HTTP status code 204 as string: No Content
-pub const STATUS_CODE_204: &str = "204";
-
 /// HTTP status code 205 as string: Reset Content
 pub const STATUS_CODE_205: &str = "205";
-
-/// HTTP status code 206 as string: Partial Content
-pub const STATUS_CODE_206: &str = "206";
 
 /// HTTP status code 207 as string: Multi-Status
 pub const STATUS_CODE_207: &str = "207";
@@ -247,9 +238,6 @@ pub const STATUS_CODE_302: &str = "302";
 /// HTTP status code 303 as string: See Other
 pub const STATUS_CODE_303: &str = "303";
 
-/// HTTP status code 304 as string: Not Modified
-pub const STATUS_CODE_304: &str = "304";
-
 /// HTTP status code 305 as string: Use Proxy
 pub const STATUS_CODE_305: &str = "305";
 
@@ -259,9 +247,6 @@ pub const STATUS_CODE_307: &str = "307";
 /// HTTP status code 308 as string: Permanent Redirect
 pub const STATUS_CODE_308: &str = "308";
 
-/// HTTP status code 400 as string: Bad Request
-pub const STATUS_CODE_400: &str = "400";
-
 /// HTTP status code 401 as string: Unauthorized
 pub const STATUS_CODE_401: &str = "401";
 
@@ -270,9 +255,6 @@ pub const STATUS_CODE_402: &str = "402";
 
 /// HTTP status code 403 as string: Forbidden
 pub const STATUS_CODE_403: &str = "403";
-
-/// HTTP status code 404 as string: Not Found
-pub const STATUS_CODE_404: &str = "404";
 
 /// HTTP status code 405 as string: Method Not Allowed
 pub const STATUS_CODE_405: &str = "405";
@@ -346,9 +328,6 @@ pub const STATUS_CODE_431: &str = "431";
 /// HTTP status code 451 as string: Unavailable For Legal Reasons
 pub const STATUS_CODE_451: &str = "451";
 
-/// HTTP status code 500 as string: Internal Server Error
-pub const STATUS_CODE_500: &str = "500";
-
 /// HTTP status code 501 as string: Not Implemented
 pub const STATUS_CODE_501: &str = "501";
 
@@ -378,3 +357,24 @@ pub const STATUS_CODE_510: &str = "510";
 
 /// HTTP status code 511 as string: Network Authentication Required
 pub const STATUS_CODE_511: &str = "511";
+
+/// HTTP status code 200 as string: OK
+pub(crate) const STATUS_CODE_200: &str = "200";
+
+/// HTTP status code 204 as string: No Content
+pub(crate) const STATUS_CODE_204: &str = "204";
+
+/// HTTP status code 206 as string: Partial Content
+pub(crate) const STATUS_CODE_206: &str = "206";
+
+/// HTTP status code 304 as string: Not Modified
+pub(crate) const STATUS_CODE_304: &str = "304";
+
+/// HTTP status code 400 as string: Bad Request
+pub(crate) const STATUS_CODE_400: &str = "400";
+
+/// HTTP status code 404 as string: Not Found
+pub(crate) const STATUS_CODE_404: &str = "404";
+
+/// HTTP status code 500 as string: Internal Server Error
+pub(crate) const STATUS_CODE_500: &str = "500";
