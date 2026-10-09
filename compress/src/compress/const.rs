@@ -1,8 +1,8 @@
 /// The header name for content encoding.
-pub const CONTENT_ENCODING: &str = "content-encoding";
+pub(crate) const CONTENT_ENCODING: &str = "content-encoding";
 
 /// An empty string.
-pub const EMPTY_STR: &str = "";
+pub(crate) const EMPTY_STR: &str = "";
 
 /// The content encoding type for gzip.
 pub(crate) const CONTENT_ENCODING_GZIP: &str = "gzip";
