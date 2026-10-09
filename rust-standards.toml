@@ -1,1 +1,1 @@
-pub_const_exempt = ["http-constant"]
+pub_const_exempt = ["constant"]
