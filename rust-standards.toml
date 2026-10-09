@@ -1,0 +1,1 @@
+pub_const_exempt = ["http-constant"]

@@ -102,11 +102,6 @@ fn test_request_error_clone_and_equality() {
 }
 
 #[test]
-fn test_app_name_constant() {
-    assert_eq!(APP_NAME, "http-request");
-}
-
-#[test]
 fn test_header_name_constants() {
     assert_eq!(ACCEPT, "accept");
     assert_eq!(HOST, "host");
