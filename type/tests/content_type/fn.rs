@@ -172,7 +172,6 @@ fn test_content_type_charset_formatting_edge_cases() {
 
 #[test]
 fn test_content_type_memory_size() {
-    use std::mem;
     let size: usize = mem::size_of::<ContentType>();
     assert!(size > 0);
     let json_size: usize = mem::size_of_val(&ContentType::ApplicationJson);

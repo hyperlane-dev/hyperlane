@@ -187,7 +187,6 @@ fn test_http_version_ordering() {
 
 #[test]
 fn test_http_version_memory_size() {
-    use std::mem;
     let size: usize = mem::size_of::<HttpVersion>();
     assert!(size > 0);
     let http11_size: usize = mem::size_of_val(&HttpVersion::Http1_1);
