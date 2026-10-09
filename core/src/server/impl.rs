@@ -406,16 +406,15 @@ impl Server {
     ///
     /// # Arguments
     ///
-    /// - `P` - The route path pattern.
+    /// - `impl AsRef<str>` - The route path pattern.
     ///
     /// # Returns
     ///
     /// - `&mut Self` - Reference to self for method chaining.
     #[inline(always)]
-    pub fn route<S, P>(&mut self, path: P) -> &mut Self
+    pub fn route<S>(&mut self, path: impl AsRef<str>) -> &mut Self
     where
         S: ServerHook,
-        P: AsRef<str>,
     {
         self.get_mut_route_matcher()
             .add(path.as_ref(), Hook::factory::<S>())
