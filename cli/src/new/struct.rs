@@ -1,5 +1,7 @@
+use super::*;
+
 /// Configuration for creating a new project
-#[derive(Clone, Debug)]
+#[derive(Clone, Data, Debug)]
 pub struct NewProjectConfig {
     /// Name of the project to create
     pub project_name: String,

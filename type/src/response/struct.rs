@@ -1,6 +1,9 @@
 use super::*;
 
 /// Represents a parsed HTTP response.
+///
+/// The fields stay `pub`: `type/tests/response` reads them directly, so this is
+/// published API and §17.14 does not recall it (semver).
 #[derive(
     Clone, Debug, Deserialize, DisplayDebug, Eq, Getter, GetterMut, PartialEq, Serialize, Setter,
 )]

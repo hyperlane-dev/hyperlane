@@ -22,15 +22,6 @@ impl Body {
     /// # Returns
     ///
     /// - `&[u8]` - The raw body bytes.
-    pub fn get_bytes_ref(&self) -> &[u8] {
-        &self.bytes
-    }
-
-    /// View body as `&[u8]`.
-    ///
-    /// # Returns
-    ///
-    /// - `&[u8]` - The raw body bytes.
     pub fn as_slice(&self) -> &[u8] {
         self.get_bytes()
     }
@@ -62,7 +53,7 @@ impl Display for Body {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.as_str() {
             Some(s) => f.write_str(s),
-            None => f.write_str(&format!("{:?}", self.bytes)),
+            None => f.write_str(&format!("{:?}", self.get_bytes())),
         }
     }
 }

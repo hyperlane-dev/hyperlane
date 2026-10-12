@@ -4,7 +4,7 @@ use super::*;
 ///
 /// This struct manages broadcast capabilities and holds the internal broadcast map
 /// responsible for handling message distribution to various WebSocket connections.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Data, Debug, Default)]
 pub struct WebSocket {
     /// The internal broadcast map.
     ///
@@ -21,36 +21,46 @@ pub struct WebSocket {
 /// # Type Parameters
 ///
 /// - `B`: The type used for broadcast keys, which must implement `BroadcastTypeTrait`.
+#[derive(Data)]
 pub struct WebSocketConfig<'a, B: BroadcastTypeTrait> {
     /// The underlying stream for this WebSocket connection.
+    #[set(skip)]
     pub(super) stream: &'a mut Stream,
     /// The Hyperlane context.
     ///
     /// This context is associated with this WebSocket connection.
+    #[set(skip)]
     pub(super) context: &'a mut Context,
     /// The capacity.
     ///
     /// This is the capacity of the broadcast sender channel.
+    #[get(type(copy))]
+    #[set(skip)]
     pub(super) capacity: Capacity,
     /// The broadcast type.
     ///
     /// This defines the type of broadcast this WebSocket connection will participate in
     /// (point-to-point or point-to-group).
+    #[set(skip)]
     pub(super) broadcast_type: BroadcastType<B>,
     /// The connected hook handler.
     ///
     /// This hook is executed when the WebSocket connection is established.
+    #[set(skip)]
     pub(super) connected_hook: ServerHookHandler,
     /// The request hook handler.
     ///
     /// This hook is executed when a new request is received on the WebSocket.
+    #[set(skip)]
     pub(super) request_hook: ServerHookHandler,
     /// The sended hook handler.
     ///
     /// This hook is executed after a message has been successfully sent over the WebSocket.
+    #[set(skip)]
     pub(super) sended_hook: ServerHookHandler,
     /// The closed hook handler.
     ///
     /// This hook is executed when the WebSocket connection is closed.
+    #[set(skip)]
     pub(super) closed_hook: ServerHookHandler,
 }

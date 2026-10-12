@@ -15,8 +15,15 @@ pub type RequestPath = String;
 /// An alias for `String`, representing the key type for request query parameters.
 pub type RequestQuerysKey = String;
 
-/// An alias for `String`, representing the value type for request query parameters.
-pub type RequestQuerysValue = String;
+/// An alias for `String`, representing a single value of a request query parameter.
+///
+/// A query key may repeat (`?tag=a&tag=b`), so every key maps to a collection
+/// rather than to one value, which keeps the earlier values instead of dropping
+/// them on the floor the way a single-value map would.
+pub type RequestQuerysValueItem = String;
+
+/// An alias for `VecDeque<RequestQuerysValueItem>`, representing every value of one query parameter.
+pub type RequestQuerysValue = VecDeque<RequestQuerysValueItem>;
 
 /// An alias for `HashMapXxHash3_64<RequestQuerysKey, RequestQuerysValue>`, representing all query parameters parsed from the request URL.
 pub type RequestQuerys = HashMapXxHash3_64<RequestQuerysKey, RequestQuerysValue>;

@@ -1,15 +1,6 @@
 use super::*;
 
 impl RequestBuilder {
-    /// Returns the underlying request mutably.
-    ///
-    /// # Returns
-    ///
-    /// - `&mut HttpRequest` - The mutable request being built.
-    pub fn get_request_mut(&mut self) -> &mut HttpRequest {
-        &mut self.request
-    }
-
     /// Create an empty builder (defaults: GET, no headers, default config).
     pub fn new() -> Self {
         Self::default()
@@ -189,7 +180,7 @@ impl RequestBuilder {
     ///
     /// - `&mut Self` - A mutable reference to this builder for chaining.
     pub fn timeout(&mut self, ms: u64) -> &mut Self {
-        self.get_mut_request().get_config_mut().set_timeout(ms);
+        self.get_mut_request().get_mut_config().set_timeout(ms);
         self
     }
 
@@ -203,7 +194,7 @@ impl RequestBuilder {
     ///
     /// - `&mut Self` - A mutable reference to this builder for chaining.
     pub fn buffer_size(&mut self, n: usize) -> &mut Self {
-        self.get_mut_request().get_config_mut().set_buffer_size(n);
+        self.get_mut_request().get_mut_config().set_buffer_size(n);
         self
     }
 
@@ -214,7 +205,7 @@ impl RequestBuilder {
     /// - `&mut Self` - A mutable reference to this builder for chaining.
     pub fn http1_1_only(&mut self) -> &mut Self {
         self.get_mut_request()
-            .get_config_mut()
+            .get_mut_config()
             .set_http_version(HttpVersion::Http1_1);
         self
     }
@@ -226,7 +217,7 @@ impl RequestBuilder {
     /// - `&mut Self` - A mutable reference to this builder for chaining.
     pub fn http2_only(&mut self) -> &mut Self {
         self.get_mut_request()
-            .get_config_mut()
+            .get_mut_config()
             .set_http_version(HttpVersion::Http2);
         self
     }
@@ -237,7 +228,7 @@ impl RequestBuilder {
     ///
     /// - `&mut Self` - A mutable reference to this builder for chaining.
     pub fn redirect(&mut self) -> &mut Self {
-        self.get_mut_request().get_config_mut().set_redirect(true);
+        self.get_mut_request().get_mut_config().set_redirect(true);
         self
     }
 
@@ -247,7 +238,7 @@ impl RequestBuilder {
     ///
     /// - `&mut Self` - A mutable reference to this builder for chaining.
     pub fn no_redirect(&mut self) -> &mut Self {
-        self.get_mut_request().get_config_mut().set_redirect(false);
+        self.get_mut_request().get_mut_config().set_redirect(false);
         self
     }
 
@@ -262,7 +253,7 @@ impl RequestBuilder {
     /// - `&mut Self` - A mutable reference to this builder for chaining.
     pub fn max_redirect_times(&mut self, n: usize) -> &mut Self {
         self.get_mut_request()
-            .get_config_mut()
+            .get_mut_config()
             .set_max_redirect_times(n);
         self
     }
@@ -273,7 +264,7 @@ impl RequestBuilder {
     ///
     /// - `&mut Self` - A mutable reference to this builder for chaining.
     pub fn decode(&mut self) -> &mut Self {
-        self.get_mut_request().get_config_mut().set_decode(true);
+        self.get_mut_request().get_mut_config().set_decode(true);
         self
     }
 
@@ -283,7 +274,7 @@ impl RequestBuilder {
     ///
     /// - `&mut Self` - A mutable reference to this builder for chaining.
     pub fn no_decode(&mut self) -> &mut Self {
-        self.get_mut_request().get_config_mut().set_decode(false);
+        self.get_mut_request().get_mut_config().set_decode(false);
         self
     }
 
@@ -302,7 +293,7 @@ impl RequestBuilder {
     /// - `&mut Self` - A mutable reference to this builder for chaining.
     pub fn proxy(&mut self, proxy: Proxy) -> &mut Self {
         self.get_mut_request()
-            .get_config_mut()
+            .get_mut_config()
             .set_proxy(Some(proxy));
         self
     }
@@ -313,7 +304,7 @@ impl RequestBuilder {
     ///
     /// - `&mut Self` - A mutable reference to this builder for chaining.
     pub fn no_proxy(&mut self) -> &mut Self {
-        self.get_mut_request().get_config_mut().set_proxy(None);
+        self.get_mut_request().get_mut_config().set_proxy(None);
         self
     }
 
