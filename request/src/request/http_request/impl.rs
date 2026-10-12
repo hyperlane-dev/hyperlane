@@ -98,7 +98,7 @@ impl HttpRequest {
         let mut out: Vec<u8> = Vec::with_capacity(estimated_size);
         for (key, value) in &header {
             out.extend_from_slice(key.as_bytes());
-            out.extend_from_slice(b": ");
+            out.extend_from_slice(HEADER_VALUE_SEPARATOR);
             out.extend_from_slice(value.as_bytes());
             out.extend_from_slice(HTTP_BR_BYTES);
         }
@@ -434,7 +434,7 @@ impl HttpRequest {
         while pos < body_bytes.len() {
             let chunk_size_end: usize = match body_bytes[pos..]
                 .windows(2)
-                .position(|w: &[u8]| w == b"\r\n")
+                .position(|w: &[u8]| w == HTTP_CARRIAGE_RETURN_LINE_FEED)
             {
                 Some(p) => pos + p,
                 None => return false,

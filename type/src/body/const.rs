@@ -27,3 +27,36 @@ pub(crate) const HEX_RADIX: u8 = 16;
 
 /// The offset turning a hexadecimal letter digit into its numeric value.
 pub(crate) const HEX_LOWER_OFFSET: u8 = 10;
+
+/// The blank-line separator between a part header block and its payload.
+pub(crate) const MULTIPART_HEADER_SEPARATOR: &[u8] = b"\n\n";
+
+/// The byte offset consumed by [`MULTIPART_HEADER_SEPARATOR`].
+pub(crate) const MULTIPART_HEADER_SEPARATOR_LEN: usize = 2;
+
+/// The byte a `+` in a URL-encoded form stands in for.
+pub(crate) const URL_ENCODED_SPACE: u8 = b' ';
+
+/// The byte that opens a percent escape in a URL-encoded form.
+pub(crate) const URL_ENCODED_PERCENT: u8 = b'%';
+
+/// The byte that stands in for a space in a URL-encoded form.
+pub(crate) const URL_ENCODED_PLUS: u8 = b'+';
+
+/// The first byte of the decimal digit range in a percent escape.
+pub(crate) const HEX_DIGIT_ZERO: u8 = b'0';
+
+/// The last byte of the decimal digit range in a percent escape.
+pub(crate) const HEX_DIGIT_NINE: u8 = b'9';
+
+/// The first byte of the lowercase hexadecimal range in a percent escape.
+pub(crate) const HEX_DIGIT_LOWER_A: u8 = b'a';
+
+/// The last byte of the lowercase hexadecimal range in a percent escape.
+pub(crate) const HEX_DIGIT_LOWER_F: u8 = b'f';
+
+/// The first byte of the uppercase hexadecimal range in a percent escape.
+pub(crate) const HEX_DIGIT_UPPER_A: u8 = b'A';
+
+/// The last byte of the uppercase hexadecimal range in a percent escape.
+pub(crate) const HEX_DIGIT_UPPER_F: u8 = b'F';

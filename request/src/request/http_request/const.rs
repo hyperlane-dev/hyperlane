@@ -42,3 +42,9 @@ pub(crate) const HEADER_TERMINATOR: &str = "\r\n\r\n";
 
 /// HTTP request-line method token for POST.
 pub(crate) const HTTP_METHOD_POST: &str = "POST";
+
+/// The `": "` separator written between a header name and its value.
+pub(crate) const HEADER_VALUE_SEPARATOR: &[u8] = b": ";
+
+/// The carriage-return / line-feed pair terminating an HTTP header line.
+pub(crate) const HTTP_CARRIAGE_RETURN_LINE_FEED: &[u8] = b"\r\n";

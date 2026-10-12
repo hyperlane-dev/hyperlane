@@ -248,8 +248,8 @@ impl MultipartFormData {
             let data_start: usize = position + HTTP_DOUBLE_BR.len();
             return (&segment[..position], &segment[data_start..]);
         }
-        if let Some(position) = Self::find_subslice(segment, b"\n\n") {
-            let data_start: usize = position + 2;
+        if let Some(position) = Self::find_subslice(segment, MULTIPART_HEADER_SEPARATOR) {
+            let data_start: usize = position + MULTIPART_HEADER_SEPARATOR_LEN;
             return (&segment[..position], &segment[data_start..]);
         }
         (segment, fallback)
@@ -446,11 +446,11 @@ impl MultipartFormData {
         while index < bytes.len() {
             let byte: u8 = bytes[index];
             match byte {
-                b'+' => {
-                    decoded.push(b' ');
+                URL_ENCODED_PLUS => {
+                    decoded.push(URL_ENCODED_SPACE);
                     index += 1;
                 }
-                b'%' if index + 2 < bytes.len() => {
+                byte if byte == URL_ENCODED_PERCENT && index + 2 < bytes.len() => {
                     match Self::parse_hex_pair(&bytes[index + 1], &bytes[index + 2]) {
                         Some(value) => {
                             decoded.push(value);
@@ -498,9 +498,13 @@ impl MultipartFormData {
     /// - `Option<u8>` - The numeric value, or `None` when the byte is not hexadecimal.
     fn hex_digit(byte: &u8) -> Option<u8> {
         match byte {
-            b'0'..=b'9' => Some(byte - b'0'),
-            b'a'..=b'f' => Some(byte - b'a' + HEX_LOWER_OFFSET),
-            b'A'..=b'F' => Some(byte - b'A' + HEX_LOWER_OFFSET),
+            HEX_DIGIT_ZERO..=HEX_DIGIT_NINE => Some(byte - HEX_DIGIT_ZERO),
+            HEX_DIGIT_LOWER_A..=HEX_DIGIT_LOWER_F => {
+                Some(byte - HEX_DIGIT_LOWER_A + HEX_LOWER_OFFSET)
+            }
+            HEX_DIGIT_UPPER_A..=HEX_DIGIT_UPPER_F => {
+                Some(byte - HEX_DIGIT_UPPER_A + HEX_LOWER_OFFSET)
+            }
             _ => None,
         }
     }
