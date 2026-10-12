@@ -7,6 +7,9 @@ use super::*;
 /// when parsing HTTP requests.
 /// Since all fields implement `Copy`, this struct is lightweight
 /// and can be easily cloned and shared.
+///
+/// The fields stay `pub`: `type/tests/request` reads them directly, so this is
+/// published API and §17.14 does not recall it (semver).
 #[derive(Clone, Copy, Data, Debug, Deserialize, DisplayDebug, Eq, New, PartialEq, Serialize)]
 pub struct RequestConfig {
     /// Buffer size for reading operations.
@@ -35,6 +38,9 @@ pub struct RequestConfig {
 /// HTTP request representation.
 ///
 /// Contains all components of an HTTP request.
+///
+/// The fields stay `pub`: `type/tests/request` builds fixtures through them, so
+/// this is published API and §17.14 does not recall it (semver).
 #[derive(
     Clone, Debug, Deserialize, DisplayDebug, Eq, Getter, GetterMut, PartialEq, Serialize, Setter,
 )]

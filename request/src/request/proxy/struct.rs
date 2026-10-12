@@ -24,8 +24,10 @@ pub struct Proxy {
     /// Proxy server port.
     pub port: u16,
     /// Optional username for proxy auth.
+    #[get(type(clone))]
     pub username: Option<String>,
     /// Optional password for proxy auth.
+    #[get(type(clone))]
     pub password: Option<String>,
 }
 
@@ -33,13 +35,13 @@ pub struct Proxy {
 /// pre-read bytes that are returned before delegating to the inner stream.
 #[derive(Data)]
 pub struct ProxyTunnelStream {
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
     pub(super) inner: BoxAsyncReadWrite,
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
     pub(super) pre_read_data: Vec<u8>,
 }
 
@@ -47,12 +49,12 @@ pub struct ProxyTunnelStream {
 /// pre-read bytes that are returned before delegating to the inner stream.
 #[derive(Data)]
 pub struct SyncProxyTunnelStream {
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
     pub(super) inner: BoxReadWrite,
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
     pub(super) pre_read_data: Vec<u8>,
 }

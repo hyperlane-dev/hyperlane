@@ -397,7 +397,8 @@ impl Response {
     {
         let mut deque: VecDeque<String> = VecDeque::with_capacity(1);
         deque.push_back(value.as_ref().to_owned());
-        self.headers.insert(key.as_ref().to_owned(), deque);
+        self.get_mut_headers()
+            .insert(key.as_ref().to_owned(), deque);
         self
     }
 

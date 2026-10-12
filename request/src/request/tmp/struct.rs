@@ -16,7 +16,7 @@ pub struct Tmp {
     #[get(pub(crate))]
     #[get_mut(pub(crate))]
     #[set(pub(crate))]
-    pub(crate) root_cert: RootCertStore,
+    pub(super) root_cert: RootCertStore,
 }
 
 impl Default for Tmp {

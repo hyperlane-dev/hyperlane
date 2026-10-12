@@ -2,6 +2,7 @@ mod any;
 mod arc_mutex;
 mod arc_rwlock;
 mod attribute;
+mod body;
 mod box_leak;
 mod box_rwlock;
 mod content_type;

@@ -390,46 +390,6 @@ where
         self
     }
 
-    /// Returns a mutable reference to the stream served by this configuration.
-    ///
-    /// # Returns
-    ///
-    /// - `&mut Stream` - A mutable reference to the stream.
-    #[inline(always)]
-    pub fn get_stream(&mut self) -> &mut Stream {
-        self.stream
-    }
-
-    /// Retrieves a reference to the context associated with this configuration.
-    ///
-    /// # Returns
-    ///
-    /// - `&mut Context` - A reference to the context object.
-    #[inline(always)]
-    pub fn get_context(&mut self) -> &mut Context {
-        self.context
-    }
-
-    /// Retrieves the capacity configured for the broadcast sender.
-    ///
-    /// # Returns
-    ///
-    /// - `Capacity` - The capacity.
-    #[inline(always)]
-    pub fn get_capacity(&self) -> Capacity {
-        self.capacity
-    }
-
-    /// Retrieves a reference to the broadcast type configured for this WebSocket.
-    ///
-    /// # Returns
-    ///
-    /// - `&BroadcastType<B>` - A reference to the broadcast type object.
-    #[inline(always)]
-    pub fn get_broadcast_type(&self) -> &BroadcastType<B> {
-        &self.broadcast_type
-    }
-
     /// Sets the connected hook handler.
     ///
     /// This hook is executed when the WebSocket connection is established.
@@ -561,46 +521,6 @@ where
         self.closed_hook = Hook::factory::<S>();
         self
     }
-
-    /// Retrieves a reference to the connected hook handler.
-    ///
-    /// # Returns
-    ///
-    /// - `&ServerHookHandler` - A reference to the connected hook handler.
-    #[inline(always)]
-    pub fn get_connected_hook(&self) -> &ServerHookHandler {
-        &self.connected_hook
-    }
-
-    /// Retrieves a reference to the request hook handler.
-    ///
-    /// # Returns
-    ///
-    /// - `&ServerHookHandler` - A reference to the request hook handler.
-    #[inline(always)]
-    pub fn get_request_hook(&self) -> &ServerHookHandler {
-        &self.request_hook
-    }
-
-    /// Retrieves a reference to the sended hook handler.
-    ///
-    /// # Returns
-    ///
-    /// - `&ServerHookHandler` - A reference to the sended hook handler.
-    #[inline(always)]
-    pub fn get_sended_hook(&self) -> &ServerHookHandler {
-        &self.sended_hook
-    }
-
-    /// Retrieves a reference to the closed hook handler.
-    ///
-    /// # Returns
-    ///
-    /// - `&ServerHookHandler` - A reference to the closed hook handler.
-    #[inline(always)]
-    pub fn get_closed_hook(&self) -> &ServerHookHandler {
-        &self.closed_hook
-    }
 }
 
 impl WebSocket {
@@ -614,19 +534,6 @@ impl WebSocket {
     #[inline(always)]
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Returns a shared reference to the internal broadcast map.
-    ///
-    /// Hand-written accessor: the `WebSocket` struct does not derive the lombok
-    /// `Data` macro, and §17.3 forbids reading `self.broadcast_map` directly.
-    ///
-    /// # Returns
-    ///
-    /// - `&BroadcastMap<Vec<u8>>` - A shared reference to the internal broadcast map.
-    #[inline(always)]
-    pub fn get_broadcast_map(&self) -> &BroadcastMap<Vec<u8>> {
-        &self.broadcast_map
     }
 
     /// Subscribes to a broadcast type or inserts a new one if it doesn't exist.

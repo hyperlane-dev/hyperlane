@@ -13,5 +13,5 @@ use super::*;
 #[derive(Clone, Debug, Default, Eq, Getter, PartialEq, Serialize)]
 pub struct Body {
     /// Raw body bytes.
-    pub bytes: Vec<u8>,
+    pub(super) bytes: Vec<u8>,
 }

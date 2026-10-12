@@ -3216,7 +3216,7 @@ pub fn try_get_request_query(attr: TokenStream, item: TokenStream) -> TokenStrea
 ///
 ///     #[prologue_macros(
 ///         request_query("test" => request_query),
-///         response_body(&format!("request query: {request_query}")),
+///         response_body(&format!("request query: {request_query:?}")),
 ///         send
 ///     )]
 ///     async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status { Status::Continue }

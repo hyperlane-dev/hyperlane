@@ -27,5 +27,6 @@ use {
         tokio::sync::broadcast::{Receiver, error::SendError},
         *,
     },
+    lombok_macros::*,
     tokio_broadcast::*,
 };

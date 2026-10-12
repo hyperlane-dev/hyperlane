@@ -28,7 +28,7 @@ impl HttpRequest {
     ///
     /// - `Result<HttpUrlComponents, RequestError>` - The parsed URL components, or a `RequestError` when the URL is malformed.
     pub(crate) fn parse_url(&self) -> Result<HttpUrlComponents, RequestError> {
-        HttpUrlComponents::parse(self.get_url_ref())
+        HttpUrlComponents::parse(self.get_url())
             .map_err(|e: ::http_type::HttpUrlError| RequestError::Request(e.to_string()))
     }
 
@@ -39,8 +39,8 @@ impl HttpRequest {
     /// - `String` - The request path, with the query string appended when present.
     pub(crate) fn full_path(&self) -> String {
         let url_obj: HttpUrlComponents = self.parse_url().unwrap_or_default();
-        let query: String = url_obj.query.unwrap_or_default();
-        let path: String = url_obj.path.unwrap_or_default();
+        let query: String = url_obj.get_query().unwrap_or_default();
+        let path: String = url_obj.get_path().unwrap_or_default();
         if query.is_empty() {
             path
         } else {
@@ -58,7 +58,7 @@ impl HttpRequest {
     ///
     /// - `String` - The lower-cased protocol name.
     pub(crate) fn protocol_lower(config: &RequestConfig) -> String {
-        config.http_version.to_string().to_ascii_lowercase()
+        config.get_http_version().to_string().to_ascii_lowercase()
     }
 
     /// Build the wire-format header bytes, with `Host`, `Content-Length`,
@@ -72,11 +72,11 @@ impl HttpRequest {
     ///
     /// - `Vec<u8>` - The wire-format request header bytes.
     pub(crate) fn header_bytes(&self, body_length: usize) -> Vec<u8> {
-        let mut header: HashMap<String, String> = self.get_headers();
+        let mut header: HashMap<String, String> = self.get_headers().clone();
         let host_value: String = self
             .parse_url()
             .ok()
-            .and_then(|u: ::http_type::HttpUrlComponents| u.host.clone())
+            .and_then(|u: ::http_type::HttpUrlComponents| u.get_host().clone())
             .unwrap_or_default();
         let content_length_value: String = body_length.to_string();
         if !Self::header_has_key(&header, HOST) {
@@ -137,7 +137,7 @@ impl HttpRequest {
                 .to_lowercase()
                 .parse::<ContentType>()
                 .unwrap_or_default()
-                .get_body_string(&String::from_utf8_lossy(self.get_body_ref().as_slice()))
+                .get_body_string(&String::from_utf8_lossy(self.get_body().as_slice()))
                 .into_bytes(),
             None => Vec::new(),
         }
@@ -150,8 +150,8 @@ impl HttpRequest {
     /// - `RequestResult` - The parsed HTTP response, or a `RequestError` on failure.
     pub(crate) fn send_sync(&mut self) -> RequestResult {
         let url_obj: HttpUrlComponents = self.parse_url()?;
-        let host: String = url_obj.host.clone().unwrap_or_default();
-        let port: u16 = self.resolve_port(url_obj.port.unwrap_or_default());
+        let host: String = url_obj.get_host().clone().unwrap_or_default();
+        let port: u16 = self.resolve_port(url_obj.get_port().unwrap_or_default());
         let mut stream: BoxReadWrite = self.open_sync_stream(host, port)?;
         let method: Method = self.get_method();
         if method.is_get() {
@@ -170,8 +170,8 @@ impl HttpRequest {
     /// - `RequestResult` - The parsed HTTP response, or a `RequestError` on failure.
     async fn send_async_impl(&mut self) -> RequestResult {
         let url_obj: HttpUrlComponents = self.parse_url()?;
-        let host: String = url_obj.host.clone().unwrap_or_default();
-        let port: u16 = self.resolve_port(url_obj.port.unwrap_or_default());
+        let host: String = url_obj.get_host().clone().unwrap_or_default();
+        let port: u16 = self.resolve_port(url_obj.get_port().unwrap_or_default());
         let mut stream: BoxAsyncReadWrite = self.open_async_stream(host, port).await?;
         let method: Method = self.get_method();
         if method.is_get() {
@@ -196,7 +196,7 @@ impl HttpRequest {
         if port != 0 {
             return port;
         }
-        let protocol: String = Self::protocol_lower(self.get_config_ref());
+        let protocol: String = Self::protocol_lower(self.get_config());
         Protocol::get_port(&protocol)
     }
 
@@ -206,7 +206,7 @@ impl HttpRequest {
     ///
     /// - `bool` - `true` when the configured protocol is `https`, `false` otherwise.
     fn is_https(&self) -> bool {
-        Self::protocol_lower(self.get_config_ref()) == HTTPS_LOWERCASE
+        Self::protocol_lower(self.get_config()) == HTTPS_LOWERCASE
     }
 
     // ---------- sync stream plumbing ----------
@@ -222,10 +222,10 @@ impl HttpRequest {
     ///
     /// - `Result<BoxReadWrite, RequestError>` - The connected stream, TLS-wrapped for HTTPS, or a `RequestError` on failure.
     fn open_sync_stream(&self, host: String, port: u16) -> Result<BoxReadWrite, RequestError> {
-        if let Some(proxy) = &self.get_config_ref().proxy {
+        if let Some(proxy) = &self.get_config().get_proxy() {
             return self.open_sync_proxy_stream(host, port, proxy);
         }
-        let timeout: Duration = Duration::from_millis(self.get_config_ref().timeout);
+        let timeout: Duration = Duration::from_millis(self.get_config().get_timeout());
         let tcp: TcpStream = TcpStream::connect((host.clone(), port))
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         tcp.set_read_timeout(Some(timeout))
@@ -233,7 +233,7 @@ impl HttpRequest {
         tcp.set_write_timeout(Some(timeout))
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         if self.is_https() {
-            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
+            let roots: RootCertStore = self.get_tmp().get_root_cert().clone();
             let tls_cfg: ClientConfig = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -262,7 +262,7 @@ impl HttpRequest {
     ) -> Result<HttpResponse, RequestError> {
         let path: String = self.full_path();
         let header_bytes: Vec<u8> = self.header_bytes(0);
-        let version: String = self.get_config_ref().http_version.to_string();
+        let version: String = self.get_config().get_http_version().to_string();
         let request: Vec<u8> = build_http_request("GET", path, header_bytes, None, version);
         stream
             .write_all(&request)
@@ -287,7 +287,7 @@ impl HttpRequest {
         let body_bytes: Vec<u8> = self.body_bytes();
         let path: String = self.full_path();
         let header_bytes: Vec<u8> = self.header_bytes(body_bytes.len());
-        let version: String = self.get_config_ref().http_version.to_string();
+        let version: String = self.get_config().get_http_version().to_string();
         let request: Vec<u8> = build_http_request(
             HTTP_METHOD_POST,
             path,
@@ -315,7 +315,7 @@ impl HttpRequest {
         &mut self,
         stream: &mut BoxReadWrite,
     ) -> Result<HttpResponse, RequestError> {
-        let buffer_size: usize = self.get_config_ref().buffer_size;
+        let buffer_size: usize = self.get_config().buffer_size;
         let mut buffer: Vec<u8> = vec![0u8; buffer_size];
         let mut response_bytes: Vec<u8> = Vec::with_capacity(buffer_size.max(8192));
         let mut headers_done: bool = false;
@@ -325,7 +325,7 @@ impl HttpRequest {
         let mut is_chunked: bool = false;
         let version_bytes: Vec<u8> = self
             .config
-            .http_version
+            .get_http_version()
             .to_string()
             .to_ascii_lowercase()
             .into_bytes();
@@ -377,9 +377,9 @@ impl HttpRequest {
             response_bytes.extend_from_slice(&decoded);
         }
         let mut response: HttpResponse = HttpResponse::from_bytes(&response_bytes);
-        if !self.get_config_ref().redirect || redirect_url.is_none() {
-            if self.get_config_ref().decode {
-                response = response.decode(self.get_config_ref().buffer_size);
+        if !self.get_config().get_redirect() || redirect_url.is_none() {
+            if self.get_config().get_decode() {
+                response = response.decode(self.get_config().buffer_size);
             }
             return Ok(response);
         }
@@ -401,19 +401,21 @@ impl HttpRequest {
     ///
     /// - `Result<HttpResponse, RequestError>` - The response of the redirect target, or a `RequestError` when redirects are disabled, looping, or exhausted.
     fn handle_redirect(&mut self, url: String) -> Result<HttpResponse, RequestError> {
-        if !self.get_config_ref().redirect {
+        if !self.get_config().get_redirect() {
             return Err(RequestError::Request(REDIRECT_NOT_ENABLED.to_string()));
         }
-        if self.get_tmp_ref().get_visit_url().contains(&url) {
+        if self.get_tmp().get_visit_url().contains(&url) {
             return Err(RequestError::Request(REDIRECT_URL_DEAD_LOOP.to_string()));
         }
-        self.get_tmp_mut().get_mut_visit_url().insert(url.clone());
-        if self.get_config_ref().max_redirect_times == 0 {
+        self.get_mut_tmp().get_mut_visit_url().insert(url.clone());
+        if self.get_config().get_max_redirect_times() == 0 {
             return Err(RequestError::Request(
                 MAX_REDIRECT_TIMES_EXCEEDED.to_string(),
             ));
         }
-        self.get_config_mut().max_redirect_times -= 1;
+        let remaining: usize = self.get_config().get_max_redirect_times();
+        self.get_mut_config()
+            .set_max_redirect_times(remaining.saturating_sub(1));
         self.set_url(url);
         self.send_sync()
     }
@@ -479,7 +481,7 @@ impl HttpRequest {
         host: String,
         port: u16,
     ) -> Result<BoxAsyncReadWrite, RequestError> {
-        if let Some(proxy) = &self.get_config_ref().proxy {
+        if let Some(proxy) = &self.get_config().get_proxy() {
             return self.open_async_proxy_stream(host, port, proxy).await;
         }
         let tcp: http_type::tokio::net::TcpStream =
@@ -487,7 +489,7 @@ impl HttpRequest {
                 .await
                 .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         if self.is_https() {
-            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
+            let roots: RootCertStore = self.get_tmp().get_root_cert().clone();
             let tls_cfg: ClientConfig = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -519,7 +521,7 @@ impl HttpRequest {
     ) -> Result<HttpResponse, RequestError> {
         let path: String = self.full_path();
         let header_bytes: Vec<u8> = self.header_bytes(0);
-        let version: String = self.get_config_ref().http_version.to_string();
+        let version: String = self.get_config().get_http_version().to_string();
         let request: Vec<u8> = build_http_request("GET", path, header_bytes, None, version);
         stream
             .write_all(&request)
@@ -548,7 +550,7 @@ impl HttpRequest {
         let body_bytes: Vec<u8> = self.body_bytes();
         let path: String = self.full_path();
         let header_bytes: Vec<u8> = self.header_bytes(body_bytes.len());
-        let version: String = self.get_config_ref().http_version.to_string();
+        let version: String = self.get_config().get_http_version().to_string();
         let request: Vec<u8> = build_http_request(
             HTTP_METHOD_POST,
             path,
@@ -580,7 +582,7 @@ impl HttpRequest {
         &mut self,
         stream: &mut BoxAsyncReadWrite,
     ) -> Result<HttpResponse, RequestError> {
-        let buffer_size: usize = self.get_config_ref().buffer_size;
+        let buffer_size: usize = self.get_config().buffer_size;
         let mut buffer: Vec<u8> = vec![0u8; buffer_size];
         let mut response_bytes: Vec<u8> = Vec::with_capacity(buffer_size.max(8192));
         let mut headers_done: bool = false;
@@ -590,7 +592,7 @@ impl HttpRequest {
         let mut is_chunked: bool = false;
         let version_bytes: Vec<u8> = self
             .config
-            .http_version
+            .get_http_version()
             .to_string()
             .to_ascii_lowercase()
             .into_bytes();
@@ -643,9 +645,9 @@ impl HttpRequest {
             response_bytes.extend_from_slice(&decoded);
         }
         let mut response: HttpResponse = HttpResponse::from_bytes(&response_bytes);
-        if !self.get_config_ref().redirect || redirect_url.is_none() {
-            if self.get_config_ref().decode {
-                response = response.decode(self.get_config_ref().buffer_size);
+        if !self.get_config().get_redirect() || redirect_url.is_none() {
+            if self.get_config().get_decode() {
+                response = response.decode(self.get_config().buffer_size);
             }
             return Ok(response);
         }
@@ -667,19 +669,21 @@ impl HttpRequest {
     ///
     /// - `Result<HttpResponse, RequestError>` - The response of the redirect target, or a `RequestError` when redirects are disabled, looping, or exhausted.
     async fn handle_redirect_async(&mut self, url: String) -> Result<HttpResponse, RequestError> {
-        if !self.get_config_ref().redirect {
+        if !self.get_config().get_redirect() {
             return Err(RequestError::Request(REDIRECT_NOT_ENABLED.to_string()));
         }
-        if self.get_tmp_ref().get_visit_url().contains(&url) {
+        if self.get_tmp().get_visit_url().contains(&url) {
             return Err(RequestError::Request(REDIRECT_URL_DEAD_LOOP.to_string()));
         }
-        self.get_tmp_mut().get_mut_visit_url().insert(url.clone());
-        if self.get_config_ref().max_redirect_times == 0 {
+        self.get_mut_tmp().get_mut_visit_url().insert(url.clone());
+        if self.get_config().get_max_redirect_times() == 0 {
             return Err(RequestError::Request(
                 MAX_REDIRECT_TIMES_EXCEEDED.to_string(),
             ));
         }
-        self.get_config_mut().max_redirect_times -= 1;
+        let remaining: usize = self.get_config().get_max_redirect_times();
+        self.get_mut_config()
+            .set_max_redirect_times(remaining.saturating_sub(1));
         self.set_url(url);
         Box::pin(self.send_async()).await
     }
@@ -703,7 +707,7 @@ impl HttpRequest {
         target_port: u16,
         proxy: &Proxy,
     ) -> Result<BoxReadWrite, RequestError> {
-        match proxy.proxy_type {
+        match *proxy.get_proxy_type() {
             ProxyType::Http | ProxyType::Https => {
                 self.open_sync_http_proxy(target_host, target_port, proxy)
             }
@@ -728,19 +732,19 @@ impl HttpRequest {
         target_port: u16,
         proxy: &Proxy,
     ) -> Result<BoxReadWrite, RequestError> {
-        let timeout: Duration = Duration::from_millis(self.get_config_ref().timeout);
-        let tcp: TcpStream = TcpStream::connect((proxy.host.clone(), proxy.port))
+        let timeout: Duration = Duration::from_millis(self.get_config().get_timeout());
+        let tcp: TcpStream = TcpStream::connect((proxy.get_host().clone(), *proxy.get_port()))
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         tcp.set_read_timeout(Some(timeout))
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         tcp.set_write_timeout(Some(timeout))
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        let mut proxy_stream: BoxReadWrite = if proxy.proxy_type == ProxyType::Https {
-            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
+        let mut proxy_stream: BoxReadWrite = if proxy.get_proxy_type() == &ProxyType::Https {
+            let roots: RootCertStore = self.get_tmp().get_root_cert().clone();
             let tls_cfg: ClientConfig = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
-            let dns: ServerName<'static> = ServerName::try_from(proxy.host.clone())
+            let dns: ServerName<'static> = ServerName::try_from(proxy.get_host().clone())
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
             let session: ClientConnection = ClientConnection::new(Arc::new(tls_cfg), dns)
                 .map_err(|e: rustls::Error| RequestError::Request(e.to_string()))?;
@@ -748,7 +752,8 @@ impl HttpRequest {
         } else {
             Box::new(tcp)
         };
-        let connect_request: String = if let (Some(u), Some(p)) = (&proxy.username, &proxy.password)
+        let connect_request: String = if let (Some(u), Some(p)) =
+            (proxy.get_username(), proxy.get_password())
         {
             let auth: String = format!("{u}:{p}");
             let encoded: String = crate::utils::base64_encode(auth.as_bytes());
@@ -786,7 +791,7 @@ impl HttpRequest {
             Vec::new()
         };
         if self.is_https() {
-            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
+            let roots: RootCertStore = self.get_tmp().get_root_cert().clone();
             let tls_cfg: ClientConfig = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -817,18 +822,19 @@ impl HttpRequest {
         target_port: u16,
         proxy: &Proxy,
     ) -> Result<BoxReadWrite, RequestError> {
-        let timeout: Duration = Duration::from_millis(self.get_config_ref().timeout);
-        let mut tcp: TcpStream = TcpStream::connect((proxy.host.clone(), proxy.port))
+        let timeout: Duration = Duration::from_millis(self.get_config().get_timeout());
+        let mut tcp: TcpStream = TcpStream::connect((proxy.get_host().clone(), *proxy.get_port()))
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         tcp.set_read_timeout(Some(timeout))
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         tcp.set_write_timeout(Some(timeout))
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        let auth_methods: Vec<u8> = if proxy.username.is_some() && proxy.password.is_some() {
-            vec![0x05, 0x02, 0x00, 0x02]
-        } else {
-            vec![0x05, 0x01, 0x00]
-        };
+        let auth_methods: Vec<u8> =
+            if proxy.get_username().is_some() && proxy.get_password().is_some() {
+                vec![0x05, 0x02, 0x00, 0x02]
+            } else {
+                vec![0x05, 0x01, 0x00]
+            };
         tcp.write_all(&auth_methods)
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         let mut resp: [u8; 2] = [0u8; 2];
@@ -840,7 +846,7 @@ impl HttpRequest {
         match resp[1] {
             0x00 => {}
             0x02 => {
-                let (Some(u), Some(p)) = (&proxy.username, &proxy.password) else {
+                let (Some(u), Some(p)) = (proxy.get_username(), proxy.get_password()) else {
                     return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
                 };
                 let mut auth_req: Vec<u8> = vec![0x01];
@@ -902,7 +908,7 @@ impl HttpRequest {
             _ => return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string())),
         }
         if self.is_https() {
-            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
+            let roots: RootCertStore = self.get_tmp().get_root_cert().clone();
             let tls_cfg: ClientConfig = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -936,7 +942,7 @@ impl HttpRequest {
         target_port: u16,
         proxy: &Proxy,
     ) -> Result<BoxAsyncReadWrite, RequestError> {
-        match proxy.proxy_type {
+        match *proxy.get_proxy_type() {
             ProxyType::Http | ProxyType::Https => {
                 self.open_async_http_proxy(target_host, target_port, proxy)
                     .await
@@ -965,17 +971,19 @@ impl HttpRequest {
         target_port: u16,
         proxy: &Proxy,
     ) -> Result<BoxAsyncReadWrite, RequestError> {
-        let tcp: http_type::tokio::net::TcpStream =
-            http_type::tokio::net::TcpStream::connect((proxy.host.clone(), proxy.port))
-                .await
-                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        let mut proxy_stream: BoxAsyncReadWrite = if proxy.proxy_type == ProxyType::Https {
-            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
+        let tcp: http_type::tokio::net::TcpStream = http_type::tokio::net::TcpStream::connect((
+            proxy.get_host().clone(),
+            *proxy.get_port(),
+        ))
+        .await
+        .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+        let mut proxy_stream: BoxAsyncReadWrite = if proxy.get_proxy_type() == &ProxyType::Https {
+            let roots: RootCertStore = self.get_tmp().get_root_cert().clone();
             let tls_cfg: ClientConfig = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
             let connector: TlsConnector = TlsConnector::from(Arc::new(tls_cfg));
-            let dns: ServerName<'static> = ServerName::try_from(proxy.host.clone())
+            let dns: ServerName<'static> = ServerName::try_from(proxy.get_host().clone())
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
             let tls: tokio_rustls::client::TlsStream<http_type::tokio::net::TcpStream> = connector
                 .connect(dns, tcp)
@@ -985,7 +993,8 @@ impl HttpRequest {
         } else {
             Box::new(tcp)
         };
-        let connect_request: String = if let (Some(u), Some(p)) = (&proxy.username, &proxy.password)
+        let connect_request: String = if let (Some(u), Some(p)) =
+            (proxy.get_username(), proxy.get_password())
         {
             let auth: String = format!("{u}:{p}");
             let encoded: String = crate::utils::base64_encode(auth.as_bytes());
@@ -1026,7 +1035,7 @@ impl HttpRequest {
             Vec::new()
         };
         if self.is_https() {
-            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
+            let roots: RootCertStore = self.get_tmp().get_root_cert().clone();
             let tls_cfg: ClientConfig = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -1061,15 +1070,17 @@ impl HttpRequest {
         target_port: u16,
         proxy: &Proxy,
     ) -> Result<BoxAsyncReadWrite, RequestError> {
-        let mut tcp: http_type::tokio::net::TcpStream =
-            http_type::tokio::net::TcpStream::connect((proxy.host.clone(), proxy.port))
-                .await
-                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        let auth_methods: Vec<u8> = if proxy.username.is_some() && proxy.password.is_some() {
-            vec![0x05, 0x02, 0x00, 0x02]
-        } else {
-            vec![0x05, 0x01, 0x00]
-        };
+        let mut tcp: http_type::tokio::net::TcpStream = http_type::tokio::net::TcpStream::connect(
+            (proxy.get_host().clone(), *proxy.get_port()),
+        )
+        .await
+        .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+        let auth_methods: Vec<u8> =
+            if proxy.get_username().is_some() && proxy.get_password().is_some() {
+                vec![0x05, 0x02, 0x00, 0x02]
+            } else {
+                vec![0x05, 0x01, 0x00]
+            };
         tcp.write_all(&auth_methods)
             .await
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
@@ -1083,7 +1094,7 @@ impl HttpRequest {
         match resp[1] {
             0x00 => {}
             0x02 => {
-                let (Some(u), Some(p)) = (&proxy.username, &proxy.password) else {
+                let (Some(u), Some(p)) = (proxy.get_username(), proxy.get_password()) else {
                     return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
                 };
                 let mut auth_req: Vec<u8> = vec![0x01u8];
@@ -1153,7 +1164,7 @@ impl HttpRequest {
             _ => return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string())),
         }
         if self.is_https() {
-            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
+            let roots: RootCertStore = self.get_tmp().get_root_cert().clone();
             let tls_cfg: ClientConfig = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -1302,123 +1313,6 @@ impl HttpRequest {
     pub fn set_config(&mut self, config: RequestConfig) -> &mut Self {
         self.config = config;
         self
-    }
-
-    /// Get a copy of the HTTP method.
-    ///
-    /// # Returns
-    ///
-    /// - `Method` - A clone of the configured HTTP method.
-    pub fn get_method(&self) -> Method {
-        self.method.clone()
-    }
-
-    /// Get a clone of the URL string.
-    ///
-    /// # Returns
-    ///
-    /// - `String` - A clone of the configured URL.
-    pub fn get_url(&self) -> String {
-        self.url.clone()
-    }
-
-    /// Get a reference to the URL string.
-    ///
-    /// # Returns
-    ///
-    /// - `&str` - A borrowed slice of the configured URL.
-    pub fn get_url_ref(&self) -> &str {
-        self.url.as_str()
-    }
-
-    /// Get a clone of the request headers map.
-    ///
-    /// # Returns
-    ///
-    /// - `HashMap<String, String>` - A clone of the configured header map.
-    pub fn get_headers(&self) -> HashMap<String, String> {
-        self.headers.clone()
-    }
-
-    /// Get a reference to the request headers map.
-    ///
-    /// # Returns
-    ///
-    /// - `&HashMap<String, String>` - A borrowed reference to the configured header map.
-    pub fn get_headers_ref(&self) -> &HashMap<String, String> {
-        &self.headers
-    }
-
-    /// Returns a mutable reference to the headers map.
-    ///
-    /// # Returns
-    ///
-    /// - `&mut HashMap<String, String>` - The mutable headers map.
-    pub fn get_headers_mut(&mut self) -> &mut HashMap<String, String> {
-        &mut self.headers
-    }
-
-    /// Get a clone of the body.
-    ///
-    /// # Returns
-    ///
-    /// - `Body` - A clone of the configured body.
-    pub fn get_body(&self) -> Body {
-        self.body.clone()
-    }
-
-    /// Get a reference to the body.
-    ///
-    /// # Returns
-    ///
-    /// - `&Body` - A borrowed reference to the configured body.
-    pub fn get_body_ref(&self) -> &Body {
-        &self.body
-    }
-
-    /// Get a clone of the request config.
-    ///
-    /// # Returns
-    ///
-    /// - `RequestConfig` - A clone of the configured request options.
-    pub fn get_config(&self) -> RequestConfig {
-        self.config.clone()
-    }
-
-    /// Get a reference to the request config.
-    ///
-    /// # Returns
-    ///
-    /// - `&RequestConfig` - A borrowed reference to the configured request options.
-    pub fn get_config_ref(&self) -> &RequestConfig {
-        &self.config
-    }
-
-    /// Get a mutable reference to the request config.
-    ///
-    /// # Returns
-    ///
-    /// - `&mut RequestConfig` - A mutable reference to the configured request options.
-    pub fn get_config_mut(&mut self) -> &mut RequestConfig {
-        &mut self.config
-    }
-
-    /// Get a reference to the internal scratch `Tmp`.
-    ///
-    /// # Returns
-    ///
-    /// - `&Tmp` - A borrowed reference to the internal redirect-tracking state.
-    pub(crate) fn get_tmp_ref(&self) -> &Tmp {
-        &self.tmp
-    }
-
-    /// Get a mutable reference to the internal scratch `Tmp`.
-    ///
-    /// # Returns
-    ///
-    /// - `&mut Tmp` - A mutable reference to the internal redirect-tracking state.
-    pub(crate) fn get_tmp_mut(&mut self) -> &mut Tmp {
-        &mut self.tmp
     }
 
     /// Normalize a header key to lowercase so `set_header` /

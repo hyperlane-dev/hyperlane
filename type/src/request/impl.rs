@@ -409,7 +409,8 @@ impl Request {
 
     /// Parses a query string as_ref key-value pairs into the given map.
     ///
-    /// Expects format "key1=value1&key2=value2". Empty values are allowed.
+    /// Expects format "key1=value1&key2=value2". Empty values are allowed, and a
+    /// key that repeats keeps every value instead of letting the last one win.
     /// The target map is expected to be empty; entries are inserted without
     /// reallocating the map when it already has sufficient capacity.
     ///
@@ -425,10 +426,13 @@ impl Request {
         for pair in query.split(AND) {
             if let Some((key, value)) = pair.split_once(EQUAL) {
                 if !key.is_empty() {
-                    querys.insert(key.to_string(), value.to_string());
+                    querys
+                        .entry(key.to_string())
+                        .or_default()
+                        .push_back(value.to_string());
                 }
             } else if !pair.is_empty() {
-                querys.insert(pair.to_string(), String::new());
+                querys.entry(pair.to_string()).or_default();
             }
         }
     }
@@ -627,9 +631,10 @@ impl Request {
         Ok(())
     }
 
-    /// Tries to get a query parameter value by key.
+    /// Tries to get a query parameter by key.
     ///
-    /// The key type must implement AsRef<str> conversion.
+    /// The key type must implement AsRef<str> conversion. A key that repeats in
+    /// the query carries every one of its values.
     ///
     /// # Arguments
     ///
@@ -637,18 +642,19 @@ impl Request {
     ///
     /// # Returns
     ///
-    /// - `Option<RequestQuerysValue>` - The parameter value if exists.
+    /// - `Option<RequestQuerysValue>` - Every value of the parameter if it exists.
     #[inline(always)]
     pub fn try_get_query<K>(&self, key: K) -> Option<RequestQuerysValue>
     where
         K: AsRef<str>,
     {
-        self.querys.get(key.as_ref()).cloned()
+        self.get_querys().get(key.as_ref()).cloned()
     }
 
-    /// Gets a query parameter value by key.
+    /// Tries to get the first query parameter value by key.
     ///
-    /// The key type must implement AsRef<str> conversion.
+    /// Use this when the parameter is expected to appear once; use
+    /// `try_get_query` when every value matters.
     ///
     /// # Arguments
     ///
@@ -656,7 +662,81 @@ impl Request {
     ///
     /// # Returns
     ///
-    /// - `RequestQuerysValue` - The parameter value if exists.
+    /// - `Option<RequestQuerysValueItem>` - The first parameter value if it exists.
+    #[inline(always)]
+    pub fn try_get_query_front<K>(&self, key: K) -> Option<RequestQuerysValueItem>
+    where
+        K: AsRef<str>,
+    {
+        self.get_querys()
+            .get(key.as_ref())
+            .and_then(|values: &VecDeque<String>| values.front().cloned())
+    }
+
+    /// Tries to get the last query parameter value by key.
+    ///
+    /// # Arguments
+    ///
+    /// - `K` - The query parameter key, which implements `AsRef<str>`.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<RequestQuerysValueItem>` - The last parameter value if it exists.
+    #[inline(always)]
+    pub fn try_get_query_back<K>(&self, key: K) -> Option<RequestQuerysValueItem>
+    where
+        K: AsRef<str>,
+    {
+        self.get_querys()
+            .get(key.as_ref())
+            .and_then(|values: &VecDeque<String>| values.back().cloned())
+    }
+
+    /// Tries to get the number of values of a query parameter.
+    ///
+    /// # Arguments
+    ///
+    /// - `K` - The query parameter key, which implements `AsRef<str>`.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<usize>` - The number of values if the parameter exists.
+    #[inline(always)]
+    pub fn try_get_query_size<K>(&self, key: K) -> Option<usize>
+    where
+        K: AsRef<str>,
+    {
+        self.get_querys()
+            .get(key.as_ref())
+            .map(|values: &VecDeque<String>| values.len())
+    }
+
+    /// Checks whether a query parameter exists.
+    ///
+    /// # Arguments
+    ///
+    /// - `K` - The query parameter key, which implements `AsRef<str>`.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - Whether the parameter exists.
+    #[inline(always)]
+    pub fn has_query<K>(&self, key: K) -> bool
+    where
+        K: AsRef<str>,
+    {
+        self.get_querys().contains_key(key.as_ref())
+    }
+
+    /// Gets a query parameter by key.
+    ///
+    /// # Arguments
+    ///
+    /// - `K` - The query parameter key, which implements `AsRef<str>`.
+    ///
+    /// # Returns
+    ///
+    /// - `RequestQuerysValue` - Every value of the parameter.
     ///
     /// # Panics
     ///
@@ -669,7 +749,43 @@ impl Request {
         self.try_get_query(key).unwrap()
     }
 
+    /// Gets the first query parameter value by key.
+    ///
+    /// # Arguments
+    ///
+    /// - `K` - The query parameter key, which implements `AsRef<str>`.
+    ///
+    /// # Returns
+    ///
+    /// - `RequestQuerysValueItem` - The first parameter value.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the query parameter key is not found.
+    #[inline(always)]
+    pub fn get_query_front<K>(&self, key: K) -> RequestQuerysValueItem
+    where
+        K: AsRef<str>,
+    {
+        self.try_get_query_front(key).unwrap()
+    }
+
+    /// Retrieves the number of query parameters.
+    ///
+    /// # Returns
+    ///
+    /// - `usize` - The count of distinct query parameter keys.
+    #[inline(always)]
+    pub fn get_querys_size(&self) -> usize {
+        self.get_querys().len()
+    }
+
     /// Tries to retrieve the value of a request header by its key.
+    ///
+    /// The key is matched case-insensitively, because the parser stores every
+    /// header name lowercased and an HTTP header name is case-insensitive by
+    /// specification. Looking a header up with `Content-Type` and with
+    /// `content-type` therefore find the same value.
     ///
     /// # Arguments
     ///
@@ -683,7 +799,9 @@ impl Request {
     where
         K: AsRef<str>,
     {
-        self.headers.get(key.as_ref()).cloned()
+        self.get_headers()
+            .get(&key.as_ref().to_ascii_lowercase())
+            .cloned()
     }
 
     /// Retrieves the value of a request header by its key.
@@ -721,8 +839,8 @@ impl Request {
     where
         K: AsRef<str>,
     {
-        self.headers
-            .get(key.as_ref())
+        self.get_headers()
+            .get(&key.as_ref().to_ascii_lowercase())
             .and_then(|header_values: &VecDeque<String>| header_values.front().cloned())
     }
 
@@ -761,8 +879,8 @@ impl Request {
     where
         K: AsRef<str>,
     {
-        self.headers
-            .get(key.as_ref())
+        self.get_headers()
+            .get(&key.as_ref().to_ascii_lowercase())
             .and_then(|header_values: &VecDeque<String>| header_values.back().cloned())
     }
 
@@ -801,8 +919,8 @@ impl Request {
     where
         K: AsRef<str>,
     {
-        self.headers
-            .get(key.as_ref())
+        self.get_headers()
+            .get(&key.as_ref().to_ascii_lowercase())
             .map(|header_values: &VecDeque<String>| header_values.len())
     }
 
@@ -834,7 +952,7 @@ impl Request {
     /// - `usize` - The total count of all header values.
     #[inline(always)]
     pub fn get_headers_values_size(&self) -> usize {
-        self.headers
+        self.get_headers()
             .values()
             .map(|header_values: &VecDeque<String>| header_values.len())
             .sum()
@@ -847,7 +965,7 @@ impl Request {
     /// - `usize` - The count of unique header keys.
     #[inline(always)]
     pub fn get_headers_size(&self) -> usize {
-        self.headers.len()
+        self.get_headers().len()
     }
 
     /// Checks if a specific header exists.
@@ -864,7 +982,8 @@ impl Request {
     where
         K: AsRef<str>,
     {
-        self.get_headers().contains_key(key.as_ref())
+        self.get_headers()
+            .contains_key(&key.as_ref().to_ascii_lowercase())
     }
 
     /// Checks if a header contains a specific value.
@@ -883,7 +1002,7 @@ impl Request {
         K: AsRef<str>,
         V: AsRef<str>,
     {
-        if let Some(values) = self.get_headers().get(key.as_ref()) {
+        if let Some(values) = self.get_headers().get(&key.as_ref().to_ascii_lowercase()) {
             values.iter().any(|data: &String| data == value.as_ref())
         } else {
             false
@@ -1046,6 +1165,120 @@ impl Request {
     #[inline(always)]
     pub fn is_ws_upgrade_type(&self) -> bool {
         self.get_upgrade_type().is_ws()
+    }
+
+    /// Checks whether the request declares a `multipart/form-data` body.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - Whether the request content type is `multipart/form-data`.
+    #[inline(always)]
+    pub fn is_multipart_form_data(&self) -> bool {
+        self.try_get_content_type()
+            .map(|content_type: String| MultipartFormData::is_form_data(content_type))
+            .unwrap_or(false)
+    }
+
+    /// Tries to get the request content type with its parameters stripped.
+    ///
+    /// A `Content-Type` header such as `text/html; charset=utf-8` yields the
+    /// media type alone, so a caller comparing against a media type does not
+    /// have to know that parameters may follow it.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<RequestContentType>` - The media type, or `None` when the header is absent.
+    #[inline(always)]
+    pub fn try_get_content_type(&self) -> Option<RequestContentType> {
+        self.try_get_header_front(CONTENT_TYPE)
+            .map(|value: String| {
+                value
+                    .split(SEMICOLON)
+                    .next()
+                    .unwrap_or(EMPTY_STR)
+                    .trim()
+                    .to_ascii_lowercase()
+            })
+    }
+
+    /// Tries to get one parameter of the request `Content-Type` header.
+    ///
+    /// The name is matched case-insensitively and a quoted value is unquoted,
+    /// so both `boundary=abc` and `boundary="abc"` yield `abc`.
+    ///
+    /// # Arguments
+    ///
+    /// - `K` - The parameter name, which requires the `AsRef<str>` bound.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<RequestContentTypeParameter>` - The parameter value, or `None` when absent.
+    pub fn try_get_content_type_parameter<K>(&self, name: K) -> Option<RequestContentTypeParameter>
+    where
+        K: AsRef<str>,
+    {
+        let content_type: String = self.try_get_header_front(CONTENT_TYPE)?;
+        let name: &str = name.as_ref();
+        for parameter in content_type.split(SEMICOLON).skip(1) {
+            let (key, value) = parameter.trim().split_once(EQUAL)?;
+            if !key.trim().eq_ignore_ascii_case(name) {
+                continue;
+            }
+            let value: &str = value.trim();
+            let value: &str = value
+                .strip_prefix(MULTIPART_PARAMETER_QUOTE)
+                .and_then(|value: &str| value.strip_suffix(MULTIPART_PARAMETER_QUOTE))
+                .unwrap_or(value);
+            if !value.is_empty() {
+                return Some(value.to_string());
+            }
+        }
+        None
+    }
+
+    /// Tries to decode a `multipart/form-data` body into its parts.
+    ///
+    /// The boundary is read from the request `Content-Type` header rather than
+    /// guessed, so a body whose content type declares no boundary, a truncated
+    /// body, and a part without a name all yield `None`.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<MultipartFormDataParts>` - The decoded parts, or `None` when unavailable.
+    pub fn try_get_body_form_data(&self) -> Option<MultipartFormDataParts> {
+        let boundary: MultipartFormDataBoundary =
+            self.try_get_content_type_parameter(MULTIPART_BOUNDARY_PARAMETER)?;
+        MultipartFormData::parse(self.get_body(), &boundary)
+    }
+
+    /// Decodes an `application/x-www-form-urlencoded` body into its fields.
+    ///
+    /// # Returns
+    ///
+    /// - `BodyForm` - The decoded form fields.
+    #[inline(always)]
+    pub fn get_body_form(&self) -> BodyForm {
+        MultipartFormData::parse_url_encoded(self.get_body())
+    }
+
+    /// Tries to get a plain text field of a `multipart/form-data` body.
+    ///
+    /// A part that uploads a file is skipped, so a file field never silently
+    /// decodes as text.
+    ///
+    /// # Arguments
+    ///
+    /// - `K` - The form field name, which requires the `AsRef<str>` bound.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<BodyFormValue>` - The field value, or `None` when absent or a file.
+    pub fn try_get_body_form_data_text<K>(&self, name: K) -> Option<BodyFormValue>
+    where
+        K: AsRef<str>,
+    {
+        let parts: MultipartFormDataParts = self.try_get_body_form_data()?;
+        MultipartFormData::try_get_part_text(&parts, name)
     }
 
     /// Checks if the current upgrade type is HTTP/2 cleartext (h2c).

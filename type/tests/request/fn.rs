@@ -51,16 +51,60 @@ fn request_default() {
 #[test]
 fn request_query_operations() {
     let mut request: Request = Request::default();
+    let mut first: VecDeque<String> = VecDeque::new();
+    first.push_back("value1".to_string());
+    request.get_mut_querys().insert("key1".to_string(), first);
+    let mut second: VecDeque<String> = VecDeque::new();
+    second.push_back("value2".to_string());
+    request.get_mut_querys().insert("key2".to_string(), second);
+    assert_eq!(
+        request.try_get_query_front("key1"),
+        Some("value1".to_string())
+    );
+    assert_eq!(
+        request.try_get_query_front("key2"),
+        Some("value2".to_string())
+    );
+    assert_eq!(request.try_get_query_front("key3"), None);
+    assert_eq!(request.get_query_front("key1"), "value1".to_string());
+}
+
+#[test]
+fn request_query_keeps_every_value_of_a_repeated_key() {
+    let mut request: Request = Request::default();
+    let mut values: VecDeque<String> = VecDeque::new();
+    values.push_back("a".to_string());
+    values.push_back("b".to_string());
+    values.push_back("c".to_string());
+    request.get_mut_querys().insert("tag".to_string(), values);
+    let all: RequestQuerysValue = request.get_query("tag");
+    assert_eq!(all.len(), 3);
+    assert_eq!(request.try_get_query_size("tag"), Some(3));
+    assert_eq!(request.try_get_query_front("tag"), Some("a".to_string()));
+    assert_eq!(request.try_get_query_back("tag"), Some("c".to_string()));
+    assert!(request.has_query("tag"));
+    assert!(!request.has_query("missing"));
+    assert_eq!(request.get_querys_size(), 1);
+}
+
+#[test]
+fn request_header_lookup_is_case_insensitive() {
+    let mut request: Request = Request::default();
+    let mut values: VecDeque<String> = VecDeque::new();
+    values.push_back("text/plain".to_string());
     request
-        .querys
-        .insert("key1".to_string(), "value1".to_string());
-    request
-        .querys
-        .insert("key2".to_string(), "value2".to_string());
-    assert_eq!(request.try_get_query("key1"), Some("value1".to_string()));
-    assert_eq!(request.try_get_query("key2"), Some("value2".to_string()));
-    assert_eq!(request.try_get_query("key3"), None);
-    assert_eq!(request.get_query("key1"), "value1".to_string());
+        .get_mut_headers()
+        .insert("content-type".to_string(), values);
+    assert_eq!(
+        request.try_get_header("Content-Type"),
+        request.try_get_header("content-type")
+    );
+    assert!(request.has_header("Content-Type"));
+    assert_eq!(
+        request.try_get_header_front("CONTENT-TYPE"),
+        Some("text/plain".to_string())
+    );
+    assert_eq!(request.try_get_header_size("Content-Type"), Some(1));
 }
 
 #[test]

@@ -45,7 +45,7 @@ pub struct ServerControlHook {
     /// the application exits.
     #[debug(skip)]
     #[set(pub(crate))]
-    pub(super) wait_hook: ServerControlHookHandler<()>,
+    pub(crate) wait_hook: ServerControlHookHandler<()>,
     /// A hook that, when called, initiates a graceful shutdown of the server.
     /// This will stop the server from accepting new connections and allow existing ones
     /// to complete.

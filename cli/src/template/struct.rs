@@ -1,7 +1,7 @@
 use super::*;
 
 /// Configuration for template generation
-#[derive(Clone, Debug)]
+#[derive(Clone, Data, Debug)]
 pub struct TemplateConfig {
     /// Type of template component to generate
     pub template_type: TemplateType,

@@ -21,25 +21,25 @@ pub struct Stream {
 #[derive(Data, New)]
 pub(crate) struct PooledReader<'a> {
     /// The underlying TCP stream being read.
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
     pub(super) stream: &'a mut TcpStream,
     /// The reusable read buffer holding unconsumed bytes in `start..end`.
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
     pub(super) buffer: Vec<u8>,
     /// The index of the first unconsumed byte in the buffer.
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
     #[new(skip)]
     pub(super) start: usize,
     /// The index one past the last valid byte in the buffer.
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
     #[new(skip)]
     pub(super) end: usize,
 }

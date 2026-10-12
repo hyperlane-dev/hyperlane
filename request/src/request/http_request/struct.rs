@@ -10,9 +10,10 @@ use super::*;
 /// `HttpRequest` is constructed either via [`crate::RequestBuilder`] or
 /// directly from its public fields, then sent via [`HttpRequest::send`]
 /// (sync) or [`HttpRequest::send_async`].
-#[derive(Clone, Debug, Default, GetterMut)]
+#[derive(Clone, Debug, Default, Getter, GetterMut)]
 pub struct HttpRequest {
     /// HTTP method (`Method::Get` / `Method::Post` / ...).
+    #[get(type(clone))]
     #[get_mut(skip)]
     pub method: Method,
     /// Target URL (string form, parsed on send).
@@ -24,10 +25,8 @@ pub struct HttpRequest {
     #[get_mut(skip)]
     pub body: Body,
     /// Per-request config: timeout, redirects, proxy, decode, etc.
-    #[get_mut(skip)]
     pub config: RequestConfig,
     /// Internal scratch: redirect-loop tracking + TLS root store.
     /// Private; only `HttpRequest` methods touch it.
-    #[get_mut(skip)]
-    pub(crate) tmp: Tmp,
+    pub tmp: Tmp,
 }

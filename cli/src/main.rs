@@ -9,7 +9,7 @@ use std::process::exit;
 async fn main() {
     Logger::init(log::LevelFilter::Info);
     let args: Args = parse_args();
-    match args.command {
+    match args.get_command() {
         CommandType::Watch => {
             if let Err(error) = execute_watch().await {
                 log::error!("watch failed: {error}");
@@ -17,7 +17,7 @@ async fn main() {
             }
         }
         CommandType::New => {
-            if let Some(project_name) = args.project_name {
+            if let Some(project_name) = args.get_project_name() {
                 if let Err(error) = execute_new(&project_name).await {
                     log::error!("new failed: {error}");
                     exit(1);
@@ -30,7 +30,7 @@ async fn main() {
             }
         }
         CommandType::Template => {
-            let template_type: TemplateType = match args.template_type {
+            let template_type: TemplateType = match args.get_template_type() {
                 Some(tt) => tt,
                 None => {
                     log::error!(
@@ -39,7 +39,7 @@ async fn main() {
                     exit(1);
                 }
             };
-            let component_name: String = match args.component_name {
+            let component_name: String = match args.get_component_name() {
                 Some(cn) => cn,
                 None => {
                     log::error!(
@@ -48,12 +48,12 @@ async fn main() {
                     exit(1);
                 }
             };
-            if template_type == TemplateType::Model && args.model_sub_type.is_none() {
+            if template_type == TemplateType::Model && args.get_model_sub_type().is_none() {
                 log::error!("Error: Model type requires subtype (application|request|response)");
                 exit(1);
             }
             if let Err(error) =
-                execute_template(template_type, &component_name, args.model_sub_type).await
+                execute_template(template_type, &component_name, args.get_model_sub_type()).await
             {
                 log::error!("template failed: {error}");
                 exit(1);
