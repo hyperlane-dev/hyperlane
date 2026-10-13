@@ -11,6 +11,28 @@ pub struct Stream {
     #[get(type(copy))]
     #[get_mut(pub(super))]
     pub(super) closed: bool,
+    /// Bytes read ahead of the current request, already consumed from the
+    /// socket but not yet parsed into a request.
+    ///
+    /// A single socket read can deliver bytes belonging to the next pipelined
+    /// request. Those bytes are carried here between requests so
+    /// HTTP pipelining is not silently dropped.
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    #[new(skip)]
+    pub(super) leftover: Vec<u8>,
+    /// Offset of the first unconsumed byte in `leftover`.
+    #[get(type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    #[new(skip)]
+    pub(super) leftover_start: usize,
+    /// Offset one past the last valid byte in `leftover`.
+    #[get(type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    #[new(skip)]
+    pub(super) leftover_end: usize,
 }
 
 /// A buffered reader over a `TcpStream` with a reusable read buffer.

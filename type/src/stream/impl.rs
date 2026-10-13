@@ -269,8 +269,31 @@ impl Stream {
         let config: RequestConfig = *self.get_request_config();
         let buffer_size: usize = config.get_buffer_size();
         let max_path_size: usize = config.get_max_path_size();
+        // Take any bytes the previous request read ahead, BEFORE borrowing the
+        // socket: those bytes already left the socket and cannot be re-read, so
+        // dropping them would silently discard a pipelined request.
+        let seeded: Vec<u8> = {
+            let start: usize = self.get_leftover_start();
+            let end: usize = self.get_leftover_end();
+            let mut pending: Vec<u8> = Vec::new();
+            if start < end {
+                let leftover: Vec<u8> = mem::take(self.get_mut_leftover());
+                let take: usize = (end - start).min(leftover.len());
+                pending.extend_from_slice(&leftover[start..start + take]);
+            }
+            self.set_leftover(Vec::new());
+            self.set_leftover_start(0);
+            self.set_leftover_end(0);
+            pending
+        };
         let buffer: Vec<u8> = take_read_buffer(buffer_size);
         let mut reader: PooledReader<'_> = PooledReader::new(self.get_mut_stream(), buffer);
+        if !seeded.is_empty() {
+            let target: &mut Vec<u8> = reader.get_mut_buffer();
+            let copy_len: usize = seeded.len().min(target.len());
+            target[..copy_len].copy_from_slice(&seeded[..copy_len]);
+            reader.set_end(copy_len);
+        }
         let mut line: String = String::with_capacity(REQUEST_LINE_BUFFER_CAPACITY);
         AsyncBufReadExt::read_line(&mut reader, &mut line).await?;
         let (method, path, version): (RequestMethod, &str, RequestVersion) =
@@ -286,6 +309,20 @@ impl Stream {
         request.set_method(method);
         request.set_version(version);
         Request::fill_http_body(&mut reader, request.get_mut_body(), content_size).await?;
+        // Preserve bytes read ahead for the next pipelined request: they have
+        // already left the socket and cannot be read again.
+        let reader_start: usize = *reader.get_start();
+        let reader_end: usize = *reader.get_end();
+        let pending: Vec<u8> = if reader_start < reader_end {
+            reader.get_buffer()[reader_start..reader_end].to_vec()
+        } else {
+            Vec::new()
+        };
+        drop(reader);
+        let pending_len: usize = pending.len();
+        self.set_leftover(pending);
+        self.set_leftover_start(0);
+        self.set_leftover_end(pending_len);
         Ok(())
     }
 
