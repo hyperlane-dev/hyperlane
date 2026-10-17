@@ -16,10 +16,6 @@ name = "hyperlane"
 path = "src/main.rs"
 
 [dependencies]
-http-type = { workspace = true }
-hyperlane-core = { workspace = true }
-hyperlane-macros = { workspace = true }
-
 log = { workspace = true }
 tokio = { workspace = true }
 notify = { workspace = true }

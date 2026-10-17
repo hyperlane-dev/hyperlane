@@ -12,7 +12,7 @@ categories = ["network-programming", "web-programming"]
 exclude.workspace = true
 
 [workspace.package]
-version = "21.13.2"
+version = "21.13.3"
 readme = "README.md"
 edition = "2024"
 authors = ["root@ltpp.vip"]
@@ -34,15 +34,15 @@ members = [
 ]
 
 [workspace.dependencies]
-hyperlane = { path = ".", version = "21.13.1" }
-http-type = { path = "type", version = "21.13.1" }
-hyperlane-cli = { path = "cli", version = "21.13.1" }
-hyperlane-core = { path = "core", version = "21.13.1" }
-http-request = { path = "request", version = "21.13.1" }
-http-compress = { path = "compress", version = "21.13.1" }
-http-constant = { path = "constant", version = "21.13.1" }
-hyperlane-macros = { path = "macros", version = "21.13.1" }
-hyperlane-plugin-websocket = { path = "plugin/websocket", version = "21.13.1" }
+hyperlane = { path = ".", version = "21.13.3" }
+http-type = { path = "type", version = "21.13.3" }
+hyperlane-cli = { path = "cli", version = "21.13.3" }
+hyperlane-core = { path = "core", version = "21.13.3" }
+http-request = { path = "request", version = "21.13.3" }
+http-compress = { path = "compress", version = "21.13.3" }
+http-constant = { path = "constant", version = "21.13.3" }
+hyperlane-macros = { path = "macros", version = "21.13.3" }
+hyperlane-plugin-websocket = { path = "plugin/websocket", version = "21.13.3" }
 
 hex = "0.4.3"
 md5 = "0.8.1"
@@ -62,7 +62,6 @@ base64 = "0.23.1"
 chrono = "0.4.45"
 flate2 = "1.1.10"
 dotenvy = "0.15.7"
-futures = "0.3.34"
 lettre = "0.11.22"
 scraper = "0.27.0"
 sysinfo = "0.39.6"
@@ -82,7 +81,6 @@ hot-restart = "10.2.6"
 jwt-service = "10.2.6"
 serde-xml-rs = "0.8.2"
 serde_json = "1.0.151"
-tungstenite = "0.30.0"
 webpki-roots = "1.0.9"
 clonelicious = "10.2.6"
 color-output = "10.2.6"
@@ -98,7 +96,6 @@ instrument-level = "10.2.6"
 rustls-pki-types = "1.15.1"
 bin-encode-decode = "1.1.51"
 recoverable-spawn = "3.9.30"
-tokio-tungstenite = "0.30.0"
 hyperlane-broadcast = "2.0.13"
 std-macro-extensions = "10.2.6"
 recoverable-thread-pool = "2.4.28"
