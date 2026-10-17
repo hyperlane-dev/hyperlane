@@ -292,112 +292,112 @@ pub const SOCKET_ADDRESS: &str = "socket-address";
 pub const TOKEN: &str = "token";
 
 /// The HTTP header field name `accept-language`, used to specify preferred languages for the response.
-pub(crate) const ACCEPT_LANGUAGE: &str = "accept-language";
+pub const ACCEPT_LANGUAGE: &str = "accept-language";
 
 /// The HTTP header field name `authorization`, used to specify authentication credentials.
-pub(crate) const AUTHORIZATION: &str = "authorization";
+pub const AUTHORIZATION: &str = "authorization";
 
 /// The HTTP header field name `cache-control`, used to specify caching directives.
-pub(crate) const CACHE_CONTROL: &str = "cache-control";
+pub const CACHE_CONTROL: &str = "cache-control";
 
 /// The HTTP header field name `date`, used to specify the date and time at which the message was sent.
-pub(crate) const DATE: &str = "date";
+pub const DATE: &str = "date";
 
 /// The HTTP header field name `etag`, used to specify a unique identifier for a resource version.
-pub(crate) const ETAG: &str = "etag";
+pub const ETAG: &str = "etag";
 
 /// The HTTP header field name `last-modified`, used to specify the last modification date of the resource.
-pub(crate) const LAST_MODIFIED: &str = "last-modified";
+pub const LAST_MODIFIED: &str = "last-modified";
 
 /// The HTTP header field name `refresh`, used to specify a time interval for page refresh or redirection.
-pub(crate) const REFRESH: &str = "refresh";
+pub const REFRESH: &str = "refresh";
 
 /// The HTTP header field name `vary`, used to specify that the response may vary based on certain request headers.
-pub(crate) const VARY: &str = "vary";
+pub const VARY: &str = "vary";
 
 /// The HTTP header field `expires`, used to specify the date/time after which the response is considered stale.
-pub(crate) const EXPIRES: &str = "expires";
+pub const EXPIRES: &str = "expires";
 
 /// The HTTP header field `if-match`, used to make a request conditional based on etag values.
-pub(crate) const IF_MATCH: &str = "if-match";
+pub const IF_MATCH: &str = "if-match";
 
 /// The HTTP header field `if-none-match`, used to make a request conditional based on etag values.
-pub(crate) const IF_NONE_MATCH: &str = "if-none-match";
+pub const IF_NONE_MATCH: &str = "if-none-match";
 
 /// The HTTP header field `if-modified-since`, used to make a request conditional based on timestamps.
-pub(crate) const IF_MODIFIED_SINCE: &str = "if-modified-since";
+pub const IF_MODIFIED_SINCE: &str = "if-modified-since";
 
 /// The HTTP header field `if-unmodified-since`, used to make a request conditional based on timestamps.
-pub(crate) const IF_UNMODIFIED_SINCE: &str = "if-unmodified-since";
+pub const IF_UNMODIFIED_SINCE: &str = "if-unmodified-since";
 
 /// The HTTP header field `accept-charset`, used to specify which character sets are acceptable.
-pub(crate) const ACCEPT_CHARSET: &str = "accept-charset";
+pub const ACCEPT_CHARSET: &str = "accept-charset";
 
 /// The HTTP header field `allow`, used to specify supported HTTP methods.
-pub(crate) const ALLOW: &str = "allow";
+pub const ALLOW: &str = "allow";
 
 /// The HTTP header field `content-disposition`, used to indicate how the content should be displayed.
-pub(crate) const CONTENT_DISPOSITION: &str = "content-disposition";
+pub const CONTENT_DISPOSITION: &str = "content-disposition";
 
 /// The HTTP header field `content-language`, used to specify the language of the content.
-pub(crate) const CONTENT_LANGUAGE: &str = "content-language";
+pub const CONTENT_LANGUAGE: &str = "content-language";
 
 /// The HTTP header field `content-range`, used to indicate where in the full resource this partial message belongs.
-pub(crate) const CONTENT_RANGE: &str = "content-range";
+pub const CONTENT_RANGE: &str = "content-range";
 
 /// The HTTP header field `proxy-authenticate`, used in responses from a proxy to indicate authentication is required.
-pub(crate) const PROXY_AUTHENTICATE: &str = "proxy-authenticate";
+pub const PROXY_AUTHENTICATE: &str = "proxy-authenticate";
 
 /// The HTTP header field `proxy-authorization`, used to authenticate with a proxy server.
-pub(crate) const PROXY_AUTHORIZATION: &str = "proxy-authorization";
+pub const PROXY_AUTHORIZATION: &str = "proxy-authorization";
 
 /// The HTTP header field `retry-after`, used to indicate how long to wait before making a new request.
-pub(crate) const RETRY_AFTER: &str = "retry-after";
+pub const RETRY_AFTER: &str = "retry-after";
 
 /// The HTTP header field `strict-transport-security`, used to specify that the browser should only connect using HTTPS.
-pub(crate) const STRICT_TRANSPORT_SECURITY: &str = "strict-transport-security";
+pub const STRICT_TRANSPORT_SECURITY: &str = "strict-transport-security";
 
 /// The HTTP header field `www-authenticate`, used to indicate the authentication scheme.
-pub(crate) const WWW_AUTHENTICATE: &str = "www-authenticate";
+pub const WWW_AUTHENTICATE: &str = "www-authenticate";
 
 /// The HTTP/2 pseudo-header field `:authority`, used to specify the authority portion of the target URI.
-pub(crate) const COLON_AUTHORITY: &str = ":authority";
+pub const COLON_AUTHORITY: &str = ":authority";
 
 /// The HTTP/2 pseudo-header field `:method`, used to specify the HTTP method.
-pub(crate) const COLON_METHOD: &str = ":method";
+pub const COLON_METHOD: &str = ":method";
 
 /// The HTTP/2 pseudo-header field `:path`, used to specify the path and query parts of the target URI.
-pub(crate) const COLON_PATH: &str = ":path";
+pub const COLON_PATH: &str = ":path";
 
 /// The HTTP/2 pseudo-header field `:scheme`, used to specify the scheme portion of the target URI.
-pub(crate) const COLON_SCHEME: &str = ":scheme";
+pub const COLON_SCHEME: &str = ":scheme";
 
 /// The HTTP header field `age`, used to indicate the age of the response in seconds.
-pub(crate) const AGE: &str = "age";
+pub const AGE: &str = "age";
 
 /// The HTTP header field `expect`, used to indicate expectations that need to be fulfilled by the server.
-pub(crate) const EXPECT: &str = "expect";
+pub const EXPECT: &str = "expect";
 
 /// The HTTP header field `from`, used to specify an Internet email address for a human user.
-pub(crate) const FROM: &str = "from";
+pub const FROM: &str = "from";
 
 /// The HTTP header field `link`, used to specify relationships between resources.
-pub(crate) const LINK: &str = "link";
+pub const LINK: &str = "link";
 
 /// The HTTP header field `max-forwards`, used to limit the number of times a message can be forwarded through proxies or gateways.
-pub(crate) const MAX_FORWARDS: &str = "max-forwards";
+pub const MAX_FORWARDS: &str = "max-forwards";
 
 /// The HTTP header field `range`, used to specify the range of a resource to be retrieved.
-pub(crate) const RANGE: &str = "range";
+pub const RANGE: &str = "range";
 
 /// The HTTP header field `via`, used to indicate the intermediate protocols and recipients between the user agent and the server.
-pub(crate) const VIA: &str = "via";
+pub const VIA: &str = "via";
 
 /// The HTTP header field `accept-ranges`, used to specify the range units that can be accepted.
-pub(crate) const ACCEPT_RANGES: &str = "accept-ranges";
+pub const ACCEPT_RANGES: &str = "accept-ranges";
 
 /// The HTTP header field `content-location`, used to specify the location of the resource.
-pub(crate) const CONTENT_LOCATION: &str = "content-location";
+pub const CONTENT_LOCATION: &str = "content-location";
 
 /// The HTTP header field `if-range`, used to make a range request conditional.
-pub(crate) const IF_RANGE: &str = "if-range";
+pub const IF_RANGE: &str = "if-range";

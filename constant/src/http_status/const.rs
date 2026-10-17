@@ -359,22 +359,22 @@ pub const STATUS_CODE_510: &str = "510";
 pub const STATUS_CODE_511: &str = "511";
 
 /// HTTP status code 200 as string: OK
-pub(crate) const STATUS_CODE_200: &str = "200";
+pub const STATUS_CODE_200: &str = "200";
 
 /// HTTP status code 204 as string: No Content
-pub(crate) const STATUS_CODE_204: &str = "204";
+pub const STATUS_CODE_204: &str = "204";
 
 /// HTTP status code 206 as string: Partial Content
-pub(crate) const STATUS_CODE_206: &str = "206";
+pub const STATUS_CODE_206: &str = "206";
 
 /// HTTP status code 304 as string: Not Modified
-pub(crate) const STATUS_CODE_304: &str = "304";
+pub const STATUS_CODE_304: &str = "304";
 
 /// HTTP status code 400 as string: Bad Request
-pub(crate) const STATUS_CODE_400: &str = "400";
+pub const STATUS_CODE_400: &str = "400";
 
 /// HTTP status code 404 as string: Not Found
-pub(crate) const STATUS_CODE_404: &str = "404";
+pub const STATUS_CODE_404: &str = "404";
 
 /// HTTP status code 500 as string: Internal Server Error
-pub(crate) const STATUS_CODE_500: &str = "500";
+pub const STATUS_CODE_500: &str = "500";
