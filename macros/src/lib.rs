@@ -11,6 +11,7 @@ mod from_stream;
 mod hook;
 mod host;
 mod hyperlane;
+mod import;
 mod inject;
 mod method;
 mod referer;
@@ -27,8 +28,9 @@ mod version;
 
 use {
     closed::*, common::*, context::*, filter::*, flush::*, from_stream::*, hook::*, host::*,
-    hyperlane::*, inject::*, method::*, referer::*, reject::*, request::*, request_middleware::*,
-    response::*, response_middleware::*, route::*, send::*, stream::*, upgrade::*, version::*,
+    hyperlane::*, import::*, inject::*, method::*, referer::*, reject::*, request::*,
+    request_middleware::*, response::*, response_middleware::*, route::*, send::*, stream::*,
+    upgrade::*, version::*,
 };
 
 use {
@@ -4468,4 +4470,64 @@ pub fn flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn context(input: TokenStream) -> TokenStream {
     context_macro(input)
+}
+
+/// Imports a path anonymously at the top of the decorated function body.
+///
+/// This attribute macro injects `use <path> as _;` as the first statement of the
+/// function body, bringing trait methods (or other importable items) into scope
+/// without binding a name.
+///
+/// # Usage
+///
+/// ```rust
+/// use hyperlane_macros::*;
+///
+/// trait Greet {
+///     fn greet(&self) -> &'static str;
+/// }
+///
+/// struct Greeter;
+///
+/// impl Greet for Greeter {
+///     fn greet(&self) -> &'static str {
+///         "hello"
+///     }
+/// }
+///
+/// #[import(crate::Greet)]
+/// fn run() -> &'static str {
+///     Greeter.greet()
+/// }
+///
+/// fn main() {
+///     assert_eq!(run(), "hello");
+/// }
+/// ```
+///
+/// The macro accepts a single path and can be applied to any function, regardless
+/// of its signature. The injected import carries `#[allow(unused_imports)]`, so an
+/// unused import is silently ignored instead of being flagged for removal, while an
+/// invalid path still fails to compile:
+///
+/// ```compile_fail
+/// use hyperlane_macros::*;
+///
+/// #[import(crate::DoesNotExist)]
+/// fn run() {}
+///
+/// fn main() {}
+/// ```
+///
+/// # Arguments
+///
+/// - `TokenStream` - The path to import anonymously.
+/// - `TokenStream` - The token stream of the item to be processed.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream.
+#[proc_macro_attribute]
+pub fn import(attr: TokenStream, item: TokenStream) -> TokenStream {
+    import_macro(attr, item)
 }
