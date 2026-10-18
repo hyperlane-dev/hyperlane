@@ -5,6 +5,10 @@ use super::*;
 pub enum ServerError {
     /// An error occurred while trying to bind to a TCP socket.
     TcpBind(String),
+    /// An error occurred while loading or configuring TLS material.
+    Tls(String),
+    /// HTTP/3 was selected without TLS, which the protocol requires.
+    MissingTlsForHttp3,
     /// An unknown or unexpected error occurred.
     Unknown(String),
     /// An error occurred while reading an HTTP request.

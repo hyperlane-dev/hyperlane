@@ -14,10 +14,18 @@ exclude.workspace = true
 [dependencies]
 http-type = { workspace = true }
 
+h2 = { workspace = true }
+h3 = { workspace = true }
+http = { workspace = true }
+bytes = { workspace = true }
+quinn = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true }
-inventory = { workspace = true }
-lombok-macros = { workspace = true }
-
-[dev-dependencies]
 tokio = { workspace = true }
+rustls = { workspace = true }
+futures = { workspace = true }
+h3-quinn = { workspace = true }
+inventory = { workspace = true }
+tokio-rustls = { workspace = true }
+lombok-macros = { workspace = true }
+rustls-pki-types = { workspace = true }

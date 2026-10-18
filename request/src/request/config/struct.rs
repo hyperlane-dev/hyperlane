@@ -12,22 +12,22 @@ use super::*;
 pub struct RequestConfig {
     /// Per-read buffer size in bytes.
     #[get(type(copy))]
-    pub(crate) buffer_size: usize,
+    pub buffer_size: usize,
     /// Request timeout in milliseconds.
     #[get(type(copy))]
-    pub(super) timeout: u64,
+    pub timeout: u64,
     /// Maximum number of redirects to follow (0 = no redirect).
     #[get(type(copy))]
-    pub(super) max_redirect_times: usize,
+    pub max_redirect_times: usize,
     /// HTTP version (`HttpVersion::Http1_1` / `HttpVersion::Http2`).
-    pub(super) http_version: HttpVersion,
+    pub http_version: HttpVersion,
     /// Whether to follow redirects automatically.
     #[get(type(copy))]
-    pub(super) redirect: bool,
+    pub redirect: bool,
     /// Whether to automatically decode response bodies (gzip / deflate / br).
     #[get(type(copy))]
-    pub(super) decode: bool,
+    pub decode: bool,
     /// Optional proxy configuration. `None` means direct connection.
     #[get(type(clone))]
-    pub(super) proxy: Option<Proxy>,
+    pub proxy: Option<Proxy>,
 }
