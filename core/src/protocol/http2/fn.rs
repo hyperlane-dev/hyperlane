@@ -58,7 +58,7 @@ pub(crate) async fn serve_h2_connection<T>(
 /// - `Arc<Server>` - The server whose pipeline serves the request.
 /// - `RequestConfig` - The parsing limits and read timeout for the connection.
 /// - `SocketAddr` - The local address of the carrying connection.
-/// - `http::Request<h2::RecvStream>` - The decoded protocol request.
+/// - `ProtocolRequest<H2RecvStream>` - The decoded protocol request.
 /// - `h2::server::SendResponse<Bytes>` - The response half of the stream.
 ///
 pub(crate) async fn h2_request_task(
@@ -66,10 +66,10 @@ pub(crate) async fn h2_request_task(
     request_config: RequestConfig,
     local: SocketAddr,
     remote: SocketAddr,
-    request: http::Request<h2::RecvStream>,
+    request: ProtocolRequest<H2RecvStream>,
     send_response: h2::server::SendResponse<Bytes>,
 ) {
-    let (parts, mut recv_stream): (http::request::Parts, h2::RecvStream) = request.into_parts();
+    let (parts, mut recv_stream): (http::request::Parts, H2RecvStream) = request.into_parts();
     let uri: &http::Uri = &parts.uri;
     let mut framer: H2Framer = H2Framer::new(send_response);
     let mut body: Vec<u8> = Vec::new();
@@ -190,7 +190,7 @@ pub(crate) async fn h2_fail_request(
 ///
 /// # Arguments
 ///
-/// - `&mut h2::RecvStream` - The receive half of the request stream.
+/// - `&mut H2RecvStream` - The receive half of the request stream.
 /// - `&RequestConfig` - The parsing limits to enforce.
 /// - `&ProtocolHeaders` - The protocol request headers carrying the declared length.
 /// - `&mut Vec<u8>` - The buffer to collect the body into.
@@ -199,7 +199,7 @@ pub(crate) async fn h2_fail_request(
 ///
 /// - `Result<(), RequestError>` - `Ok(())` once the body is complete, or the
 pub(crate) async fn collect_h2_body(
-    recv_stream: &mut h2::RecvStream,
+    recv_stream: &mut H2RecvStream,
     request_config: &RequestConfig,
     headers: &ProtocolHeaders,
     body: &mut Vec<u8>,
@@ -234,7 +234,7 @@ pub(crate) async fn collect_h2_body(
 ///
 /// # Arguments
 ///
-/// - `&mut h2::RecvStream` - The receive half of the request stream.
+/// - `&mut H2RecvStream` - The receive half of the request stream.
 /// - `usize` - The maximum number of body bytes to accept.
 /// - `&mut Vec<u8>` - The buffer to collect the body into.
 ///
@@ -242,20 +242,20 @@ pub(crate) async fn collect_h2_body(
 ///
 /// - `Result<(), RequestError>` - `Ok(())` once the body is complete, or the
 async fn collect_h2_body_until_end(
-    recv_stream: &mut h2::RecvStream,
+    recv_stream: &mut H2RecvStream,
     max_body_size: usize,
     body: &mut Vec<u8>,
 ) -> Result<(), RequestError> {
     loop {
-        let received: Option<Result<Bytes, h2::Error>> = recv_stream.data().await;
+        let received: Option<Result<Bytes, H2Error>> = recv_stream.data().await;
         let Some(received) = received else {
             return Ok(());
         };
         let data: Bytes =
-            received.map_err(|error: h2::Error| RequestError::Request(error.to_string()))?;
+            received.map_err(|error: H2Error| RequestError::Request(error.to_string()))?;
         let data_len: usize = data.len();
         let collected: Result<(), RequestError> = push_bounded_body(max_body_size, body, data);
-        let _: Result<(), h2::Error> = recv_stream.flow_control().release_capacity(data_len);
+        let _: Result<(), H2Error> = recv_stream.flow_control().release_capacity(data_len);
         collected?;
     }
 }

@@ -239,7 +239,6 @@ async fn http3_one_connection_answers_a_fast_stream_while_a_slow_stream_is_block
             .expect("http3 quic server must start");
     let _lease: GateLease = gate_lease(GateSlot::SlowHttp3).await;
     let order: Arc<Mutex<Vec<&'static str>>> = Arc::new(Mutex::new(Vec::new()));
-
     let slow_order: Arc<Mutex<Vec<&'static str>>> = Arc::clone(&order);
     let slow: JoinHandle<Result<H3Reply, String>> = spawn(async move {
         let outcome: Result<H3Reply, String> = h3_request(
@@ -252,9 +251,7 @@ async fn http3_one_connection_answers_a_fast_stream_while_a_slow_stream_is_block
         slow_order.lock().expect("order lock").push("slow");
         outcome
     });
-
     route_gate(GateSlot::SlowHttp3).await_slow_entered().await;
-
     let fast_order: Arc<Mutex<Vec<&'static str>>> = Arc::clone(&order);
     let fast: JoinHandle<Result<H3Reply, String>> = spawn(async move {
         let outcome: Result<H3Reply, String> = h3_request(
@@ -267,7 +264,6 @@ async fn http3_one_connection_answers_a_fast_stream_while_a_slow_stream_is_block
         fast_order.lock().expect("order lock").push("fast");
         outcome
     });
-
     let budget: Duration = Duration::from_millis(FAST_STREAM_BUDGET_MILLIS);
     let fast_result: Result<H3Reply, String> = timeout(budget, fast)
         .await
@@ -282,7 +278,6 @@ async fn http3_one_connection_answers_a_fast_stream_while_a_slow_stream_is_block
         vec!["fast"],
         "only the fast stream may complete while the slow handler is blocked"
     );
-
     route_gate(GateSlot::SlowHttp3).release_slow();
     let slow_result: Result<H3Reply, String> =
         timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), slow)

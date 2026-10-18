@@ -16,7 +16,7 @@ use super::*;
 ///
 /// - `&RequestConfig` - The parsing limits to enforce.
 /// - `HttpVersion` - The real protocol version to stamp on the request.
-/// - `http::Method` - The request method decoded by the protocol library.
+/// - `ProtocolMethod` - The request method decoded by the protocol library.
 /// - `&str` - The `value` argument.
 /// - `&http::Uri` - The request URI, which carries the authority.
 /// - `&ProtocolHeaders` - The protocol request headers.
@@ -28,7 +28,7 @@ use super::*;
 pub fn build_protocol_request(
     config: &RequestConfig,
     version: HttpVersion,
-    method: http::Method,
+    method: ProtocolMethod,
     target: &str,
     target_uri: &http::Uri,
     headers: &ProtocolHeaders,
@@ -169,12 +169,12 @@ pub fn fill_request_querys(query: &str, querys: &mut RequestQuerys) {
 ///
 /// # Arguments
 ///
-/// - `http::Method` - The method decoded by the protocol library.
+/// - `ProtocolMethod` - The method decoded by the protocol library.
 ///
 /// # Returns
 ///
 /// - `RequestMethod` - The framework method.
-pub fn protocol_method(method: http::Method) -> RequestMethod {
+pub fn protocol_method(method: ProtocolMethod) -> RequestMethod {
     method
         .as_str()
         .parse::<RequestMethod>()

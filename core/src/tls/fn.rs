@@ -11,17 +11,17 @@ use super::*;
 ///
 /// - `&TlsConfig` - The certificate chain and private key paths to load.
 /// - `&[u8]` - The single ALPN protocol identifier to advertise.
-/// - `&[&'static rustls::SupportedProtocolVersion]` - The TLS versions to offer.
+/// - `&[&'static SupportedProtocolVersion]` - The TLS versions to offer.
 ///
 /// # Returns
 ///
-/// - `Result<Arc<rustls::ServerConfig>, Box<ServerError>>` - The TLS configuration, or
+/// - `Result<Arc<TlsServerConfig>, Box<ServerError>>` - The TLS configuration, or
 ///   the first failure while reading the PEM material.
 pub fn build_server_tls_config(
     tls: &TlsConfig,
     alpn: &[u8],
-    versions: &[&'static rustls::SupportedProtocolVersion],
-) -> Result<Arc<rustls::ServerConfig>, Box<ServerError>> {
+    versions: &[&'static SupportedProtocolVersion],
+) -> Result<Arc<TlsServerConfig>, Box<ServerError>> {
     let certificate_chain: Vec<CertificateDer<'static>> =
         CertificateDer::pem_file_iter(tls.get_certificate_path())
             .map_err(|error: pem::Error| ServerError::Tls(tls_error_string(&error)))?
@@ -30,14 +30,13 @@ pub fn build_server_tls_config(
     let private_key: PrivateKeyDer<'static> =
         PrivateKeyDer::from_pem_file(tls.get_private_key_path())
             .map_err(|error: pem::Error| ServerError::Tls(tls_error_string(&error)))?;
-    let mut server_config: rustls::ServerConfig = rustls::ServerConfig::builder_with_provider(
-        Arc::new(rustls::crypto::ring::default_provider()),
-    )
-    .with_protocol_versions(versions)
-    .map_err(|error: rustls::Error| Box::new(ServerError::Tls(error.to_string())))?
-    .with_no_client_auth()
-    .with_single_cert(certificate_chain, private_key)
-    .map_err(|error: rustls::Error| Box::new(ServerError::Tls(error.to_string())))?;
+    let mut server_config: TlsServerConfig =
+        TlsServerConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
+            .with_protocol_versions(versions)
+            .map_err(|error: TlsError| Box::new(ServerError::Tls(error.to_string())))?
+            .with_no_client_auth()
+            .with_single_cert(certificate_chain, private_key)
+            .map_err(|error: TlsError| Box::new(ServerError::Tls(error.to_string())))?;
     server_config.alpn_protocols = vec![alpn.to_vec()];
     Ok(Arc::new(server_config))
 }
@@ -51,13 +50,13 @@ pub fn build_server_tls_config(
 ///
 /// # Returns
 ///
-/// - `Result<Arc<rustls::ServerConfig>, Box<ServerError>>` - The TLS configuration, or
+/// - `Result<Arc<TlsServerConfig>, Box<ServerError>>` - The TLS configuration, or
 ///   the first failure while reading the PEM material.
 pub fn build_stream_tls_config(
     tls: &TlsConfig,
     protocol: &ServerProtocol,
-) -> Result<Arc<rustls::ServerConfig>, Box<ServerError>> {
-    let versions: &[&'static rustls::SupportedProtocolVersion] =
+) -> Result<Arc<TlsServerConfig>, Box<ServerError>> {
+    let versions: &[&'static SupportedProtocolVersion] =
         &[&rustls::version::TLS13, &rustls::version::TLS12];
     build_server_tls_config(tls, protocol.get_alpn_protocol(), versions)
 }
@@ -75,12 +74,10 @@ pub fn build_stream_tls_config(
 ///
 /// # Returns
 ///
-/// - `Result<Arc<rustls::ServerConfig>, Box<ServerError>>` - The TLS configuration, or
+/// - `Result<Arc<TlsServerConfig>, Box<ServerError>>` - The TLS configuration, or
 ///   the first failure while reading the PEM material.
-pub fn build_quic_tls_config(
-    tls: &TlsConfig,
-) -> Result<Arc<rustls::ServerConfig>, Box<ServerError>> {
-    let versions: &[&'static rustls::SupportedProtocolVersion] = &[&rustls::version::TLS13];
+pub fn build_quic_tls_config(tls: &TlsConfig) -> Result<Arc<TlsServerConfig>, Box<ServerError>> {
+    let versions: &[&'static SupportedProtocolVersion] = &[&rustls::version::TLS13];
     build_server_tls_config(tls, ServerProtocol::Http3.get_alpn_protocol(), versions)
 }
 

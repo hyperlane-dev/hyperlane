@@ -12,6 +12,27 @@ pub(crate) type RequestH3Stream = h3::server::RequestStream<h3_quinn::BidiStream
 /// The HTTP/2 connection half shared by every request stream of one connection.
 pub(crate) type ConnectionH2<T> = h2::server::Connection<T, Bytes>;
 
+/// The failure one HTTP/2 stream operation reports.
+pub(crate) type H2Error = h2::Error;
+
+/// The receive half of one HTTP/2 request stream.
+pub(crate) type H2RecvStream = h2::RecvStream;
+
+/// The stream half carrying the body of one HTTP/2 response.
+pub(crate) type H2SendStream = h2::SendStream<Bytes>;
+
+/// A request head in its protocol representation.
+pub(crate) type ProtocolRequest<T> = http::Request<T>;
+
+/// A response head in its protocol representation.
+pub(crate) type ProtocolResponse<T> = http::Response<T>;
+
+/// The failure one protocol head builder reports.
+pub(crate) type ProtocolBuildError = http::Error;
+
+/// The request method in its protocol representation.
+pub(crate) type ProtocolMethod = http::Method;
+
 /// The bare line feed byte.
 pub(crate) const LF_U8: u8 = b'\n';
 

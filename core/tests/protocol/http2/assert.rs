@@ -285,7 +285,6 @@ async fn http2_one_connection_answers_a_fast_stream_while_a_slow_stream_is_block
     });
     let _lease: GateLease = gate_lease(GateSlot::SlowHttp2).await;
     let order: Arc<Mutex<Vec<&'static str>>> = Arc::new(Mutex::new(Vec::new()));
-
     let slow_target: String = format!("http://{TLS_SERVER_NAME}:{port}{SLOW_ROUTE_PATH}");
     let slow_order: Arc<Mutex<Vec<&'static str>>> = Arc::clone(&order);
     let mut slow_sender: h2::client::SendRequest<Bytes> = sender.clone();
@@ -295,9 +294,7 @@ async fn http2_one_connection_answers_a_fast_stream_while_a_slow_stream_is_block
         slow_order.lock().expect("order lock").push("slow");
         outcome
     });
-
     route_gate(GateSlot::SlowHttp2).await_slow_entered().await;
-
     let fast_target: String = format!("http://{TLS_SERVER_NAME}:{port}{VERSION_ROUTE_PATH}");
     let fast_order: Arc<Mutex<Vec<&'static str>>> = Arc::clone(&order);
     let mut fast_sender: h2::client::SendRequest<Bytes> = sender.clone();
@@ -307,7 +304,6 @@ async fn http2_one_connection_answers_a_fast_stream_while_a_slow_stream_is_block
         fast_order.lock().expect("order lock").push("fast");
         outcome
     });
-
     let budget: Duration = Duration::from_millis(FAST_STREAM_BUDGET_MILLIS);
     let fast_result: Result<H2Reply, String> = timeout(budget, fast)
         .await
@@ -322,7 +318,6 @@ async fn http2_one_connection_answers_a_fast_stream_while_a_slow_stream_is_block
         vec!["fast"],
         "only the fast stream may complete while the slow handler is blocked"
     );
-
     route_gate(GateSlot::SlowHttp2).release_slow();
     let slow_result: Result<H2Reply, String> =
         timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), slow)

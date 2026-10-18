@@ -73,9 +73,9 @@ impl ResponseFramer for H2Framer {
                     builder = builder.header(name.clone(), value);
                 }
             }
-            let response: http::Response<()> = builder
+            let response: ProtocolResponse<()> = builder
                 .body(())
-                .map_err(|error: http::Error| ResponseError::Send(error.to_string()))?;
+                .map_err(|error: ProtocolBuildError| ResponseError::Send(error.to_string()))?;
             let mut send_response: h2::server::SendResponse<Bytes> = self
                 .get_mut_send_response()
                 .take()
@@ -84,13 +84,12 @@ impl ResponseFramer for H2Framer {
                 self.set_finished(true);
                 send_response
                     .send_response(response, true)
-                    .map_err(|error: h2::Error| ResponseError::Send(error.to_string()))?;
+                    .map_err(|error: H2Error| ResponseError::Send(error.to_string()))?;
                 return Ok(());
             }
-            let send_stream: h2::SendStream<Bytes> =
-                send_response
-                    .send_response(response, false)
-                    .map_err(|error: h2::Error| ResponseError::Send(error.to_string()))?;
+            let send_stream: H2SendStream = send_response
+                .send_response(response, false)
+                .map_err(|error: H2Error| ResponseError::Send(error.to_string()))?;
             self.set_send_stream(Some(send_stream));
             Ok(())
         })
@@ -125,7 +124,7 @@ impl ResponseFramer for H2Framer {
                 rest = &rest[take..];
                 send_stream
                     .send_data(chunk, false)
-                    .map_err(|error: h2::Error| ResponseError::Send(error.to_string()))?;
+                    .map_err(|error: H2Error| ResponseError::Send(error.to_string()))?;
             }
             self.set_send_stream(Some(send_stream));
             Ok(())
@@ -154,7 +153,7 @@ impl ResponseFramer for H2Framer {
             };
             send_stream
                 .send_data(Bytes::new(), true)
-                .map_err(|error: h2::Error| ResponseError::Send(error.to_string()))?;
+                .map_err(|error: H2Error| ResponseError::Send(error.to_string()))?;
             Ok(())
         })
     }

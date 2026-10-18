@@ -240,8 +240,8 @@ pub(crate) async fn serve_plain_tcp(
                 bounded_handshake(request_config, h2::server::handshake(stream))
                     .await
                     .map_err(|_: tokio::time::error::Elapsed| H2_HANDSHAKE_TIMEOUT.to_owned())
-                    .and_then(|connection: Result<_, h2::Error>| {
-                        connection.map_err(|error: h2::Error| error.to_string())
+                    .and_then(|connection: Result<_, H2Error>| {
+                        connection.map_err(|error: H2Error| error.to_string())
                     }),
             )
             .await;
@@ -289,8 +289,8 @@ pub(crate) async fn serve_tls_stream(
                 bounded_handshake(request_config, h2::server::handshake(session))
                     .await
                     .map_err(|_: tokio::time::error::Elapsed| H2_HANDSHAKE_TIMEOUT.to_owned())
-                    .and_then(|connection: Result<_, h2::Error>| {
-                        connection.map_err(|error: h2::Error| error.to_string())
+                    .and_then(|connection: Result<_, H2Error>| {
+                        connection.map_err(|error: H2Error| error.to_string())
                     }),
             )
             .await;

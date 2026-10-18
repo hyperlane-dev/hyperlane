@@ -69,9 +69,9 @@ impl ResponseFramer for H3Framer {
                     builder = builder.header(name.clone(), value);
                 }
             }
-            let response: http::Response<()> = builder
+            let response: ProtocolResponse<()> = builder
                 .body(())
-                .map_err(|error: http::Error| ResponseError::Send(error.to_string()))?;
+                .map_err(|error: ProtocolBuildError| ResponseError::Send(error.to_string()))?;
             let Some(mut request_stream) = self.get_mut_request_stream().take() else {
                 return Err(ResponseError::Terminated);
             };

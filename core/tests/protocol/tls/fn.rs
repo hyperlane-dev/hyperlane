@@ -74,7 +74,6 @@ fn the_three_argument_constructor_keeps_speaking_http1_without_tls() {
     let legacy: String = SERVER_CONFIG_LEGACY_ADDRESS.to_string();
     let config: ServerConfig = ServerConfig::new(legacy, None, None);
     assert_eq!(*config.get_address(), SERVER_CONFIG_LEGACY_ADDRESS);
-
     assert_eq!(config.get_protocol(), ServerProtocol::Http1);
     assert!(config.get_tls().is_none());
 }
