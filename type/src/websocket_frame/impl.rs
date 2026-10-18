@@ -21,6 +21,7 @@ impl Default for WebSocketFrame {
     }
 }
 
+/// Inherent implementation of [`WebSocketOpcode`].
 impl WebSocketOpcode {
     /// Creates a `WebSocketOpcode` from a raw u8 value.
     ///
@@ -153,6 +154,7 @@ impl WebSocketOpcode {
     }
 }
 
+/// Inherent implementation of [`WebSocketFrame`].
 impl WebSocketFrame {
     /// Decodes a WebSocket frame from the provided data slice.
     ///

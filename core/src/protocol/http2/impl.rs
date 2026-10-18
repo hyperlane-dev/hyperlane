@@ -1,5 +1,6 @@
 use super::*;
 
+/// Inherent implementation of [`H2Framer`].
 impl H2Framer {
     /// Creates a framer over one request stream.
     ///
@@ -37,6 +38,7 @@ impl H2Framer {
     }
 }
 
+/// Implements [`ResponseFramer`] for [`H2Framer`].
 impl ResponseFramer for H2Framer {
     /// Sends the response head as the first HEADERS frame of the stream.
     ///

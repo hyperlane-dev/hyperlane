@@ -1,5 +1,6 @@
 use super::*;
 
+/// Inherent implementation of [`H3Framer`].
 impl H3Framer {
     /// Creates a framer over one request stream.
     ///
@@ -33,6 +34,7 @@ impl H3Framer {
     }
 }
 
+/// Implements [`ResponseFramer`] for [`H3Framer`].
 impl ResponseFramer for H3Framer {
     /// Sends the response head as the first HEADERS frame of the stream.
     ///

@@ -10,16 +10,15 @@ use super::*;
 ///
 /// # Arguments
 ///
-/// - `Arc<Server>` - The server whose pipeline serves each request.
-/// - `RequestConfig` - The parsing limits and read timeout for the connection.
-/// - `SocketAddr` - The `value` argument.
+/// - `ConnectionEnv` - The server, limits and protocol of the connection.
+/// - `StreamPeers` - The addresses of the connection.
 /// - `Result<ConnectionH2<T>, String>` - The negotiated HTTP/2 connection, or
 ///
+/// `StreamPeers` travels separately from `ConnectionEnv` because the connection
+/// half itself does not read it; only the per-request tasks it spawns do.
 pub(crate) async fn serve_h2_connection<T>(
-    server: Arc<Server>,
-    request_config: RequestConfig,
-    local: SocketAddr,
-    remote: SocketAddr,
+    env: ConnectionEnv,
+    peers: StreamPeers,
     connection: Result<ConnectionH2<T>, String>,
 ) where
     T: AsyncRead + AsyncWrite + Unpin + Send + Sync + 'static,
@@ -32,10 +31,11 @@ pub(crate) async fn serve_h2_connection<T>(
         match connection.accept().await {
             Some(Ok((request, send_response))) => {
                 spawn(h2_request_task(
-                    server.clone(),
-                    request_config,
-                    local,
-                    remote,
+                    H2RequestEnv {
+                        server: env.server.clone(),
+                        request_config: env.request_config,
+                        peers,
+                    },
                     request,
                     send_response,
                 ));
@@ -55,33 +55,33 @@ pub(crate) async fn serve_h2_connection<T>(
 ///
 /// # Arguments
 ///
-/// - `Arc<Server>` - The server whose pipeline serves the request.
-/// - `RequestConfig` - The parsing limits and read timeout for the connection.
-/// - `SocketAddr` - The local address of the carrying connection.
+/// - `H2RequestEnv` - The server, limits and connection addresses.
 /// - `ProtocolRequest<H2RecvStream>` - The decoded protocol request.
 /// - `h2::server::SendResponse<Bytes>` - The response half of the stream.
 ///
 pub(crate) async fn h2_request_task(
-    server: Arc<Server>,
-    request_config: RequestConfig,
-    local: SocketAddr,
-    remote: SocketAddr,
+    env: H2RequestEnv,
     request: ProtocolRequest<H2RecvStream>,
     send_response: h2::server::SendResponse<Bytes>,
 ) {
+    let H2RequestEnv {
+        server,
+        request_config,
+        peers,
+    } = env;
     let (parts, mut recv_stream): (http::request::Parts, H2RecvStream) = request.into_parts();
-    let uri: &http::Uri = &parts.uri;
     let mut framer: H2Framer = H2Framer::new(send_response);
     let mut body: Vec<u8> = Vec::new();
     if let Err(error) =
         collect_h2_body(&mut recv_stream, &request_config, &parts.headers, &mut body).await
     {
         h2_fail_request(
-            &server,
+            &H2RequestEnv {
+                server,
+                request_config,
+                peers,
+            },
             &mut framer,
-            request_config,
-            local,
-            remote,
             HttpVersion::Http2,
             error,
         )
@@ -90,22 +90,23 @@ pub(crate) async fn h2_request_task(
     }
     let built: Result<Request, RequestError> = build_protocol_request(
         &request_config,
-        HttpVersion::Http2,
-        parts.method.clone(),
-        &request_target(uri.path(), uri.query()),
-        uri,
-        &parts.headers,
-        body,
+        ProtocolRequestHead {
+            version: HttpVersion::Http2,
+            method: parts.method.clone(),
+            parts,
+            body,
+        },
     );
     let request: Request = match built {
         Ok(request) => request,
         Err(error) => {
             h2_fail_request(
-                &server,
+                &H2RequestEnv {
+                    server,
+                    request_config,
+                    peers,
+                },
                 &mut framer,
-                request_config,
-                local,
-                remote,
                 HttpVersion::Http2,
                 error,
             )
@@ -114,8 +115,7 @@ pub(crate) async fn h2_request_task(
         }
     };
     let is_head: bool = request.get_method().is_head();
-    let (stream, peer): (Stream, DuplexStream) =
-        build_duplex_transport(request_config, Some(local), Some(remote));
+    let (stream, peer): (Stream, DuplexStream) = build_duplex_transport(request_config, peers);
     let lifecycle: ServerLifecycle = ServerLifecycle::new(server, request);
     let joined: Result<((), ()), ResponseError> = futures::try_join!(
         async {
@@ -137,21 +137,18 @@ pub(crate) async fn h2_request_task(
 /// an HTTP/1.1 shaped head that is framed as HTTP/2 on the wire instead of the
 /// stream ending silently.
 ///
+/// Borrows the request environment while framing the error response.
+///
 /// # Arguments
 ///
-/// - `&Arc<Server>` - The server whose error hooks answer the request.
+/// - `&H2RequestEnv` - The server, limits and connection addresses.
 /// - `&mut H2Framer` - The framer owning the stream's frames.
-/// - `RequestConfig` - The parsing limits and read timeout for the connection.
-/// - `SocketAddr` - The local address of the carrying connection.
 /// - `HttpVersion` - The real protocol version to stamp on the error context.
 /// - `RequestError` - The failure that stopped the request.
 ///
 pub(crate) async fn h2_fail_request(
-    server: &Arc<Server>,
+    env: &H2RequestEnv,
     framer: &mut H2Framer,
-    request_config: RequestConfig,
-    local: SocketAddr,
-    remote: SocketAddr,
     version: HttpVersion,
     error: RequestError,
 ) {
@@ -161,9 +158,9 @@ pub(crate) async fn h2_fail_request(
     ctx.set_request(request);
     ctx.get_mut_response().reset().set_version(version);
     let (mut stream, peer): (Stream, DuplexStream) =
-        build_duplex_transport(request_config, Some(local), Some(remote));
+        build_duplex_transport(env.request_config, env.peers);
     let is_head: bool = false;
-    let server: Arc<Server> = server.clone();
+    let server: Arc<Server> = env.server.clone();
     let (_, pump_result): ((), Result<(), ResponseError>) = join!(
         async move {
             server

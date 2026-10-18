@@ -858,30 +858,34 @@ impl Server {
                 let endpoint: Endpoint =
                     Endpoint::server(quinn::ServerConfig::with_crypto(quic_config), bind_addr)
                         .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+                let env: ConnectionEnv = ConnectionEnv {
+                    server,
+                    request_config,
+                    protocol,
+                };
                 spawn(async move {
-                    let _: Result<(), Box<ServerError>> = quic_accept(
-                        server,
-                        request_config,
-                        endpoint,
-                        shutdown_receiver,
-                        running_sender,
-                    )
-                    .await;
+                    let _: Result<(), Box<ServerError>> =
+                        quic_accept(env, endpoint, shutdown_receiver, running_sender).await;
                 })
             }
             _ => {
                 let tcp_listener: TcpListener = TcpListener::bind(&bind_address)
                     .await
                     .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+                let env: ConnectionEnv = ConnectionEnv {
+                    server,
+                    request_config,
+                    protocol,
+                };
                 spawn(async move {
                     tcp_accept(
-                        server,
-                        request_config,
-                        protocol,
+                        env,
                         stream_tls,
-                        tcp_listener,
-                        shutdown_receiver,
-                        running_sender,
+                        AcceptSignal {
+                            listener: tcp_listener,
+                            shutdown_receiver,
+                            running_sender,
+                        },
                     )
                     .await;
                 })

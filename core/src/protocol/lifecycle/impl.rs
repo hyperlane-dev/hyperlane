@@ -1,5 +1,6 @@
 use super::*;
 
+/// Inherent implementation of [`ServerLifecycle`].
 impl ServerLifecycle {
     /// Creates a lifecycle for one protocol request.
     ///

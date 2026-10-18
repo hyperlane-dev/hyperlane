@@ -23,3 +23,23 @@ pub(crate) struct H2Framer {
     #[set(pub(crate))]
     pub(super) finished: bool,
 }
+
+/// The environment one HTTP/2 request stream is served in.
+///
+/// A request stream needs the server that serves it, the limits and read timeout
+/// its head and body are bounded by, and the addresses the duplex transport
+/// reports to the framework. Carried together they stop being the same four
+/// parameters repeated in the same order at every layer of the HTTP/2 path.
+///
+/// Every field but the server handle is `Copy`. The handle is an `Arc` the
+/// connection loop already cloned, so passing the environment by value moves that
+/// handle instead of cloning it again.
+#[derive(Clone, Debug)]
+pub(crate) struct H2RequestEnv {
+    /// The server whose pipeline serves the request.
+    pub(crate) server: Arc<Server>,
+    /// The parsing limits and read timeout for the connection.
+    pub(crate) request_config: RequestConfig,
+    /// The addresses of the connection carrying the request.
+    pub(crate) peers: StreamPeers,
+}

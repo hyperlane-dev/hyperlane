@@ -3,6 +3,7 @@ use super::*;
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> AsyncReadWrite for T {}
 impl<T: Read + Write> ReadWrite for T {}
 
+/// Inherent implementation of [`HttpRequest`].
 impl HttpRequest {
     /// Send the HTTP request synchronously, returning the parsed response.
     ///
@@ -1181,6 +1182,7 @@ impl HttpRequest {
     }
 }
 
+/// Inherent implementation of [`HttpRequest`].
 impl HttpRequest {
     /// Create a GET request for `url`.
     ///

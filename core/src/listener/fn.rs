@@ -16,26 +16,23 @@ use super::*;
 ///
 /// # Arguments
 ///
-/// - `Arc<Server>` - The server whose pipeline serves each request.
-/// - `RequestConfig` - The parsing limits and read timeouts for connections.
-/// - `ServerProtocol` - The protocol to serve on accepted connections.
+/// - `ConnectionEnv` - The server, limits and protocol for the connection.
 /// - `Option<Arc<rustls::ServerConfig>>` - The TLS configuration, when present.
-/// - `TcpListener` - The bound listener to accept connections from.
-/// - `Receiver<()>` - The shutdown signal the loop selects on.
-/// - `Sender<bool>` - Publishes whether the loop is still serving.
+/// - `AcceptSignal` - The bound listener and the loop's shutdown channels.
 ///
 /// # Returns
 ///
 /// - `()` - Resolves once the accept loop stops.
 pub(crate) async fn tcp_accept(
-    server: Arc<Server>,
-    request_config: RequestConfig,
-    protocol: ServerProtocol,
+    env: ConnectionEnv,
     stream_tls: Option<Arc<rustls::ServerConfig>>,
-    tcp_listener: TcpListener,
-    mut shutdown_receiver: Receiver<()>,
-    running_sender: Sender<bool>,
+    signal: AcceptSignal,
 ) {
+    let AcceptSignal {
+        listener: tcp_listener,
+        mut shutdown_receiver,
+        running_sender,
+    } = signal;
     loop {
         let accepted: Option<(TcpStream, SocketAddr)> = tokio::select! {
             biased;
@@ -45,10 +42,10 @@ pub(crate) async fn tcp_accept(
         let Some((stream, remote)) = accepted else {
             break;
         };
-        let server: Arc<Server> = server.clone();
+        let env: ConnectionEnv = env.clone();
         let tls: Option<Arc<rustls::ServerConfig>> = stream_tls.clone();
         spawn(async move {
-            serve_tcp_connection(server, request_config, protocol, tls, stream, remote).await;
+            serve_tcp_connection(env, tls, stream, remote).await;
         });
     }
     drop(tcp_listener);
@@ -60,9 +57,7 @@ pub(crate) async fn tcp_accept(
 ///
 /// # Arguments
 ///
-/// - `Arc<Server>` - The server whose pipeline serves the connection.
-/// - `RequestConfig` - The parsing limits and read timeouts for the connection.
-/// - `ServerProtocol` - The protocol to serve on this connection.
+/// - `ConnectionEnv` - The server, limits and protocol for the connection.
 /// - `Option<Arc<rustls::ServerConfig>>` - The TLS configuration, when present.
 /// - `TcpStream` - The accepted socket, before its socket options are applied.
 /// - `SocketAddr` - The remote address of the accepted socket.
@@ -71,39 +66,33 @@ pub(crate) async fn tcp_accept(
 ///
 /// - `()` - Resolves once the connection is finished.
 pub(crate) async fn serve_tcp_connection(
-    server: Arc<Server>,
-    request_config: RequestConfig,
-    protocol: ServerProtocol,
+    env: ConnectionEnv,
     stream_tls: Option<Arc<rustls::ServerConfig>>,
     stream: TcpStream,
     remote: SocketAddr,
 ) {
     let local: Option<SocketAddr> = stream.local_addr().ok();
-    configure_socket(&stream, &server);
+    configure_socket(&stream, &env.server);
+    let peers: StreamPeers = StreamPeers {
+        local: local.unwrap_or(remote),
+        remote,
+    };
     let Some(tls) = stream_tls else {
-        serve_plain_tcp(server, request_config, protocol, stream, local, remote).await;
+        serve_plain_tcp(env, peers, stream).await;
         return;
     };
     let Ok(handshake) =
-        bounded_handshake(request_config, TlsAcceptor::from(tls).accept(stream)).await
+        bounded_handshake(env.request_config, TlsAcceptor::from(tls).accept(stream)).await
     else {
         return;
     };
     let Ok(handshake) = handshake else {
         return;
     };
-    if !negotiated_protocol_matches(&handshake, &protocol) {
+    if !negotiated_protocol_matches(&handshake, &env.protocol) {
         return;
     }
-    serve_tls_stream(
-        server,
-        request_config,
-        protocol,
-        TlsTransport::new(handshake),
-        local,
-        remote,
-    )
-    .await;
+    serve_tls_stream(env, peers, TlsTransport::new(handshake)).await;
 }
 
 /// Reports whether a negotiated TLS session speaks the protocol being served.
@@ -212,42 +201,27 @@ pub(crate) fn configure_socket(stream: &TcpStream, server: &Arc<Server>) {
 ///
 /// # Arguments
 ///
-/// - `Arc<Server>` - The server whose pipeline serves the connection.
-/// - `RequestConfig` - The parsing limits and read timeouts for the connection.
-/// - `ServerProtocol` - The protocol to serve on this connection.
+/// - `ConnectionEnv` - The server, limits and protocol for the connection.
+/// - `StreamPeers` - The addresses of the connection.
 /// - `TcpStream` - The accepted socket.
-/// - `Option<SocketAddr>` - The local address of the connection.
-/// - `SocketAddr` - The remote address of the connection.
 ///
 /// # Returns
 ///
 /// - `()` - Resolves once the connection is finished.
-pub(crate) async fn serve_plain_tcp(
-    server: Arc<Server>,
-    request_config: RequestConfig,
-    protocol: ServerProtocol,
-    stream: TcpStream,
-    local: Option<SocketAddr>,
-    remote: SocketAddr,
-) {
-    match protocol {
+pub(crate) async fn serve_plain_tcp(env: ConnectionEnv, peers: StreamPeers, stream: TcpStream) {
+    match env.protocol {
         ServerProtocol::Http2 => {
-            serve_h2_connection(
-                server,
-                request_config,
-                local.unwrap_or(remote),
-                remote,
-                bounded_handshake(request_config, h2::server::handshake(stream))
+            let handshake: Result<ConnectionH2<TcpStream>, String> =
+                bounded_handshake(env.request_config, h2::server::handshake(stream))
                     .await
                     .map_err(|_: tokio::time::error::Elapsed| H2_HANDSHAKE_TIMEOUT.to_owned())
                     .and_then(|connection: Result<_, H2Error>| {
                         connection.map_err(|error: H2Error| error.to_string())
-                    }),
-            )
-            .await;
+                    });
+            serve_h2_connection(env, peers, handshake).await;
         }
         _ => {
-            serve_h1_connection(server, request_config, stream).await;
+            serve_h1_connection(env.server, env.request_config, stream).await;
         }
     }
 }
@@ -260,43 +234,32 @@ pub(crate) async fn serve_plain_tcp(
 ///
 /// # Arguments
 ///
-/// - `Arc<Server>` - The server whose pipeline serves the connection.
-/// - `RequestConfig` - The parsing limits and read timeouts for the connection.
-/// - `ServerProtocol` - The protocol to serve on this connection.
+/// - `ConnectionEnv` - The server, limits and protocol for the connection.
+/// - `StreamPeers` - The addresses of the connection.
 /// - `TlsTransport` - The negotiated session carrying the connection.
-/// - `Option<SocketAddr>` - The local address of the connection.
-/// - `SocketAddr` - The remote address of the connection.
 ///
 /// # Returns
 ///
 /// - `()` - Resolves once the connection is finished.
 pub(crate) async fn serve_tls_stream(
-    server: Arc<Server>,
-    request_config: RequestConfig,
-    protocol: ServerProtocol,
+    env: ConnectionEnv,
+    peers: StreamPeers,
     transport: TlsTransport,
-    local: Option<SocketAddr>,
-    remote: SocketAddr,
 ) {
-    match protocol {
+    match env.protocol {
         ServerProtocol::Http2 => {
             let session: TlsTransport = transport;
-            serve_h2_connection(
-                server,
-                request_config,
-                local.unwrap_or(remote),
-                remote,
-                bounded_handshake(request_config, h2::server::handshake(session))
+            let handshake: Result<ConnectionH2<TlsTransport>, String> =
+                bounded_handshake(env.request_config, h2::server::handshake(session))
                     .await
                     .map_err(|_: tokio::time::error::Elapsed| H2_HANDSHAKE_TIMEOUT.to_owned())
                     .and_then(|connection: Result<_, H2Error>| {
                         connection.map_err(|error: H2Error| error.to_string())
-                    }),
-            )
-            .await;
+                    });
+            serve_h2_connection(env, peers, handshake).await;
         }
         _ => {
-            serve_h1_transport(server, request_config, transport).await;
+            serve_h1_transport(env.server, env.request_config, transport).await;
         }
     }
 }
@@ -312,8 +275,7 @@ pub(crate) async fn serve_tls_stream(
 ///
 /// # Arguments
 ///
-/// - `Arc<Server>` - The server whose pipeline serves each request.
-/// - `RequestConfig` - The parsing limits and read timeouts for connections.
+/// - `ConnectionEnv` - The server, limits and protocol for the connection.
 /// - `Endpoint` - The bound QUIC endpoint to accept connections from.
 /// - `Receiver<()>` - The shutdown signal the loop selects on.
 /// - `Sender<bool>` - Publishes whether the loop is still serving.
@@ -323,8 +285,7 @@ pub(crate) async fn serve_tls_stream(
 /// - `Result<(), Box<ServerError>>` - `Ok(())` once the endpoint has been closed and
 ///   drained, or the failure that stopped the loop early.
 pub(crate) async fn quic_accept(
-    server: Arc<Server>,
-    request_config: RequestConfig,
+    env: ConnectionEnv,
     endpoint: Endpoint,
     mut shutdown_receiver: Receiver<()>,
     running_sender: Sender<bool>,
@@ -342,7 +303,7 @@ pub(crate) async fn quic_accept(
             break;
         };
         let remote: SocketAddr = connecting.remote_address();
-        let server: Arc<Server> = server.clone();
+        let env: ConnectionEnv = env.clone();
         spawn(async move {
             let Ok(connection) = connecting.await else {
                 return;
@@ -358,7 +319,7 @@ pub(crate) async fn quic_accept(
             else {
                 return;
             };
-            serve_h3_connection(server, request_config, local, remote, h3_connection).await;
+            serve_h3_connection(env, StreamPeers { local, remote }, h3_connection).await;
         });
     }
     let close_code: VarInt = VarInt::from_u32(QUIC_CLOSE_CODE);

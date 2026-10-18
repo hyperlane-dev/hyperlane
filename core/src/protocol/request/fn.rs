@@ -15,25 +15,23 @@ use super::*;
 /// # Arguments
 ///
 /// - `&RequestConfig` - The parsing limits to enforce.
-/// - `HttpVersion` - The real protocol version to stamp on the request.
-/// - `ProtocolMethod` - The request method decoded by the protocol library.
-/// - `&str` - The `value` argument.
-/// - `&http::Uri` - The request URI, which carries the authority.
-/// - `&ProtocolHeaders` - The protocol request headers.
-/// - `Vec<u8>` - The already collected request body.
+/// - `ProtocolRequestHead` - The decoded head and the collected body.
 ///
 /// # Returns
 ///
 /// - `Result<Request, RequestError>` - The converted request, or the first limit violation.
 pub fn build_protocol_request(
     config: &RequestConfig,
-    version: HttpVersion,
-    method: ProtocolMethod,
-    target: &str,
-    target_uri: &http::Uri,
-    headers: &ProtocolHeaders,
-    body: Vec<u8>,
+    head: ProtocolRequestHead,
 ) -> Result<Request, RequestError> {
+    let ProtocolRequestHead {
+        version,
+        method,
+        parts,
+        body,
+    } = head;
+    let uri: &http::Uri = &parts.uri;
+    let target: String = request_target(uri.path(), uri.query());
     let max_path_size: usize = config.get_max_path_size();
     if target.len() > max_path_size && max_path_size != DEFAULT_LOW_SECURITY_MAX_PATH_SIZE {
         return Err(RequestError::PathTooLong(HttpStatus::URITooLong));
@@ -48,16 +46,16 @@ pub fn build_protocol_request(
     let query_index: Option<usize> = target.find(QUESTION_MARK);
     let hash_index: Option<usize> = target.find(HASH);
     fill_request_querys(
-        split_target_query(target, query_index, hash_index),
+        split_target_query(&target, query_index, hash_index),
         request.get_mut_querys(),
     );
     request
         .get_mut_path()
-        .push_str(split_target_path(target, query_index, hash_index));
+        .push_str(split_target_path(&target, query_index, hash_index));
     request.set_method(protocol_method(method));
     request.set_version(version);
-    fill_request_headers(headers, config, &mut request)?;
-    request.set_host(resolve_request_host(headers, target_uri));
+    fill_request_headers(&parts.headers, config, &mut request)?;
+    request.set_host(resolve_request_host(&parts.headers, uri));
     request.get_mut_body().clear();
     request.get_mut_body().extend_from_slice(&body);
     Ok(request)

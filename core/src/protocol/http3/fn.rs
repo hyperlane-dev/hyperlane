@@ -8,16 +8,15 @@ use super::*;
 ///
 /// # Arguments
 ///
-/// - `Arc<Server>` - The server whose pipeline serves each request.
-/// - `RequestConfig` - The parsing limits and read timeout for the connection.
-/// - `SocketAddr` - The local address of the carrying connection.
+/// - `ConnectionEnv` - The server, limits and protocol of the connection.
+/// - `StreamPeers` - The addresses of the connection.
 /// - `h3::server::Connection<h3_quinn::Connection, Bytes>` - The HTTP/3 connection.
 ///
+/// `StreamPeers` travels separately from `ConnectionEnv` because the connection
+/// half itself does not read it; only the per-request tasks it spawns do.
 pub(crate) async fn serve_h3_connection(
-    server: Arc<Server>,
-    request_config: RequestConfig,
-    local: SocketAddr,
-    remote: SocketAddr,
+    env: ConnectionEnv,
+    peers: StreamPeers,
     mut connection: h3::server::Connection<h3_quinn::Connection, Bytes>,
 ) {
     loop {
@@ -30,10 +29,11 @@ pub(crate) async fn serve_h3_connection(
             return;
         };
         spawn(h3_request_task(
-            server.clone(),
-            request_config,
-            local,
-            remote,
+            H3RequestEnv {
+                server: env.server.clone(),
+                request_config: env.request_config,
+                peers,
+            },
             resolver,
         ));
     }
@@ -43,36 +43,33 @@ pub(crate) async fn serve_h3_connection(
 ///
 /// # Arguments
 ///
-/// - `Arc<Server>` - The server whose pipeline serves the request.
-/// - `RequestConfig` - The parsing limits and read timeout for the connection.
-/// - `SocketAddr` - The local address of the carrying connection.
-/// - `h3::server::RequestResolver<h3_quinn::Connection, Bytes>` - The resolver for
+/// - `H3RequestEnv` - The server, limits and connection addresses.
+/// - `RequestResolverH3` - The resolver for the request stream.
 ///
-pub(crate) async fn h3_request_task(
-    server: Arc<Server>,
-    request_config: RequestConfig,
-    local: SocketAddr,
-    remote: SocketAddr,
-    resolver: h3::server::RequestResolver<h3_quinn::Connection, Bytes>,
-) {
+pub(crate) async fn h3_request_task(env: H3RequestEnv, resolver: RequestResolverH3) {
+    let H3RequestEnv {
+        server,
+        request_config,
+        peers,
+    } = env;
     let (head, request_stream): (http::Request<()>, RequestH3Stream) =
         match resolver.resolve_request().await {
             Ok(resolved) => resolved,
             Err(_) => return,
         };
     let (parts, ()): (http::request::Parts, ()) = head.into_parts();
-    let uri: &http::Uri = &parts.uri;
     let mut framer: H3Framer = H3Framer::new(request_stream);
     let mut body: Vec<u8> = Vec::new();
     match collect_h3_body(&mut framer, &request_config, &parts.headers, &mut body).await {
         Ok(()) => {}
         Err(error) => {
             h3_fail_request(
-                &server,
+                &H3RequestEnv {
+                    server,
+                    request_config,
+                    peers,
+                },
                 &mut framer,
-                request_config,
-                local,
-                remote,
                 HttpVersion::Http3,
                 error,
             )
@@ -82,22 +79,23 @@ pub(crate) async fn h3_request_task(
     }
     let built: Result<Request, RequestError> = build_protocol_request(
         &request_config,
-        HttpVersion::Http3,
-        parts.method.clone(),
-        &request_target(uri.path(), uri.query()),
-        uri,
-        &parts.headers,
-        body,
+        ProtocolRequestHead {
+            version: HttpVersion::Http3,
+            method: parts.method.clone(),
+            parts,
+            body,
+        },
     );
     let request: Request = match built {
         Ok(request) => request,
         Err(error) => {
             h3_fail_request(
-                &server,
+                &H3RequestEnv {
+                    server,
+                    request_config,
+                    peers,
+                },
                 &mut framer,
-                request_config,
-                local,
-                remote,
                 HttpVersion::Http3,
                 error,
             )
@@ -106,8 +104,7 @@ pub(crate) async fn h3_request_task(
         }
     };
     let is_head: bool = request.get_method().is_head();
-    let (stream, peer): (Stream, DuplexStream) =
-        build_duplex_transport(request_config, Some(local), Some(remote));
+    let (stream, peer): (Stream, DuplexStream) = build_duplex_transport(request_config, peers);
     let lifecycle: ServerLifecycle = ServerLifecycle::new(server, request);
     let joined: Result<((), ()), ResponseError> = futures::try_join!(
         async {
@@ -217,21 +214,18 @@ async fn collect_h3_body_until_end(
 /// an HTTP/1.1 shaped head that is framed as HTTP/3 on the wire instead of the
 /// stream ending silently.
 ///
+/// Borrows the request environment while framing the error response.
+///
 /// # Arguments
 ///
-/// - `&Arc<Server>` - The server whose error hooks answer the request.
+/// - `&H3RequestEnv` - The server, limits and connection addresses.
 /// - `&mut H3Framer` - The framer owning the stream's frames.
-/// - `RequestConfig` - The parsing limits and read timeout for the connection.
-/// - `SocketAddr` - The local address of the carrying connection.
 /// - `HttpVersion` - The real protocol version to stamp on the error context.
 /// - `RequestError` - The failure that stopped the request.
 ///
 pub(crate) async fn h3_fail_request(
-    server: &Arc<Server>,
+    env: &H3RequestEnv,
     framer: &mut H3Framer,
-    request_config: RequestConfig,
-    local: SocketAddr,
-    remote: SocketAddr,
     version: HttpVersion,
     error: RequestError,
 ) {
@@ -241,9 +235,9 @@ pub(crate) async fn h3_fail_request(
     ctx.set_request(request);
     ctx.get_mut_response().reset().set_version(version);
     let (mut stream, peer): (Stream, DuplexStream) =
-        build_duplex_transport(request_config, Some(local), Some(remote));
+        build_duplex_transport(env.request_config, env.peers);
     let is_head: bool = false;
-    let server: Arc<Server> = server.clone();
+    let server: Arc<Server> = env.server.clone();
     let (_, pump_result): ((), Result<(), ResponseError>) = join!(
         async move {
             server

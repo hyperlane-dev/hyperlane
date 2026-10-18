@@ -47,3 +47,40 @@ pub(crate) struct TlsTransport {
     #[set(pub(crate))]
     pub(super) session: tokio_rustls::server::TlsStream<TcpStream>,
 }
+
+/// The environment one accepted connection is served in.
+///
+/// Every protocol path needs the same three things: the server whose pipeline
+/// runs each request, the parsing limits and read timeouts those requests are
+/// bounded by, and the protocol this connection is served as. Carried as one
+/// value they stop being the same three parameters repeated in the same order at
+/// every layer.
+///
+/// The server handle is held in an `Arc` exactly as before: one clone per spawned
+/// connection, and one per request task, which is the count the previous
+/// signature already forced. `Clone` copies the handle and adds one to the number
+/// of existing clones of that `Arc`. The other two fields are `Copy`, so they are
+/// carried by value.
+#[derive(Clone, Debug)]
+pub(crate) struct ConnectionEnv {
+    /// The server whose pipeline serves each request.
+    pub(crate) server: Arc<Server>,
+    /// The parsing limits and read timeouts for the connection.
+    pub(crate) request_config: RequestConfig,
+    /// The protocol served on this connection.
+    pub(crate) protocol: ServerProtocol,
+}
+
+/// The addresses of the connection carrying one request stream.
+///
+/// The duplex transport reports these to the framework, so a handler that reads
+/// them sees the real connection rather than a fabricated one. They are the same
+/// two values on every protocol path and the duplex transport is always built
+/// from both, so they travel together.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct StreamPeers {
+    /// The local address of the carrying connection.
+    pub(crate) local: SocketAddr,
+    /// The remote address of the carrying connection.
+    pub(crate) remote: SocketAddr,
+}

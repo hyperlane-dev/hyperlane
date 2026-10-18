@@ -13,13 +13,14 @@ async fn http3_over_quic_reports_the_real_local_and_peer_addresses_of_the_connec
     let client_local: SocketAddr = endpoint
         .local_addr()
         .expect("the client endpoint must report its own udp address");
-    let (status, _headers, body, _alpn): H3HeadReply = h3_exchange_on(
+    let target: String = format!("https://{TLS_SERVER_NAME}:{port}{SOCKET_METADATA_ROUTE_PATH}");
+    let (status, _headers, body, _alpn): H3HeadReply = h3_exchange_on(H3Exchange {
         connection,
-        None,
-        "GET",
-        &format!("https://{TLS_SERVER_NAME}:{port}{SOCKET_METADATA_ROUTE_PATH}"),
-        &[],
-    )
+        alpn: None,
+        method: "GET",
+        target: &target,
+        body: &[],
+    })
     .await
     .expect("h3 socket metadata request must complete");
     assert_eq!(status, 200);

@@ -57,16 +57,24 @@ pub(crate) async fn h3_request_with_headers(
     let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await?;
     let alpn: Option<Vec<u8>> = negotiated_quic_alpn(&connection);
-    h3_exchange_on(connection, alpn, method, target, body).await
+    h3_exchange_on(H3Exchange {
+        connection,
+        alpn,
+        method,
+        target,
+        body,
+    })
+    .await
 }
 
-pub(crate) async fn h3_exchange_on(
-    connection: quinn::Connection,
-    alpn: Option<Vec<u8>>,
-    method: &str,
-    target: &str,
-    body: &[u8],
-) -> Result<H3HeadReply, String> {
+pub(crate) async fn h3_exchange_on(exchange: H3Exchange<'_>) -> Result<H3HeadReply, String> {
+    let H3Exchange {
+        connection,
+        alpn,
+        method,
+        target,
+        body,
+    } = exchange;
     let (mut driver, mut client) = h3::client::new(h3_quinn::Connection::new(connection.clone()))
         .await
         .map_err(|error: h3::error::ConnectionError| format!("h3 handshake failed: {error}"))?;

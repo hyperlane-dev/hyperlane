@@ -1,5 +1,6 @@
 use super::*;
 
+/// Implements [`Transport`] for [`DuplexTransport`].
 impl Transport for DuplexTransport {
     /// Reports the address of the remote end of the carrying connection.
     ///
@@ -30,6 +31,7 @@ impl Transport for DuplexTransport {
     }
 }
 
+/// Implements [`AsyncRead`] for [`DuplexTransport`].
 impl AsyncRead for DuplexTransport {
     /// Reads from the half the framing pump writes nothing into.
     ///
@@ -55,6 +57,7 @@ impl AsyncRead for DuplexTransport {
     }
 }
 
+/// Implements [`AsyncWrite`] for [`DuplexTransport`].
 impl AsyncWrite for DuplexTransport {
     /// Writes response bytes into the pipe the framing pump reads.
     ///
@@ -110,6 +113,7 @@ impl AsyncWrite for DuplexTransport {
     }
 }
 
+/// Inherent implementation of [`TlsTransport`].
 impl TlsTransport {
     /// Wraps a negotiated TLS session.
     ///
@@ -122,6 +126,7 @@ impl TlsTransport {
     }
 }
 
+/// Inherent implementation of [`TlsTransport`].
 impl TlsTransport {
     /// Borrows the negotiated session.
     ///
@@ -142,6 +147,7 @@ impl TlsTransport {
     }
 }
 
+/// Implements [`Transport`] for [`TlsTransport`].
 impl Transport for TlsTransport {
     /// Reports the address of the remote end of the session.
     ///
@@ -170,6 +176,7 @@ impl Transport for TlsTransport {
     }
 }
 
+/// Implements [`AsyncRead`] for [`TlsTransport`].
 impl AsyncRead for TlsTransport {
     /// Reads decrypted bytes from the negotiated session.
     ///
@@ -192,6 +199,7 @@ impl AsyncRead for TlsTransport {
     }
 }
 
+/// Implements [`AsyncWrite`] for [`TlsTransport`].
 impl AsyncWrite for TlsTransport {
     /// Writes encrypted bytes onto the negotiated session.
     ///

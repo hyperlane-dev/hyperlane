@@ -165,6 +165,7 @@ impl Transport for TcpStream {
     }
 }
 
+/// Implements [`Drop`] for [`PooledReader`].
 impl Drop for PooledReader<'_> {
     /// Releases the buffer back to the pool for reuse by later requests.
     fn drop(&mut self) {
@@ -258,6 +259,7 @@ impl AsyncBufRead for PooledReader<'_> {
     }
 }
 
+/// Inherent implementation of [`Stream`].
 impl Stream {
     /// Boxes a transport into a `Stream` for the request pipeline.
     ///

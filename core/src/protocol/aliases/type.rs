@@ -9,6 +9,9 @@ pub(crate) type ProtocolHeaders = http::HeaderMap;
 /// The bidirectional stream one HTTP/3 request runs over.
 pub(crate) type RequestH3Stream = h3::server::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes>;
 
+/// The resolver an HTTP/3 connection hands back for one request stream.
+pub(crate) type RequestResolverH3 = h3::server::RequestResolver<h3_quinn::Connection, Bytes>;
+
 /// The HTTP/2 connection half shared by every request stream of one connection.
 pub(crate) type ConnectionH2<T> = h2::server::Connection<T, Bytes>;
 
