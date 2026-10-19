@@ -21,6 +21,7 @@ impl Default for WebSocketFrame {
     }
 }
 
+/// Inherent implementation of [`WebSocketOpcode`].
 impl WebSocketOpcode {
     /// Creates a `WebSocketOpcode` from a raw u8 value.
     ///
@@ -153,6 +154,7 @@ impl WebSocketOpcode {
     }
 }
 
+/// Inherent implementation of [`WebSocketFrame`].
 impl WebSocketFrame {
     /// Decodes a WebSocket frame from the provided data slice.
     ///
@@ -567,7 +569,7 @@ impl WebSocketFrame {
     ) -> Result<Option<RequestBody>, RequestError> {
         let payload_data: &[u8] = self.get_payload_data();
         full_frame.extend_from_slice(payload_data);
-        if *self.get_fin() {
+        if self.get_fin() {
             return Ok(Some(full_frame.clone()));
         }
         Ok(None)

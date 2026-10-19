@@ -537,61 +537,6 @@ impl Server {
         Self::flush_stderr();
     }
 
-    /// Spawns a task handler for a given stream and hook.
-    ///
-    /// # Arguments
-    ///
-    /// - `&'static self` - The server instance whose task-panic hooks are used.
-    /// - `usize` - The addresses of the stream and of the context.
-    /// - `F` - The hook to execute.
-    ///
-    /// # Safety
-    ///
-    /// - The address is guaranteed to be a valid `Context` instance
-    ///   that was previously converted from a reference and is managed by the runtime.
-    async fn task_handler<F>(&'static self, stream_address: usize, ctx_address: usize, hook: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        if let Err(error) = spawn(hook).await
-            && error.is_panic()
-        {
-            let ctx: &mut Context = ctx_address.into();
-            let stream: &mut Stream = stream_address.into();
-            let panic: PanicData = PanicData::from_join_error(error);
-            ctx.set_task_panic(panic)
-                .get_mut_response()
-                .set_status_code(HttpStatus::InternalServerError.code());
-            stream.set_closed(false);
-            for hook in self.get_task_panic().iter() {
-                if hook(stream, ctx).await.is_reject() {
-                    break;
-                }
-            }
-            unsafe {
-                let _: Box<Context> = Box::from_raw(ctx);
-                let _: Box<Stream> = Box::from_raw(stream);
-            }
-        };
-    }
-
-    /// Configures socket options for a newly accepted `TcpStream`.
-    ///
-    /// This applies settings like `TCP_NODELAY`, and `IP_TTL` from the server's configuration.
-    ///
-    /// # Arguments
-    ///
-    /// - `&TcpStream` - A reference to the `TcpStream` to configure.
-    fn configure_stream(&self, stream: &TcpStream) {
-        let config: &ServerConfig = self.get_server_config();
-        if let Some(nodelay) = config.try_get_nodelay() {
-            let _: Result<(), io::Error> = stream.set_nodelay(nodelay);
-        }
-        if let Some(ttl) = config.try_get_ttl() {
-            let _: Result<(), io::Error> = stream.set_ttl(ttl);
-        }
-    }
-
     /// Executes trait-based request middleware in sequence.
     ///
     /// # Arguments
@@ -699,7 +644,12 @@ impl Server {
     /// # Returns
     ///
     /// - `bool` - A boolean indicating whether the connection should be kept alive.
-    async fn request_hook(&self, stream: &mut Stream, ctx: &mut Context, request: Request) -> bool {
+    pub(crate) async fn request_hook(
+        &self,
+        stream: &mut Stream,
+        ctx: &mut Context,
+        request: Request,
+    ) -> bool {
         let keep_alive: bool = request.is_enable_keep_alive();
         let version: RequestVersion = request.get_version().clone();
         let route: RequestPath = request.get_path().clone();
@@ -751,16 +701,14 @@ impl Server {
     /// Handles a single client connection, determining whether it's an HTTP or WebSocket request.
     ///
     /// It reads the initial request from the stream and dispatches it to the appropriate hook.
+    /// Both arguments are borrowed: the stream and the context belong to the
+    /// caller, so this leaves them alive for whatever runs next — the panic
+    /// hooks after an unwind, or the next request on a keep alive connection.
     ///
     /// # Arguments
     ///
     /// - `&mut Stream` - The `Stream` for the current request.
     /// - `&mut Context` - The `Context` for the current request.
-    ///
-    /// # Safety
-    ///
-    /// - The `ctx` is a valid pointer to a `Context` that was
-    ///   originally created via `Box::into_raw` and is now being reclaimed.
     async fn handle_connection(&self, stream: &mut Stream, ctx: &mut Context) {
         match stream.try_get_http_request().await {
             Ok(request) => {
@@ -770,62 +718,186 @@ impl Server {
                 self.handle_request_error(stream, ctx, &error).await;
             }
         }
-        unsafe {
-            let _: Box<Context> = Box::from_raw(ctx);
-            let _: Box<Stream> = Box::from_raw(stream);
-        }
     }
 
-    /// Enters a loop to accept incoming TCP connections and spawn handlers for them.
+    /// Serves one HTTP/1.1 connection through the existing keep alive pipeline.
+    ///
+    /// This is the same pipeline a plaintext connection has always used: the
+    /// request parser runs in a loop, so keep alive, upgrades and raw writes
+    /// behave exactly as they did before TLS and the multiplexed protocols
+    /// existed. A handler that panics is caught here and reported through the
+    /// existing task panic hooks, so the accept loop survives it and the hooks
+    /// see the panic while the stream and context are still alive.
     ///
     /// # Arguments
     ///
-    /// - `&'static self` - The server instance that owns the accept loop.
-    /// - `&TcpListener` - A reference to the `TcpListener` to accept connections from.
-    async fn tcp_accept(&'static self, tcp_listener: &TcpListener) {
-        loop {
-            if let Ok((stream, _)) = tcp_listener.accept().await {
-                self.configure_stream(&stream);
-                let request_config: RequestConfig = *self.get_request_config();
-                let stream: &'static mut Stream =
-                    Box::leak(Box::new(Stream::new(stream, request_config, false)));
-                let ctx: &'static mut Context = Box::leak(Box::new(Context::default()));
-                spawn(self.task_handler(
-                    stream.into(),
-                    ctx.into(),
-                    self.handle_connection(stream, ctx),
-                ));
+    /// - `&mut Stream` - The stream carrying the connection.
+    ///
+    /// # Returns
+    ///
+    /// - `()` - Resolves once the connection is finished.
+    pub(crate) async fn serve_h1_connection_stream(&self, stream: &mut Stream) {
+        let mut ctx: Context = Context::default();
+        let panicked: Option<PanicData> =
+            catch_connection_panic(self.handle_connection(stream, &mut ctx)).await;
+        let Some(panic) = panicked else {
+            return;
+        };
+        ctx.set_task_panic(panic)
+            .get_mut_response()
+            .set_status_code(HttpStatus::InternalServerError.code());
+        stream.set_closed(false);
+        for hook in self.get_task_panic().iter() {
+            if hook(stream, &mut ctx).await.is_reject() {
+                break;
             }
         }
     }
 
-    /// Starts the server, binds to the configured address, and begins listening for connections.
+    /// Serves one request that arrived on a multiplexed protocol stream.
     ///
-    /// This is the main entry point to launch the server. It will initialize the panic hook,
-    /// create a TCP listener, and then enter the connection acceptance loop in a background task.
+    /// The lifecycle is the one an HTTP/1.1 request runs: the request
+    /// middleware, the matched route and the response middleware, in that
+    /// order, against the same context and the same error hook. A panic inside
+    /// it is caught the same way a connection panic is.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut Stream` - The stream the pipeline writes its response onto.
+    /// - `&mut Context` - The context for the current request.
+    /// - `Request` - The request converted from the protocol head and body.
     ///
     /// # Returns
     ///
-    /// Returns a `Result` containing a shutdown function on success.
-    /// Calling this function will shut down the server by aborting its main task.
-    /// Returns an error if the server fails to start.
+    /// - `()` - Resolves once the pipeline has finished writing.
+    pub(crate) async fn run_protocol_lifecycle(
+        &self,
+        stream: &mut Stream,
+        ctx: &mut Context,
+        request: Request,
+    ) {
+        let panicked: Option<PanicData> = catch_connection_panic(async {
+            let _keep_alive: bool = self.request_hook(stream, ctx, request).await;
+        })
+        .await;
+        let Some(panic) = panicked else {
+            return;
+        };
+        ctx.set_task_panic(panic)
+            .get_mut_response()
+            .set_status_code(HttpStatus::InternalServerError.code());
+        stream.set_closed(false);
+        for hook in self.get_task_panic().iter() {
+            if hook(stream, ctx).await.is_reject() {
+                break;
+            }
+        }
+    }
+
+    /// Starts the server, binds to the configured address, and begins listening.
+    ///
+    /// The configured protocol selects the listener. HTTP/1.1 and HTTP/2 share
+    /// the TCP listener, the latter speaking its own preface and optionally
+    /// wrapping the connection in TLS, while HTTP/3 binds a QUIC UDP endpoint.
+    /// Invalid TLS material and an HTTP/3 configuration without TLS are both
+    /// rejected before the socket is bound, so a misconfigured server fails to
+    /// start rather than accepting connections it cannot serve.
+    ///
+    /// The accept loop owns a clone of the server instead of borrowing it, so
+    /// running a short lived `Server` stays safe and dropping it leaves no
+    /// leaked allocation behind.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<ServerControlHook, Box<ServerError>>` - The shutdown hook on
+    ///   success, or the failure that prevented the server from binding.
     pub async fn run(&self) -> Result<ServerControlHook, Box<ServerError>> {
-        let bind_address: &String = self.get_server_config().get_address();
-        let tcp_listener: TcpListener = TcpListener::bind(&bind_address)
-            .await
-            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
-        let server: &'static Self = unsafe { self.leak() };
-        let (wait_sender, wait_receiver) = channel(());
-        let (shutdown_sender, mut shutdown_receiver) = channel(());
-        let accept_connections: JoinHandle<()> = spawn(async move {
-            server.tcp_accept(&tcp_listener).await;
-            let _: Result<(), tokio::sync::watch::error::SendError<()>> = wait_sender.send(());
-        });
+        let server_config: &ServerConfig = self.get_server_config();
+        let protocol: ServerProtocol = server_config.get_protocol();
+        let tls_config: Option<TlsConfig> = server_config.get_tls().clone();
+        if protocol == ServerProtocol::Http3 && tls_config.is_none() {
+            return Err(Box::new(ServerError::MissingTlsForHttp3));
+        }
+        let stream_tls: Option<Arc<rustls::ServerConfig>> = match tls_config.clone() {
+            Some(_) if protocol == ServerProtocol::Http3 => None,
+            Some(config) => Some(build_stream_tls_config(&config, &protocol)?),
+            None => None,
+        };
+        let bind_address: &String = server_config.get_address();
+        let server: Arc<Server> = Arc::new(Self::clone(self));
+        let request_config: RequestConfig = *self.get_request_config();
+        let (shutdown_sender, shutdown_receiver) = channel(());
+        let (running_sender, running_receiver) = channel(SERVER_RUNNING);
+        let _: JoinHandle<()> = match protocol {
+            ServerProtocol::Http3 => {
+                let Some(config) = tls_config.clone() else {
+                    return Err(Box::new(ServerError::MissingTlsForHttp3));
+                };
+                let quic_config: Arc<quinn::crypto::rustls::QuicServerConfig> = Arc::new(
+                    quinn::crypto::rustls::QuicServerConfig::try_from(build_quic_tls_config(
+                        &config,
+                    )?)
+                    .map_err(
+                        |error: quinn::crypto::rustls::NoInitialCipherSuite| {
+                            Box::new(ServerError::Tls(format!(
+                                "no compatible cipher suite for quic: {}",
+                                error
+                            )))
+                        },
+                    )?,
+                );
+                let bind_addr: SocketAddr =
+                    bind_address
+                        .parse::<SocketAddr>()
+                        .map_err(|error: AddrParseError| {
+                            Box::new(ServerError::Tls(format!(
+                                "invalid bind address {}: {}",
+                                bind_address, error
+                            )))
+                        })?;
+                let endpoint: Endpoint =
+                    Endpoint::server(quinn::ServerConfig::with_crypto(quic_config), bind_addr)
+                        .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+                let env: ConnectionEnv = ConnectionEnv {
+                    server,
+                    request_config,
+                    protocol,
+                };
+                spawn(async move {
+                    let _: Result<(), Box<ServerError>> =
+                        quic_accept(env, endpoint, shutdown_receiver, running_sender).await;
+                })
+            }
+            _ => {
+                let tcp_listener: TcpListener = TcpListener::bind(&bind_address)
+                    .await
+                    .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+                let env: ConnectionEnv = ConnectionEnv {
+                    server,
+                    request_config,
+                    protocol,
+                };
+                spawn(async move {
+                    tcp_accept(
+                        env,
+                        stream_tls,
+                        AcceptSignal {
+                            listener: tcp_listener,
+                            shutdown_receiver,
+                            running_sender,
+                        },
+                    )
+                    .await;
+                })
+            }
+        };
         let wait_hook: ServerControlHookHandler<()> = Arc::new(move || {
-            let mut wait_receiver_clone: Receiver<()> = wait_receiver.clone();
+            let mut running_receiver_clone: Receiver<bool> = running_receiver.clone();
             Box::pin(async move {
-                let _: Result<(), tokio::sync::watch::error::RecvError> =
-                    wait_receiver_clone.changed().await;
+                while !*running_receiver_clone.borrow_and_update() {
+                    let _: Result<(), tokio::sync::watch::error::RecvError> =
+                        running_receiver_clone.changed().await;
+                }
             })
         });
         let shutdown_hook: ServerControlHookHandler<()> = Arc::new(move || {
@@ -834,11 +906,6 @@ impl Server {
                 let _: Result<(), tokio::sync::watch::error::SendError<()>> =
                     shutdown_sender_clone.send(());
             })
-        });
-        spawn(async move {
-            let _: Result<(), tokio::sync::watch::error::RecvError> =
-                shutdown_receiver.changed().await;
-            accept_connections.abort();
         });
         let mut server_control_hook: ServerControlHook = ServerControlHook::default();
         server_control_hook.set_shutdown_hook(shutdown_hook);

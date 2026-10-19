@@ -7,11 +7,11 @@ use super::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub struct Context {
     /// The incoming HTTP request.
-    pub(super) request: Request,
+    pub request: Request,
     /// The outgoing HTTP response.
-    pub(super) response: Response,
+    pub response: Response,
     /// Parameters extracted from the route path.
-    pub(super) route_params: RouteParams,
+    pub route_params: RouteParams,
     /// A collection of custom attributes for sharing data within the request lifecycle.
-    pub(super) attributes: ThreadSafeAttributeStore,
+    pub attributes: ThreadSafeAttributeStore,
 }

@@ -22,6 +22,7 @@ pub struct Proxy {
     /// Proxy server hostname or IP.
     pub host: String,
     /// Proxy server port.
+    #[get(type(copy))]
     pub port: u16,
     /// Optional username for proxy auth.
     #[get(type(clone))]

@@ -41,9 +41,7 @@ pub struct RequestConfig {
 ///
 /// The fields stay `pub`: `type/tests/request` builds fixtures through them, so
 /// this is published API and §17.14 does not recall it (semver).
-#[derive(
-    Clone, Debug, Deserialize, DisplayDebug, Eq, Getter, GetterMut, PartialEq, Serialize, Setter,
-)]
+#[derive(Clone, Data, Debug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
 pub struct Request {
     /// HTTP request method.
     pub method: RequestMethod,

@@ -3,6 +3,7 @@ use super::*;
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> AsyncReadWrite for T {}
 impl<T: Read + Write> ReadWrite for T {}
 
+/// Inherent implementation of [`HttpRequest`].
 impl HttpRequest {
     /// Send the HTTP request synchronously, returning the parsed response.
     ///
@@ -733,7 +734,7 @@ impl HttpRequest {
         proxy: &Proxy,
     ) -> Result<BoxReadWrite, RequestError> {
         let timeout: Duration = Duration::from_millis(self.get_config().get_timeout());
-        let tcp: TcpStream = TcpStream::connect((proxy.get_host().clone(), *proxy.get_port()))
+        let tcp: TcpStream = TcpStream::connect((proxy.get_host().clone(), proxy.get_port()))
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         tcp.set_read_timeout(Some(timeout))
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
@@ -823,7 +824,7 @@ impl HttpRequest {
         proxy: &Proxy,
     ) -> Result<BoxReadWrite, RequestError> {
         let timeout: Duration = Duration::from_millis(self.get_config().get_timeout());
-        let mut tcp: TcpStream = TcpStream::connect((proxy.get_host().clone(), *proxy.get_port()))
+        let mut tcp: TcpStream = TcpStream::connect((proxy.get_host().clone(), proxy.get_port()))
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         tcp.set_read_timeout(Some(timeout))
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
@@ -971,12 +972,10 @@ impl HttpRequest {
         target_port: u16,
         proxy: &Proxy,
     ) -> Result<BoxAsyncReadWrite, RequestError> {
-        let tcp: http_type::tokio::net::TcpStream = http_type::tokio::net::TcpStream::connect((
-            proxy.get_host().clone(),
-            *proxy.get_port(),
-        ))
-        .await
-        .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+        let tcp: http_type::tokio::net::TcpStream =
+            http_type::tokio::net::TcpStream::connect((proxy.get_host().clone(), proxy.get_port()))
+                .await
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         let mut proxy_stream: BoxAsyncReadWrite = if proxy.get_proxy_type() == &ProxyType::Https {
             let roots: RootCertStore = self.get_tmp().get_root_cert().clone();
             let tls_cfg: ClientConfig = ClientConfig::builder()
@@ -1070,11 +1069,10 @@ impl HttpRequest {
         target_port: u16,
         proxy: &Proxy,
     ) -> Result<BoxAsyncReadWrite, RequestError> {
-        let mut tcp: http_type::tokio::net::TcpStream = http_type::tokio::net::TcpStream::connect(
-            (proxy.get_host().clone(), *proxy.get_port()),
-        )
-        .await
-        .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+        let mut tcp: http_type::tokio::net::TcpStream =
+            http_type::tokio::net::TcpStream::connect((proxy.get_host().clone(), proxy.get_port()))
+                .await
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         let auth_methods: Vec<u8> =
             if proxy.get_username().is_some() && proxy.get_password().is_some() {
                 vec![0x05, 0x02, 0x00, 0x02]
@@ -1184,6 +1182,7 @@ impl HttpRequest {
     }
 }
 
+/// Inherent implementation of [`HttpRequest`].
 impl HttpRequest {
     /// Create a GET request for `url`.
     ///

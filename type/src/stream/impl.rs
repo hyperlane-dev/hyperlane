@@ -141,6 +141,31 @@ impl Lifetime for Stream {
     }
 }
 
+/// Implementation of `Transport` trait for the plain TCP socket.
+///
+/// The socket is the reference transport: it already carries a socket
+/// identity, so its addresses are reported directly.
+impl Transport for TcpStream {
+    /// Reports the address of the remote end of the socket.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<SocketAddr, io::Error>` - The peer address of the socket.
+    fn peer_addr(&self) -> Result<SocketAddr, io::Error> {
+        TcpStream::peer_addr(self)
+    }
+
+    /// Reports the address of the local end of the socket.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<SocketAddr, io::Error>` - The local address of the socket.
+    fn local_addr(&self) -> Result<SocketAddr, io::Error> {
+        TcpStream::local_addr(self)
+    }
+}
+
+/// Implements [`Drop`] for [`PooledReader`].
 impl Drop for PooledReader<'_> {
     /// Releases the buffer back to the pool for reuse by later requests.
     fn drop(&mut self) {
@@ -171,11 +196,11 @@ impl AsyncRead for PooledReader<'_> {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         let this: &mut Self = self.get_mut();
-        if *this.get_start() < *this.get_end() {
-            let available: usize = *this.get_end() - *this.get_start();
+        if this.get_start() < this.get_end() {
+            let available: usize = this.get_end() - this.get_start();
             let amount: usize = available.min(buf.remaining());
-            let end: usize = *this.get_start() + amount;
-            buf.put_slice(&this.get_buffer()[*this.get_start()..end]);
+            let end: usize = this.get_start() + amount;
+            buf.put_slice(&this.get_buffer()[this.get_start()..end]);
             this.set_start(end);
             return Poll::Ready(Ok(()));
         }
@@ -229,12 +254,89 @@ impl AsyncBufRead for PooledReader<'_> {
     /// - `usize` - The number of bytes to consume.
     fn consume(self: Pin<&mut Self>, amount: usize) {
         let this: &mut Self = self.get_mut();
-        let new_start: usize = (*this.get_start() + amount).min(*this.get_end());
+        let new_start: usize = (this.get_start() + amount).min(this.get_end());
         this.set_start(new_start);
     }
 }
 
+/// Inherent implementation of [`Stream`].
 impl Stream {
+    /// Boxes a transport into a `Stream` for the request pipeline.
+    ///
+    /// This is the single construction path: a plain TCP socket, a TLS session
+    /// and a per-request duplex stream all enter here, so nothing above the
+    /// transport line has to know which one it is serving. The transport is
+    /// type erased immediately, which keeps `Stream` a fixed size regardless of
+    /// the concrete protocol adapter behind it.
+    ///
+    /// # Arguments
+    ///
+    /// - `T` - The transport type to serve the request cycle over.
+    /// - `RequestConfig` - The parsing limits and read timeout for the cycle.
+    /// - `bool` - Whether the connection starts already closed.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - A stream serving bytes through the boxed transport.
+    pub fn from_transport<T>(transport: T, request_config: RequestConfig, closed: bool) -> Self
+    where
+        T: Transport + 'static,
+    {
+        Self {
+            stream: Box::new(transport),
+            request_config,
+            closed,
+            leftover: Vec::new(),
+            leftover_start: 0,
+            leftover_end: 0,
+        }
+    }
+
+    /// Boxes a TCP socket into a `Stream` for the request pipeline.
+    ///
+    /// Kept as the socket-facing constructor so the accept loop keeps its
+    /// existing call shape; it delegates to `from_transport`, so there is one
+    /// construction path rather than two.
+    ///
+    /// # Arguments
+    ///
+    /// - `TcpStream` - The accepted socket to serve the request cycle over.
+    /// - `RequestConfig` - The parsing limits and read timeout for the cycle.
+    /// - `bool` - Whether the connection starts already closed.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - A stream serving bytes through the boxed socket.
+    pub fn new(stream: TcpStream, request_config: RequestConfig, closed: bool) -> Self {
+        Self::from_transport(stream, request_config, closed)
+    }
+
+    /// Reports the address of the remote end of the transport.
+    ///
+    /// Delegates to the transport itself, so a transport without a socket
+    /// identity answers with an error rather than a fabricated address.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<SocketAddr, io::Error>` - The peer address reported by the transport.
+    #[inline(always)]
+    pub fn get_peer_addr(&self) -> Result<SocketAddr, io::Error> {
+        self.get_stream().peer_addr()
+    }
+
+    /// Reports the address of the local end of the transport.
+    ///
+    /// Delegates to the transport itself, so a transport without a socket
+    /// identity answers with an error rather than a fabricated address.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<SocketAddr, io::Error>` - The local address reported by the transport.
+    #[inline(always)]
+    pub fn get_local_addr(&self) -> Result<SocketAddr, io::Error> {
+        self.get_stream().local_addr()
+    }
+
     /// Checks if the connection should be kept alive.
     ///
     /// This method evaluates whether the connection should remain open based on
@@ -311,8 +413,8 @@ impl Stream {
         Request::fill_http_body(&mut reader, request.get_mut_body(), content_size).await?;
         // Preserve bytes read ahead for the next pipelined request: they have
         // already left the socket and cannot be read again.
-        let reader_start: usize = *reader.get_start();
-        let reader_end: usize = *reader.get_end();
+        let reader_start: usize = reader.get_start();
+        let reader_end: usize = reader.get_end();
         let pending: Vec<u8> = if reader_start < reader_end {
             reader.get_buffer()[reader_start..reader_end].to_vec()
         } else {
@@ -450,7 +552,7 @@ impl Stream {
         duration_opt: Option<Duration>,
         is_client_response: &mut bool,
     ) -> Result<Option<usize>, RequestError> {
-        let stream: &mut TcpStream = self.get_mut_stream();
+        let stream: &mut Box<dyn Transport> = self.get_mut_stream();
         if let Some(duration) = duration_opt {
             return match timeout(duration, stream.read(buffer)).await {
                 Ok(result) => match result {
@@ -526,7 +628,7 @@ impl Stream {
         if self.get_closed() {
             return Err(ResponseError::ConnectionClosed);
         }
-        let stream: &mut TcpStream = self.get_mut_stream();
+        let stream: &mut Box<dyn Transport> = self.get_mut_stream();
         for data in data_iter {
             stream.write_all(data.as_ref()).await?;
         }

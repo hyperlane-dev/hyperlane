@@ -49,7 +49,7 @@ use std::{
     hash::Hash,
     io::{self, ErrorKind},
     mem,
-    net::IpAddr,
+    net::{IpAddr, SocketAddr},
     num::ParseIntError,
     pin::Pin,
     rc::Rc,
@@ -69,7 +69,10 @@ use {
     lombok_macros::*,
     serde::{Deserialize, Serialize, de::DeserializeOwned},
     tokio::{
-        io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, ReadBuf},
+        io::{
+            AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt,
+            ReadBuf,
+        },
         net::TcpStream,
         runtime::Handle,
         sync::{
