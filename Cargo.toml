@@ -12,7 +12,7 @@ categories = ["network-programming", "web-programming"]
 exclude.workspace = true
 
 [workspace.package]
-version = "21.13.7"
+version = "21.14.0"
 readme = "README.md"
 edition = "2024"
 authors = ["root@ltpp.vip"]
