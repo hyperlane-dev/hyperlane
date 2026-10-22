@@ -34,6 +34,19 @@ pub struct Stream {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) leftover_end: usize,
+    /// The buffer the request line is read into.
+    ///
+    /// It lives with the connection rather than with the request, so a
+    /// keep-alive connection reads its second, third and later request lines
+    /// into the same allocation instead of a fresh one per request.
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) line_buffer: String,
+    /// The buffer the header lines are read into, kept for the same reason as
+    /// the request line buffer.
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) header_line_buffer: String,
 }
 
 /// A buffered reader over a transport with a reusable read buffer.

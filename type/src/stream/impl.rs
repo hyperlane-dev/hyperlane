@@ -289,6 +289,8 @@ impl Stream {
             leftover: Vec::new(),
             leftover_start: 0,
             leftover_end: 0,
+            line_buffer: String::with_capacity(REQUEST_LINE_BUFFER_CAPACITY),
+            header_line_buffer: String::with_capacity(HEADER_LINE_BUFFER_CAPACITY),
         }
     }
 
@@ -389,17 +391,25 @@ impl Stream {
             pending
         };
         let buffer: Vec<u8> = take_read_buffer(buffer_size);
-        let mut reader: PooledReader<'_> = PooledReader::new(self.get_mut_stream(), buffer);
+        // Split the borrow of the stream: the reader takes the transport, the
+        // line buffers are separate fields, so both can be held at once.
+        let Stream {
+            stream,
+            line_buffer,
+            header_line_buffer,
+            ..
+        } = self;
+        let mut reader: PooledReader<'_> = PooledReader::new(stream, buffer);
         if !seeded.is_empty() {
             let target: &mut Vec<u8> = reader.get_mut_buffer();
             let copy_len: usize = seeded.len().min(target.len());
             target[..copy_len].copy_from_slice(&seeded[..copy_len]);
             reader.set_end(copy_len);
         }
-        let mut line: String = String::with_capacity(REQUEST_LINE_BUFFER_CAPACITY);
-        AsyncBufReadExt::read_line(&mut reader, &mut line).await?;
+        line_buffer.clear();
+        AsyncBufReadExt::read_line(&mut reader, line_buffer).await?;
         let (method, path, version): (RequestMethod, &str, RequestVersion) =
-            Request::get_http_first_line(&line)?;
+            Request::get_http_first_line(line_buffer)?;
         Request::check_http_path_size(path, max_path_size)?;
         let hash_index: Option<usize> = path.find(HASH);
         let query_index: Option<usize> = path.find(QUERY);
@@ -407,7 +417,9 @@ impl Stream {
         Request::fill_http_querys(query, request.get_mut_querys());
         let path_slice: &str = Request::get_http_path(path, query_index, hash_index);
         request.get_mut_path().push_str(path_slice);
-        let content_size: usize = request.get_http_headers(&mut reader, &config).await?;
+        let content_size: usize = request
+            .get_http_headers(&mut reader, &config, header_line_buffer)
+            .await?;
         request.set_method(method);
         request.set_version(version);
         Request::fill_http_body(&mut reader, request.get_mut_body(), content_size).await?;
@@ -452,7 +464,18 @@ impl Stream {
             return self.fill_http_from_stream(request).await;
         }
         let duration: Duration = Duration::from_millis(timeout_ms);
-        timeout(duration, self.fill_http_from_stream(request)).await?
+        let mut reading: Pin<&mut _> = pin!(self.fill_http_from_stream(request));
+        // A request whose bytes have already arrived is read on the first
+        // poll, so the ordinary case never arms a timer at all. Arming one
+        // costs a timer registration and a cancellation per request, and that
+        // churn is the most expensive thing a request path can do once the
+        // concurrency is high enough for the timer driver to become a
+        // bottleneck. The timer is armed only when the read really has to
+        // wait, which is exactly when the timeout can still fire.
+        if let Some(result) = poll_once(reading.as_mut()).await {
+            return result;
+        }
+        timeout(duration, reading).await?
     }
 
     /// Parses an HTTP request from a TCP stream.

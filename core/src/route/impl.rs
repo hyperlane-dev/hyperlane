@@ -604,6 +604,29 @@ impl RouteMatcher {
         Ok(())
     }
 
+    /// Resolves a static route hook by reference (no Arc::clone) for hot-path use.
+    ///
+    /// A static route is the common case, and it needs neither a route
+    /// parameter nor a mutable context, so the caller can look it up with
+    /// nothing but the path. That keeps the path from being copied out of the
+    /// request for every request that a static route answers.
+    ///
+    /// # Arguments
+    ///
+    /// - `&'a self` - The route table to search.
+    /// - `&str` - The request path to resolve.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<&'a ServerHookHandler>`: The matched handler, or `None` when
+    ///   no static route matched.
+    pub(crate) fn try_resolve_static_route<'a>(
+        &'a self,
+        path: &str,
+    ) -> Option<&'a ServerHookHandler> {
+        self.get_static_route().get(path)
+    }
+
     /// Resolves a route hook by reference (no Arc::clone) for hot-path use.
     ///
     /// Returns a reference to the matched `ServerHookHandler` if any. The

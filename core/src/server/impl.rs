@@ -652,7 +652,6 @@ impl Server {
     ) -> bool {
         let keep_alive: bool = request.is_enable_keep_alive();
         let version: RequestVersion = request.get_version().clone();
-        let route: RequestPath = request.get_path().clone();
         ctx.set_request(request);
         ctx.get_mut_response().reset().set_version(version);
         ctx.clear_route_params();
@@ -661,8 +660,23 @@ impl Server {
         if self.handle_request_middleware(stream, ctx).await {
             return stream.is_keep_alive(keep_alive);
         }
-        if self.handle_route_matcher(stream, ctx, &route).await {
-            return stream.is_keep_alive(keep_alive);
+        // A static route is the common case and needs nothing but the path,
+        // so the path is borrowed from the request instead of being copied
+        // out of it. Only a pattern route, which is the rarer case, pays for
+        // the copy.
+        let static_hook: Option<&ServerHookHandler> = {
+            let path: &str = ctx.get_request().get_path().as_str();
+            self.get_route_matcher().try_resolve_static_route(path)
+        };
+        if let Some(hook) = static_hook {
+            if hook(stream, ctx).await.is_reject() {
+                return stream.is_keep_alive(keep_alive);
+            }
+        } else {
+            let route: RequestPath = ctx.get_request().get_path().clone();
+            if self.handle_route_matcher(stream, ctx, &route).await {
+                return stream.is_keep_alive(keep_alive);
+            }
         }
         if self.handle_response_middleware(stream, ctx).await {
             return stream.is_keep_alive(keep_alive);

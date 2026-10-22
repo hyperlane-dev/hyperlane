@@ -289,9 +289,29 @@ impl Request {
         self.set_version(HttpVersion::default());
         self.get_mut_path().clear();
         self.get_mut_querys().clear();
-        self.get_mut_headers().clear();
+        self.recycle_headers();
         self.get_mut_body().clear();
         self
+    }
+
+    /// Hands the header entries to the pool and empties the header map.
+    ///
+    /// The map ends up empty, exactly as clearing it would, but the name and
+    /// the value buffers of every header survive in the pool. The next
+    /// request on the same connection takes them back and overwrites them,
+    /// so a connection that keeps its headers stops allocating for them.
+    ///
+    /// # Returns
+    ///
+    /// - `()` - The headers have been recycled.
+    fn recycle_headers(&mut self) {
+        let headers: &mut RequestHeaders = self.get_mut_headers();
+        if headers.is_empty() {
+            return;
+        }
+        for (key, values) in headers.drain() {
+            return_header_entry((key, values));
+        }
     }
 
     /// Parses the first line of HTTP request into method, path, and version components.
@@ -538,11 +558,15 @@ impl Request {
     /// host string are expected to be empty; they are filled without reallocating when they
     /// already have sufficient capacity.
     ///
+    /// The line buffer belongs to the caller so that a keep-alive connection
+    /// reads every header line of every request into the same allocation.
+    ///
     /// # Arguments
     ///
     /// - `&mut R` - A mutable reference to a buffered reader, which requires the
     ///   `AsyncBufReadExt + Unpin` bound.
     /// - `&RequestConfig` - Configuration for security limits and buffer settings.
+    /// - `&mut String` - The buffer the header lines are read into.
     ///
     /// # Returns
     ///
@@ -552,6 +576,7 @@ impl Request {
         &mut self,
         reader: &mut R,
         config: &RequestConfig,
+        header_line_buffer: &mut String,
     ) -> Result<usize, RequestError>
     where
         R: AsyncBufReadExt + Unpin,
@@ -563,10 +588,9 @@ impl Request {
         let max_body_size: usize = config.get_max_body_size();
         let mut content_size: usize = 0;
         let mut header_count: usize = 0;
-        let mut header_line_buffer: String = String::with_capacity(HEADER_LINE_BUFFER_CAPACITY);
         loop {
             header_line_buffer.clear();
-            AsyncBufReadExt::read_line(reader, &mut header_line_buffer).await?;
+            AsyncBufReadExt::read_line(reader, header_line_buffer).await?;
             let header_line: &str = header_line_buffer.trim();
             if header_line.is_empty() {
                 break;
@@ -581,23 +605,64 @@ impl Request {
             if key_trimmed.is_empty() {
                 continue;
             }
-            let key: String = key_trimmed.to_ascii_lowercase();
-            Self::check_http_header_key_size(&key, max_header_key_size)?;
+            Self::check_http_header_key_size(key_trimmed, max_header_key_size)?;
             let value: &str = value_part.trim();
             Self::check_http_header_value_size(value, max_header_value_size)?;
-            match key.as_str() {
-                HOST => {
+            match key_trimmed {
+                key if key.eq_ignore_ascii_case(HOST) => {
                     host.clear();
                     host.push_str(value);
                 }
-                CONTENT_LENGTH => {
+                key if key.eq_ignore_ascii_case(CONTENT_LENGTH) => {
                     content_size = Self::check_http_body_size(value, max_body_size)?;
                 }
                 _ => {}
             }
-            headers.entry(key).or_default().push_back(value.to_string());
+            Self::insert_http_header(headers, key_trimmed, value);
         }
         Ok(content_size)
+    }
+
+    /// Stores one header, reusing a pooled name and value where possible.
+    ///
+    /// The name is lowercased into the buffer of a recycled entry and the
+    /// value is written into that entry's value buffer, so a header that was
+    /// already seen on this connection costs no allocation at all.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut RequestHeaders` - The header map to store the header in.
+    /// - `&str` - The header name, as it arrived.
+    /// - `&str` - The header value.
+    fn insert_http_header(headers: &mut RequestHeaders, key: &str, value: &str) {
+        let (mut name, mut values): (String, VecDeque<String>) =
+            take_header_entry().unwrap_or_else(|| (String::new(), VecDeque::new()));
+        name.clear();
+        name.push_str(key);
+        name.make_ascii_lowercase();
+        match headers.entry(name) {
+            Entry::Occupied(mut occupied) => {
+                // The header repeats: it keeps every value it was given.
+                occupied.get_mut().push_back(value.to_string());
+                return_header_entry((String::new(), values));
+            }
+            Entry::Vacant(vacant) => {
+                // A recycled entry may carry the values of a header that was
+                // sent more than once. Those values belong to that header, so
+                // only the first one is kept and the rest are dropped.
+                while values.len() > 1 {
+                    values.pop_back();
+                }
+                if values.is_empty() {
+                    values.push_back(String::new());
+                }
+                if let Some(slot) = values.front_mut() {
+                    slot.clear();
+                    slot.push_str(value);
+                }
+                vacant.insert(values);
+            }
+        }
     }
 
     /// Reads the request body from the buffered reader into the given buffer.

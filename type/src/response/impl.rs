@@ -395,10 +395,27 @@ impl Response {
         K: AsRef<str>,
         V: AsRef<str>,
     {
-        let mut deque: VecDeque<String> = VecDeque::with_capacity(1);
-        deque.push_back(value.as_ref().to_owned());
-        self.get_mut_headers()
-            .insert(key.as_ref().to_owned(), deque);
+        // A recycled entry carries the buffers of the name and of the value,
+        // so a response that sets the same headers over and over stops
+        // allocating for them.
+        let (mut name, mut values): (String, VecDeque<String>) =
+            take_header_entry().unwrap_or_else(|| (String::new(), VecDeque::new()));
+        name.clear();
+        name.push_str(key.as_ref());
+        // A recycled entry may carry the values of a header that was sent
+        // more than once. Those values belong to that header, so only the
+        // first one is kept and the rest are dropped.
+        while values.len() > 1 {
+            values.pop_back();
+        }
+        if values.is_empty() {
+            values.push_back(String::new());
+        }
+        if let Some(slot) = values.front_mut() {
+            slot.clear();
+            slot.push_str(value.as_ref());
+        }
+        self.get_mut_headers().insert(name, values);
         self
     }
 
@@ -536,9 +553,28 @@ impl Response {
         self.set_status_code(http_status.code());
         self.get_mut_reason_phrase().clear();
         let _: fmt::Result = write!(self.get_mut_reason_phrase(), "{}", http_status);
-        self.get_mut_headers().clear();
+        self.recycle_headers();
         self.get_mut_body().clear();
         self
+    }
+
+    /// Hands the header entries to the pool and empties the header map.
+    ///
+    /// The map ends up empty, exactly as clearing it would, but the name and
+    /// the value buffers of every header survive in the pool. The next
+    /// response reuses them instead of allocating new ones.
+    ///
+    /// # Returns
+    ///
+    /// - `()` - The headers have been recycled.
+    fn recycle_headers(&mut self) {
+        let headers: &mut ResponseHeaders = self.get_mut_headers();
+        if headers.is_empty() {
+            return;
+        }
+        for (key, values) in headers.drain() {
+            return_header_entry((key, values));
+        }
     }
 
     /// Tries to parse cookies from the `Set-Cookie` header.
@@ -637,17 +673,15 @@ impl Response {
         if self.try_get_header_back(CONNECTION).is_none() {
             self.set_header_without_check(CONNECTION, KEEP_ALIVE);
         }
-        let content_type: ResponseHeadersValueItem =
-            self.try_get_header_back(CONTENT_TYPE).unwrap_or_else(|| {
-                let mut content_type: String = String::with_capacity(
-                    TEXT_HTML.len() + SEMICOLON_SPACE.len() + CHARSET_UTF_8.len(),
-                );
-                content_type.push_str(TEXT_HTML);
-                content_type.push_str(SEMICOLON_SPACE);
-                content_type.push_str(CHARSET_UTF_8);
-                self.set_header_without_check(CONTENT_TYPE, &content_type);
-                content_type
-            });
+        let owned_content_type: Option<String> = self.try_get_header_back(CONTENT_TYPE);
+        let content_type: &str = match owned_content_type {
+            Some(ref value) => value.as_str(),
+            None => {
+                let default: &str = default_content_type();
+                self.set_header_without_check(CONTENT_TYPE, default);
+                default
+            }
+        };
         let compressed_body: Option<Vec<u8>> = match compress_type_opt {
             Some(compress_type) if !compress_type.is_unknown() => Some(
                 compress_type
@@ -660,7 +694,13 @@ impl Response {
             .as_ref()
             .map_or_else(|| self.get_body().len(), Vec::len);
         if !content_type.eq_ignore_ascii_case(TEXT_EVENT_STREAM) {
-            self.set_header_without_check(CONTENT_LENGTH, body_len.to_string());
+            // The length is written into a pooled string, so announcing it
+            // does not allocate a fresh one for every response.
+            let mut length: String = take_recycled_string().unwrap_or_default();
+            length.clear();
+            let _: fmt::Result = write!(length, "{body_len}");
+            self.set_header_without_check(CONTENT_LENGTH, length.as_str());
+            return_recycled_string(length);
         }
         let mut head_size: usize = self.get_reason_phrase().len() + B_16 + HTTP_BR.len();
         head_size += self
@@ -700,4 +740,24 @@ impl Response {
         }
         response_bytes
     }
+}
+
+/// The content type a response announces when the application chose none.
+///
+/// It is built once and then shared, so a response that does not choose a
+/// content type does not build the value again for every request.
+///
+/// # Returns
+///
+/// - `&'static str` - The default content type.
+fn default_content_type() -> &'static str {
+    static DEFAULT_CONTENT_TYPE: OnceLock<String> = OnceLock::new();
+    DEFAULT_CONTENT_TYPE.get_or_init(|| {
+        let mut content_type: String =
+            String::with_capacity(TEXT_HTML.len() + SEMICOLON_SPACE.len() + CHARSET_UTF_8.len());
+        content_type.push_str(TEXT_HTML);
+        content_type.push_str(SEMICOLON_SPACE);
+        content_type.push_str(CHARSET_UTF_8);
+        content_type
+    })
 }
