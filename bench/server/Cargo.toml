@@ -1,0 +1,11 @@
+[package]
+name = "bench-server"
+version = "0.1.0"
+edition = "2024"
+publish = false
+exclude = ["target"]
+
+[dependencies]
+hyperlane = { path = "../../" }
+
+tokio = { version = "1", features = ["full"] }

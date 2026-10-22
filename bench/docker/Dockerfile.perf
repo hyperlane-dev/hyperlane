@@ -1,0 +1,36 @@
+FROM rust:1.99-alpine AS base
+RUN apk add --no-cache build-base perl
+
+FROM base AS server
+WORKDIR /src
+COPY . /src/hyperlane/
+WORKDIR /src/hyperlane/bench/server
+RUN cargo build --release --locked || cargo build --release
+
+FROM base AS loadgen
+WORKDIR /src
+COPY . /src/hyperlane/
+WORKDIR /src/hyperlane/bench/loadgen
+RUN cargo build --release --locked || cargo build --release
+
+FROM base AS control
+WORKDIR /src
+COPY . /src/hyperlane/
+WORKDIR /src/hyperlane/bench/control
+RUN cargo build --release --locked || cargo build --release
+
+FROM alpine:3.22 AS server-runtime
+RUN apk add --no-cache libgcc
+COPY --from=server /src/hyperlane/bench/target/release/bench-server /usr/local/bin/bench-server
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/bench-server"]
+
+FROM alpine:3.22 AS loadgen-runtime
+COPY --from=loadgen /src/hyperlane/bench/target/release/bench-loadgen /usr/local/bin/bench-loadgen
+ENTRYPOINT ["/usr/local/bin/bench-loadgen"]
+
+FROM alpine:3.22 AS control-runtime
+RUN apk add --no-cache libgcc
+COPY --from=control /src/hyperlane/bench/target/release/bench-control /usr/local/bin/bench-control
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/bench-control"]

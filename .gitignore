@@ -2,3 +2,5 @@ target
 *.log
 /logs
 Cargo.lock
+!bench/**/Cargo.lock
+bench/results

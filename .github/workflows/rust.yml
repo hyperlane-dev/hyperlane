@@ -69,6 +69,14 @@ jobs:
           components: rustfmt
       - name: Format check
         run: cargo fmt --all -- --check
+      - name: Format check the benchmark harness
+        # Advisory on purpose. The harness is a measurement tool, and a
+        # difference in rustfmt's output between the runner's toolchain and the
+        # one the harness was written with must not gate the library's
+        # pipeline. The harness is still formatted with the repository's own
+        # toolchain before it is committed.
+        continue-on-error: true
+        run: cargo fmt --manifest-path bench/Cargo.toml --all -- --check
 
   tests:
     needs: setup
@@ -85,6 +93,8 @@ jobs:
           toolchain: stable
       - name: Run tests
         run: cargo test --workspace --all-features -- --nocapture
+      - name: Test the benchmark harness
+        run: cargo test --manifest-path bench/Cargo.toml --workspace
 
   clippy:
     needs: setup
@@ -102,6 +112,8 @@ jobs:
           components: clippy
       - name: Run clippy
         run: cargo clippy --workspace --all-features --all-targets
+      - name: Run clippy on the benchmark harness
+        run: cargo clippy --manifest-path bench/Cargo.toml --workspace --all-targets
 
   build:
     needs: setup
