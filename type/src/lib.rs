@@ -57,9 +57,8 @@ use std::{
     result::Result,
     str::{FromStr, SplitWhitespace, from_utf8},
     sync::{
-        Arc,
+        Arc, OnceLock,
         atomic::{self, AtomicBool, AtomicUsize},
-        OnceLock,
     },
     task::{Context, Poll},
     thread_local,

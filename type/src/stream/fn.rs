@@ -10,9 +10,8 @@ pub(crate) const MAX_POOLED_HEADER_ENTRIES: usize = B_128;
 /// - `Option<(String, VecDeque<String>)>` - The recycled entry, or `None` when
 ///   the pool is empty.
 pub(crate) fn take_header_entry() -> Option<(String, VecDeque<String>)> {
-    HEADER_ENTRY_POOL.with(|pool: &RefCell<Vec<(String, VecDeque<String>)>>| {
-        pool.borrow_mut().pop()
-    })
+    HEADER_ENTRY_POOL
+        .with(|pool: &RefCell<Vec<(String, VecDeque<String>)>>| pool.borrow_mut().pop())
 }
 
 /// Returns a header entry to the pool for reuse.
@@ -67,10 +66,12 @@ pub(crate) async fn poll_once<F>(mut future: Pin<&mut F>) -> Option<F::Output>
 where
     F: Future,
 {
-    future::poll_fn(|context: &mut Context<'_>| match future.as_mut().poll(context) {
-        Poll::Ready(value) => Poll::Ready(Some(value)),
-        Poll::Pending => Poll::Ready(None),
-    })
+    future::poll_fn(
+        |context: &mut Context<'_>| match future.as_mut().poll(context) {
+            Poll::Ready(value) => Poll::Ready(Some(value)),
+            Poll::Pending => Poll::Ready(None),
+        },
+    )
     .await
 }
 
