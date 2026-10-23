@@ -70,11 +70,6 @@ jobs:
       - name: Format check
         run: cargo fmt --all -- --check
       - name: Format check the benchmark harness
-        # Advisory on purpose. The harness is a measurement tool, and a
-        # difference in rustfmt's output between the runner's toolchain and the
-        # one the harness was written with must not gate the library's
-        # pipeline. The harness is still formatted with the repository's own
-        # toolchain before it is committed.
         continue-on-error: true
         run: cargo fmt --manifest-path bench/Cargo.toml --all -- --check
 

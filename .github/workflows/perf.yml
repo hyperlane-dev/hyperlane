@@ -84,9 +84,6 @@ jobs:
           ./run-perf.sh bench candidate baseline
 
       - name: Report
-        # The verdict is a report, never a gate. Only a broken measurement
-        # fails the job, so that a harness that cannot measure is not read as
-        # a server that did not regress.
         run: |
           set -e
           cd bench
