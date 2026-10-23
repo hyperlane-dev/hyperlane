@@ -1,0 +1,18 @@
+[package]
+name = "hyperlane-plugin-static-files"
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A static file plugin for the Hyperlane framework, serving the files of a directory with the content type of the framework."""
+keywords = ["http", "request", "response", "tcp", "static"]
+categories = ["network-programming", "web-programming"]
+exclude.workspace = true
+publish = false
+
+[dependencies]
+hyperlane = { workspace = true }
+
+lombok-macros = { workspace = true }

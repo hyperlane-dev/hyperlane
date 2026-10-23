@@ -30,8 +30,11 @@ members = [
     "core",
     "macros",
     "cli",
+    "plugin/compression",
+    "plugin/cors",
     "plugin/logger",
     "plugin/shutdown",
+    "plugin/static-files",
     "plugin/websocket",
 ]
 
@@ -44,9 +47,12 @@ http-request = { path = "request", version = "21.15.0" }
 http-compress = { path = "compress", version = "21.15.0" }
 http-constant = { path = "constant", version = "21.15.0" }
 hyperlane-macros = { path = "macros", version = "21.15.0" }
+hyperlane-plugin-cors = { path = "plugin/cors", version = "21.15.0" }
 hyperlane-plugin-logger = { path = "plugin/logger", version = "21.15.0" }
 hyperlane-plugin-shutdown = { path = "plugin/shutdown", version = "21.15.0" }
 hyperlane-plugin-websocket = { path = "plugin/websocket", version = "21.15.0" }
+hyperlane-plugin-compression = { path = "plugin/compression", version = "21.15.0" }
+hyperlane-plugin-static-files = { path = "plugin/static-files", version = "21.15.0" }
 
 h3 = "0.0.8"
 h2 = "0.4.20"

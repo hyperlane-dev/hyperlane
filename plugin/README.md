@@ -17,8 +17,18 @@ The mechanism already exists; a plugin does not invent one.
 - **Installation.** `#[hyperlane(server: Server)]` collects every submitted
   hook, checks that the explicit orders are unique, sorts by order and
   installs them. A plugin therefore needs no registration call of its own.
-- **Order.** A hook carries an optional priority. Higher runs first, and two
-  hooks of the same kind may not claim the same priority.
+- **Order.** A hook carries an optional priority. The hooks run in the order
+  of their priority, from the smallest to the largest, and a hook without a
+  priority runs before every hook that has one. Two hooks of the same kind may
+  not claim the same priority.
+- **The order of a plugin.** The plugins that answer a request, such as the
+  cross origin plugin, keep the negative priorities, and an application that
+  gives its own middlewares positive priorities runs after them. A plugin that
+  has to mark the answer before it is built, such as the compression plugin,
+  therefore runs before the middleware of the application that sends it. A
+  plugin that reports the answer, such as the logger plugin, runs after the
+  middlewares of the application instead, so that it reports the answer that
+  was really sent.
 - **Configuration.** The registry is fixed at compile time, so a plugin's
   settings live in a process wide static, initialised before the server
   starts. The pattern is a `OnceLock` behind an `init` and a `get`, and the
@@ -82,10 +92,18 @@ from a path dependency today, and they wait for the release job to name them.
 | `hyperlane-plugin-compression` | gzip and brotli on the response |
 | `hyperlane-plugin-static-files` | serving files, with the content type table the framework already carries |
 
+All three are in the tree now.
+
 The compression plugin is the cheapest of the three: `http-compress` is
 already a dependency and the response builder already honours a
 `Content-Encoding` header, so the plugin only has to set the header when the
 client asked for it and the body is worth compressing.
+
+The static file plugin registers a route and no middleware, because the path
+the files are served under belongs to the application. The application
+registers the route with the pattern the plugin builds, and the answer of a
+file is built and sent by the middlewares of the application, like the answer
+of any other route.
 
 ### P2 - the data layer
 
@@ -153,10 +171,6 @@ application calls. Everything else is private.
   list, so no plugin is published today. Until that is settled, the plugins
   are only usable from a path dependency, and the list has to grow before
   they are useful to anyone else.
-- **The order of the middleware.** A plugin that adds a request middleware
-  has to pick a priority, and two plugins that pick the same one collide.
-  The priorities the framework reserves for itself have to be written down
-  before the first plugin ships.
 - **How much configuration is enough.** Every plugin that needs a setting
   needs it set before the server starts, and that is a second thing the
   application has to remember. A single configuration entry point would be
