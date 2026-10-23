@@ -141,16 +141,14 @@ where
 async fn start_websocket_server(
     tls: Option<TlsConfig>,
 ) -> Result<(ServerControlHook, u16), Box<ServerError>> {
-    let port: u16 = reserve_tcp_port();
-    let address: String = format!("{LOOPBACK_HOST}:{port}");
     let mut config: ServerConfig = ServerConfig::default();
-    config.set_address(&address).set_tls(tls);
+    config.set_tls(tls);
     let mut server: Server = Server::default();
     server
         .server_config(config)
         .request_middleware::<WebsocketUpgradeMiddleware>()
         .route::<WebsocketEchoRoute>(WEBSOCKET_ROUTE_PATH);
-    let control: ServerControlHook = server.run().await?;
+    let (control, port): (ServerControlHook, u16) = run_on_reserved_port(&mut server).await?;
     drop(server);
     let probe: io::Result<TcpStream> = connect_tcp(port).await;
     assert!(
