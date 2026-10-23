@@ -124,13 +124,20 @@ def verdict_for(level, baseline, candidate, control):
         return "inconclusive", "no repeat produced a usable pair"
     median_delta = statistics.median(deltas)
     spread = max(deltas) - min(deltas)
-    detail = f"median paired difference {median_delta:+.2f}%, spread {spread:.1f} points"
+    detail = (
+        f"median paired difference {median_delta:+.2f}%, spread {spread:.1f} points"
+    )
     if control:
         control_rps = [result["rps"] for result in control.values()]
         if len(control_rps) > 1:
-            control_spread = (max(control_rps) - min(control_rps)) / max(control_rps) * 100.0
+            control_spread = (
+                (max(control_rps) - min(control_rps)) / max(control_rps) * 100.0
+            )
             if control_spread > CONTROL_TOLERANCE:
-                return "inconclusive", f"the control moved {control_spread:.1f}%, the machine changed"
+                return (
+                    "inconclusive",
+                    f"the control moved {control_spread:.1f}%, the machine changed",
+                )
     if abs(median_delta) <= spread:
         return "within noise", detail
     if median_delta >= IMPROVEMENT_THRESHOLD:
