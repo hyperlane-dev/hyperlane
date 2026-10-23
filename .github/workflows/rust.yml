@@ -1,4 +1,5 @@
 name: Rust
+
 on:
   push:
     branches: [master]
