@@ -39,20 +39,20 @@ members = [
 ]
 
 [workspace.dependencies]
-hyperlane = { path = ".", version = "22.0.1" }
-http-type = { path = "type", version = "22.0.1" }
-hyperlane-cli = { path = "cli", version = "22.0.1" }
-hyperlane-core = { path = "core", version = "22.0.1" }
-http-request = { path = "request", version = "22.0.1" }
-http-compress = { path = "compress", version = "22.0.1" }
-http-constant = { path = "constant", version = "22.0.1" }
-hyperlane-macros = { path = "macros", version = "22.0.1" }
-hyperlane-plugin-cors = { path = "plugin/cors", version = "22.0.1" }
-hyperlane-plugin-logger = { path = "plugin/logger", version = "22.0.1" }
-hyperlane-plugin-shutdown = { path = "plugin/shutdown", version = "22.0.1" }
-hyperlane-plugin-websocket = { path = "plugin/websocket", version = "22.0.1" }
-hyperlane-plugin-compression = { path = "plugin/compression", version = "22.0.1" }
-hyperlane-plugin-static-files = { path = "plugin/static-files", version = "22.0.1" }
+hyperlane = { path = ".", version = "22.0.2" }
+http-type = { path = "type", version = "22.0.2" }
+hyperlane-cli = { path = "cli", version = "22.0.2" }
+hyperlane-core = { path = "core", version = "22.0.2" }
+http-request = { path = "request", version = "22.0.2" }
+http-compress = { path = "compress", version = "22.0.2" }
+http-constant = { path = "constant", version = "22.0.2" }
+hyperlane-macros = { path = "macros", version = "22.0.2" }
+hyperlane-plugin-cors = { path = "plugin/cors", version = "22.0.2" }
+hyperlane-plugin-logger = { path = "plugin/logger", version = "22.0.2" }
+hyperlane-plugin-shutdown = { path = "plugin/shutdown", version = "22.0.2" }
+hyperlane-plugin-websocket = { path = "plugin/websocket", version = "22.0.2" }
+hyperlane-plugin-compression = { path = "plugin/compression", version = "22.0.2" }
+hyperlane-plugin-static-files = { path = "plugin/static-files", version = "22.0.2" }
 
 h3 = "0.0.8"
 h2 = "0.4.20"
