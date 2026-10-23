@@ -6,21 +6,28 @@ use super::*;
 /// and triggered at different stages of request handling or server events.
 /// Hooks with an `Option<isize>` allow specifying a priority order; `None` indicates
 /// the default order (0 or unspecified).
+///
+/// The hooks run in the order of their priority, from the smallest to the
+/// largest, and a hook without a priority runs before every hook that has
+/// one.
 #[derive(Clone, Copy, Debug, DisplayDebug)]
 pub enum HookType {
     /// Hook triggered when a task panic occurs during request processing.
     ///
-    /// - `Option<isize>` - Optional execution priority. Higher values execute first.
+    /// - `Option<isize>` - Optional execution priority. The smaller the value,
+    ///   the earlier the hook runs.
     /// - `ServerHookHandlerFactory` - Factory function creating the panic handler.
     TaskPanic(Option<isize>, ServerHookHandlerFactory),
     /// Hook triggered when a request error occurs during HTTP request processing.
     ///
-    /// - `Option<isize>` - Optional execution priority. Higher values execute first.
+    /// - `Option<isize>` - Optional execution priority. The smaller the value,
+    ///   the earlier the hook runs.
     /// - `ServerHookHandlerFactory` - Factory function creating the error handler.
     RequestError(Option<isize>, ServerHookHandlerFactory),
     /// Hook executed before a request reaches its designated route handler.
     ///
-    /// - `Option<isize>` - Optional execution priority. Higher values execute first.
+    /// - `Option<isize>` - Optional execution priority. The smaller the value,
+    ///   the earlier the hook runs.
     /// - `ServerHookHandlerFactory` - Factory function creating the middleware handler.
     RequestMiddleware(Option<isize>, ServerHookHandlerFactory),
     /// Hook representing a route handler for a specific path.
@@ -30,7 +37,8 @@ pub enum HookType {
     Route(&'static str, ServerHookHandlerFactory),
     /// Hook executed after a route handler but before the response is sent.
     ///
-    /// - `Option<isize>` - Optional execution priority. Higher values execute first.
+    /// - `Option<isize>` - Optional execution priority. The smaller the value,
+    ///   the earlier the hook runs.
     /// - `ServerHookHandlerFactory` - Factory function creating the middleware handler.
     ResponseMiddleware(Option<isize>, ServerHookHandlerFactory),
 }

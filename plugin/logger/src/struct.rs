@@ -15,7 +15,7 @@ pub struct LoggerPlugin;
 
 /// The middleware that notes when a request arrived.
 #[derive(Clone, Copy, Debug, Default)]
-#[hyperlane::request_middleware(100)]
+#[hyperlane::request_middleware(-120)]
 pub struct RequestLogger;
 
 /// The middleware that writes the line of an answered request.

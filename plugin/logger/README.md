@@ -29,5 +29,9 @@ request arrived, and read by a response middleware that writes the line.
 
 ## Order
 
-The two middlewares use the order `100`, which leaves `0` to `99` for the
-framework and for the application.
+The request middleware uses the order `-120`, so it notes the arrival before
+the middlewares of the application run, and the response middleware uses the
+order `100`, so it reports the answer after the application built and sent
+it. The plugins that answer a request keep the negative orders, and an
+application that gives its own middlewares positive orders runs between the
+two.
