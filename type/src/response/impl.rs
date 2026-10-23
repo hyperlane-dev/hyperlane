@@ -664,7 +664,7 @@ impl Response {
     ///
     /// - `ResponseData` - The complete HTTP response bytes.
     pub fn build(&mut self) -> ResponseData {
-        if self.get_reason_phrase().is_empty() {
+        if self.get_reason_phrase().is_empty() || self.get_reason_phrase().as_str() == OK {
             self.set_reason_phrase(HttpStatus::phrase(self.get_status_code()));
         }
         let compress_type_opt: Option<Compress> = self
