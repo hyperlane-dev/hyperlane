@@ -12,7 +12,7 @@ categories = ["network-programming", "web-programming"]
 exclude.workspace = true
 
 [workspace.package]
-version = "21.14.0"
+version = "22.0.0"
 readme = "README.md"
 edition = "2024"
 authors = ["root@ltpp.vip"]
@@ -30,19 +30,29 @@ members = [
     "core",
     "macros",
     "cli",
+    "plugin/compression",
+    "plugin/cors",
+    "plugin/logger",
+    "plugin/shutdown",
+    "plugin/static-files",
     "plugin/websocket",
 ]
 
 [workspace.dependencies]
-hyperlane = { path = ".", version = "21.14.0" }
-http-type = { path = "type", version = "21.14.0" }
-hyperlane-cli = { path = "cli", version = "21.14.0" }
-hyperlane-core = { path = "core", version = "21.14.0" }
-http-request = { path = "request", version = "21.14.0" }
-http-compress = { path = "compress", version = "21.14.0" }
-http-constant = { path = "constant", version = "21.14.0" }
-hyperlane-macros = { path = "macros", version = "21.14.0" }
-hyperlane-plugin-websocket = { path = "plugin/websocket", version = "21.14.0" }
+hyperlane = { path = ".", version = "22.0.0" }
+http-type = { path = "type", version = "22.0.0" }
+hyperlane-cli = { path = "cli", version = "22.0.0" }
+hyperlane-core = { path = "core", version = "22.0.0" }
+http-request = { path = "request", version = "22.0.0" }
+http-compress = { path = "compress", version = "22.0.0" }
+http-constant = { path = "constant", version = "22.0.0" }
+hyperlane-macros = { path = "macros", version = "22.0.0" }
+hyperlane-plugin-cors = { path = "plugin/cors", version = "22.0.0" }
+hyperlane-plugin-logger = { path = "plugin/logger", version = "22.0.0" }
+hyperlane-plugin-shutdown = { path = "plugin/shutdown", version = "22.0.0" }
+hyperlane-plugin-websocket = { path = "plugin/websocket", version = "22.0.0" }
+hyperlane-plugin-compression = { path = "plugin/compression", version = "22.0.0" }
+hyperlane-plugin-static-files = { path = "plugin/static-files", version = "22.0.0" }
 
 h3 = "0.0.8"
 h2 = "0.4.20"

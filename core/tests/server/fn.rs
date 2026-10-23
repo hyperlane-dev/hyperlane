@@ -4,19 +4,31 @@ async fn start_server_with<Register>(register: Register) -> (ServerControlHook, 
 where
     Register: FnOnce(&mut Server),
 {
-    let listener: TcpListener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let port: u16 = listener.local_addr().unwrap().port();
-    drop(listener);
     let mut server: Server = Server::default();
     let mut server_config: ServerConfig = ServerConfig::default();
-    server_config.set_address(format!("127.0.0.1:{port}"));
     server_config.set_nodelay(Some(false));
     server.server_config(server_config);
     server.response_middleware::<ResponseMiddleware>();
     register(&mut server);
     let leaked: &'static mut Server = Box::leak(Box::new(server));
-    let control_hook: ServerControlHook = leaked.run().await.unwrap_or_default();
-    (control_hook, port)
+    let mut attempt: usize = 0;
+    loop {
+        let listener: TcpListener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port: u16 = listener.local_addr().unwrap().port();
+        drop(listener);
+        let mut config: ServerConfig = leaked.get_server_config().clone();
+        config.set_address(format!("127.0.0.1:{port}"));
+        leaked.server_config(config);
+        match leaked.run().await {
+            Ok(control_hook) => return (control_hook, port),
+            Err(error) => {
+                attempt += 1;
+                if attempt >= BIND_ATTEMPTS || !matches!(error.as_ref(), ServerError::TcpBind(_)) {
+                    return (ServerControlHook::default(), port);
+                }
+            }
+        }
+    }
 }
 
 async fn client_write_request(port: u16, request: &[u8]) {

@@ -393,12 +393,10 @@ async fn a_client_that_does_not_trust_the_server_ca_is_refused() {
 
 #[tokio::test]
 async fn an_infinite_read_timeout_tls_close_still_delivers_close_notify() {
-    let port: u16 = reserve_tcp_port();
-    let address: String = format!("{LOOPBACK_HOST}:{port}");
     let mut server: Server = Server::default();
     server
         .server_config(protocol_config(
-            &address,
+            PLACEHOLDER_ADDRESS,
             ServerProtocol::Http1,
             Some(trusted_tls_config()),
         ))
@@ -407,8 +405,7 @@ async fn an_infinite_read_timeout_tls_close_still_delivers_close_notify() {
             ..RequestConfig::default()
         });
     register_probe_hooks(&mut server);
-    let control: ServerControlHook = server
-        .run()
+    let (control, port): (ServerControlHook, u16) = run_on_reserved_port(&mut server)
         .await
         .expect("http1 tls server must start with an infinite read timeout");
     drop(server);

@@ -10,6 +10,23 @@ fn response_default() {
 }
 
 #[test]
+fn response_reason_phrase_follows_the_status_code() {
+    let mut response: Response = Response::default();
+    response.set_status_code(404);
+    let _: Vec<u8> = response.build();
+    assert_eq!(response.get_reason_phrase(), "Not Found");
+}
+
+#[test]
+fn response_keeps_the_reason_phrase_that_was_set() {
+    let mut response: Response = Response::default();
+    response.set_reason_phrase("Gone");
+    response.set_status_code(410);
+    let _: Vec<u8> = response.build();
+    assert_eq!(response.get_reason_phrase(), "Gone");
+}
+
+#[test]
 fn response_header_operations() {
     let mut response: Response = Response::default();
     response.set_header("content-type", "application/json");

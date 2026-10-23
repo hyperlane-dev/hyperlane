@@ -26,27 +26,17 @@ pub(crate) async fn start_limits_server(
     request_config: RequestConfig,
 ) -> Result<(ServerControlHook, u16), Box<ServerError>> {
     let mut server: Server = Server::default();
-    let address: String = if protocol.is_quic() {
-        format!("{LOOPBACK_HOST}:{}", reserve_udp_port())
-    } else {
-        format!("{LOOPBACK_HOST}:{}", reserve_tcp_port())
-    };
     let tls: Option<TlsConfig> = if protocol.is_quic() {
         Some(trusted_tls_config())
     } else {
         None
     };
-    server.server_config(protocol_config(&address, protocol, tls));
+    server.server_config(protocol_config(PLACEHOLDER_ADDRESS, protocol, tls));
     server.request_config(request_config);
     register_limits_hooks(&mut server);
-    let control: ServerControlHook = server.run().await?;
+    let (control, port): (ServerControlHook, u16) = run_on_reserved_port(&mut server).await?;
     drop(server);
     sleep(Duration::from_millis(SERVER_BOOT_MILLIS)).await;
-    let port: u16 = address
-        .rsplit(':')
-        .next()
-        .and_then(|value: &str| value.parse::<u16>().ok())
-        .expect("bind address must carry a numeric port");
     Ok((control, port))
 }
 

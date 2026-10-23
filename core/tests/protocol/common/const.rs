@@ -20,7 +20,9 @@ pub(crate) const ALPN_HTTP3: &[u8] = b"h3";
 
 pub(crate) const LOOPBACK_HOST: &str = "127.0.0.1";
 pub(crate) const TLS_SERVER_NAME: &str = "localhost";
+pub(crate) const PLACEHOLDER_ADDRESS: &str = "127.0.0.1:0";
 
+pub(crate) const BIND_ATTEMPTS: usize = 8;
 pub(crate) const CONNECT_TIMEOUT_SECS: u64 = 15;
 pub(crate) const REQUEST_TIMEOUT_SECS: u64 = 20;
 pub(crate) const GATE_TIMEOUT_SECS: u64 = 20;

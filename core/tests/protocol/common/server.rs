@@ -35,44 +35,58 @@ pub(crate) fn protocol_config(
     config
 }
 
+pub(crate) async fn run_on_reserved_port(
+    server: &mut Server,
+) -> Result<(ServerControlHook, u16), Box<ServerError>> {
+    let quic: bool = server.get_server_config().get_protocol().is_quic();
+    let mut attempt: usize = 0;
+    loop {
+        let port: u16 = if quic {
+            reserve_udp_port()
+        } else {
+            reserve_tcp_port()
+        };
+        let address: String = format!("{LOOPBACK_HOST}:{port}");
+        let mut config: ServerConfig = server.get_server_config().clone();
+        config.set_address(address);
+        server.server_config(config);
+        match server.run().await {
+            Ok(control) => return Ok((control, port)),
+            Err(error) => {
+                attempt += 1;
+                if attempt >= BIND_ATTEMPTS || !matches!(error.as_ref(), ServerError::TcpBind(_)) {
+                    return Err(error);
+                }
+            }
+        }
+    }
+}
+
 pub(crate) async fn start_protocol_server(
     protocol: ServerProtocol,
     tls: Option<TlsConfig>,
 ) -> Result<(ServerControlHook, u16), Box<ServerError>> {
     let mut server: Server = Server::default();
-    let address: String = if protocol.is_quic() {
-        format!("{LOOPBACK_HOST}:{}", reserve_udp_port())
-    } else {
-        format!("{LOOPBACK_HOST}:{}", reserve_tcp_port())
-    };
-    server.server_config(protocol_config(&address, protocol, tls));
+    server.server_config(protocol_config(PLACEHOLDER_ADDRESS, protocol, tls));
     register_probe_hooks(&mut server);
-    let control: ServerControlHook = server.run().await?;
+    let (control, port): (ServerControlHook, u16) = run_on_reserved_port(&mut server).await?;
     drop(server);
     sleep(Duration::from_millis(SERVER_BOOT_MILLIS)).await;
-    let port: u16 = address
-        .rsplit(':')
-        .next()
-        .and_then(|value: &str| value.parse::<u16>().ok())
-        .expect("bind address must carry a numeric port");
     Ok((control, port))
 }
 
 pub(crate) async fn start_dropped_caller_server()
 -> Result<(ServerControlHook, u16), Box<ServerError>> {
-    let address: String = format!("{LOOPBACK_HOST}:{}", reserve_tcp_port());
-    let control: ServerControlHook = {
-        let mut server: Server = Server::default();
-        server.server_config(protocol_config(&address, ServerProtocol::Http1, None));
-        register_probe_hooks(&mut server);
-        server.run().await?
-    };
+    let mut server: Server = Server::default();
+    server.server_config(protocol_config(
+        PLACEHOLDER_ADDRESS,
+        ServerProtocol::Http1,
+        None,
+    ));
+    register_probe_hooks(&mut server);
+    let (control, port): (ServerControlHook, u16) = run_on_reserved_port(&mut server).await?;
+    drop(server);
     sleep(Duration::from_millis(SERVER_BOOT_MILLIS)).await;
-    let port: u16 = address
-        .rsplit(':')
-        .next()
-        .and_then(|value: &str| value.parse::<u16>().ok())
-        .expect("bind address must carry a numeric port");
     Ok((control, port))
 }
 

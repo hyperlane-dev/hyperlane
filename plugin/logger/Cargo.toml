@@ -1,0 +1,18 @@
+[package]
+name = "hyperlane-plugin-logger"
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A logging plugin for the Hyperlane framework, writing the log of a server to the console, to a file, or to both."""
+keywords = ["http", "request", "response", "tcp", "log"]
+categories = ["network-programming", "web-programming"]
+exclude.workspace = true
+publish = false
+
+[dependencies]
+hyperlane = { workspace = true }
+
+log = { workspace = true }
