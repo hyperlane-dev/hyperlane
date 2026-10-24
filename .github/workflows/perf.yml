@@ -1,28 +1,9 @@
 name: Performance
 
 on:
-  pull_request:
-    paths:
-      - 'core/**'
-      - 'type/**'
-      - 'bench/**'
-      - '.github/workflows/perf.yml'
-  schedule:
-    - cron: '17 3 * * *'
-  workflow_dispatch:
-    inputs:
-      connections:
-        description: 'The concurrency levels to measure'
-        required: false
-        default: '64 256'
-      duration:
-        description: 'The length of a measured window, in seconds'
-        required: false
-        default: '12'
-      repeats:
-        description: 'How many times each level is measured'
-        required: false
-        default: '3'
+  push:
+    branches:
+      - '**'
 
 permissions:
   contents: read
@@ -35,30 +16,34 @@ jobs:
   measure:
     name: Measure
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     env:
-      PERF_CONNECTIONS: ${{ github.event.inputs.connections || '64 256' }}
-      PERF_DURATION: ${{ github.event.inputs.duration || '12' }}
-      PERF_REPEATS: ${{ github.event.inputs.repeats || '3' }}
+      PERF_CONNECTIONS: '64 256'
+      PERF_CONNECTIONS_SHORT: '16 64'
+      PERF_DURATION: '12'
+      PERF_REPEATS: '3'
+      PERF_PROTOCOLS: 'h1 h1-tls h2c h2-tls h3'
+      PERF_MODES: 'keepalive short'
       PERF_SERVER_CPUS: '1'
       PERF_LOADGEN_CPUS: '1'
       PERF_RESULTS: ${{ github.workspace }}/bench/results
+      PERF_COOLDOWN_SHORT: '20'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Install rust-toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
       - name: Resolve the baseline
         id: baseline
         run: |
           set -e
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            git fetch --no-tags --depth=0 origin master
-            BASE="$(git merge-base origin/master HEAD)"
-          else
-            BASE="$(git rev-parse HEAD^)"
-          fi
+          BASE="$(git rev-parse HEAD^)"
           echo "Baseline commit: $BASE"
           echo "base=$BASE" >> $GITHUB_OUTPUT
 
@@ -67,27 +52,27 @@ jobs:
           set -e
           mkdir -p "${{ runner.temp }}/baseline"
           git archive "${{ steps.baseline.outputs.base }}" | tar -x -C "${{ runner.temp }}/baseline"
-          cp -R bench "${{ runner.temp }}/baseline/bench"
           ls "${{ runner.temp }}/baseline"
 
       - name: Build the images
         run: |
           set -e
           cd bench
-          ./run-perf.sh build candidate ..
-          ./run-perf.sh build baseline "${{ runner.temp }}/baseline"
+          cargo run --locked -q -p bench-perf -- instrument ..
+          cargo run --locked -q -p bench-perf -- build candidate ..
+          cargo run --locked -q -p bench-perf -- build baseline "${{ runner.temp }}/baseline"
 
       - name: Measure
         run: |
           set -e
           cd bench
-          ./run-perf.sh bench candidate baseline
+          cargo run --locked -q -p bench-perf -- bench candidate baseline
 
       - name: Report
         run: |
           set -e
           cd bench
-          ./run-perf.sh report | tee "${{ github.workspace }}/bench/results/report.txt"
+          cargo run --locked -q -p bench-perf -- report | tee "${{ github.workspace }}/bench/results/report.txt"
 
       - name: Upload the measurements
         if: always()

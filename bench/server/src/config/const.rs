@@ -36,3 +36,27 @@ pub(crate) const DEFAULT_ADDRESS: &str = "0.0.0.0:8080";
 
 /// The status code every route answers with.
 pub(crate) const STATUS_OK: usize = 200;
+
+/// The environment variable that names the wire protocol.
+pub(crate) const ENV_PROTOCOL: &str = "BENCH_PROTOCOL";
+
+/// The environment variable that names the certificate chain.
+pub(crate) const ENV_TLS_CERTIFICATE: &str = "BENCH_TLS_CERT";
+
+/// The environment variable that names the private key.
+pub(crate) const ENV_TLS_KEY: &str = "BENCH_TLS_KEY";
+
+/// The protocol name that selects HTTP/1 over a plain socket.
+pub(crate) const PROTOCOL_HTTP1: &str = "http1";
+
+/// The protocol name that selects HTTP/1 over TLS.
+pub(crate) const PROTOCOL_HTTP1_TLS: &str = "http1-tls";
+
+/// The protocol name that selects HTTP/2 over a plain socket.
+pub(crate) const PROTOCOL_HTTP2: &str = "http2";
+
+/// The protocol name that selects HTTP/2 over TLS.
+pub(crate) const PROTOCOL_HTTP2_TLS: &str = "http2-tls";
+
+/// The protocol name that selects HTTP/3 over QUIC.
+pub(crate) const PROTOCOL_HTTP3: &str = "http3";

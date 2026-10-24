@@ -1,5 +1,37 @@
 use super::*;
 
+/// Takes a recycled body buffer from the pool.
+///
+/// # Returns
+///
+/// - `Option<Vec<u8>>` - The recycled buffer, or `None` when the pool is
+///   empty.
+fn take_recycled_buffer() -> Option<Vec<u8>> {
+    BODY_BUFFER_POOL.with(|pool: &RefCell<Vec<Vec<u8>>>| pool.borrow_mut().pop())
+}
+
+/// Returns a body buffer to the pool for reuse.
+///
+/// The buffer keeps its capacity, so the next response that takes it does not
+/// allocate one. A buffer that grew past the size the pool keeps is dropped
+/// instead, because a pool of very large buffers would hold the memory of
+/// every worker at once.
+///
+/// # Arguments
+///
+/// - `Vec<u8>` - The buffer to recycle.
+fn return_recycled_buffer(buffer: Vec<u8>) {
+    if buffer.capacity() > MAX_POOLED_BUFFER_CAPACITY {
+        return;
+    }
+    BODY_BUFFER_POOL.with(|pool: &RefCell<Vec<Vec<u8>>>| {
+        let mut pool: RefMut<'_, Vec<Vec<u8>>> = pool.borrow_mut();
+        if pool.len() < MAX_POOLED_BUFFERS {
+            pool.push(buffer);
+        }
+    });
+}
+
 /// Increments a response head and forwards every body chunk that follows it.
 ///
 /// The pump owns the write side of a protocol stream. It reads the HTTP/1.1
@@ -35,21 +67,58 @@ use super::*;
 /// - `Result<(), ResponseError>` - `Ok(())` once the lifecycle dropped its end
 pub(crate) async fn pump_response<F>(
     framer: &mut F,
-    mut reader: DuplexStream,
+    reader: DuplexStream,
     max_head_size: usize,
     is_head: bool,
 ) -> Result<(), ResponseError>
 where
     F: ResponseFramer,
 {
+    let mut chunk: Vec<u8> = match take_recycled_buffer() {
+        Some(mut buffer) => {
+            buffer.clear();
+            buffer.resize(PROTOCOL_BODY_CHUNK, 0);
+            buffer
+        }
+        None => vec![0; PROTOCOL_BODY_CHUNK],
+    };
+    let outcome: Result<(), ResponseError> =
+        pump_response_inner(framer, reader, max_head_size, is_head, &mut chunk).await;
+    return_recycled_buffer(chunk);
+    outcome
+}
+
+/// Pumps the response head and body onto the framer.
+///
+/// # Arguments
+///
+/// - `&mut F` - The framer that receives the frames.
+/// - `DuplexStream` - The half of the pipe the response arrives on.
+/// - `usize` - The largest head the pump accepts.
+/// - `bool` - Whether the request method was `HEAD`.
+/// - `&mut [u8]` - The buffer the reads land in.
+///
+/// # Returns
+///
+/// - `Result<(), ResponseError>` - Nothing, or the reason the response could not
+///   be pumped.
+async fn pump_response_inner<F>(
+    framer: &mut F,
+    mut reader: DuplexStream,
+    max_head_size: usize,
+    is_head: bool,
+    read_chunk: &mut [u8],
+) -> Result<(), ResponseError>
+where
+    F: ResponseFramer,
+{
     let mut pending: Vec<u8> = Vec::new();
-    let mut read_chunk: Vec<u8> = vec![0; PROTOCOL_BODY_CHUNK];
     let mut head: Option<FramedHead> = None;
     let mut body_len: usize = 0;
     let mut suppress_body: bool = is_head;
     let mut announced_len: Option<usize> = None;
     loop {
-        let read: usize = tokio::io::AsyncReadExt::read(&mut reader, &mut read_chunk).await?;
+        let read: usize = tokio::io::AsyncReadExt::read(&mut reader, read_chunk).await?;
         if read == 0 {
             break;
         }

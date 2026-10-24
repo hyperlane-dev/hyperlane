@@ -5,19 +5,28 @@ FROM base AS server
 WORKDIR /src
 COPY . /src/hyperlane/
 WORKDIR /src/hyperlane/bench/server
-RUN cargo build --release --locked || cargo build --release
+# The lock is authoritative. A fallback to an unlocked build would resolve
+# the dependencies again, and the two arms could end up built against
+# different dependency sets without anything reporting it.
+RUN cargo build --release --locked
 
 FROM base AS loadgen
 WORKDIR /src
 COPY . /src/hyperlane/
 WORKDIR /src/hyperlane/bench/loadgen
-RUN cargo build --release --locked || cargo build --release
+# The lock is authoritative. A fallback to an unlocked build would resolve
+# the dependencies again, and the two arms could end up built against
+# different dependency sets without anything reporting it.
+RUN cargo build --release --locked
 
 FROM base AS control
 WORKDIR /src
 COPY . /src/hyperlane/
 WORKDIR /src/hyperlane/bench/control
-RUN cargo build --release --locked || cargo build --release
+# The lock is authoritative. A fallback to an unlocked build would resolve
+# the dependencies again, and the two arms could end up built against
+# different dependency sets without anything reporting it.
+RUN cargo build --release --locked
 
 FROM alpine:3.22 AS server-runtime
 RUN apk add --no-cache libgcc

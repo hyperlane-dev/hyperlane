@@ -42,14 +42,41 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 name = "bench-control"
 version = "0.1.0"
 dependencies = [
+ "bytes",
+ "h2",
+ "h3",
+ "h3-quinn",
+ "http",
+ "quinn",
+ "rustls",
+ "rustls-pki-types",
  "tokio",
+ "tokio-rustls",
 ]
 
 [[package]]
 name = "bench-loadgen"
 version = "0.1.0"
 dependencies = [
+ "bytes",
+ "futures",
+ "h2",
+ "h3",
+ "h3-quinn",
+ "http",
+ "quinn",
+ "rustls",
+ "rustls-pki-types",
  "tokio",
+ "tokio-rustls",
+]
+
+[[package]]
+name = "bench-perf"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -401,7 +428,7 @@ dependencies = [
 
 [[package]]
 name = "http-compress"
-version = "22.0.0"
+version = "22.0.4"
 dependencies = [
  "brotli",
  "flate2",
@@ -410,11 +437,11 @@ dependencies = [
 
 [[package]]
 name = "http-constant"
-version = "22.0.0"
+version = "22.0.4"
 
 [[package]]
 name = "http-type"
-version = "22.0.0"
+version = "22.0.4"
 dependencies = [
  "hex",
  "http-compress",
@@ -430,7 +457,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "22.0.0"
+version = "22.0.4"
 dependencies = [
  "hyperlane-core",
  "hyperlane-macros",
@@ -438,7 +465,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane-core"
-version = "22.0.0"
+version = "22.0.4"
 dependencies = [
  "bytes",
  "futures",
@@ -460,7 +487,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane-macros"
-version = "22.0.0"
+version = "22.0.4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -636,9 +663,9 @@ checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 
 [[package]]
 name = "lombok-macros"
-version = "10.2.8"
+version = "10.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07402745f3647c6d78259f263ed8ac49ce94c80bf6504ccca6e03727def4004a"
+checksum = "6edd3fcad2c16f23521b56e44a32aaf625d4588b63ab27335685b072f21ff48c"
 dependencies = [
  "proc-macro2",
  "quote",

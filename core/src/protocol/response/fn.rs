@@ -179,24 +179,26 @@ pub fn parse_content_length(headers: &ProtocolHeaders) -> Result<Option<usize>, 
 /// # Arguments
 ///
 /// - `&ProtocolHeaders` - The headers to inspect.
+/// - `&str` - The header name to test.
 ///
 /// # Returns
 ///
-/// - `Vec<String>` - The lowercased header names nominated by `Connection`.
-pub fn connection_nominated_headers(headers: &ProtocolHeaders) -> Vec<String> {
-    let mut nominated: Vec<String> = vec![CONNECTION.to_owned()];
+/// - `bool` - Whether the `Connection` header nominates the name.
+pub fn connection_nominates(headers: &ProtocolHeaders, name: &str) -> bool {
+    if name.eq_ignore_ascii_case(CONNECTION) {
+        return true;
+    }
     for value in headers.get_all(CONNECTION).iter() {
         let Ok(value) = value.to_str() else {
             continue;
         };
         for token in value.split(COMMA_STR) {
-            let token: String = token.trim().to_ascii_lowercase();
-            if !token.is_empty() && !nominated.contains(&token) {
-                nominated.push(token);
+            if token.trim().eq_ignore_ascii_case(name) {
+                return true;
             }
         }
     }
-    nominated
+    false
 }
 
 /// Waits until the send stream may carry at least one more byte.

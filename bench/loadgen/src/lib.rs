@@ -1,22 +1,45 @@
 //! bench-loadgen
 //!
 //! A closed-loop HTTP/1.1 load generator for the hyperlane benchmark harness.
-mod r#const;
+mod config;
+mod r#protocol;
 
-pub(crate) use r#const::*;
+pub use r#protocol::r#enum::{Mode, Protocol};
+
+pub(crate) use config::*;
+
+pub(crate) use r#protocol::*;
 
 use std::{
-    io::Error,
+    fs::File,
+    io::{BufReader, Error},
+    net::{AddrParseError, SocketAddr},
     sync::Arc,
+    task::Context,
     time::{Duration, Instant},
 };
 
+use bytes::{Buf, Bytes};
+use h2::RecvStream;
+use http::{HeaderMap, HeaderValue, Method, Request, Response, Uri};
+use quinn::{ConnectError, Connecting, ConnectionError, Endpoint};
+use rustls::{
+    ClientConfig, RootCertStore,
+    pki_types::{CertificateDer, ServerName, pem::PemObject},
+};
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     net::TcpStream,
     sync::{Barrier, BarrierWaitResult},
     task::JoinHandle,
 };
+
+/// The HTTP/2 error used by the protocol module.
+pub(crate) type H2Error = h2::Error;
+/// The QUIC client configuration, distinct from the TLS configuration.
+pub(crate) type QuicClientConfig = quinn::ClientConfig;
+/// The QUIC connection, distinct from the harness connection state.
+pub(crate) type QuicConnection = quinn::Connection;
 
 /// The configuration of one generator run.
 #[derive(Clone, Debug)]
@@ -29,8 +52,17 @@ pub struct Config {
     duration_secs: u64,
     /// The length of the warm-up window, in seconds.
     warmup_secs: u64,
+    /// The wire protocol the connections speak.
+    protocol: Protocol,
+    /// The way a connection carries requests.
+    mode: Mode,
+    /// The path of the certificate authority, for the secure protocols.
+    ca_path: Option<String>,
+    /// The ceiling on the number of connections opened per second.
+    rate_per_sec: u64,
 }
 
+/// Inherent implementation of [`Config`].
 impl Config {
     /// The address of the server under test.
     ///
@@ -68,6 +100,42 @@ impl Config {
         self.warmup_secs
     }
 
+    /// The wire protocol the connections speak.
+    ///
+    /// # Returns
+    ///
+    /// - `Protocol` - The protocol.
+    pub fn get_protocol(&self) -> Protocol {
+        self.protocol
+    }
+
+    /// The way a connection carries requests.
+    ///
+    /// # Returns
+    ///
+    /// - `Mode` - The mode.
+    pub fn get_mode(&self) -> Mode {
+        self.mode
+    }
+
+    /// The path of the certificate authority, for the secure protocols.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<&String>` - The path, when the command line named one.
+    pub fn get_ca_path(&self) -> Option<&String> {
+        self.ca_path.as_ref()
+    }
+
+    /// The ceiling on the number of connections opened per second.
+    ///
+    /// # Returns
+    ///
+    /// - `u64` - The rate.
+    pub fn get_rate_per_sec(&self) -> u64 {
+        self.rate_per_sec
+    }
+
     /// Sets the address of the server under test.
     ///
     /// # Arguments
@@ -103,8 +171,45 @@ impl Config {
     fn set_warmup_secs(&mut self, warmup_secs: u64) {
         self.warmup_secs = warmup_secs;
     }
+
+    /// Sets the wire protocol the connections speak.
+    ///
+    /// # Arguments
+    ///
+    /// - `Protocol` - The protocol.
+    fn set_protocol(&mut self, protocol: Protocol) {
+        self.protocol = protocol;
+    }
+
+    /// Sets the way a connection carries requests.
+    ///
+    /// # Arguments
+    ///
+    /// - `Mode` - The mode.
+    fn set_mode(&mut self, mode: Mode) {
+        self.mode = mode;
+    }
+
+    /// Sets the path of the certificate authority.
+    ///
+    /// # Arguments
+    ///
+    /// - `String` - The path.
+    fn set_ca_path(&mut self, ca_path: String) {
+        self.ca_path = Some(ca_path);
+    }
+
+    /// Sets the ceiling on the number of connections opened per second.
+    ///
+    /// # Arguments
+    ///
+    /// - `u64` - The rate.
+    fn set_rate_per_sec(&mut self, rate_per_sec: u64) {
+        self.rate_per_sec = rate_per_sec;
+    }
 }
 
+/// Default construction for [`Config`].
 impl Default for Config {
     /// Builds the configuration the generator uses when nothing is given.
     ///
@@ -117,10 +222,15 @@ impl Default for Config {
             connections: DEFAULT_CONNECTIONS,
             duration_secs: DEFAULT_DURATION_SECS,
             warmup_secs: DEFAULT_WARMUP_SECS,
+            protocol: Protocol::Http1,
+            mode: Mode::KeepAlive,
+            ca_path: None,
+            rate_per_sec: DEFAULT_RATE_PER_SEC,
         }
     }
 }
 
+/// Inherent implementation of [`Config`].
 impl Config {
     /// Reads the configuration from the command line arguments.
     ///
@@ -147,6 +257,47 @@ impl Config {
                         return Err(format!("{ARG_ADDR} needs a value"));
                     };
                     config.set_address(value.to_owned());
+                    index += 2;
+                }
+                ARG_PROTOCOL => {
+                    let Some(value) = value else {
+                        return Err(format!("{ARG_PROTOCOL} needs a value"));
+                    };
+                    let Some(protocol) = Protocol::from_name(value) else {
+                        return Err(format!("unknown protocol {value}"));
+                    };
+                    config.set_protocol(protocol);
+                    index += 2;
+                }
+                ARG_MODE => {
+                    let Some(value) = value else {
+                        return Err(format!("{ARG_MODE} needs a value"));
+                    };
+                    let Some(mode) = Mode::from_name(value) else {
+                        return Err(format!("unknown connection mode {value}"));
+                    };
+                    config.set_mode(mode);
+                    index += 2;
+                }
+                ARG_CA => {
+                    let Some(value) = value else {
+                        return Err(format!("{ARG_CA} needs a value"));
+                    };
+                    config.set_ca_path(value.to_owned());
+                    index += 2;
+                }
+                ARG_RATE => {
+                    let Some(value) = value else {
+                        return Err(format!("{ARG_RATE} needs a value"));
+                    };
+                    let rate: u64 = match value.parse::<u64>() {
+                        Ok(rate) => rate,
+                        Err(error) => return Err(error.to_string()),
+                    };
+                    if rate == 0 {
+                        return Err(ERROR_RATE_ZERO.to_owned());
+                    }
+                    config.set_rate_per_sec(rate);
                     index += 2;
                 }
                 ARG_CONNECTIONS => {
@@ -202,6 +353,7 @@ pub struct Outcome {
     latencies_us: Vec<u64>,
 }
 
+/// Inherent implementation of [`Outcome`].
 impl Outcome {
     /// The number of requests that completed with the expected body.
     ///
@@ -441,6 +593,8 @@ fn parse_content_length_line(line: &[u8]) -> Option<usize> {
 struct Case {
     /// The bytes to write.
     bytes: Vec<u8>,
+    /// The body the request carries.
+    body: Vec<u8>,
     /// The body length the answer must have.
     expect_len: usize,
 }
@@ -459,28 +613,134 @@ fn build_cases() -> Vec<Case> {
     for _ in 0..4 {
         cases.push(Case {
             bytes: REQUEST_ROOT.as_bytes().to_vec(),
+            body: Vec::new(),
             expect_len: EXPECT_ROOT,
         });
     }
     for _ in 0..2 {
         cases.push(Case {
             bytes: REQUEST_USER.as_bytes().to_vec(),
+            body: Vec::new(),
             expect_len: EXPECT_USER,
         });
     }
     cases.push(Case {
         bytes: REQUEST_SEARCH.as_bytes().to_vec(),
+        body: Vec::new(),
         expect_len: EXPECT_SEARCH,
     });
     cases.push(Case {
         bytes: REQUEST_HEADERS.as_bytes().to_vec(),
+        body: Vec::new(),
         expect_len: EXPECT_HEADERS,
     });
     cases.push(Case {
-        bytes: REQUEST_ECHO.as_bytes().to_vec(),
+        bytes: REQUEST_ECHO_HEAD.as_bytes().to_vec(),
+        body: BODY_ECHO.as_bytes().to_vec(),
         expect_len: EXPECT_ECHO,
     });
     cases
+}
+
+/// Converts the request mix into the shape the protocol drivers take.
+///
+/// # Arguments
+///
+/// - `Vec<Case>` - The mix.
+///
+/// # Returns
+///
+/// - `Vec<ProtocolCase>` - The mix in the shape the protocol drivers take.
+fn to_protocol_cases(cases: Vec<Case>) -> Vec<ProtocolCase> {
+    cases
+        .into_iter()
+        .map(|case: Case| ProtocolCase {
+            bytes: case.bytes,
+            body: case.body,
+            expect_len: case.expect_len,
+        })
+        .collect()
+}
+
+/// Drives one short connection: one connection, one request, torn down.
+///
+/// A short connection opens one connection per request, so it is a different
+/// code path from a keep-alive connection rather than a dial on the same one.
+///
+/// # Arguments
+///
+/// - `Run` - The parameters of the run.
+/// - `Vec<Case>` - The request mix.
+///
+/// # Returns
+///
+/// - `ConnStats` - The counters of the connection.
+async fn run_short(run: Run, cases: Vec<Case>) -> ConnStats {
+    let mut stats: ConnStats = ConnStats::default();
+    let mut body: Vec<u8> = Vec::with_capacity(READ_BUFFER_SIZE);
+    let mut index: usize = 0;
+    let _: BarrierWaitResult = run.barrier.wait().await;
+    // The whole generator opens at most this many connections per second, so
+    // the ephemeral ports the kernel holds in TIME_WAIT stay inside the
+    // budget. Each worker takes an equal share of the budget.
+    let interval: Duration = Duration::from_nanos(
+        1_000_000_000 * u64::try_from(run.connections).unwrap_or(1) / run.rate_per_sec.max(1),
+    );
+    let mut next_open: Instant = Instant::now();
+    loop {
+        let now: Instant = Instant::now();
+        if now >= run.deadline {
+            break;
+        }
+        let Some(case) = cases.get(index % cases.len()) else {
+            break;
+        };
+        index = index.wrapping_add(1);
+        if now < next_open {
+            tokio::time::sleep(next_open - now).await;
+        }
+        next_open += interval;
+        let transport: Box<dyn Transport> =
+            match open_transport(&run.address, run.protocol, run.ca_path.as_deref()).await {
+                Ok(transport) => transport,
+                Err(_) => {
+                    stats.errors += 1;
+                    continue;
+                }
+            };
+        let mut connection: Connection = Connection::from_transport(transport);
+        let wrote: Result<(), Error> = connection.get_mut_stream().write_all(&case.bytes).await;
+        if wrote.is_err() {
+            stats.errors += 1;
+            continue;
+        }
+        if !case.body.is_empty() {
+            let wrote: Result<(), Error> = connection.get_mut_stream().write_all(&case.body).await;
+            if wrote.is_err() {
+                stats.errors += 1;
+                continue;
+            }
+        }
+        match connection.read_response(&mut body).await {
+            Ok(length) => {
+                if length == case.expect_len {
+                    stats.completed += 1;
+                } else {
+                    stats.errors += 1;
+                }
+            }
+            Err(_) => {
+                stats.errors += 1;
+            }
+        }
+        let micros: u128 = now.elapsed().as_micros();
+        if now >= run.warmup_until {
+            stats
+                .latencies_us
+                .push(u64::try_from(micros).unwrap_or(u64::MAX));
+        }
+    }
+    stats
 }
 
 /// The counters of one connection.
@@ -496,8 +756,8 @@ struct ConnStats {
 
 /// A connection that keeps its buffers between requests.
 struct Connection {
-    /// The socket the connection runs over.
-    stream: TcpStream,
+    /// The transport the connection runs over.
+    stream: Box<dyn Transport>,
     /// The bytes read from the socket that the current response has not consumed.
     buffer: Vec<u8>,
     /// The offset of the first unconsumed byte in the buffer.
@@ -508,13 +768,14 @@ struct Connection {
     chunk: Vec<u8>,
 }
 
+/// Inherent implementation of [`Connection`].
 impl Connection {
-    /// The socket the connection runs over.
+    /// The transport the connection runs over.
     ///
     /// # Returns
     ///
-    /// - `&mut TcpStream` - The socket.
-    fn get_mut_stream(&mut self) -> &mut TcpStream {
+    /// - `&mut Box<dyn Transport>` - The transport.
+    fn get_mut_stream(&mut self) -> &mut Box<dyn Transport> {
         &mut self.stream
     }
 
@@ -554,29 +815,44 @@ impl Connection {
         self.start = start;
     }
 
-    /// Opens a connection to the server under test.
+    /// Wraps an open transport in a connection.
     ///
     /// # Arguments
     ///
-    /// - `&str` - The address of the server.
+    /// - `Box<dyn Transport>` - The transport.
     ///
     /// # Returns
     ///
-    /// - `Result<Connection, String>` - The connection, or the reason it could
-    ///   not be opened.
-    async fn open(address: &str) -> Result<Connection, String> {
-        let stream: TcpStream = match TcpStream::connect(address).await {
-            Ok(stream) => stream,
-            Err(error) => return Err(error.to_string()),
-        };
-        let _: Result<(), Error> = stream.set_nodelay(true);
-        Ok(Connection {
+    /// - `Connection` - The connection.
+    fn from_transport(stream: Box<dyn Transport>) -> Connection {
+        Connection {
             stream,
             buffer: Vec::with_capacity(READ_BUFFER_SIZE),
             start: 0,
             end: 0,
             chunk: vec![0; READ_BUFFER_SIZE],
-        })
+        }
+    }
+
+    /// Opens a connection to the server under test.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - The address of the server.
+    /// - `Protocol` - The protocol the connection speaks.
+    /// - `Option<&str>` - The path of the certificate authority.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Connection, String>` - The connection, or the reason it could
+    ///   not be opened.
+    async fn open(
+        address: &str,
+        protocol: Protocol,
+        ca_path: Option<&str>,
+    ) -> Result<Connection, String> {
+        let stream: Box<dyn Transport> = open_transport(address, protocol, ca_path).await?;
+        Ok(Connection::from_transport(stream))
     }
 
     /// Reads more bytes from the socket into the buffer.
@@ -686,6 +962,8 @@ impl Connection {
 /// - `Arc<Barrier>` - The barrier that starts every connection together.
 /// - `Instant` - The moment the warm-up window ends.
 /// - `Instant` - The moment the run ends.
+/// - `Protocol` - The protocol the connection speaks.
+/// - `Option<String>` - The path of the certificate authority.
 ///
 /// # Returns
 ///
@@ -696,12 +974,15 @@ async fn run_connection(
     barrier: Arc<Barrier>,
     warmup_until: Instant,
     deadline: Instant,
+    protocol: Protocol,
+    ca_path: Option<String>,
 ) -> ConnStats {
     let mut stats: ConnStats = ConnStats::default();
-    let mut connection: Connection = match Connection::open(&address).await {
-        Ok(connection) => connection,
-        Err(_) => return stats,
-    };
+    let mut connection: Connection =
+        match Connection::open(&address, protocol, ca_path.as_deref()).await {
+            Ok(connection) => connection,
+            Err(_) => return stats,
+        };
     let mut body: Vec<u8> = Vec::with_capacity(READ_BUFFER_SIZE);
     let mut index: usize = 0;
     let _: BarrierWaitResult = barrier.wait().await;
@@ -719,6 +1000,16 @@ async fn run_connection(
             .write_all(&case.bytes)
             .await
             .is_err()
+        {
+            stats.errors += 1;
+            break;
+        }
+        if !case.body.is_empty()
+            && connection
+                .get_mut_stream()
+                .write_all(&case.body)
+                .await
+                .is_err()
         {
             stats.errors += 1;
             break;
@@ -761,13 +1052,108 @@ pub async fn run(config: Config) -> Result<Outcome, String> {
     let barrier: Arc<Barrier> = Arc::new(Barrier::new(config.get_connections()));
     let warmup_until: Instant = Instant::now() + Duration::from_secs(config.get_warmup_secs());
     let deadline: Instant = warmup_until + Duration::from_secs(config.get_duration_secs());
+    let protocol: Protocol = config.get_protocol();
+    let mode: Mode = config.get_mode();
+    let ca_path: Option<String> = config.get_ca_path().cloned();
+    let rate_per_sec: u64 = config.get_rate_per_sec();
+    let connections: usize = config.get_connections();
     let mut handles: Vec<JoinHandle<ConnStats>> = Vec::new();
-    for _ in 0..config.get_connections() {
+    for _ in 0..connections {
         let address: String = config.get_address().clone();
         let cases: Vec<Case> = cases.clone();
         let barrier: Arc<Barrier> = Arc::clone(&barrier);
+        let ca_path: Option<String> = ca_path.clone();
         handles.push(tokio::spawn(async move {
-            run_connection(address, cases, barrier, warmup_until, deadline).await
+            match protocol {
+                Protocol::Http3 => match mode {
+                    Mode::KeepAlive => {
+                        let run: Run = Run {
+                            address,
+                            cases: to_protocol_cases(cases),
+                            barrier,
+                            warmup_until,
+                            deadline,
+                            protocol,
+                            ca_path,
+                            rate_per_sec,
+                            connections,
+                        };
+                        run_http3(run).await
+                    }
+                    Mode::Short => {
+                        let run: Run = Run {
+                            address,
+                            cases: to_protocol_cases(cases),
+                            barrier,
+                            warmup_until,
+                            deadline,
+                            protocol,
+                            ca_path,
+                            rate_per_sec,
+                            connections,
+                        };
+                        run_http3_short(run).await
+                    }
+                },
+                Protocol::H2c | Protocol::H2Tls => match mode {
+                    Mode::KeepAlive => {
+                        let run: Run = Run {
+                            address,
+                            cases: to_protocol_cases(cases),
+                            barrier,
+                            warmup_until,
+                            deadline,
+                            protocol,
+                            ca_path,
+                            rate_per_sec,
+                            connections,
+                        };
+                        run_http2(run).await
+                    }
+                    Mode::Short => {
+                        let run: Run = Run {
+                            address,
+                            cases: to_protocol_cases(cases),
+                            barrier,
+                            warmup_until,
+                            deadline,
+                            protocol,
+                            ca_path,
+                            rate_per_sec,
+                            connections,
+                        };
+                        run_http2_short(run).await
+                    }
+                },
+                Protocol::Http1 | Protocol::Http1Tls => match mode {
+                    Mode::KeepAlive => {
+                        run_connection(
+                            address,
+                            cases,
+                            barrier,
+                            warmup_until,
+                            deadline,
+                            protocol,
+                            ca_path,
+                        )
+                        .await
+                    }
+                    Mode::Short => {
+                        let run: Run = Run {
+                            address,
+                            cases: to_protocol_cases(cases.clone()),
+                            barrier,
+                            warmup_until,
+                            deadline,
+                            protocol,
+                            ca_path,
+                            rate_per_sec,
+                            connections,
+                        };
+                        run_short(run, cases).await
+                    }
+                },
+            }
         }));
     }
     let mut outcome: Outcome = Outcome::default();

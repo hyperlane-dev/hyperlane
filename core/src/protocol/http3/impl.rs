@@ -53,23 +53,17 @@ impl ResponseFramer for H3Framer {
         _bodyless: bool,
     ) -> Pin<Box<dyn Future<Output = Result<(), ResponseError>> + Send + 'a>> {
         Box::pin(async move {
-            let nominated: Vec<String> = connection_nominated_headers(&head.headers);
             let mut builder: http::response::Builder =
                 http::Response::builder().status(head.status_code as u16);
             for (name, value) in head.headers.iter() {
                 let key: &str = name.as_str();
-                let nominated_by_connection: bool = nominated
-                    .iter()
-                    .any(|nominated: &String| nominated.as_str() == key);
                 if key.starts_with(PSEUDO_HEADER_PREFIX)
                     || is_hop_by_hop(key)
-                    || nominated_by_connection
+                    || connection_nominates(&head.headers, key)
                 {
                     continue;
                 }
-                if let Ok(value) = http::HeaderValue::from_bytes(value.as_bytes()) {
-                    builder = builder.header(name.clone(), value);
-                }
+                builder = builder.header(name.clone(), value.clone());
             }
             let response: ProtocolResponse<()> = builder
                 .body(())
