@@ -4,9 +4,9 @@
 //! shapes a typical workload carries, through the public API only.
 #[cfg(feature = "alloc-count")]
 mod r#alloc;
-mod r#const;
+mod config;
 
-pub(crate) use r#const::*;
+pub(crate) use config::*;
 
 #[cfg(feature = "alloc-count")]
 pub(crate) use r#alloc::*;

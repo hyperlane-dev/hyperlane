@@ -329,12 +329,12 @@ pub(crate) async fn serve_http2(stream: Box<dyn Transport>) -> Result<(), String
             .map(|value: &str| value.to_owned());
         let body: Vec<u8> = read_h2_body(request.into_body()).await?;
         let answer: Answer = answer_for(&path, &query, tag.as_deref(), &body);
-        let response: http::Response<()> = http::Response::builder()
+        let response: Response<()> = Response::builder()
             .status(STATUS_OK)
             .header(http::header::CONTENT_LENGTH, answer.body.len())
             .body(())
-            .map_err(|error: http::Error| error.to_string())?;
-        let mut send_body: h2::SendStream<Bytes> = match respond.send_response(response, false) {
+            .map_err(|error: HttpError| error.to_string())?;
+        let mut send_body: SendStream<Bytes> = match respond.send_response(response, false) {
             Ok(stream) => stream,
             Err(_) => continue,
         };
@@ -347,12 +347,12 @@ pub(crate) async fn serve_http2(stream: Box<dyn Transport>) -> Result<(), String
 ///
 /// # Arguments
 ///
-/// - `h2::RecvStream` - The receive half of the request stream.
+/// - `RecvStream` - The receive half of the request stream.
 ///
 /// # Returns
 ///
 /// - `Result<Vec<u8>, String>` - The body, or the reason it could not be read.
-pub(crate) async fn read_h2_body(mut body: h2::RecvStream) -> Result<Vec<u8>, String> {
+pub(crate) async fn read_h2_body(mut body: RecvStream) -> Result<Vec<u8>, String> {
     let mut collected: Vec<u8> = Vec::new();
     while let Some(chunk) = body.data().await {
         let chunk: Bytes = match chunk {
@@ -368,12 +368,12 @@ pub(crate) async fn read_h2_body(mut body: h2::RecvStream) -> Result<Vec<u8>, St
 ///
 /// # Arguments
 ///
-/// - `quinn::Connection` - The accepted connection.
+/// - `Connection` - The accepted connection.
 ///
 /// # Returns
 ///
 /// - `Result<(), String>` - Nothing, or the reason the connection failed.
-pub(crate) async fn serve_http3_connection(connection: quinn::Connection) -> Result<(), String> {
+pub(crate) async fn serve_http3_connection(connection: Connection) -> Result<(), String> {
     let mut server: h3::server::Connection<h3_quinn::Connection, Bytes> =
         match h3::server::builder()
             .build(h3_quinn::Connection::new(connection))
@@ -402,11 +402,11 @@ pub(crate) async fn serve_http3_connection(connection: quinn::Connection) -> Res
             .map(|value: &str| value.to_owned());
         let body: Vec<u8> = read_h3_body(&mut stream).await?;
         let answer: Answer = answer_for(&path, &query, tag.as_deref(), &body);
-        let response: http::Response<()> = http::Response::builder()
+        let response: Response<()> = Response::builder()
             .status(STATUS_OK)
             .header(http::header::CONTENT_LENGTH, answer.body.len())
             .body(())
-            .map_err(|error: http::Error| error.to_string())?;
+            .map_err(|error: HttpError| error.to_string())?;
         let _: Result<(), h3::error::StreamError> = stream.send_response(response).await;
         let _: Result<(), h3::error::StreamError> =
             stream.send_data(Bytes::from(answer.body)).await;

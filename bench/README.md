@@ -13,13 +13,14 @@ for the same reason.
 
 ## What it measures
 
-Three binaries run in containers:
+Three binaries run in containers, with a local Rust runner orchestrating them:
 
 | binary | what it is |
 |---|---|
 | `bench-server` | the server under test, written against the public API only, speaking the protocol the row names |
 | `bench-loadgen` | a closed-loop client that speaks every protocol of the matrix, natively |
 | `bench-control` | a minimal server with no framework, one read and one write per request |
+| `bench-perf` | the local orchestrator, certificate generator and report renderer |
 
 The control speaks the same protocol as the row it references. A control that
 spoke HTTP/1.1 could not say what the machine allowed for HTTP/3, so the
@@ -88,7 +89,7 @@ that repository, and this one is a throwaway that anyone could use to
 impersonate the benchmark server.
 
 ```sh
-./scripts/generate-certs.sh certs
+cargo run -q -p bench-perf -- certificates certs
 ```
 
 The generator makes a certificate authority and one leaf certificate. The leaf
@@ -99,14 +100,14 @@ leaves the generator's temporary directory.
 
 ## Running it locally
 
-The same script the workflow runs:
+The same Rust runner the workflow runs:
 
 ```sh
 cd bench
-./run-perf.sh instrument ..
-./run-perf.sh build candidate ..
-./run-perf.sh bench candidate baseline
-./run-perf.sh report
+cargo run -q -p bench-perf -- instrument ..
+cargo run -q -p bench-perf -- build candidate ..
+cargo run -q -p bench-perf -- bench candidate baseline
+cargo run -q -p bench-perf -- report
 ```
 
 `instrument` builds the load generator and the control. They are the
@@ -121,7 +122,7 @@ harness into it:
 ```sh
 mkdir -p /tmp/hyperlane-perf-baseline
 git archive "$(git merge-base origin/master HEAD)" | tar -x -C /tmp/hyperlane-perf-baseline
-./run-perf.sh build baseline /tmp/hyperlane-perf-baseline
+cargo run -q -p bench-perf -- build baseline /tmp/hyperlane-perf-baseline
 ```
 
 The build copies the current harness into the baseline context, so the two
@@ -148,9 +149,9 @@ The knobs, all environment variables:
 | `PERF_MEMORY` | `4g` | the memory limit of each container |
 | `PERF_RESULTS` | `bench/results` | where the raw rows are written |
 
-The frozen parameters and the verdict rules live in [CONTRACT.md](CONTRACT.md).
-They are fixed before the first sample, because a cohort measured under
-changing conditions compares two experiments rather than two arms of one.
+The frozen parameters and verdict rules are fixed before the first sample,
+because a cohort measured under changing conditions compares two experiments
+rather than two arms of one.
 
 On a GitHub hosted runner, which has four shared vCPUs, the defaults fit. On a
 machine with more cores, raise the quotas: the measurement is only meaningful
@@ -163,7 +164,7 @@ control probe is what tells the two apart.
 
 ## In the pipeline
 
-`.github/workflows/perf.yml` runs the harness on pull requests, on a schedule
-and on demand. It builds the candidate from the pull request and the baseline
-from the merge-base of `master`, measures both, and prints the table and the
-verdict into the job log. It never fails a build because of the verdict.
+`.github/workflows/perf.yml` runs the harness on every branch push. It builds
+the candidate from that commit and the baseline from its parent, measures both,
+and prints the table and the verdict into the job log. It never fails a build
+because of the verdict.

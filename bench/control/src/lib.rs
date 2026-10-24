@@ -6,15 +6,18 @@
 //! and one write per request and no framework in the way. The number it
 //! reaches is the ceiling the machine allows, so a drop in it means the
 //! machine moved rather than the framework.
-mod r#const;
+mod config;
 mod r#protocol;
 
-pub(crate) use r#const::*;
+pub(crate) use config::*;
 pub(crate) use r#protocol::*;
 
 use std::{env::var, io::Error, net::SocketAddr, sync::Arc};
 
 use bytes::{Buf, Bytes};
+use h2::{RecvStream, SendStream};
+use http::Response;
+use quinn::Connection;
 use rustls::{
     ServerConfig,
     pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject},
@@ -24,6 +27,9 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 use tokio_rustls::TlsAcceptor;
+
+/// The HTTP response construction error used by the protocol module.
+pub(crate) type HttpError = http::Error;
 
 /// Starts the control server and serves until it is shut down.
 ///

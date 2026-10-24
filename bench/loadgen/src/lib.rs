@@ -1,12 +1,12 @@
 //! bench-loadgen
 //!
 //! A closed-loop HTTP/1.1 load generator for the hyperlane benchmark harness.
-mod r#const;
+mod config;
 mod r#protocol;
 
 pub use r#protocol::r#enum::{Mode, Protocol};
 
-pub(crate) use r#const::*;
+pub(crate) use config::*;
 
 pub(crate) use r#protocol::*;
 
@@ -20,7 +20,9 @@ use std::{
 };
 
 use bytes::{Buf, Bytes};
-use http::{HeaderMap, HeaderValue, Method, Request, Uri};
+use h2::RecvStream;
+use http::{HeaderMap, HeaderValue, Method, Request, Response, Uri};
+use quinn::{ConnectError, Connecting, ConnectionError, Endpoint};
 use rustls::{
     ClientConfig, RootCertStore,
     pki_types::{CertificateDer, ServerName, pem::PemObject},
@@ -31,6 +33,13 @@ use tokio::{
     sync::{Barrier, BarrierWaitResult},
     task::JoinHandle,
 };
+
+/// The HTTP/2 error used by the protocol module.
+pub(crate) type H2Error = h2::Error;
+/// The QUIC client configuration, distinct from the TLS configuration.
+pub(crate) type QuicClientConfig = quinn::ClientConfig;
+/// The QUIC connection, distinct from the harness connection state.
+pub(crate) type QuicConnection = quinn::Connection;
 
 /// The configuration of one generator run.
 #[derive(Clone, Debug)]

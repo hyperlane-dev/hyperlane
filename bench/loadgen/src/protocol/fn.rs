@@ -49,9 +49,9 @@ pub(crate) fn build_client_config(ca_path: &str, alpn: &[u8]) -> Result<ClientCo
 ///
 /// # Returns
 ///
-/// - `Result<quinn::ClientConfig, String>` - The configuration, or the reason it
+/// - `Result<QuicClientConfig, String>` - The configuration, or the reason it
 ///   could not be built.
-pub(crate) fn build_quic_config(ca_path: &str) -> Result<quinn::ClientConfig, String> {
+pub(crate) fn build_quic_config(ca_path: &str) -> Result<QuicClientConfig, String> {
     let crypto: quinn::crypto::rustls::QuicClientConfig =
         match quinn::crypto::rustls::QuicClientConfig::try_from(build_client_config(
             ca_path, ALPN_HTTP3,
@@ -59,7 +59,7 @@ pub(crate) fn build_quic_config(ca_path: &str) -> Result<quinn::ClientConfig, St
             Ok(crypto) => crypto,
             Err(error) => return Err(error.to_string()),
         };
-    Ok(quinn::ClientConfig::new(Arc::new(crypto)))
+    Ok(QuicClientConfig::new(Arc::new(crypto)))
 }
 
 /// Opens a plain socket to the server under test.
@@ -215,7 +215,7 @@ pub(crate) async fn run_http2(run: Run) -> ConnStats {
         Err(_) => return stats,
     };
     let driver: JoinHandle<()> = tokio::spawn(async move {
-        let _: Result<(), h2::Error> = connection.await;
+        let _: Result<(), H2Error> = connection.await;
     });
     let scheme: &str = run.protocol.scheme();
     let _: BarrierWaitResult = run.barrier.wait().await;
@@ -244,7 +244,7 @@ pub(crate) async fn run_http2(run: Run) -> ConnStats {
                 break;
             }
         }
-        let received: http::Response<h2::RecvStream> = match response.await {
+        let received: Response<RecvStream> = match response.await {
             Ok(response) => response,
             Err(_) => {
                 stats.errors += 1;
@@ -296,24 +296,23 @@ pub(crate) async fn send_one_http2(
     let transport: Box<dyn Transport> = open_transport(address, protocol, ca_path).await?;
     let (mut sender, connection) = h2::client::handshake(transport)
         .await
-        .map_err(|error: h2::Error| error.to_string())?;
+        .map_err(|error: H2Error| error.to_string())?;
     let driver: JoinHandle<()> = tokio::spawn(async move {
-        let _: Result<(), h2::Error> = connection.await;
+        let _: Result<(), H2Error> = connection.await;
     });
     let scheme: &str = protocol.scheme();
     let request: Request<()> = build_request(case, scheme, AUTHORITY);
     let (response, mut send_body) = sender
         .send_request(request, case.body.is_empty())
-        .map_err(|error: h2::Error| error.to_string())?;
+        .map_err(|error: H2Error| error.to_string())?;
     if !case.body.is_empty() {
         let body: Bytes = Bytes::copy_from_slice(case.body.as_slice());
         send_body
             .send_data(body, true)
-            .map_err(|error: h2::Error| error.to_string())?;
+            .map_err(|error: H2Error| error.to_string())?;
     }
-    let received: http::Response<h2::RecvStream> = response
-        .await
-        .map_err(|error: h2::Error| error.to_string())?;
+    let received: Response<RecvStream> =
+        response.await.map_err(|error: H2Error| error.to_string())?;
     let length: usize = read_h2_body(received.into_body())
         .await
         .map_err(|error: String| error)?;
@@ -387,7 +386,7 @@ pub(crate) async fn run_http3(run: Run) -> ConnStats {
     let Some(ca_path) = run.ca_path.clone() else {
         return stats;
     };
-    let config: quinn::ClientConfig = match build_quic_config(&ca_path) {
+    let config: QuicClientConfig = match build_quic_config(&ca_path) {
         Ok(config) => config,
         Err(_) => return stats,
     };
@@ -395,7 +394,7 @@ pub(crate) async fn run_http3(run: Run) -> ConnStats {
         Ok(bind) => bind,
         Err(_) => return stats,
     };
-    let endpoint: quinn::Endpoint = match quinn::Endpoint::client(bind) {
+    let endpoint: Endpoint = match Endpoint::client(bind) {
         Ok(endpoint) => endpoint,
         Err(_) => return stats,
     };
@@ -403,11 +402,11 @@ pub(crate) async fn run_http3(run: Run) -> ConnStats {
         Ok(server) => server,
         Err(_) => return stats,
     };
-    let connecting: quinn::Connecting = match endpoint.connect_with(config, server, VERIFY_NAME) {
+    let connecting: Connecting = match endpoint.connect_with(config, server, VERIFY_NAME) {
         Ok(connecting) => connecting,
         Err(_) => return stats,
     };
-    let connection: quinn::Connection = match connecting.await {
+    let connection: QuicConnection = match connecting.await {
         Ok(connection) => connection,
         Err(_) => return stats,
     };
@@ -507,19 +506,18 @@ pub(crate) async fn send_one_http3(
         Some(ca_path) => ca_path,
         None => return Err(ERROR_TLS_NEEDS_CA.to_owned()),
     };
-    let config: quinn::ClientConfig = build_quic_config(&ca_path)?;
+    let config: QuicClientConfig = build_quic_config(&ca_path)?;
     let bind: SocketAddr = QUIC_BIND_ADDRESS
         .parse()
         .map_err(|error: AddrParseError| error.to_string())?;
-    let endpoint: quinn::Endpoint =
-        quinn::Endpoint::client(bind).map_err(|error: Error| error.to_string())?;
+    let endpoint: Endpoint = Endpoint::client(bind).map_err(|error: Error| error.to_string())?;
     let server: SocketAddr = resolve_address(address).await?;
-    let connecting: quinn::Connecting = endpoint
+    let connecting: Connecting = endpoint
         .connect_with(config, server, VERIFY_NAME)
-        .map_err(|error: quinn::ConnectError| error.to_string())?;
-    let connection: quinn::Connection = connecting
+        .map_err(|error: ConnectError| error.to_string())?;
+    let connection: QuicConnection = connecting
         .await
-        .map_err(|error: quinn::ConnectionError| error.to_string())?;
+        .map_err(|error: ConnectionError| error.to_string())?;
     let (client, mut sender) = h3::client::builder()
         .build(h3_quinn::Connection::new(connection))
         .await
@@ -672,13 +670,13 @@ pub(crate) fn build_request(case: &ProtocolCase, scheme: &str, authority: &str) 
 ///
 /// # Arguments
 ///
-/// - `h2::RecvStream` - The receive half of the response stream.
+/// - `RecvStream` - The receive half of the response stream.
 ///
 /// # Returns
 ///
 /// - `Result<usize, String>` - The body length, or the reason the body could
 ///   not be read.
-pub(crate) async fn read_h2_body(mut body: h2::RecvStream) -> Result<usize, String> {
+pub(crate) async fn read_h2_body(mut body: RecvStream) -> Result<usize, String> {
     let mut length: usize = 0;
     while let Some(chunk) = body.data().await {
         let chunk: Bytes = match chunk {

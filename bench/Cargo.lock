@@ -72,6 +72,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "bench-perf"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "bench-server"
 version = "0.1.0"
 dependencies = [
@@ -420,7 +428,7 @@ dependencies = [
 
 [[package]]
 name = "http-compress"
-version = "22.0.3"
+version = "22.0.4"
 dependencies = [
  "brotli",
  "flate2",
@@ -429,11 +437,11 @@ dependencies = [
 
 [[package]]
 name = "http-constant"
-version = "22.0.3"
+version = "22.0.4"
 
 [[package]]
 name = "http-type"
-version = "22.0.3"
+version = "22.0.4"
 dependencies = [
  "hex",
  "http-compress",
@@ -449,7 +457,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "22.0.3"
+version = "22.0.4"
 dependencies = [
  "hyperlane-core",
  "hyperlane-macros",
@@ -457,7 +465,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane-core"
-version = "22.0.3"
+version = "22.0.4"
 dependencies = [
  "bytes",
  "futures",
@@ -479,7 +487,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane-macros"
-version = "22.0.3"
+version = "22.0.4"
 dependencies = [
  "proc-macro2",
  "quote",
