@@ -1,5 +1,2 @@
-/// The separator that joins the values of a header.
-pub(crate) const SEPARATOR: &str = ", ";
-
-/// The value that tells a browser that credentials are allowed.
-pub(crate) const VALUE_TRUE: &str = "true";
+/// The message that names a configuration that was already set.
+pub(crate) const MESSAGE_ALREADY_SET: &str = "the cross origin configuration was already set";

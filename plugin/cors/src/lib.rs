@@ -17,10 +17,7 @@ use r#const::*;
 use std::sync::OnceLock;
 
 use {
-    hyperlane::{
-        ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_HEADERS,
-        ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_MAX_AGE,
-        ALL_METHODS, Context, ORIGIN, Response, ServerHook, Status, Stream, VARY, WILDCARD_ANY,
-    },
+    cors_policy::CorsPolicy,
+    hyperlane::{ALL_METHODS, Context, ORIGIN, Response, ServerHook, Status, Stream, WILDCARD_ANY},
     lombok_macros::*,
 };

@@ -1,7 +1,8 @@
 use super::*;
 
 impl Default for CorsConfig {
-    /// Builds the configuration the plugin uses when none is given.
+    /// Builds the configuration the cross origin plugin uses when none is
+    /// given.
     ///
     /// # Returns
     ///
@@ -18,6 +19,21 @@ impl Default for CorsConfig {
 }
 
 impl CorsConfig {
+    /// The rules the configuration works from.
+    ///
+    /// # Returns
+    ///
+    /// - `CorsPolicy` - The rules of the configuration.
+    fn policy(&self) -> CorsPolicy {
+        CorsPolicy {
+            allowed_origins: self.get_allowed_origins().clone(),
+            allowed_methods: self.get_allowed_methods().clone(),
+            allowed_headers: self.get_allowed_headers().clone(),
+            max_age: self.get_max_age(),
+            allow_credentials: self.get_allow_credentials(),
+        }
+    }
+
     /// The origin that is written back, when the origin is allowed.
     ///
     /// A wildcard answers with the wildcard itself, a list answers with the
@@ -32,21 +48,7 @@ impl CorsConfig {
     /// - `Option<String>` - The origin to write back, when the origin is
     ///   allowed.
     pub fn allowed_origin(&self, origin: &str) -> Option<String> {
-        if self
-            .get_allowed_origins()
-            .iter()
-            .any(|allowed: &String| allowed == WILDCARD_ANY)
-        {
-            return Some(WILDCARD_ANY.to_owned());
-        }
-        if self
-            .get_allowed_origins()
-            .iter()
-            .any(|allowed: &String| allowed == origin)
-        {
-            return Some(origin.to_owned());
-        }
-        None
+        self.policy().allowed_origin(origin)
     }
 }
 
@@ -62,9 +64,13 @@ impl CorsPlugin {
     /// - `Result<(), String>` - Nothing, or the reason the configuration was
     ///   refused.
     pub fn init(config: CorsConfig) -> Result<(), String> {
+        let policy: CorsPolicy = config.policy();
         CONFIG
             .set(config)
-            .map_err(|_: CorsConfig| "the cross origin configuration was already set".to_owned())
+            .map_err(|_: CorsConfig| MESSAGE_ALREADY_SET.to_owned())?;
+        POLICY
+            .set(policy)
+            .map_err(|_: CorsPolicy| MESSAGE_ALREADY_SET.to_owned())
     }
 
     /// The configuration the plugin works from.
@@ -107,8 +113,8 @@ impl ServerHook for CorsMiddleware {
     ///
     /// - `Status` - Whether the pipeline continues.
     async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
-        let config: &CorsConfig = match CONFIG.get() {
-            Some(config) => config,
+        let policy: &CorsPolicy = match POLICY.get() {
+            Some(policy) => policy,
             None => return Status::Continue,
         };
         let origin: String = match ctx.get_request().try_get_header(ORIGIN) {
@@ -118,27 +124,14 @@ impl ServerHook for CorsMiddleware {
             },
             None => return Status::Continue,
         };
-        let allowed: String = match config.allowed_origin(&origin) {
-            Some(allowed) => allowed,
+        let headers: Vec<(&'static str, String)> = match policy.headers(&origin) {
+            Some(headers) => headers,
             None => return Status::Continue,
         };
         let response: &mut Response = ctx.get_mut_response();
-        response.set_header(ACCESS_CONTROL_ALLOW_ORIGIN, allowed);
-        response.set_header(
-            ACCESS_CONTROL_ALLOW_METHODS,
-            config.get_allowed_methods().join(SEPARATOR),
-        );
-        response.set_header(
-            ACCESS_CONTROL_ALLOW_HEADERS,
-            config.get_allowed_headers().join(SEPARATOR),
-        );
-        if let Some(max_age) = config.get_max_age() {
-            response.set_header(ACCESS_CONTROL_MAX_AGE, max_age.to_string());
+        for (name, value) in headers {
+            response.set_header(name, value);
         }
-        if config.get_allow_credentials() {
-            response.set_header(ACCESS_CONTROL_ALLOW_CREDENTIALS, VALUE_TRUE);
-        }
-        response.set_header(VARY, ORIGIN);
         Status::Continue
     }
 }

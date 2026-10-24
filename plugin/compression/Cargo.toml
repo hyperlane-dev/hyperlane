@@ -16,3 +16,4 @@ publish = true
 hyperlane = { workspace = true }
 
 lombok-macros = { workspace = true }
+encoding-negotiator = { workspace = true }

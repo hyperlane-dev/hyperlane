@@ -1,7 +1,8 @@
 use super::*;
 
 impl Default for StaticFilesConfig {
-    /// Builds the configuration the plugin uses when none is given.
+    /// Builds the configuration the static file plugin uses when none is
+    /// given.
     ///
     /// # Returns
     ///
@@ -15,6 +16,18 @@ impl Default for StaticFilesConfig {
 }
 
 impl StaticFilesConfig {
+    /// The rules the configuration works from.
+    ///
+    /// # Returns
+    ///
+    /// - `StaticFileResolver<'_>` - The rules of the configuration.
+    fn resolver(&self) -> StaticFileResolver<'_> {
+        StaticFileResolver {
+            root: self.get_root().as_path(),
+            index: self.get_index(),
+        }
+    }
+
     /// The file a path names under the root, when the path is allowed.
     ///
     /// A path that climbs out of the root is refused, so a request cannot
@@ -28,22 +41,7 @@ impl StaticFilesConfig {
     ///
     /// - `Option<PathBuf>` - The file, when the path is allowed.
     pub fn resolve(&self, path: &str) -> Option<PathBuf> {
-        let mut file: PathBuf = self.get_root().clone();
-        if path.is_empty() {
-            file.push(self.get_index());
-            return Some(file);
-        }
-        for segment in path.split(SEPARATOR_SLASH) {
-            if segment.is_empty()
-                || segment == SEGMENT_CURRENT
-                || segment == SEGMENT_PARENT
-                || segment.contains(SEPARATOR_BACKSLASH)
-            {
-                return None;
-            }
-            file.push(segment);
-        }
-        Some(file)
+        self.resolver().resolve(path)
     }
 
     /// The content type of a file, by the extension of its name.
@@ -140,12 +138,12 @@ impl ServerHook for StaticFilesRoute {
     ///
     /// - `Status` - Whether the pipeline continues.
     async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
-        let config: &StaticFilesConfig = match CONFIG.get() {
+        let config: &'static StaticFilesConfig = match CONFIG.get() {
             Some(config) => config,
             None => return Status::Continue,
         };
         let path: String = ctx.get_route_param(PARAM_PATH);
-        let file: Option<PathBuf> = config.resolve(&path);
+        let file: Option<PathBuf> = config.resolver().resolve(&path);
         let file: PathBuf = match file {
             Some(file) => file,
             None => return Self::not_found(ctx),

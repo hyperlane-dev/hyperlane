@@ -15,4 +15,5 @@ publish = true
 [dependencies]
 hyperlane = { workspace = true }
 
+cors-policy = { workspace = true }
 lombok-macros = { workspace = true }

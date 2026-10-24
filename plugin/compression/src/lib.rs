@@ -17,9 +17,10 @@ use r#const::*;
 use std::sync::OnceLock;
 
 use {
+    encoding_negotiator::CompressionPolicy,
     hyperlane::{
         ACCEPT_ENCODING, CONTENT_ENCODING, CONTENT_TYPE, Context, Response, ServerHook, Status,
-        Stream, TEXT_EVENT_STREAM, VARY, VARY_ACCEPT_ENCODING,
+        Stream, VARY, VARY_ACCEPT_ENCODING,
     },
     lombok_macros::*,
 };

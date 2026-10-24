@@ -14,6 +14,9 @@ pub(crate) use r#static::*;
 
 use r#const::*;
 
-use std::{io::Error, sync::OnceLock};
+use std::sync::OnceLock;
 
-use hyperlane::{ServerControlHook, ServerControlHookHandler, tokio};
+use {
+    hyperlane::{ServerControlHook, ServerControlHookHandler},
+    signal_watcher::{TerminationSignal, spawn_watcher},
+};

@@ -69,82 +69,36 @@ impl ShutdownPlugin {
     ///
     /// # Returns
     ///
-    /// - `Result<(), String>` - Nothing, or the reason the watcher could not
-    ///   be started.
+    /// - `Result<(), String>` - Nothing, or the reason the watcher could not be
+    ///   started.
     pub fn watch(hook: &ServerControlHook) -> Result<(), String> {
         let config: ShutdownConfig = match CONFIG.get() {
             Some(config) => config.clone(),
             None => ShutdownConfig::default(),
         };
         let hook: ServerControlHook = hook.clone();
-        tokio::spawn(async move {
-            let _: Option<String> = Self::wait(&config, &hook).await;
-        });
+        spawn_watcher(
+            config.watch_terminate,
+            move |signal: TerminationSignal| async move {
+                ShutdownPlugin::stop(&signal, &config, &hook).await;
+            },
+        );
         Ok(())
     }
 
-    /// Waits for a termination signal and stops the server.
+    /// The message that names the signal.
     ///
     /// # Arguments
     ///
-    /// - `&ShutdownConfig` - The configuration to work from.
-    /// - `&ServerControlHook` - The hook that owns the server.
+    /// - `&TerminationSignal` - The signal that asked the process to stop.
     ///
     /// # Returns
     ///
-    /// - `Option<String>` - The signal that stopped the server, when one did.
-    async fn wait(config: &ShutdownConfig, hook: &ServerControlHook) -> Option<String> {
-        let signal: String = Self::wait_for_signal(config.watch_terminate).await?;
-        Self::stop(&signal, config, hook).await;
-        Some(signal)
-    }
-
-    /// Waits for the signal that asks the process to stop.
-    ///
-    /// # Arguments
-    ///
-    /// - `bool` - Whether the terminate signal also stops the server.
-    ///
-    /// # Returns
-    ///
-    /// - `Option<String>` - The signal that arrived, when one did.
-    async fn wait_for_signal(watch_terminate: bool) -> Option<String> {
-        #[cfg(unix)]
-        {
-            if watch_terminate {
-                return Self::wait_for_terminate().await;
-            }
-        }
-        let _: bool = watch_terminate;
-        Self::wait_for_interrupt().await
-    }
-
-    /// Waits for the interrupt signal.
-    ///
-    /// # Returns
-    ///
-    /// - `Option<String>` - The signal that arrived, when one did.
-    async fn wait_for_interrupt() -> Option<String> {
-        let interrupt: Result<(), Error> = tokio::signal::ctrl_c().await;
-        if interrupt.is_err() {
-            return None;
-        }
-        Some(MESSAGE_INTERRUPTED.to_owned())
-    }
-
-    /// Waits for the terminate signal.
-    ///
-    /// # Returns
-    ///
-    /// - `Option<String>` - The signal that arrived, when one did.
-    #[cfg(unix)]
-    async fn wait_for_terminate() -> Option<String> {
-        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
-            Ok(mut signal) => {
-                signal.recv().await;
-                Some(MESSAGE_TERMINATED.to_owned())
-            }
-            Err(_) => None,
+    /// - `&'static str` - The message of the signal.
+    fn message(signal: &TerminationSignal) -> &'static str {
+        match signal {
+            TerminationSignal::Interrupted => MESSAGE_INTERRUPTED,
+            TerminationSignal::Terminated => MESSAGE_TERMINATED,
         }
     }
 
@@ -152,13 +106,13 @@ impl ShutdownPlugin {
     ///
     /// # Arguments
     ///
-    /// - `&str` - The signal that asked the process to stop.
+    /// - `&TerminationSignal` - The signal that asked the process to stop.
     /// - `&ShutdownConfig` - The configuration to work from.
     /// - `&ServerControlHook` - The hook that owns the server.
-    async fn stop(signal: &str, config: &ShutdownConfig, hook: &ServerControlHook) {
+    async fn stop(signal: &TerminationSignal, config: &ShutdownConfig, hook: &ServerControlHook) {
         match HANDLER.get() {
             Some(handler) => handler().await,
-            None => eprintln!("{}: {signal}", config.message),
+            None => eprintln!("{}: {}", config.message, Self::message(signal)),
         }
         hook.shutdown().await;
     }

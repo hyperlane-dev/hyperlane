@@ -25,4 +25,5 @@ use {
         ServerHook, Status, Stream, tokio::fs,
     },
     lombok_macros::*,
+    static_file_resolver::StaticFileResolver,
 };
