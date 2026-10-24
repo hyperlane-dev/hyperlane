@@ -81,8 +81,9 @@ Both are small, and the application already carries a working version of each,
 so upstreaming them is a move rather than a rewrite. A service that cannot shut
 down cleanly or cannot say what it is doing is not a service yet.
 
-Both are in the tree now, and both are published as `false`: they are usable
-from a path dependency today, and they wait for the release job to name them.
+The logger is in the tree now, and it is published. The shutdown plugin is
+not: the signal of the operating system is not framework state, so the plugin
+that joined it to the control hook is written again when the need is proven.
 
 ### P1 - what a web service is asked for every day
 
@@ -92,7 +93,9 @@ from a path dependency today, and they wait for the release job to name them.
 | `hyperlane-plugin-compression` | gzip and brotli on the response |
 | `hyperlane-plugin-static-files` | serving files, with the content type table the framework already carries |
 
-All three are in the tree now.
+None of the three is in the tree. Their rules are not framework state either,
+so they are written where they are needed, and a server that is not Hyperlane
+can use the same rules.
 
 The compression plugin is the cheapest of the three: `http-compress` is
 already a dependency and the response builder already honours a
@@ -167,10 +170,9 @@ application calls. Everything else is private.
 
 ## What is still to decide
 
-- **Publishing.** The websocket plugin is not in the release job's package
-  list, so no plugin is published today. Until that is settled, the plugins
-  are only usable from a path dependency, and the list has to grow before
-  they are useful to anyone else.
+- **Publishing.** The release job names the plugins of this tree, and the
+  plugins that hold no framework state are published from the crates-dev family
+  instead, so a server that is not Hyperlane can use the same rules.
 - **How much configuration is enough.** Every plugin that needs a setting
   needs it set before the server starts, and that is a second thing the
   application has to remember. A single configuration entry point would be

@@ -270,11 +270,7 @@ jobs:
             "hyperlane-macros"
             "hyperlane"
             "hyperlane-cli"
-            "hyperlane-plugin-compression"
-            "hyperlane-plugin-cors"
             "hyperlane-plugin-logger"
-            "hyperlane-plugin-shutdown"
-            "hyperlane-plugin-static-files"
             "hyperlane-plugin-websocket"
           )
 
