@@ -10,7 +10,7 @@ description = """A compression plugin for the Hyperlane framework, answering a c
 keywords = ["http", "request", "response", "tcp", "compress"]
 categories = ["network-programming", "web-programming"]
 exclude.workspace = true
-publish = false
+publish = true
 
 [dependencies]
 hyperlane = { workspace = true }

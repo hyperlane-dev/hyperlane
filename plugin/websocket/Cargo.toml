@@ -10,6 +10,7 @@ description = """A WebSocket plugin for the Hyperlane framework, providing robus
 keywords = ["http", "request", "response", "tcp", "redirect"]
 categories = ["network-programming", "web-programming"]
 exclude.workspace = true
+publish = true
 
 [dependencies]
 hyperlane = { workspace = true }

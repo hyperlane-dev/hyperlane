@@ -10,7 +10,7 @@ description = """A shutdown plugin for the Hyperlane framework, turning the term
 keywords = ["http", "request", "response", "tcp", "shutdown"]
 categories = ["network-programming", "web-programming"]
 exclude.workspace = true
-publish = false
+publish = true
 
 [dependencies]
 hyperlane = { workspace = true }

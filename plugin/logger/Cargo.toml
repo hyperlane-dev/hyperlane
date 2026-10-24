@@ -10,7 +10,7 @@ description = """A logging plugin for the Hyperlane framework, writing the log o
 keywords = ["http", "request", "response", "tcp", "log"]
 categories = ["network-programming", "web-programming"]
 exclude.workspace = true
-publish = false
+publish = true
 
 [dependencies]
 hyperlane = { workspace = true }

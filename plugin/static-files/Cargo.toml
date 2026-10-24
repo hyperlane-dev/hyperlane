@@ -10,7 +10,7 @@ description = """A static file plugin for the Hyperlane framework, serving the f
 keywords = ["http", "request", "response", "tcp", "static"]
 categories = ["network-programming", "web-programming"]
 exclude.workspace = true
-publish = false
+publish = true
 
 [dependencies]
 hyperlane = { workspace = true }
