@@ -1,79 +1,35 @@
 //! bench-control
 //!
-//! A minimal HTTP/1.1 server used as the environment reference of the
-//! hyperlane benchmark harness.
+//! The machine-ceiling reference of the hyperlane benchmark harness.
 //!
 //! It answers the same request shapes as the server under test, with one read
-//! and one write per request and no allocation on the hot path. The number it
+//! and one write per request and no framework in the way. The number it
 //! reaches is the ceiling the machine allows, so a drop in it means the
 //! machine moved rather than the framework.
 mod r#const;
+mod r#protocol;
 
-pub use r#const::*;
+pub(crate) use r#const::*;
+pub(crate) use r#protocol::*;
 
-use std::{env::var, io::Error};
+use std::{env::var, io::Error, net::SocketAddr, sync::Arc};
 
+use bytes::{Buf, Bytes};
+use rustls::{
+    ServerConfig,
+    pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject},
+};
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     net::{TcpListener, TcpStream},
 };
-
-/// Picks the answer for a request.
-///
-/// # Arguments
-///
-/// - `&[u8]` - The request bytes.
-///
-/// # Returns
-///
-/// - `&'static [u8]` - The answer.
-fn respond_to(request: &[u8]) -> &'static [u8] {
-    if request.starts_with(PREFIX_ROOT) {
-        return RESPONSE_ROOT;
-    }
-    if request.starts_with(PREFIX_USER) {
-        return RESPONSE_USER;
-    }
-    if request.starts_with(PREFIX_SEARCH) {
-        return RESPONSE_SEARCH;
-    }
-    if request.starts_with(PREFIX_HEADERS) {
-        return RESPONSE_HEADERS;
-    }
-    RESPONSE_ECHO
-}
-
-/// Serves one connection until the peer closes it.
-///
-/// # Arguments
-///
-/// - `TcpStream` - The accepted connection.
-///
-/// # Returns
-///
-/// - `Result<(), String>` - Nothing, or the reason the connection failed.
-async fn serve_connection(mut stream: TcpStream) -> Result<(), String> {
-    let _: Result<(), Error> = stream.set_nodelay(true);
-    let mut buffer: Vec<u8> = vec![0; READ_BUFFER_SIZE];
-    loop {
-        let read: usize = match stream.read(&mut buffer).await {
-            Ok(read) => read,
-            Err(error) => return Err(error.to_string()),
-        };
-        if read == 0 {
-            return Ok(());
-        }
-        let response: &'static [u8] = respond_to(&buffer[..read]);
-        if stream.write_all(response).await.is_err() {
-            return Ok(());
-        }
-    }
-}
+use tokio_rustls::TlsAcceptor;
 
 /// Starts the control server and serves until it is shut down.
 ///
 /// The address comes from the environment, so the entry point does not have to
-/// know it.
+/// know it. The protocol comes from the environment too, so one image serves
+/// every row of the measurement matrix.
 ///
 /// # Returns
 ///
@@ -83,18 +39,128 @@ pub async fn serve() -> Result<(), String> {
         Ok(address) => address,
         Err(_) => DEFAULT_ADDRESS.to_owned(),
     };
-    println!("bench-control listening on {address}");
-    let listener: TcpListener = match TcpListener::bind(&address).await {
+    let protocol: Protocol = match var(ENV_PROTOCOL) {
+        Ok(name) => match Protocol::from_name(&name) {
+            Some(protocol) => protocol,
+            None => return Err(format!("unknown protocol {name}")),
+        },
+        Err(_) => Protocol::Http1,
+    };
+    let certificate: Option<String> = var(ENV_TLS_CERTIFICATE).ok();
+    let key: Option<String> = var(ENV_TLS_KEY).ok();
+    match protocol {
+        Protocol::Http3 => serve_http3(&address, certificate, key).await,
+        _ => serve_stream(&address, protocol, certificate, key).await,
+    }
+}
+
+/// Serves the socket-based protocols.
+///
+/// # Arguments
+///
+/// - `&str` - The address to bind.
+/// - `Protocol` - The protocol to speak.
+/// - `Option<String>` - The path of the certificate chain.
+/// - `Option<String>` - The path of the private key.
+///
+/// # Returns
+///
+/// - `Result<(), String>` - Nothing, or the reason the server could not start.
+async fn serve_stream(
+    address: &str,
+    protocol: Protocol,
+    certificate: Option<String>,
+    key: Option<String>,
+) -> Result<(), String> {
+    let listener: TcpListener = match TcpListener::bind(address).await {
         Ok(listener) => listener,
         Err(error) => return Err(error.to_string()),
     };
+    let acceptor: Option<TlsAcceptor> = match (protocol.uses_tls(), certificate, key) {
+        (true, Some(certificate), Some(key)) => {
+            let config: ServerConfig = build_server_config(&certificate, &key, protocol.alpn())?;
+            Some(TlsAcceptor::from(Arc::new(config)))
+        }
+        (true, _, _) => return Err("the TLS protocol needs a certificate and a key".to_owned()),
+        _ => None,
+    };
+    println!("bench-control ready on {address} speaking {protocol:?}");
     loop {
         let (stream, _): (TcpStream, _) = match listener.accept().await {
             Ok(accepted) => accepted,
             Err(error) => return Err(error.to_string()),
         };
+        let _: Result<(), Error> = stream.set_nodelay(true);
+        let acceptor: Option<TlsAcceptor> = acceptor.clone();
         tokio::spawn(async move {
-            let _: Result<(), String> = serve_connection(stream).await;
+            match acceptor {
+                Some(acceptor) => {
+                    let session: tokio_rustls::server::TlsStream<TcpStream> =
+                        match acceptor.accept(stream).await {
+                            Ok(session) => session,
+                            Err(_) => return,
+                        };
+                    let transport: Box<dyn Transport> = Box::new(session);
+                    let _: Result<(), String> = match protocol {
+                        Protocol::H2c | Protocol::H2Tls => serve_http2(transport).await,
+                        _ => serve_http1(transport).await,
+                    };
+                }
+                None => {
+                    let transport: Box<dyn Transport> = Box::new(stream);
+                    let _: Result<(), String> = match protocol {
+                        Protocol::H2c | Protocol::H2Tls => serve_http2(transport).await,
+                        _ => serve_http1(transport).await,
+                    };
+                }
+            }
         });
     }
+}
+
+/// Serves the HTTP/3 protocol over QUIC.
+///
+/// # Arguments
+///
+/// - `&str` - The address to bind.
+/// - `Option<String>` - The path of the certificate chain.
+/// - `Option<String>` - The path of the private key.
+///
+/// # Returns
+///
+/// - `Result<(), String>` - Nothing, or the reason the server could not start.
+async fn serve_http3(
+    address: &str,
+    certificate: Option<String>,
+    key: Option<String>,
+) -> Result<(), String> {
+    let (Some(certificate), Some(key)) = (certificate, key) else {
+        return Err(ERROR_HTTP3_NEEDS_TLS.to_owned());
+    };
+    let config: ServerConfig = build_server_config(&certificate, &key, ALPN_HTTP3)?;
+    let quic: quinn::crypto::rustls::QuicServerConfig =
+        match quinn::crypto::rustls::QuicServerConfig::try_from(config) {
+            Ok(quic) => quic,
+            Err(error) => return Err(error.to_string()),
+        };
+    let bind: SocketAddr = match address.parse() {
+        Ok(bind) => bind,
+        Err(error) => return Err(error.to_string()),
+    };
+    let endpoint: quinn::Endpoint =
+        match quinn::Endpoint::server(quinn::ServerConfig::with_crypto(Arc::new(quic)), bind) {
+            Ok(endpoint) => endpoint,
+            Err(error) => return Err(error.to_string()),
+        };
+    println!("bench-control ready on {address} speaking Http3");
+    while let Some(incoming) = endpoint.accept().await {
+        let connection: quinn::Connection = match incoming.await {
+            Ok(connection) => connection,
+            Err(_) => continue,
+        };
+        tokio::spawn(async move {
+            let _: Result<(), String> = serve_http3_connection(connection).await;
+        });
+    }
+    Ok(())
 }

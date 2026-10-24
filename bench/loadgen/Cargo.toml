@@ -6,4 +6,25 @@ publish = false
 exclude = ["target"]
 
 [dependencies]
+h3 = "0.0.8"
+h2 = "0.4.20"
+http = "1.5.0"
+bytes = "1.12.1"
+futures = "0.3.31"
+h3-quinn = "0.0.10"
 tokio = { version = "1", features = ["full"] }
+rustls-pki-types = { version = "1.15.1", features = ["std"] }
+tokio-rustls = { version = "0.26.6", default-features = false, features = [
+    "ring",
+    "tls12",
+] }
+rustls = { version = "0.23.46", default-features = false, features = [
+    "std",
+    "ring",
+    "tls12",
+] }
+quinn = { version = "0.11.12", default-features = false, features = [
+    "log",
+    "rustls-ring",
+    "runtime-tokio",
+] }

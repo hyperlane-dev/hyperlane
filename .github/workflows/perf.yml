@@ -15,6 +15,10 @@ on:
         description: 'The concurrency levels to measure'
         required: false
         default: '64 256'
+      connections_short:
+        description: 'The concurrency levels to measure in short-connection mode'
+        required: false
+        default: '16 64'
       duration:
         description: 'The length of a measured window, in seconds'
         required: false
@@ -23,6 +27,14 @@ on:
         description: 'How many times each level is measured'
         required: false
         default: '3'
+      protocols:
+        description: 'The protocol variants to measure'
+        required: false
+        default: 'h1 h1-tls h2c h2-tls h3'
+      modes:
+        description: 'The connection modes to measure'
+        required: false
+        default: 'keepalive short'
 
 permissions:
   contents: read
@@ -35,14 +47,18 @@ jobs:
   measure:
     name: Measure
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     env:
       PERF_CONNECTIONS: ${{ github.event.inputs.connections || '64 256' }}
+      PERF_CONNECTIONS_SHORT: ${{ github.event.inputs.connections_short || '16 64' }}
       PERF_DURATION: ${{ github.event.inputs.duration || '12' }}
       PERF_REPEATS: ${{ github.event.inputs.repeats || '3' }}
+      PERF_PROTOCOLS: ${{ github.event.inputs.protocols || 'h1 h1-tls h2c h2-tls h3' }}
+      PERF_MODES: ${{ github.event.inputs.modes || 'keepalive short' }}
       PERF_SERVER_CPUS: '1'
       PERF_LOADGEN_CPUS: '1'
       PERF_RESULTS: ${{ github.workspace }}/bench/results
+      PERF_COOLDOWN_SHORT: '20'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -67,13 +83,13 @@ jobs:
           set -e
           mkdir -p "${{ runner.temp }}/baseline"
           git archive "${{ steps.baseline.outputs.base }}" | tar -x -C "${{ runner.temp }}/baseline"
-          cp -R bench "${{ runner.temp }}/baseline/bench"
           ls "${{ runner.temp }}/baseline"
 
       - name: Build the images
         run: |
           set -e
           cd bench
+          ./run-perf.sh instrument ..
           ./run-perf.sh build candidate ..
           ./run-perf.sh build baseline "${{ runner.temp }}/baseline"
 

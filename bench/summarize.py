@@ -54,17 +54,24 @@ def load(path):
 
 
 def group(rows):
-    """Groups the rows by concurrency level and variant.
+    """Groups the rows by cell and variant.
+
+    A cell is a protocol, a connection mode and a concurrency level. The
+    protocol and the mode are separate axes: a keep-alive connection carries
+    many requests, so the accept loop and the per-connection handshake are
+    exercised once per persistent connection, while a short connection
+    exercises them once per request.
 
     Arguments:
         rows - The measurement rows.
 
     Returns:
-        The rows keyed by level and variant, and by repeat.
+        The rows keyed by cell and variant, and by repeat.
     """
     grouped = defaultdict(lambda: defaultdict(dict))
     for row in rows:
-        grouped[row["connections"]][row["variant"]][row["repeat"]] = row["result"]
+        cell = (row["protocol"], row["mode"], row["connections"])
+        grouped[cell][row["variant"]][row["repeat"]] = row["result"]
     return grouped
 
 
@@ -161,12 +168,12 @@ def main():
         print("no measurements were found", file=sys.stderr)
         return 1
     grouped = group(rows)
-    levels = sorted(grouped.keys())
+    cells = sorted(grouped.keys())
     print("hyperlane performance report")
     print("===========================")
-    for level in levels:
-        per_variant = grouped[level]
-        print(f"\nconcurrency {level}")
+    for protocol, mode, connections in cells:
+        per_variant = grouped[(protocol, mode, connections)]
+        print(f"\n{protocol} / {mode} / concurrency {connections}")
         for variant in ("baseline", "candidate", "control"):
             results = per_variant.get(variant, {})
             if results:
@@ -177,7 +184,7 @@ def main():
         if not baseline or not candidate:
             print("  incomplete: the two variants were not measured together")
             continue
-        verdict, reason = verdict_for(level, baseline, candidate, control)
+        verdict, reason = verdict_for((protocol, mode, connections), baseline, candidate, control)
         print(f"  => {verdict}: {reason}")
     print("")
     print("The verdict is a report. It never blocks a build.")

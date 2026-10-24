@@ -5,6 +5,9 @@ edition = "2024"
 publish = false
 exclude = ["target"]
 
+[features]
+alloc-count = []
+
 [dependencies]
 hyperlane = { path = "../../" }
 
