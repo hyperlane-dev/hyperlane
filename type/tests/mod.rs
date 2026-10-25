@@ -26,11 +26,12 @@ mod task;
 mod upgrade_type;
 mod websocket_frame;
 
-use http_type::*;
+use super::*;
 
 use std::{
     collections::VecDeque,
     fmt::{self, Debug, Formatter},
+    future::poll_fn,
     io::{self, ErrorKind},
     mem,
     net::SocketAddr,
@@ -49,13 +50,16 @@ use std::{
 use {
     serde::Deserialize,
     tokio::{
-        io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream, ReadBuf, duplex},
+        io::{
+            AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt,
+            DuplexStream, ReadBuf, duplex,
+        },
         net::{TcpListener, TcpStream},
         runtime::Handle,
         spawn,
         sync::{RwLockReadGuard, RwLockWriteGuard},
-        task::{JoinError, JoinHandle},
-        time::{Duration, error::Elapsed},
+        task::{JoinError, JoinHandle, yield_now},
+        time::{Duration, error::Elapsed, sleep},
     },
     url::{ParseError, Url},
 };

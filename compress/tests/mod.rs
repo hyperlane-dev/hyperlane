@@ -1,6 +1,6 @@
 mod compress;
 
-use http_compress::*;
+use super::*;
 
 use std::{
     borrow::Cow,

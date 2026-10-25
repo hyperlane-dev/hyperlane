@@ -16,6 +16,9 @@ mod path;
 mod protocol;
 mod query;
 mod session;
+#[cfg(test)]
+#[path = "../tests/mod.rs"]
+mod tests;
 
 pub use {
     body::*, common::*, content_type_value::*, file_extension::*, header_key::*, header_value::*,

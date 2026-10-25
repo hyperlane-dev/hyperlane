@@ -8,6 +8,9 @@ mod r#const;
 mod r#enum;
 mod r#impl;
 mod r#struct;
+#[cfg(test)]
+#[path = "../tests/mod.rs"]
+mod tests;
 mod r#trait;
 
 pub use {r#enum::*, r#struct::*, r#trait::*};

@@ -1,0 +1,8 @@
+.git
+**/target
+**/node_modules
+**/.env
+**/.env.*
+performance/certs
+performance/results
+performance/results2

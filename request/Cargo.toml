@@ -1,5 +1,6 @@
 [package]
 name = "http-request"
+autotests = false
 version.workspace = true
 readme.workspace = true
 edition.workspace = true

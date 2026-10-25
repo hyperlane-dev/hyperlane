@@ -12,13 +12,13 @@ categories = ["network-programming", "web-programming"]
 exclude.workspace = true
 
 [workspace.package]
-version = "22.0.6"
+version = "22.0.8"
 readme = "README.md"
 edition = "2024"
 authors = ["root@devhub.vip"]
 license = "MIT"
 repository = "https://github.com/hyperlane-dev/hyperlane.git"
-exclude = ["target", "Cargo.lock", "sh", ".github", "logs", "img", "**/*.log"]
+exclude = ["target", "Cargo.lock", "sh", ".github", "logs", "img", "**/*.log", "certs/**", "results/**", "results2/**"]
 
 [workspace]
 resolver = "2"
@@ -32,19 +32,21 @@ members = [
     "cli",
     "plugin/logger",
     "plugin/websocket",
+    "performance",
 ]
 
 [workspace.dependencies]
-hyperlane = { path = ".", version = "22.0.6" }
-http-type = { path = "type", version = "22.0.6" }
-hyperlane-cli = { path = "cli", version = "22.0.6" }
-hyperlane-core = { path = "core", version = "22.0.6" }
-http-request = { path = "request", version = "22.0.6" }
-http-compress = { path = "compress", version = "22.0.6" }
-http-constant = { path = "constant", version = "22.0.6" }
-hyperlane-macros = { path = "macros", version = "22.0.6" }
-hyperlane-plugin-logger = { path = "plugin/logger", version = "22.0.6" }
-hyperlane-plugin-websocket = { path = "plugin/websocket", version = "22.0.6" }
+hyperlane = { path = ".", version = "22.0.8" }
+http-type = { path = "type", version = "22.0.8" }
+hyperlane-cli = { path = "cli", version = "22.0.8" }
+hyperlane-core = { path = "core", version = "22.0.8" }
+http-request = { path = "request", version = "22.0.8" }
+http-compress = { path = "compress", version = "22.0.8" }
+http-constant = { path = "constant", version = "22.0.8" }
+hyperlane-macros = { path = "macros", version = "22.0.8" }
+hyperlane-performance = { path = "performance", version = "22.0.8" }
+hyperlane-plugin-logger = { path = "plugin/logger", version = "22.0.8" }
+hyperlane-plugin-websocket = { path = "plugin/websocket", version = "22.0.8" }
 
 h3 = "0.0.8"
 h2 = "0.4.20"
@@ -83,6 +85,7 @@ thiserror = "2.0.21"
 future-fn = "10.2.11"
 serde_with = "3.21.0"
 serde_yaml = "0.9.34"
+toml_edit = "0.25.17"
 tracing-log = "0.2.0"
 urlencoding = "2.1.3"
 serde-xml-rs = "0.8.2"

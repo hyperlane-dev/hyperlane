@@ -6,6 +6,6 @@ mod new;
 mod template;
 mod version;
 
-use hyperlane_cli::*;
+use super::*;
 
 use std::{env::args, io};

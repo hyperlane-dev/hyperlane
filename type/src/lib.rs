@@ -27,6 +27,9 @@ mod response;
 mod status;
 mod stream;
 mod task;
+#[cfg(test)]
+#[path = "../tests/mod.rs"]
+mod tests;
 mod upgrade_type;
 mod websocket_frame;
 

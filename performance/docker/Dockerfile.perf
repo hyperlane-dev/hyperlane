@@ -1,0 +1,33 @@
+FROM rust:1.99-alpine AS base
+RUN apk add --no-cache build-base perl
+
+FROM base AS server
+WORKDIR /src/hyperlane
+COPY . /src/hyperlane/
+RUN cargo build --release --locked -p hyperlane-performance --bin hyperlane-performance-server
+
+FROM base AS loadgen
+WORKDIR /src/hyperlane
+COPY . /src/hyperlane/
+RUN cargo build --release --locked -p hyperlane-performance --bin hyperlane-performance-loadgen
+
+FROM base AS control
+WORKDIR /src/hyperlane
+COPY . /src/hyperlane/
+RUN cargo build --release --locked -p hyperlane-performance --bin hyperlane-performance-control
+
+FROM alpine:3.22 AS server-runtime
+RUN apk add --no-cache libgcc
+COPY --from=server /src/hyperlane/target/release/hyperlane-performance-server /usr/local/bin/hyperlane-performance-server
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/hyperlane-performance-server"]
+
+FROM alpine:3.22 AS loadgen-runtime
+COPY --from=loadgen /src/hyperlane/target/release/hyperlane-performance-loadgen /usr/local/bin/hyperlane-performance-loadgen
+ENTRYPOINT ["/usr/local/bin/hyperlane-performance-loadgen"]
+
+FROM alpine:3.22 AS control-runtime
+RUN apk add --no-cache libgcc
+COPY --from=control /src/hyperlane/target/release/hyperlane-performance-control /usr/local/bin/hyperlane-performance-control
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/hyperlane-performance-control"]

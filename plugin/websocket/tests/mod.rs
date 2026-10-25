@@ -2,7 +2,7 @@ mod broadcast_type;
 mod websocket;
 mod websocket_map;
 
-use hyperlane_plugin_websocket::*;
+use super::*;
 
 use std::{
     collections::HashSet,

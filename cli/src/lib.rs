@@ -7,6 +7,9 @@ mod help;
 mod logger;
 mod new;
 mod template;
+#[cfg(test)]
+#[path = "../tests/mod.rs"]
+mod tests;
 mod version;
 mod watch;
 

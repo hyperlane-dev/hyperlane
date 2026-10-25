@@ -5,6 +5,9 @@
 mod common;
 mod request;
 mod response;
+#[cfg(test)]
+#[path = "../tests/mod.rs"]
+mod tests;
 mod utils;
 
 pub use {request::*, response::*};

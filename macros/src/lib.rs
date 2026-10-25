@@ -23,6 +23,9 @@ mod response_middleware;
 mod route;
 mod send;
 mod stream;
+#[cfg(test)]
+#[path = "../tests/mod.rs"]
+mod tests;
 mod upgrade;
 mod version;
 
