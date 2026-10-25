@@ -428,7 +428,7 @@ dependencies = [
 
 [[package]]
 name = "http-compress"
-version = "22.0.5"
+version = "22.0.7"
 dependencies = [
  "brotli",
  "flate2",
@@ -437,11 +437,11 @@ dependencies = [
 
 [[package]]
 name = "http-constant"
-version = "22.0.5"
+version = "22.0.7"
 
 [[package]]
 name = "http-type"
-version = "22.0.5"
+version = "22.0.7"
 dependencies = [
  "hex",
  "http-compress",
@@ -457,7 +457,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane"
-version = "22.0.5"
+version = "22.0.7"
 dependencies = [
  "hyperlane-core",
  "hyperlane-macros",
@@ -465,7 +465,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane-core"
-version = "22.0.5"
+version = "22.0.7"
 dependencies = [
  "bytes",
  "futures",
@@ -487,7 +487,7 @@ dependencies = [
 
 [[package]]
 name = "hyperlane-macros"
-version = "22.0.5"
+version = "22.0.7"
 dependencies = [
  "proc-macro2",
  "quote",
