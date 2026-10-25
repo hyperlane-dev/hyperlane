@@ -26,7 +26,8 @@ jobs:
       PERF_MODES: 'keepalive short'
       PERF_SERVER_CPUS: '1'
       PERF_LOADGEN_CPUS: '1'
-      PERF_RESULTS: ${{ github.workspace }}/bench/results
+      PERF_RESULTS: ${{ github.workspace }}/performance/results
+      PERF_ROOT: ${{ github.workspace }}/performance
       PERF_COOLDOWN_SHORT: '20'
     steps:
       - name: Checkout
@@ -57,27 +58,26 @@ jobs:
       - name: Build the images
         run: |
           set -e
-          cd bench
-          cargo run --locked -q -p bench-perf -- instrument ..
-          cargo run --locked -q -p bench-perf -- build candidate ..
-          cargo run --locked -q -p bench-perf -- build baseline "${{ runner.temp }}/baseline"
+          cargo fetch
+          cargo run --locked -q -p hyperlane-performance -- instrument .
+          cargo run --locked -q -p hyperlane-performance -- build candidate .
+          cargo run --locked -q -p hyperlane-performance -- build baseline "${{ runner.temp }}/baseline"
 
       - name: Measure
         run: |
           set -e
-          cd bench
-          cargo run --locked -q -p bench-perf -- bench candidate baseline
+          cargo run --locked -q -p hyperlane-performance -- bench candidate baseline
 
       - name: Report
         run: |
           set -e
-          cd bench
-          cargo run --locked -q -p bench-perf -- report | tee "${{ github.workspace }}/bench/results/report.txt"
+          set -o pipefail
+          cargo run --locked -q -p hyperlane-performance -- report | tee "${{ github.workspace }}/performance/results/report.txt"
 
       - name: Upload the measurements
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: performance-${{ github.run_id }}
-          path: ${{ github.workspace }}/bench/results
+          path: ${{ github.workspace }}/performance/results
           if-no-files-found: warn

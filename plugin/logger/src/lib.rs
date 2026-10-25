@@ -7,6 +7,9 @@ mod r#const;
 mod r#impl;
 mod r#static;
 mod r#struct;
+#[cfg(test)]
+#[path = "../tests/mod.rs"]
+mod tests;
 
 pub use {log::LevelFilter, r#struct::*};
 

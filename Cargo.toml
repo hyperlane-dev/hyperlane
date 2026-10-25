@@ -18,7 +18,7 @@ edition = "2024"
 authors = ["root@devhub.vip"]
 license = "MIT"
 repository = "https://github.com/hyperlane-dev/hyperlane.git"
-exclude = ["target", "Cargo.lock", "sh", ".github", "logs", "img", "**/*.log"]
+exclude = ["target", "Cargo.lock", "sh", ".github", "logs", "img", "**/*.log", "certs/**", "results/**", "results2/**"]
 
 [workspace]
 resolver = "2"
@@ -32,6 +32,7 @@ members = [
     "cli",
     "plugin/logger",
     "plugin/websocket",
+    "performance",
 ]
 
 [workspace.dependencies]
@@ -43,6 +44,7 @@ http-request = { path = "request", version = "22.0.7" }
 http-compress = { path = "compress", version = "22.0.7" }
 http-constant = { path = "constant", version = "22.0.7" }
 hyperlane-macros = { path = "macros", version = "22.0.7" }
+hyperlane-performance = { path = "performance", version = "22.0.7" }
 hyperlane-plugin-logger = { path = "plugin/logger", version = "22.0.7" }
 hyperlane-plugin-websocket = { path = "plugin/websocket", version = "22.0.7" }
 
@@ -83,6 +85,7 @@ thiserror = "2.0.21"
 future-fn = "10.2.11"
 serde_with = "3.21.0"
 serde_yaml = "0.9.34"
+toml_edit = "0.25.17"
 tracing-log = "0.2.0"
 urlencoding = "2.1.3"
 serde-xml-rs = "0.8.2"

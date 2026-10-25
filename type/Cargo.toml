@@ -1,5 +1,6 @@
 [package]
 name = "http-type"
+autotests = false
 version.workspace = true
 readme.workspace = true
 edition.workspace = true

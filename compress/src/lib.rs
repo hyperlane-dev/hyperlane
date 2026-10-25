@@ -9,6 +9,9 @@ mod brotli;
 mod compress;
 mod deflate;
 mod gzip;
+#[cfg(test)]
+#[path = "../tests/mod.rs"]
+mod tests;
 
 pub use compress::*;
 

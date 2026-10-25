@@ -70,9 +70,7 @@ jobs:
           components: rustfmt
       - name: Format check
         run: cargo fmt --all -- --check
-      - name: Format check the benchmark harness
-        continue-on-error: true
-        run: cargo fmt --manifest-path bench/Cargo.toml --all -- --check
+
 
   tests:
     needs: setup
@@ -89,8 +87,7 @@ jobs:
           toolchain: stable
       - name: Run tests
         run: cargo test --workspace --all-features -- --nocapture
-      - name: Test the benchmark harness
-        run: cargo test --manifest-path bench/Cargo.toml --workspace
+
 
   clippy:
     needs: setup
@@ -108,8 +105,7 @@ jobs:
           components: clippy
       - name: Run clippy
         run: cargo clippy --workspace --all-features --all-targets
-      - name: Run clippy on the benchmark harness
-        run: cargo clippy --manifest-path bench/Cargo.toml --workspace --all-targets
+
 
   build:
     needs: setup
@@ -272,6 +268,7 @@ jobs:
             "hyperlane-cli"
             "hyperlane-plugin-logger"
             "hyperlane-plugin-websocket"
+            "hyperlane-performance"
           )
 
           NOTES_FILE="$(mktemp)"

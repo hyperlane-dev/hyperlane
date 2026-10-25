@@ -2,6 +2,7 @@ use super::*;
 
 /// Split on a multi-byte delimiter, returning each slice. Used to split an
 /// HTTP response into status line / headers / body.
+/// Matches do not overlap, and an empty delimiter leaves the input unchanged.
 ///
 /// # Arguments
 ///
@@ -12,13 +13,18 @@ use super::*;
 ///
 /// - `Vec<&'a [u8]>`: The delimiter-separated slices, including any trailing remainder.
 pub(crate) fn split_multi_byte<'a>(data: &'a [u8], delimiter: &'a [u8]) -> Vec<&'a [u8]> {
+    if delimiter.is_empty() {
+        return vec![data];
+    }
     let mut result: Vec<&[u8]> = Vec::new();
     let mut start: usize = 0;
-    for i in 0..=data.len() {
-        if data[i..].starts_with(delimiter) {
-            result.push(&data[start..i]);
-            start = i + delimiter.len();
-        }
+    while let Some(offset) = data[start..]
+        .windows(delimiter.len())
+        .position(|window: &[u8]| window == delimiter)
+    {
+        let end: usize = start + offset;
+        result.push(&data[start..end]);
+        start = end + delimiter.len();
     }
     if start < data.len() {
         result.push(&data[start..]);
@@ -333,7 +339,6 @@ pub(crate) fn calculate_buffer_capacity(
     if response_bytes.len() + n <= current_capacity {
         return 0;
     }
-
     let needed_cap: usize = response_bytes.len() + n;
     if current_capacity == 0 {
         needed_cap.max(1024)
@@ -375,7 +380,6 @@ pub(crate) fn parse_response_headers(
         if status_code_end <= headers_bytes.len() {
             let status_code: usize =
                 parse_status_code(&headers_bytes[status_code_start..status_code_end]);
-
             if (300..=399).contains(&status_code)
                 && let Some(location_pos) =
                     find_pattern_case_insensitive(headers_bytes, location_sign_key)

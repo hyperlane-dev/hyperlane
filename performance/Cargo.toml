@@ -1,0 +1,51 @@
+[package]
+name = "hyperlane-performance"
+autobins = false
+autotests = false
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+exclude.workspace = true
+description = "Reproducible multi-protocol performance tools for Hyperlane."
+categories = ["development-tools::profiling"]
+publish = true
+
+[features]
+alloc-count = []
+
+[[bin]]
+name = "hyperlane-performance"
+path = "src/main.rs"
+
+[[bin]]
+name = "hyperlane-performance-server"
+path = "src/bin/server/main.rs"
+
+[[bin]]
+name = "hyperlane-performance-control"
+path = "src/bin/control/main.rs"
+
+[[bin]]
+name = "hyperlane-performance-loadgen"
+path = "src/bin/loadgen/main.rs"
+
+[dependencies]
+hyperlane = { workspace = true }
+
+h2 = { workspace = true }
+h3 = { workspace = true }
+http = { workspace = true }
+bytes = { workspace = true }
+quinn = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+rustls = { workspace = true }
+futures = { workspace = true }
+h3-quinn = { workspace = true }
+toml_edit = { workspace = true }
+serde_json = { workspace = true }
+tokio-rustls = { workspace = true }
+rustls-pki-types = { workspace = true }
