@@ -115,7 +115,7 @@ pub(crate) fn parse_chunked_body(body_bytes: &[u8]) -> Vec<u8> {
     while pos < body_bytes.len() {
         let chunk_size_end: usize = match body_bytes[pos..]
             .windows(2)
-            .position(|window: &[u8]| window == b"\r\n")
+            .position(|window: &[u8]| window == HTTP_BR_BYTES)
         {
             Some(p) => pos + p,
             None => break,
@@ -285,9 +285,9 @@ pub(crate) fn parse_decimal_bytes(bytes: &[u8]) -> usize {
     let mut started: bool = false;
     for &byte in bytes {
         match byte {
-            b'0'..=b'9' => {
+            ASCII_ZERO..=ASCII_NINE => {
                 started = true;
-                result = result * 10 + (byte - b'0') as usize;
+                result = result * 10 + (byte - ASCII_ZERO) as usize;
             }
             b' ' | b'\t' if !started => continue,
             _ => break,
@@ -312,7 +312,7 @@ pub(crate) fn parse_status_code(status_bytes: &[u8]) -> usize {
     let mut result: usize = 0;
     for &byte in status_bytes {
         if byte.is_ascii_digit() {
-            result = result * 10 + (byte - b'0') as usize;
+            result = result * 10 + (byte - ASCII_ZERO) as usize;
         } else {
             return 0;
         }
