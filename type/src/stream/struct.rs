@@ -52,8 +52,8 @@ pub struct Stream {
 /// A buffered reader over a transport with a reusable read buffer.
 ///
 /// This reader batches reads into an internal buffer to reduce syscall count,
-/// and returns its buffer to a thread-local pool on drop so keep-alive
-/// requests avoid repeated buffer allocation.
+/// and returns drained buffers to a thread-local pool while waiting for more
+/// input so idle keep-alive connections do not each retain a read buffer.
 #[derive(Data, New)]
 pub(crate) struct PooledReader<'a> {
     /// The underlying transport being read.
@@ -66,6 +66,11 @@ pub(crate) struct PooledReader<'a> {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) buffer: Vec<u8>,
+    /// The required buffer length when the transport becomes readable.
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) capacity: usize,
     /// The index of the first unconsumed byte in the buffer.
     #[get(pub(super), type(copy))]
     #[get_mut(pub(super))]

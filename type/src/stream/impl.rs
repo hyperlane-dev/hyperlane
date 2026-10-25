@@ -204,6 +204,7 @@ impl AsyncRead for PooledReader<'_> {
             this.set_start(end);
             return Poll::Ready(Ok(()));
         }
+        return_read_buffer(mem::take(this.get_mut_buffer()));
         Pin::new(&mut **this.get_mut_stream()).poll_read(cx, buf)
     }
 }
@@ -228,19 +229,26 @@ impl AsyncBufRead for PooledReader<'_> {
         let PooledReader {
             stream,
             buffer,
+            capacity,
             start,
             end,
         } = this;
         if *start >= *end {
             *start = 0;
             *end = 0;
+            if buffer.is_empty() {
+                *buffer = take_read_buffer(*capacity);
+            }
             let mut read_buf: ReadBuf<'_> = ReadBuf::new(buffer);
             match Pin::new(&mut **stream).poll_read(cx, &mut read_buf) {
                 Poll::Ready(Ok(())) => {
                     *end = read_buf.filled().len();
                 }
                 Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
-                Poll::Pending => return Poll::Pending,
+                Poll::Pending => {
+                    return_read_buffer(mem::take(buffer));
+                    return Poll::Pending;
+                }
             }
         }
         Poll::Ready(Ok(&buffer[*start..*end]))
@@ -373,24 +381,13 @@ impl Stream {
         let config: RequestConfig = *self.get_request_config();
         let buffer_size: usize = config.get_buffer_size();
         let max_path_size: usize = config.get_max_path_size();
-        // Take any bytes the previous request read ahead, BEFORE borrowing the
-        // socket: those bytes already left the socket and cannot be re-read, so
-        // dropping them would silently discard a pipelined request.
-        let seeded: Vec<u8> = {
-            let start: usize = self.get_leftover_start();
-            let end: usize = self.get_leftover_end();
-            let mut pending: Vec<u8> = Vec::new();
-            if start < end {
-                let leftover: Vec<u8> = mem::take(self.get_mut_leftover());
-                let take: usize = (end - start).min(leftover.len());
-                pending.extend_from_slice(&leftover[start..start + take]);
-            }
-            self.set_leftover(Vec::new());
-            self.set_leftover_start(0);
-            self.set_leftover_end(0);
-            pending
-        };
-        let buffer: Vec<u8> = take_read_buffer(buffer_size);
+        // Move read-ahead storage and its valid window into the reader instead
+        // of allocating and copying the remaining pipeline for every request.
+        let start: usize = self.get_leftover_start();
+        let end: usize = self.get_leftover_end();
+        let buffer: Vec<u8> = mem::take(self.get_mut_leftover());
+        self.set_leftover_start(0);
+        self.set_leftover_end(0);
         // Split the borrow of the stream: the reader takes the transport, the
         // line buffers are separate fields, so both can be held at once.
         let Stream {
@@ -399,13 +396,9 @@ impl Stream {
             header_line_buffer,
             ..
         } = self;
-        let mut reader: PooledReader<'_> = PooledReader::new(stream, buffer);
-        if !seeded.is_empty() {
-            let target: &mut Vec<u8> = reader.get_mut_buffer();
-            let copy_len: usize = seeded.len().min(target.len());
-            target[..copy_len].copy_from_slice(&seeded[..copy_len]);
-            reader.set_end(copy_len);
-        }
+        let mut reader: PooledReader<'_> = PooledReader::new(stream, buffer, buffer_size);
+        reader.set_start(start);
+        reader.set_end(end);
         line_buffer.clear();
         AsyncBufReadExt::read_line(&mut reader, line_buffer).await?;
         let (method, path, version): (RequestMethod, &str, RequestVersion) =
@@ -428,15 +421,16 @@ impl Stream {
         let reader_start: usize = reader.get_start();
         let reader_end: usize = reader.get_end();
         let pending: Vec<u8> = if reader_start < reader_end {
-            reader.get_buffer()[reader_start..reader_end].to_vec()
+            mem::take(reader.get_mut_buffer())
         } else {
             Vec::new()
         };
         drop(reader);
-        let pending_len: usize = pending.len();
+        let pending_start: usize = if pending.is_empty() { 0 } else { reader_start };
+        let pending_end: usize = if pending.is_empty() { 0 } else { reader_end };
         self.set_leftover(pending);
-        self.set_leftover_start(0);
-        self.set_leftover_end(pending_len);
+        self.set_leftover_start(pending_start);
+        self.set_leftover_end(pending_end);
         Ok(())
     }
 

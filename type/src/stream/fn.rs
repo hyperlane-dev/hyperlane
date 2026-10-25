@@ -108,7 +108,7 @@ pub(crate) fn take_read_buffer(capacity: usize) -> Vec<u8> {
 ///
 /// - `Vec<u8>` - The buffer to recycle.
 pub(crate) fn return_read_buffer(buffer: Vec<u8>) {
-    if buffer.len() > MAX_POOLED_READ_BUFFER_SIZE {
+    if buffer.is_empty() || buffer.capacity() > MAX_POOLED_READ_BUFFER_SIZE {
         return;
     }
     READ_BUFFER_POOL.with(|pool: &RefCell<Vec<Vec<u8>>>| {

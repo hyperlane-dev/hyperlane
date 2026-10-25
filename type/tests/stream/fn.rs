@@ -136,3 +136,122 @@ async fn test_from_transport_keeps_pipelined_request_in_leftover() {
     let two: Request = stream.try_get_http_request().await.unwrap();
     assert_eq!(*two.get_path(), "/two");
 }
+
+#[tokio::test]
+async fn test_pipeline_reuses_read_ahead_allocation() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+    let raw: &[u8] = b"GET /one HTTP/1.1\r\nHost: localhost\r\n\r\nGET /two HTTP/1.1\r\nHost: localhost\r\n\r\nGET /three HTTP/1.1\r\nHost: localhost\r\n\r\n";
+    client.write_all(raw).await.unwrap();
+    let mut stream: Stream =
+        Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+    let mut request: Request = Request::default();
+    stream.try_fill_http_request(&mut request).await.unwrap();
+    assert_eq!(request.get_path(), "/one");
+    let allocation: *const u8 = stream.get_leftover().as_ptr();
+    let first_start: usize = stream.get_leftover_start();
+    assert!(first_start > 0);
+    stream.try_fill_http_request(&mut request).await.unwrap();
+    assert_eq!(request.get_path(), "/two");
+    assert_eq!(stream.get_leftover().as_ptr(), allocation);
+    assert!(stream.get_leftover_start() > first_start);
+    stream.try_fill_http_request(&mut request).await.unwrap();
+    assert_eq!(request.get_path(), "/three");
+    assert!(stream.get_leftover().is_empty());
+    assert_eq!(stream.get_leftover_start(), 0);
+    assert_eq!(stream.get_leftover_end(), 0);
+}
+
+#[tokio::test]
+async fn test_pipeline_spans_small_buffers_and_preserves_binary_bodies() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(32768);
+    let body: Vec<u8> = (0..=255).collect();
+    let mut raw: Vec<u8> = Vec::new();
+    for index in 0..32 {
+        raw.extend_from_slice(
+            format!(
+                "POST /item/{index} HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
+                body.len()
+            )
+            .as_bytes(),
+        );
+        raw.extend_from_slice(&body);
+    }
+    client.write_all(&raw).await.unwrap();
+    let mut config: RequestConfig = RequestConfig::default();
+    config.set_buffer_size(64);
+    let mut stream: Stream = Stream::from_transport(TestTransport::new(server), config, false);
+    let mut request: Request = Request::default();
+    for index in 0..32 {
+        stream.try_fill_http_request(&mut request).await.unwrap();
+        assert_eq!(request.get_path(), &format!("/item/{index}"));
+        assert_eq!(request.get_body(), &body);
+        assert_eq!(*request.get_method(), RequestMethod::Post);
+    }
+}
+
+#[tokio::test]
+async fn test_fragmented_pipeline_resumes_after_pending() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(32);
+    let writer: JoinHandle<()> = spawn(async move {
+        let raw: &[u8] = b"POST /one HTTP/1.1\r\nHost: localhost\r\nContent-Length: 6\r\n\r\none\xff\0\nGET /two HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        for chunk in raw.chunks(7) {
+            client.write_all(chunk).await.unwrap();
+            yield_now().await;
+        }
+    });
+    let mut config: RequestConfig = RequestConfig::default();
+    config.set_buffer_size(16);
+    let mut stream: Stream = Stream::from_transport(TestTransport::new(server), config, false);
+    let mut request: Request = Request::default();
+    stream.try_fill_http_request(&mut request).await.unwrap();
+    assert_eq!(request.get_path(), "/one");
+    assert_eq!(request.get_body(), b"one\xff\0\n");
+    stream.try_fill_http_request(&mut request).await.unwrap();
+    assert_eq!(request.get_path(), "/two");
+    assert!(request.get_body().is_empty());
+    writer.await.unwrap();
+}
+
+#[tokio::test]
+async fn test_idle_reader_resumes_after_buffer_is_recycled() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(128);
+    let writer: JoinHandle<()> = spawn(async move {
+        sleep(Duration::from_millis(10)).await;
+        client
+            .write_all(b"GET /wake HTTP/1.1\r\nHost: localhost\r\n\r\n")
+            .await
+            .unwrap();
+    });
+    let mut stream: Stream =
+        Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+    let request: Request = stream.try_get_http_request().await.unwrap();
+    assert_eq!(request.get_path(), "/wake");
+    writer.await.unwrap();
+}
+
+#[tokio::test]
+async fn test_partial_header_still_obeys_read_timeout() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(128);
+    client
+        .write_all(b"GET /timeout HTTP/1.1\r\nHo")
+        .await
+        .unwrap();
+    let mut config: RequestConfig = RequestConfig::default();
+    config.set_read_timeout_ms(10);
+    let mut stream: Stream = Stream::from_transport(TestTransport::new(server), config, false);
+    assert!(stream.try_get_http_request().await.is_err());
+}
+
+#[tokio::test]
+async fn test_truncated_body_is_rejected_after_buffer_is_drained() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(128);
+    client
+        .write_all(b"POST /short HTTP/1.1\r\nHost: localhost\r\nContent-Length: 16\r\n\r\nshort")
+        .await
+        .unwrap();
+    client.shutdown().await.unwrap();
+    let mut config: RequestConfig = RequestConfig::default();
+    config.set_buffer_size(16);
+    let mut stream: Stream = Stream::from_transport(TestTransport::new(server), config, false);
+    assert!(stream.try_get_http_request().await.is_err());
+}
