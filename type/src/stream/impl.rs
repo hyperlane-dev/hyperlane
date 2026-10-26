@@ -299,6 +299,7 @@ impl Stream {
             leftover_end: 0,
             line_buffer: String::with_capacity(REQUEST_LINE_BUFFER_CAPACITY),
             header_line_buffer: String::with_capacity(HEADER_LINE_BUFFER_CAPACITY),
+            websocket_state: None,
         }
     }
 
@@ -496,15 +497,23 @@ impl Stream {
     /// - `Result<RequestBody, RequestError>` - The parsed WebSocket request or an error.
     pub async fn try_get_websocket_request(&mut self) -> Result<RequestBody, RequestError> {
         if self.get_closed() {
-            return Err(RequestError::ServerClosedConnection(HttpStatus::BadRequest));
+            return self.reset_websocket_state_on_error(Err(RequestError::ServerClosedConnection(
+                HttpStatus::BadRequest,
+            )));
         }
         let config: RequestConfig = *self.get_request_config();
-        let buffer_size: usize = config.get_buffer_size();
         let read_timeout_ms: u64 = config.get_read_timeout_ms();
-        let mut dynamic_buffer: Vec<u8> = Vec::with_capacity(buffer_size);
-        let mut temp_buffer: Vec<u8> = vec![0; buffer_size];
-        let mut full_frame: Vec<u8> = Vec::new();
-        let mut is_client_response: bool = false;
+        if self.get_mut_websocket_state().is_none() {
+            let mut buffer: Vec<u8> = mem::take(self.get_mut_leftover());
+            buffer.truncate(self.get_leftover_end());
+            buffer.drain(..self.get_leftover_start());
+            self.set_leftover_start(0);
+            self.set_leftover_end(0);
+            self.set_websocket_state(Some(Box::new(WebSocketReadState {
+                buffer,
+                ..WebSocketReadState::default()
+            })));
+        }
         let duration_opt: Option<Duration> =
             if read_timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
                 None
@@ -513,41 +522,130 @@ impl Stream {
                 Some(Duration::from_millis(adjusted_timeout_ms))
             };
         loop {
-            let len: usize = match self
-                .get_websocket_from_stream(&mut temp_buffer, duration_opt, &mut is_client_response)
-                .await
-            {
-                Ok(Some(len)) => len,
-                Ok(None) => continue,
-                Err(error) => return Err(error),
-            };
-            if len == 0 {
-                return Err(RequestError::IncompleteWebSocketFrame(
-                    HttpStatus::BadRequest,
+            let parsed: Result<Option<RequestBody>, RequestError> =
+                self.try_parse_websocket_request();
+            if let Some(body) = self.reset_websocket_state_on_error(parsed)? {
+                return Ok(body);
+            }
+            let read: Result<Option<usize>, RequestError> =
+                self.get_websocket_from_stream(duration_opt).await;
+            if matches!(self.reset_websocket_state_on_error(read)?, Some(0)) {
+                return self.reset_websocket_state_on_error(Err(
+                    RequestError::IncompleteWebSocketFrame(HttpStatus::BadRequest),
                 ));
             }
-            dynamic_buffer.extend_from_slice(&temp_buffer[..len]);
-            while let Some((frame, consumed)) = WebSocketFrame::decode_ws_frame(&dynamic_buffer) {
-                is_client_response = true;
-                dynamic_buffer.drain(0..consumed);
-                match frame.get_opcode() {
-                    WebSocketOpcode::Close => {
-                        return Err(RequestError::ClientClosedConnection(HttpStatus::BadRequest));
+        }
+    }
+
+    /// Discards cached parsing state only after an operation completes with an error.
+    ///
+    /// # Arguments
+    ///
+    /// - `Result<T, RequestError>` - The completed parsing or reading operation.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<T, RequestError>` - The unchanged result after releasing failed parsing state.
+    #[inline(always)]
+    fn reset_websocket_state_on_error<T>(
+        &mut self,
+        result: Result<T, RequestError>,
+    ) -> Result<T, RequestError> {
+        if result.is_err() {
+            drop(self.get_mut_websocket_state().take());
+        }
+        result
+    }
+
+    /// Parses buffered frames without discarding incomplete or subsequent input.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Option<RequestBody>, RequestError>` - A complete message, pending input, or a protocol error.
+    fn try_parse_websocket_request(&mut self) -> Result<Option<RequestBody>, RequestError> {
+        let state: &mut WebSocketReadState = self.get_mut_websocket_state().as_deref_mut().ok_or(
+            RequestError::IncompleteWebSocketFrame(HttpStatus::BadRequest),
+        )?;
+        let WebSocketReadState {
+            buffer,
+            full_frame,
+            is_client_response,
+        }: &mut WebSocketReadState = state;
+        while let Some((frame, consumed)) = WebSocketFrame::decode_ws_frame(&buffer[..]) {
+            *is_client_response = true;
+            buffer.drain(..consumed);
+            if buffer.is_empty() {
+                let mut recycled: Vec<u8> = mem::take(buffer);
+                recycled.resize(recycled.capacity().min(MAX_POOLED_READ_BUFFER_SIZE), 0);
+                return_read_buffer(recycled);
+            }
+            match frame.get_opcode() {
+                WebSocketOpcode::Close => {
+                    return Err(RequestError::ClientClosedConnection(HttpStatus::BadRequest));
+                }
+                WebSocketOpcode::Ping | WebSocketOpcode::Pong => continue,
+                WebSocketOpcode::Text | WebSocketOpcode::Binary => {
+                    if frame.get_fin() && full_frame.is_empty() {
+                        let WebSocketFrame { payload_data, .. }: WebSocketFrame = frame;
+                        return Ok(Some(payload_data));
                     }
-                    WebSocketOpcode::Ping | WebSocketOpcode::Pong => continue,
-                    WebSocketOpcode::Text | WebSocketOpcode::Binary => {
-                        match frame.build_full_frame(&mut full_frame) {
-                            Ok(Some(result)) => return Ok(result),
-                            Ok(None) => continue,
-                            Err(error) => return Err(error),
-                        }
-                    }
-                    _ => {
-                        return Err(RequestError::WebSocketOpcodeUnsupported(
-                            HttpStatus::NotImplemented,
-                        ));
+                    if let Some(body) = frame.build_full_frame(full_frame)? {
+                        return Ok(Some(body));
                     }
                 }
+                _ => {
+                    return Err(RequestError::WebSocketOpcodeUnsupported(
+                        HttpStatus::NotImplemented,
+                    ));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    /// Polls a WebSocket read using a buffer retained only while data is ready.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut Context<'_>` - The registered task context.
+    ///
+    /// # Returns
+    ///
+    /// - `Poll<io::Result<usize>>` - The bytes appended to persistent parsing state.
+    fn poll_websocket_read(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
+        let capacity: usize = self.get_request_config().get_buffer_size();
+        let mut temporary: Vec<u8> = take_read_buffer(capacity);
+        let mut read_buffer: ReadBuf<'_> = ReadBuf::new(&mut temporary[..capacity]);
+        match Pin::new(&mut **self.get_mut_stream()).poll_read(cx, &mut read_buffer) {
+            Poll::Ready(Ok(())) => {
+                let len: usize = read_buffer.filled().len();
+                temporary.truncate(len);
+                let state: &mut WebSocketReadState =
+                    match self.get_mut_websocket_state().as_deref_mut() {
+                        Some(state) => state,
+                        None => {
+                            return_read_buffer(temporary);
+                            return Poll::Ready(Err(io::Error::new(
+                                io::ErrorKind::InvalidData,
+                                WEBSOCKET_STATE_ERROR,
+                            )));
+                        }
+                    };
+                if state.get_buffer().is_empty() {
+                    mem::swap(state.get_mut_buffer(), &mut temporary);
+                } else {
+                    state.get_mut_buffer().extend_from_slice(&temporary);
+                }
+                return_read_buffer(temporary);
+                Poll::Ready(Ok(len))
+            }
+            Poll::Ready(Err(error)) => {
+                return_read_buffer(temporary);
+                Poll::Ready(Err(error))
+            }
+            Poll::Pending => {
+                return_read_buffer(temporary);
+                Poll::Pending
             }
         }
     }
@@ -556,40 +654,41 @@ impl Stream {
     ///
     /// # Arguments
     ///
-    /// - `&mut [u8]` - The buffer to read data into.
-    /// - `Option<Duration>` - The optional timeout duration. If Some, timeout is applied; if None, no timeout.
-    /// - `&mut bool` - Mutable reference to track if we got a client response.
+    /// - `Option<Duration>` - The timeout interval, or no timeout.
     ///
     /// # Returns
     ///
-    /// - `Result<Option<usize>, RequestError>` - The number of bytes read, None for timeout/ping, or an error.
+    /// - `Result<Option<usize>, RequestError>` - Bytes read, a heartbeat, or an error.
     pub(crate) async fn get_websocket_from_stream(
         &mut self,
-        buffer: &mut [u8],
         duration_opt: Option<Duration>,
-        is_client_response: &mut bool,
     ) -> Result<Option<usize>, RequestError> {
-        let stream: &mut Box<dyn Transport> = self.get_mut_stream();
         if let Some(duration) = duration_opt {
-            return match timeout(duration, stream.read(buffer)).await {
-                Ok(result) => match result {
-                    Ok(len) => Ok(Some(len)),
-                    Err(error) => Err(error.into()),
-                },
+            return match timeout(
+                duration,
+                future::poll_fn(|cx: &mut Context<'_>| self.poll_websocket_read(cx)),
+            )
+            .await
+            {
+                Ok(result) => result.map(Some).map_err(Into::into),
                 Err(error) => {
-                    if !*is_client_response {
+                    let state: &mut WebSocketReadState =
+                        self.get_mut_websocket_state().as_deref_mut().ok_or(
+                            RequestError::IncompleteWebSocketFrame(HttpStatus::BadRequest),
+                        )?;
+                    if !state.get_is_client_response() {
                         return Err(error.into());
                     }
-                    *is_client_response = false;
+                    state.set_is_client_response(false);
                     self.try_send(&PING_FRAME).await?;
                     Ok(None)
                 }
             };
         }
-        match stream.read(buffer).await {
-            Ok(len) => Ok(Some(len)),
-            Err(error) => Err(error.into()),
-        }
+        future::poll_fn(|cx: &mut Context<'_>| self.poll_websocket_read(cx))
+            .await
+            .map(Some)
+            .map_err(Into::into)
     }
 
     /// Sends data over the stream.

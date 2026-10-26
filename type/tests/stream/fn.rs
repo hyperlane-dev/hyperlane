@@ -362,3 +362,130 @@ fn string_pool_returns_the_same_allocation() {
     assert_eq!(recycled.as_ptr(), address);
     assert!(take_recycled_string().is_none());
 }
+
+#[tokio::test]
+async fn websocket_discards_fragment_state_after_close_error() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(1024);
+    let mut stream: Stream =
+        Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+    let mut fragment: Vec<u8> = WebSocketFrame::create_frame_list(b"discarded").concat();
+    fragment[0] &= 0x7f;
+    fragment.extend_from_slice(&[0x88, 0]);
+    client.write_all(&fragment).await.unwrap();
+    assert!(
+        timeout(Duration::from_secs(1), stream.try_get_websocket_request())
+            .await
+            .unwrap()
+            .is_err()
+    );
+    client
+        .write_all(&WebSocketFrame::create_frame_list(b"accepted").concat())
+        .await
+        .unwrap();
+    assert_eq!(
+        timeout(Duration::from_secs(1), stream.try_get_websocket_request())
+            .await
+            .unwrap()
+            .unwrap(),
+        b"accepted"
+    );
+}
+
+#[tokio::test]
+async fn websocket_retains_partial_frame_when_read_is_cancelled() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(1024);
+    let mut stream: Stream =
+        Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+    let frame: Vec<u8> = WebSocketFrame::create_frame_list(b"partial-message").concat();
+    client.write_all(&frame[..3]).await.unwrap();
+    let mut reading: Pin<Box<dyn Future<Output = Result<RequestBody, RequestError>> + '_>> =
+        Box::pin(stream.try_get_websocket_request());
+    let pending: bool =
+        poll_fn(|cx: &mut Context<'_>| Poll::Ready(reading.as_mut().poll(cx).is_pending())).await;
+    assert!(pending);
+    drop(reading);
+    client.write_all(&frame[3..]).await.unwrap();
+    assert_eq!(
+        timeout(Duration::from_secs(1), stream.try_get_websocket_request())
+            .await
+            .unwrap()
+            .unwrap(),
+        b"partial-message"
+    );
+}
+
+#[tokio::test]
+async fn websocket_preserves_multiple_frames_read_together() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(1024);
+    let mut stream: Stream =
+        Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+    let first: Vec<u8> = WebSocketFrame::create_frame_list(b"first").concat();
+    let second: Vec<u8> = WebSocketFrame::create_frame_list(b"second").concat();
+    client.write_all(&[first, second].concat()).await.unwrap();
+    for expected in [b"first".as_slice(), b"second".as_slice()] {
+        assert_eq!(
+            timeout(Duration::from_secs(1), stream.try_get_websocket_request())
+                .await
+                .unwrap()
+                .unwrap(),
+            expected
+        );
+    }
+}
+
+#[tokio::test]
+async fn websocket_idle_read_returns_storage_to_pool() {
+    READ_BUFFER_POOL.with(|pool: &RefCell<Vec<Vec<u8>>>| pool.borrow_mut().clear());
+    let (_client, server): (DuplexStream, DuplexStream) = duplex(1024);
+    let mut stream: Stream =
+        Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+    let mut reading: Pin<Box<dyn Future<Output = Result<RequestBody, RequestError>> + '_>> =
+        Box::pin(stream.try_get_websocket_request());
+    assert!(
+        poll_fn(|cx: &mut Context<'_>| { Poll::Ready(reading.as_mut().poll(cx).is_pending()) })
+            .await
+    );
+    assert_eq!(
+        READ_BUFFER_POOL.with(|pool: &RefCell<Vec<Vec<u8>>>| pool.borrow().len()),
+        1
+    );
+    drop(reading);
+    READ_BUFFER_POOL.with(|pool: &RefCell<Vec<Vec<u8>>>| pool.borrow_mut().clear());
+}
+
+#[tokio::test]
+async fn websocket_reads_frame_buffered_after_http_upgrade() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+    let mut stream: Stream =
+        Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+    let mut bytes: Vec<u8> = b"GET /ws HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec();
+    bytes.extend(WebSocketFrame::create_frame_list(b"upgrade-data").concat());
+    client.write_all(&bytes).await.unwrap();
+    assert_eq!(
+        stream.try_get_http_request().await.unwrap().get_path(),
+        "/ws"
+    );
+    assert_eq!(
+        timeout(Duration::from_secs(1), stream.try_get_websocket_request())
+            .await
+            .unwrap()
+            .unwrap(),
+        b"upgrade-data"
+    );
+}
+
+#[tokio::test]
+async fn websocket_rejects_half_closed_partial_frame_without_hanging() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(1024);
+    let mut stream: Stream =
+        Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+    let frame: Vec<u8> = WebSocketFrame::create_frame_list(b"truncated").concat();
+    client.write_all(&frame[..3]).await.unwrap();
+    client.shutdown().await.unwrap();
+    assert!(
+        timeout(Duration::from_secs(1), stream.try_get_websocket_request())
+            .await
+            .unwrap()
+            .is_err()
+    );
+}
