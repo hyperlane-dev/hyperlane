@@ -570,7 +570,7 @@ impl WebSocketFrame {
         let payload_data: &[u8] = self.get_payload_data();
         full_frame.extend_from_slice(payload_data);
         if self.get_fin() {
-            return Ok(Some(full_frame.clone()));
+            return Ok(Some(mem::take(full_frame)));
         }
         Ok(None)
     }

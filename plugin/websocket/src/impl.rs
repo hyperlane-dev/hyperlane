@@ -523,6 +523,7 @@ where
     }
 }
 
+/// Inherent implementation of [`WebSocket`].
 impl WebSocket {
     /// Creates a new WebSocket instance.
     ///
@@ -769,17 +770,16 @@ impl WebSocket {
     where
         B: BroadcastTypeTrait,
     {
-        let capacity: Capacity = websocket_config.get_capacity();
-        let broadcast_type: BroadcastType<B> = websocket_config.get_broadcast_type().clone();
-        let connected_hook: ServerHookHandler = websocket_config.get_connected_hook().clone();
-        let sended_hook: ServerHookHandler = websocket_config.get_sended_hook().clone();
-        let request_hook: ServerHookHandler = websocket_config.get_request_hook().clone();
-        let closed_hook: ServerHookHandler = websocket_config.get_closed_hook().clone();
         let WebSocketConfig {
             stream,
             context: ctx,
-            ..
-        } = websocket_config;
+            capacity,
+            broadcast_type,
+            connected_hook,
+            request_hook,
+            sended_hook,
+            closed_hook,
+        }: WebSocketConfig<'_, B> = websocket_config;
         let mut receiver: Receiver<Vec<u8>> = match &broadcast_type {
             BroadcastType::PointToPoint(key1, key2) => self.point_to_point(key1, key2, capacity),
             BroadcastType::PointToGroup(key) => self.point_to_group(key, capacity),

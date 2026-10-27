@@ -47,6 +47,31 @@ pub struct Stream {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) header_line_buffer: String,
+    /// Lazily allocated WebSocket parsing state retained across cancelled reads.
+    #[get(pub(super), type(ref))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) websocket_state: Option<Box<WebSocketReadState>>,
+}
+
+/// Partial WebSocket input that must survive selection of an outbound message.
+#[derive(Clone, Data, Debug, Default)]
+pub(super) struct WebSocketReadState {
+    /// Wire bytes not yet consumed by a complete frame.
+    #[get(pub(super), type(ref))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) buffer: Vec<u8>,
+    /// Payload accumulated from a message spanning multiple frames.
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) full_frame: Vec<u8>,
+    /// Whether a peer response has arrived since the last heartbeat.
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) is_client_response: bool,
 }
 
 /// A buffered reader over a transport with a reusable read buffer.
