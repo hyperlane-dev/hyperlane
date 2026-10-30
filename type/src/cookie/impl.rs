@@ -36,6 +36,12 @@ impl CookieBuilder {
     /// This method takes a `Set-Cookie` header string and extracts the various
     /// attributes of a cookie, populating a `CookieBuilder` instance.
     ///
+    /// A name that is not a token and a value that carries a control byte are
+    /// refused, because RFC 6265 Section 4.1.1 admits neither in a cookie
+    /// pair, and a name that carries a separator would turn the rest of the
+    /// name into an attribute. An attribute whose value carries a control byte
+    /// or a semicolon is skipped rather than kept, for the same reason.
+    ///
     /// # Arguments
     ///
     /// - `C` - The `Set-Cookie` header string to parse, which requires the `AsRef<str>` bound.
@@ -55,10 +61,14 @@ impl CookieBuilder {
         if let Some(name_value_pair) = parts.first() {
             let name_value_pair: &str = name_value_pair.trim();
             if let Some((name, value)) = name_value_pair.split_once(EQUAL) {
-                cookie_builder.name = name.trim().to_string();
-                cookie_builder.value = value.trim().to_string();
-            } else if !name_value_pair.is_empty() {
-                cookie_builder.name = name_value_pair.to_string();
+                let name: &str = name.trim();
+                let value: &str = value.trim();
+                if is_cookie_name_valid(name) && !value.bytes().any(is_control_byte) {
+                    cookie_builder.name = name.to_owned();
+                    cookie_builder.value = value.to_owned();
+                }
+            } else if is_cookie_name_valid(name_value_pair) {
+                cookie_builder.name = name_value_pair.to_owned();
                 cookie_builder.value = String::new();
             }
         }
@@ -70,6 +80,9 @@ impl CookieBuilder {
             if let Some((key, value)) = part.split_once(EQUAL) {
                 let key_lowercase: String = key.trim().to_lowercase();
                 let value: String = value.trim().to_string();
+                if !is_cookie_attribute_valid(&value) {
+                    continue;
+                }
                 match key_lowercase.as_str() {
                     COOKIE_EXPIRES_LOWERCASE => {
                         cookie_builder.set_expires(value);
@@ -252,12 +265,60 @@ impl CookieBuilder {
 
     /// Builds the cookie string according to the `Set-Cookie` header format.
     ///
+    /// The name, the value and every attribute are checked against the
+    /// grammar of RFC 6265 Section 4.1.1 first, so a value that carries a
+    /// control byte cannot end the header line and turn the rest of the
+    /// cookie into a second header. A cookie that fails the check is not
+    /// emitted at all, which is safer than emitting a truncated one.
+    ///
     /// # Returns
     ///
     /// - `String` - A formatted cookie string ready to be sent in a `Set-Cookie` header.
     pub fn build(&self) -> String {
+        self.try_build().unwrap_or_default()
+    }
+
+    /// Builds the cookie string, reporting why a cookie may not be built.
+    ///
+    /// The name, the value and every attribute are checked against the
+    /// grammar of RFC 6265 Section 4.1.1. A name that is not a token would
+    /// end early and turn the rest of it into an attribute, a value that
+    /// carries a control byte would end the header line, and an attribute
+    /// that carries a semicolon would start another attribute.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<String, CookieError>` - The formatted cookie string, or the
+    ///   reason the cookie cannot be represented.
+    pub fn try_build(&self) -> Result<String, CookieError> {
         if self.get_name().is_empty() {
-            return String::new();
+            return Err(CookieError::InvalidName);
+        }
+        if !is_cookie_name_valid(self.get_name()) {
+            return Err(CookieError::InvalidName);
+        }
+        if !is_cookie_value_valid(self.get_value()) {
+            return Err(CookieError::InvalidValue);
+        }
+        if let Some(expires_value) = self.try_get_expires()
+            && !is_cookie_attribute_valid(expires_value)
+        {
+            return Err(CookieError::InvalidAttribute);
+        }
+        if let Some(domain_value) = self.try_get_domain()
+            && !is_cookie_attribute_valid(domain_value)
+        {
+            return Err(CookieError::InvalidAttribute);
+        }
+        if let Some(path_value) = self.try_get_path()
+            && !is_cookie_attribute_valid(path_value)
+        {
+            return Err(CookieError::InvalidAttribute);
+        }
+        if let Some(same_site_value) = self.try_get_same_site()
+            && !is_cookie_attribute_valid(same_site_value)
+        {
+            return Err(CookieError::InvalidAttribute);
         }
         let mut cookie_string: String = format!("{}={}", self.get_name(), self.get_value());
         if let Some(expires_value) = self.try_get_expires() {
@@ -286,7 +347,7 @@ impl CookieBuilder {
             cookie_string.push_str(COOKIE_SAME_SITE_ATTRIBUTE_LOWERCASE);
             cookie_string.push_str(same_site_value);
         }
-        cookie_string
+        Ok(cookie_string)
     }
 }
 
@@ -296,6 +357,11 @@ impl Cookie {
     ///
     /// This method takes a `Cookie` header string (typically from a `Cookie` request header)
     /// and parses it into a map of cookie names to their values.
+    ///
+    /// A pair whose name is not a token and a pair whose value carries a
+    /// control byte are skipped, because RFC 6265 Section 4.1.1 admits
+    /// neither, and a name that carries a separator would let the rest of
+    /// the name be read as part of the value.
     ///
     /// # Arguments
     ///
@@ -320,13 +386,13 @@ impl Cookie {
                 continue;
             }
             if let Some((name, value)) = part.split_once(EQUAL) {
-                let name: String = name.trim().to_string();
-                let value: String = value.trim().to_string();
-                if !name.is_empty() {
-                    cookies.insert(name, value);
+                let name: &str = name.trim();
+                let value: &str = value.trim();
+                if is_cookie_name_valid(name) && !value.bytes().any(is_control_byte) {
+                    cookies.insert(name.to_owned(), value.to_owned());
                 }
-            } else if !part.is_empty() {
-                cookies.insert(part.to_string(), String::new());
+            } else if is_cookie_name_valid(part) {
+                cookies.insert(part.to_owned(), String::new());
             }
         }
         cookies

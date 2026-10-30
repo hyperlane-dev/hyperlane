@@ -1,5 +1,460 @@
 use super::*;
 
+#[tokio::test]
+async fn test_http_request_rejects_transfer_encoding() {
+    for headers in [
+        "Transfer-Encoding: chunked\r\n",
+        "transfer-encoding: identity\r\n",
+        "TRANSFER-ENCODING: gzip, chunked\r\n",
+        "Transfer-Encoding: \r\n",
+        "Content-Length: 0\r\nTransfer-Encoding: chunked\r\n",
+        "Transfer-Encoding: chunked\r\nContent-Length: 0\r\n",
+    ] {
+        let raw: String = format!("POST / HTTP/1.1\r\nHost: localhost\r\n{headers}\r\n0\r\n\r\n");
+        let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+        client.write_all(raw.as_bytes()).await.unwrap();
+        client.shutdown().await.unwrap();
+        let mut stream: Stream =
+            Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+        assert!(
+            matches!(
+                stream.try_get_http_request().await,
+                Err(RequestError::HttpRead(HttpStatus::BadRequest))
+            ),
+            "accepted invalid request: {raw:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_http_request_rejects_duplicate_content_length() {
+    for headers in [
+        "Content-Length: 5\r\nContent-Length: 5\r\n",
+        "Content-Length: 0\r\ncontent-length: 5\r\n",
+        "content-length: 5\r\nCONTENT-LENGTH: 0\r\n",
+        "Content-Length: 0\r\nContent-Length: 0\r\n",
+    ] {
+        let raw: String = format!("POST / HTTP/1.1\r\nHost: localhost\r\n{headers}\r\nhello");
+        let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+        client.write_all(raw.as_bytes()).await.unwrap();
+        client.shutdown().await.unwrap();
+        let mut stream: Stream =
+            Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+        assert!(
+            matches!(
+                stream.try_get_http_request().await,
+                Err(RequestError::InvalidContentLength(HttpStatus::BadRequest))
+            ),
+            "accepted invalid request: {raw:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_http_request_rejects_content_length_list() {
+    for value in ["5, 5", "5,5", "0,0", "5, 0"] {
+        let raw: String =
+            format!("POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: {value}\r\n\r\nhello");
+        let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+        client.write_all(raw.as_bytes()).await.unwrap();
+        client.shutdown().await.unwrap();
+        let mut stream: Stream =
+            Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+        assert!(
+            matches!(
+                stream.try_get_http_request().await,
+                Err(RequestError::InvalidContentLength(HttpStatus::BadRequest))
+            ),
+            "accepted invalid request: {raw:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_http_request_rejects_non_decimal_content_length() {
+    for value in ["5x", "+5", "-5", "0x5", "", "5 5", "5\t5", "５", "٥"] {
+        let raw: String =
+            format!("POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: {value}\r\n\r\nhello");
+        let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+        client.write_all(raw.as_bytes()).await.unwrap();
+        client.shutdown().await.unwrap();
+        let mut stream: Stream =
+            Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+        assert!(
+            matches!(
+                stream.try_get_http_request().await,
+                Err(RequestError::InvalidContentLength(HttpStatus::BadRequest))
+            ),
+            "accepted invalid request: {raw:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_http_request_rejects_folded_headers() {
+    for folded in [
+        " continuation",
+        "\tcontinuation",
+        " Content-Length: 0",
+        "\tTransfer-Encoding: chunked",
+        " ",
+        "\t",
+    ] {
+        let raw: String =
+            format!("POST / HTTP/1.1\r\nHost: localhost\r\nX-Test: value\r\n{folded}\r\n\r\n");
+        let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+        client.write_all(raw.as_bytes()).await.unwrap();
+        client.shutdown().await.unwrap();
+        let mut stream: Stream =
+            Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+        assert!(
+            matches!(
+                stream.try_get_http_request().await,
+                Err(RequestError::HttpRead(HttpStatus::BadRequest))
+            ),
+            "accepted invalid request: {raw:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_http_request_rejects_whitespace_before_colon() {
+    for header in [
+        "Foo : bar",
+        "Foo\t: bar",
+        "Host : localhost",
+        "Content-Length : 0",
+        "Transfer-Encoding : chunked",
+    ] {
+        let raw: String = format!("GET / HTTP/1.1\r\nHost: localhost\r\n{header}\r\n\r\n");
+        let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+        client.write_all(raw.as_bytes()).await.unwrap();
+        client.shutdown().await.unwrap();
+        let mut stream: Stream =
+            Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+        assert!(
+            matches!(
+                stream.try_get_http_request().await,
+                Err(RequestError::HttpRead(HttpStatus::BadRequest))
+            ),
+            "accepted invalid request: {raw:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_http_request_rejects_control_bytes_in_header_values() {
+    for control in (0_u8..=31).chain([127]) {
+        if control == b'\t' {
+            continue;
+        }
+        let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+        let mut raw: Vec<u8> = b"GET / HTTP/1.1\r\nHost: localhost\r\nX-Test: before".to_vec();
+        raw.push(control);
+        raw.extend_from_slice(b"after\r\n\r\n");
+        client.write_all(&raw).await.unwrap();
+        client.shutdown().await.unwrap();
+        let mut stream: Stream =
+            Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+        assert!(
+            matches!(
+                stream.try_get_http_request().await,
+                Err(RequestError::HttpRead(HttpStatus::BadRequest))
+            ),
+            "accepted control byte {control}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_http_request_rejects_control_bytes_at_value_edges() {
+    for value in [
+        "\x0bvalue",
+        "value\x0b",
+        "\x0cvalue",
+        "value\x0c",
+        "value\r",
+        "\0",
+    ] {
+        let raw: String = format!("GET / HTTP/1.1\r\nHost: localhost\r\nX-Test: {value}\r\n\r\n");
+        let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+        client.write_all(raw.as_bytes()).await.unwrap();
+        client.shutdown().await.unwrap();
+        let mut stream: Stream =
+            Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+        assert!(
+            matches!(
+                stream.try_get_http_request().await,
+                Err(RequestError::HttpRead(HttpStatus::BadRequest))
+            ),
+            "accepted invalid request: {raw:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_http_request_rejects_duplicate_host() {
+    for headers in [
+        "Host: localhost\r\nHost: localhost\r\n",
+        "Host: localhost\r\nhost: attacker.test\r\n",
+        "HOST: \r\nhOsT: attacker.test\r\n",
+    ] {
+        let raw: String = format!("GET / HTTP/1.1\r\n{headers}\r\n");
+        let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+        client.write_all(raw.as_bytes()).await.unwrap();
+        client.shutdown().await.unwrap();
+        let mut stream: Stream =
+            Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+        assert!(
+            matches!(
+                stream.try_get_http_request().await,
+                Err(RequestError::HttpRead(HttpStatus::BadRequest))
+            ),
+            "accepted invalid request: {raw:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_http_request_rejects_http_1_1_without_host() {
+    for headers in ["", "X-Test: value\r\n", "Content-Length: 0\r\n"] {
+        let raw: String = format!("GET / HTTP/1.1\r\n{headers}\r\n");
+        let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+        client.write_all(raw.as_bytes()).await.unwrap();
+        client.shutdown().await.unwrap();
+        let mut stream: Stream =
+            Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+        assert!(
+            matches!(
+                stream.try_get_http_request().await,
+                Err(RequestError::HttpRead(HttpStatus::BadRequest))
+            ),
+            "accepted invalid request: {raw:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_http_request_rejects_request_line_field_count() {
+    for line in [
+        "GET / HTTP/1.1 EXTRA",
+        "GET / HTTP/1.1 EXTRA MORE",
+        "GET /",
+        "GET",
+        "",
+    ] {
+        let raw: String = format!("{line}\r\nHost: localhost\r\n\r\n");
+        let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+        client.write_all(raw.as_bytes()).await.unwrap();
+        client.shutdown().await.unwrap();
+        let mut stream: Stream =
+            Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+        assert!(
+            matches!(
+                stream.try_get_http_request().await,
+                Err(RequestError::HttpRequestPartsInsufficient(
+                    HttpStatus::BadRequest
+                ))
+            ),
+            "accepted invalid request: {raw:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_http_request_rejects_unknown_version() {
+    for version in ["HTTP/9.9", "HTTP/abc", "HTTP/1.2"] {
+        let raw: String = format!("GET / {version}\r\nHost: localhost\r\n\r\n");
+        let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+        client.write_all(raw.as_bytes()).await.unwrap();
+        client.shutdown().await.unwrap();
+        let mut stream: Stream =
+            Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+        assert!(
+            matches!(
+                stream.try_get_http_request().await,
+                Err(RequestError::HttpRequestPartsInsufficient(
+                    HttpStatus::BadRequest
+                ))
+            ),
+            "accepted invalid request: {raw:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_http_request_rejects_content_length_overflow() {
+    for value in [
+        "18446744073709551616",
+        "9999999999999999999999999999999999999999",
+    ] {
+        let raw: String =
+            format!("POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: {value}\r\n\r\n");
+        let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+        client.write_all(raw.as_bytes()).await.unwrap();
+        client.shutdown().await.unwrap();
+        let mut stream: Stream =
+            Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+        assert!(
+            matches!(
+                stream.try_get_http_request().await,
+                Err(RequestError::InvalidContentLength(HttpStatus::BadRequest))
+            ),
+            "accepted invalid request: {raw:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_http_request_rejects_malformed_header_name() {
+    for header in [
+        "No-Colon",
+        ": value",
+        "Bad(Name): value",
+        "Bad\x7fName: value",
+    ] {
+        let raw: String = format!("GET / HTTP/1.1\r\nHost: localhost\r\n{header}\r\n\r\n");
+        let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+        client.write_all(raw.as_bytes()).await.unwrap();
+        client.shutdown().await.unwrap();
+        let mut stream: Stream =
+            Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+        assert!(
+            matches!(
+                stream.try_get_http_request().await,
+                Err(RequestError::HttpRead(HttpStatus::BadRequest))
+            ),
+            "accepted invalid request: {raw:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_http_request_accepts_http_1_0_without_host() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+    client
+        .write_all(b"GET /legacy HTTP/1.0\r\n\r\n")
+        .await
+        .unwrap();
+    let mut stream: Stream =
+        Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+    let request: Request = stream.try_get_http_request().await.unwrap();
+    assert_eq!(*request.get_version(), RequestVersion::Http1_0);
+    assert_eq!(request.get_path(), "/legacy");
+    assert!(request.get_host().is_empty());
+}
+
+#[tokio::test]
+async fn test_http_request_accepts_decimal_content_length_with_optional_whitespace() {
+    for value in ["5 ", "\t0005\t "] {
+        let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+        let raw: String = format!(
+            "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: {value}\r\n\r\nhelloGET /next HTTP/1.1\r\nHost: localhost\r\n\r\n"
+        );
+        client.write_all(raw.as_bytes()).await.unwrap();
+        let mut stream: Stream =
+            Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+        let first: Request = stream.try_get_http_request().await.unwrap();
+        assert_eq!(first.get_body(), b"hello");
+        let second: Request = stream.try_get_http_request().await.unwrap();
+        assert_eq!(second.get_path(), "/next");
+        assert!(second.get_body().is_empty());
+    }
+}
+
+#[tokio::test]
+async fn test_http_request_preserves_repeated_non_framing_headers_and_tabs() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+    client.write_all(b"GET / HTTP/1.1\r\nHost: localhost\r\nX-Test: before\tafter\r\nSet-Cookie: one=1\r\nSet-Cookie: two=2\r\n\r\n").await.unwrap();
+    let mut stream: Stream =
+        Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+    let request: Request = stream.try_get_http_request().await.unwrap();
+    let values: &VecDeque<String> = request.get_headers().get("set-cookie").unwrap();
+    assert_eq!(values.len(), 2);
+    assert_eq!(values.front().unwrap(), "one=1");
+    assert_eq!(values.back().unwrap(), "two=2");
+    assert_eq!(
+        request
+            .get_headers()
+            .get("x-test")
+            .unwrap()
+            .front()
+            .unwrap(),
+        "before\tafter"
+    );
+}
+
+#[tokio::test]
+async fn test_http_request_requires_host_after_http_1_0_pipeline() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+    client
+        .write_all(b"GET /legacy HTTP/1.0\r\n\r\nGET /new HTTP/1.1\r\n\r\n")
+        .await
+        .unwrap();
+    let mut stream: Stream =
+        Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+    let mut request: Request = Request::default();
+    stream.try_fill_http_request(&mut request).await.unwrap();
+    assert_eq!(*request.get_version(), RequestVersion::Http1_0);
+    assert!(matches!(
+        stream.try_fill_http_request(&mut request).await,
+        Err(RequestError::HttpRead(HttpStatus::BadRequest))
+    ));
+}
+
+#[tokio::test]
+async fn test_http_request_allows_http_1_0_after_http_1_1_pipeline() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+    client
+        .write_all(b"GET /new HTTP/1.1\r\nHost: localhost\r\n\r\nGET /legacy HTTP/1.0\r\n\r\n")
+        .await
+        .unwrap();
+    let mut stream: Stream =
+        Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+    let mut request: Request = Request::default();
+    stream.try_fill_http_request(&mut request).await.unwrap();
+    assert_eq!(*request.get_version(), RequestVersion::Http1_1);
+    stream.try_fill_http_request(&mut request).await.unwrap();
+    assert_eq!(*request.get_version(), RequestVersion::Http1_0);
+    assert!(request.get_host().is_empty());
+}
+
+#[tokio::test]
+async fn test_http_request_rejects_missing_host_after_keep_alive() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+    client
+        .write_all(b"GET /one HTTP/1.1\r\nHost: localhost\r\n\r\nGET /two HTTP/1.1\r\n\r\n")
+        .await
+        .unwrap();
+    let mut stream: Stream =
+        Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+    let mut request: Request = Request::default();
+    stream.try_fill_http_request(&mut request).await.unwrap();
+    assert_eq!(request.get_host(), "localhost");
+    assert!(matches!(
+        stream.try_fill_http_request(&mut request).await,
+        Err(RequestError::HttpRead(HttpStatus::BadRequest))
+    ));
+}
+
+#[tokio::test]
+async fn test_http_request_rejects_unterminated_header_section() {
+    for raw in [
+        b"GET / HTTP/1.1\r\nHost: localhost\r\n".as_slice(),
+        b"GET / HTTP/1.1\r\nHost: localhost".as_slice(),
+    ] {
+        let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+        client.write_all(raw).await.unwrap();
+        client.shutdown().await.unwrap();
+        let mut stream: Stream =
+            Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+        assert!(matches!(
+            stream.try_get_http_request().await,
+            Err(RequestError::HttpRead(HttpStatus::BadRequest))
+        ));
+    }
+}
+
 #[test]
 fn test_socket_host_type_alias() {
     let socket_host: SocketHost = "127.0.0.1".parse().unwrap();

@@ -182,3 +182,47 @@ pub(crate) async fn h2_stream_until(port: u16, target: &str, needle: &str) -> (V
     driving.abort();
     (collected, matched)
 }
+
+pub(crate) async fn h2_request_with_host_header(
+    sender: &mut h2::client::SendRequest<Bytes>,
+    method: &str,
+    target: &str,
+    host: &str,
+) -> Result<Option<(u16, Vec<u8>)>, String> {
+    let request: http::Request<()> = http::Request::builder()
+        .method(method)
+        .uri(target)
+        .header(HOST, host)
+        .body(())
+        .map_err(|error: http::Error| format!("h2 request build failed: {error}"))?;
+    let (response, _send_stream) = sender
+        .send_request(request, true)
+        .map_err(|error: h2::Error| format!("h2 send_request failed: {error}"))?;
+    let response: http::Response<h2::RecvStream> =
+        match timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response).await {
+            Ok(Ok(response)) => response,
+            Ok(Err(_error)) => return Ok(None),
+            Err(_) => return Err("h2 response timed out".to_string()),
+        };
+    let status: u16 = response.status().as_u16();
+    let mut received: h2::RecvStream = response.into_body();
+    let mut collected: Vec<u8> = Vec::new();
+    let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
+    loop {
+        let remaining: Duration = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err("h2 body timed out".to_string());
+        }
+        match timeout(remaining, received.data()).await {
+            Ok(Some(Ok(chunk))) => {
+                let _released: Result<(), h2::Error> =
+                    received.flow_control().release_capacity(chunk.len());
+                collected.extend_from_slice(&chunk);
+            }
+            Ok(Some(Err(_))) => return Ok(None),
+            Ok(None) => break,
+            Err(_) => return Err("h2 body timed out".to_string()),
+        }
+    }
+    Ok(Some((status, collected)))
+}

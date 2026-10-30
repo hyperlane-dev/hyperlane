@@ -29,23 +29,74 @@ impl HttpRequest {
     ///
     /// - `Result<HttpUrlComponents, RequestError>` - The parsed URL components, or a `RequestError` when the URL is malformed.
     pub(crate) fn parse_url(&self) -> Result<HttpUrlComponents, RequestError> {
-        HttpUrlComponents::parse(self.get_url())
-            .map_err(|e: ::http_type::HttpUrlError| RequestError::Request(e.to_string()))
+        let (scheme, remainder): (&str, &str) = self
+            .get_url()
+            .split_once(SCHEME_SEPARATOR)
+            .ok_or(RequestError::InvalidUrlScheme(HttpStatus::BadRequest))?;
+        if !scheme.eq_ignore_ascii_case(HTTP_SCHEME)
+            && !scheme.eq_ignore_ascii_case(HTTPS_LOWERCASE)
+        {
+            return Err(RequestError::InvalidUrlScheme(HttpStatus::BadRequest));
+        }
+        let authority_end: usize = remainder
+            .find([URL_SLASH, URL_QUERY, URL_FRAGMENT])
+            .unwrap_or(remainder.len());
+        let authority: &str = &remainder[..authority_end];
+        if authority.is_empty()
+            || authority.contains(URL_BACKSLASH)
+            || authority
+                .bytes()
+                .any(|byte: u8| byte.is_ascii_control() || byte == SPACE_U8)
+        {
+            return Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest));
+        }
+        let target: &str = remainder[authority_end..]
+            .split(URL_FRAGMENT)
+            .next()
+            .unwrap_or_default();
+        let (path, query): (&str, &str) = target
+            .split_once(URL_QUERY)
+            .unwrap_or((target, Default::default()));
+        if path
+            .bytes()
+            .any(|byte: u8| byte.is_ascii_control() || byte == SPACE_U8)
+        {
+            return Err(RequestError::InvalidUrlPath(HttpStatus::BadRequest));
+        }
+        if query
+            .bytes()
+            .any(|byte: u8| byte.is_ascii_control() || byte == SPACE_U8)
+        {
+            return Err(RequestError::InvalidUrlQuery(HttpStatus::BadRequest));
+        }
+        let components: HttpUrlComponents = match HttpUrlComponents::parse(self.get_url()) {
+            Ok(value) => value,
+            Err(_) => return Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest)),
+        };
+        let host: String = components.get_host().unwrap_or_default();
+        if host.is_empty()
+            || host
+                .bytes()
+                .any(|byte: u8| byte.is_ascii_control() || byte == SPACE_U8)
+        {
+            return Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest));
+        }
+        Ok(components)
     }
 
     /// `Host` + path (including query string) for the request line.
     ///
     /// # Returns
     ///
-    /// - `String` - The request path, with the query string appended when present.
-    pub(crate) fn full_path(&self) -> String {
-        let url_obj: HttpUrlComponents = self.parse_url().unwrap_or_default();
+    /// - `Result<String, RequestError>` - The safe request target, or an error for an invalid URL.
+    pub(crate) fn full_path(&self) -> Result<String, RequestError> {
+        let url_obj: HttpUrlComponents = self.parse_url()?;
         let query: String = url_obj.get_query().unwrap_or_default();
         let path: String = url_obj.get_path().unwrap_or_default();
         if query.is_empty() {
-            path
+            Ok(path)
         } else {
-            format!("{}{}{}", path, QUERY, query)
+            Ok(format!("{}{}{}", path, QUERY, query))
         }
     }
 
@@ -71,14 +122,10 @@ impl HttpRequest {
     ///
     /// # Returns
     ///
-    /// - `Vec<u8>` - The wire-format request header bytes.
-    pub(crate) fn header_bytes(&self, body_length: usize) -> Vec<u8> {
+    /// - `Result<Vec<u8>, RequestError>` - The validated wire-format headers, or an error for invalid fields.
+    pub(crate) fn header_bytes(&self, body_length: usize) -> Result<Vec<u8>, RequestError> {
         let mut header: HashMap<String, String> = self.get_headers().clone();
-        let host_value: String = self
-            .parse_url()
-            .ok()
-            .and_then(|u: ::http_type::HttpUrlComponents| u.get_host().clone())
-            .unwrap_or_default();
+        let host_value: String = self.parse_url()?.get_host().unwrap_or_default();
         let content_length_value: String = body_length.to_string();
         if !Self::header_has_key(&header, HOST) {
             header.insert(HOST.to_ascii_lowercase(), host_value);
@@ -92,6 +139,7 @@ impl HttpRequest {
         if !Self::header_has_key(&header, USER_AGENT) {
             header.insert(USER_AGENT.to_ascii_lowercase(), APP_NAME.to_owned());
         }
+        validate_request_headers(&header)?;
         let estimated_size: usize = header
             .iter()
             .map(|(k, v): (&String, &String)| k.len() + v.len() + 4)
@@ -103,7 +151,7 @@ impl HttpRequest {
             out.extend_from_slice(value.as_bytes());
             out.extend_from_slice(HTTP_BR_BYTES);
         }
-        out
+        Ok(out)
     }
 
     /// Check whether a header map already contains a key, comparing case-insensitively.
@@ -117,8 +165,9 @@ impl HttpRequest {
     ///
     /// - `bool` - `true` when the map contains the key, `false` otherwise.
     fn header_has_key(header: &HashMap<String, String>, target_key: &str) -> bool {
-        let target: String = target_key.to_ascii_lowercase();
-        header.keys().any(|k: &String| k == &target)
+        header
+            .keys()
+            .any(|key: &String| key.eq_ignore_ascii_case(target_key))
     }
 
     /// Encode `self.body` according to the `Content-Type` header.
@@ -151,6 +200,7 @@ impl HttpRequest {
     /// - `RequestResult` - The parsed HTTP response, or a `RequestError` on failure.
     pub(crate) fn send_sync(&mut self) -> RequestResult {
         let url_obj: HttpUrlComponents = self.parse_url()?;
+        validate_request_headers(self.get_headers())?;
         let host: String = url_obj.get_host().clone().unwrap_or_default();
         let port: u16 = self.resolve_port(url_obj.get_port().unwrap_or_default());
         let mut stream: BoxReadWrite = self.open_sync_stream(host, port)?;
@@ -171,6 +221,7 @@ impl HttpRequest {
     /// - `RequestResult` - The parsed HTTP response, or a `RequestError` on failure.
     async fn send_async_impl(&mut self) -> RequestResult {
         let url_obj: HttpUrlComponents = self.parse_url()?;
+        validate_request_headers(self.get_headers())?;
         let host: String = url_obj.get_host().clone().unwrap_or_default();
         let port: u16 = self.resolve_port(url_obj.get_port().unwrap_or_default());
         let mut stream: BoxAsyncReadWrite = self.open_async_stream(host, port).await?;
@@ -261,8 +312,8 @@ impl HttpRequest {
         &mut self,
         stream: &mut BoxReadWrite,
     ) -> Result<HttpResponse, RequestError> {
-        let path: String = self.full_path();
-        let header_bytes: Vec<u8> = self.header_bytes(0);
+        let path: String = self.full_path()?;
+        let header_bytes: Vec<u8> = self.header_bytes(0)?;
         let version: String = self.get_config().get_http_version().to_string();
         let request: Vec<u8> = build_http_request("GET", path, header_bytes, None, version);
         stream
@@ -286,8 +337,8 @@ impl HttpRequest {
         stream: &mut BoxReadWrite,
     ) -> Result<HttpResponse, RequestError> {
         let body_bytes: Vec<u8> = self.body_bytes();
-        let path: String = self.full_path();
-        let header_bytes: Vec<u8> = self.header_bytes(body_bytes.len());
+        let path: String = self.full_path()?;
+        let header_bytes: Vec<u8> = self.header_bytes(body_bytes.len())?;
         let version: String = self.get_config().get_http_version().to_string();
         let request: Vec<u8> = build_http_request(
             HTTP_METHOD_POST,
@@ -362,7 +413,7 @@ impl HttpRequest {
             }
             if headers_done {
                 if is_chunked {
-                    if Self::is_chunked_response_complete(&response_bytes[headers_end_pos..]) {
+                    if Self::is_chunked_response_complete(&response_bytes[headers_end_pos..])? {
                         break;
                     }
                 } else if response_bytes.len() >= headers_end_pos + content_length {
@@ -371,9 +422,17 @@ impl HttpRequest {
                 }
             }
         }
+        if !headers_done {
+            return Err(RequestError::HttpRequestPartsInsufficient(
+                HttpStatus::BadRequest,
+            ));
+        }
+        if !is_chunked && response_bytes.len() < headers_end_pos + content_length {
+            return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
+        }
         if is_chunked {
             let body_bytes: Vec<u8> = response_bytes[headers_end_pos..].to_vec();
-            let decoded: Vec<u8> = parse_chunked_body(&body_bytes);
+            let decoded: Vec<u8> = parse_chunked_body(&body_bytes)?;
             response_bytes.truncate(headers_end_pos);
             response_bytes.extend_from_slice(&decoded);
         }
@@ -429,40 +488,9 @@ impl HttpRequest {
     ///
     /// # Returns
     ///
-    /// - `bool` - `true` when the terminating chunk is present, `false` while more bytes are needed.
-    fn is_chunked_response_complete(body_bytes: &[u8]) -> bool {
-        let mut pos: usize = 0;
-        while pos < body_bytes.len() {
-            let chunk_size_end: usize = match body_bytes[pos..]
-                .windows(2)
-                .position(|w: &[u8]| w == HTTP_CARRIAGE_RETURN_LINE_FEED)
-            {
-                Some(p) => pos + p,
-                None => return false,
-            };
-            let raw: &[u8] = &body_bytes[pos..chunk_size_end];
-            let chunk_size_str: &[u8] = match raw.iter().position(|&b: &u8| b == b';') {
-                Some(p) => &raw[..p],
-                None => raw,
-            };
-            let chunk_size: usize = match from_utf8(chunk_size_str) {
-                Ok(s) => match usize::from_str_radix(s.trim(), 16) {
-                    Ok(n) => n,
-                    Err(_) => return false,
-                },
-                Err(_) => return false,
-            };
-            if chunk_size == 0 {
-                return true;
-            }
-            let start: usize = chunk_size_end + 2;
-            let end: usize = start + chunk_size;
-            if end + 2 > body_bytes.len() {
-                return false;
-            }
-            pos = end + 2;
-        }
-        false
+    /// - `Result<bool, RequestError>` - Completion state, or an error for invalid chunk framing.
+    fn is_chunked_response_complete(body_bytes: &[u8]) -> Result<bool, RequestError> {
+        chunked_body_end(body_bytes).map(|end: Option<usize>| end.is_some())
     }
 
     // ---------- async stream plumbing ----------
@@ -520,8 +548,8 @@ impl HttpRequest {
         &mut self,
         stream: &mut BoxAsyncReadWrite,
     ) -> Result<HttpResponse, RequestError> {
-        let path: String = self.full_path();
-        let header_bytes: Vec<u8> = self.header_bytes(0);
+        let path: String = self.full_path()?;
+        let header_bytes: Vec<u8> = self.header_bytes(0)?;
         let version: String = self.get_config().get_http_version().to_string();
         let request: Vec<u8> = build_http_request("GET", path, header_bytes, None, version);
         stream
@@ -549,8 +577,8 @@ impl HttpRequest {
         stream: &mut BoxAsyncReadWrite,
     ) -> Result<HttpResponse, RequestError> {
         let body_bytes: Vec<u8> = self.body_bytes();
-        let path: String = self.full_path();
-        let header_bytes: Vec<u8> = self.header_bytes(body_bytes.len());
+        let path: String = self.full_path()?;
+        let header_bytes: Vec<u8> = self.header_bytes(body_bytes.len())?;
         let version: String = self.get_config().get_http_version().to_string();
         let request: Vec<u8> = build_http_request(
             HTTP_METHOD_POST,
@@ -630,7 +658,7 @@ impl HttpRequest {
             }
             if headers_done {
                 if is_chunked {
-                    if Self::is_chunked_response_complete(&response_bytes[headers_end_pos..]) {
+                    if Self::is_chunked_response_complete(&response_bytes[headers_end_pos..])? {
                         break;
                     }
                 } else if response_bytes.len() >= headers_end_pos + content_length {
@@ -639,9 +667,17 @@ impl HttpRequest {
                 }
             }
         }
+        if !headers_done {
+            return Err(RequestError::HttpRequestPartsInsufficient(
+                HttpStatus::BadRequest,
+            ));
+        }
+        if !is_chunked && response_bytes.len() < headers_end_pos + content_length {
+            return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
+        }
         if is_chunked {
             let body_bytes: Vec<u8> = response_bytes[headers_end_pos..].to_vec();
-            let decoded: Vec<u8> = parse_chunked_body(&body_bytes);
+            let decoded: Vec<u8> = parse_chunked_body(&body_bytes)?;
             response_bytes.truncate(headers_end_pos);
             response_bytes.extend_from_slice(&decoded);
         }

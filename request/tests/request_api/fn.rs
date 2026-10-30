@@ -225,3 +225,303 @@ fn test_http_request_debug_lists_url() {
     let debugged: String = format!("{request:?}");
     assert!(debugged.contains("http://debug.test/"));
 }
+
+#[test]
+fn client_rejects_control_bytes_in_header_values_before_sending() {
+    for byte in (0u8..=31).chain([127]) {
+        if byte == b'\t' {
+            continue;
+        }
+        let value: String = format!("before{}after", char::from(byte));
+        let mut request: HttpRequest = HttpRequest::get("http://127.0.0.1:9/");
+        request.set_header("X-Foo", value);
+        assert!(request.header_bytes(0).is_err(), "{byte}");
+        assert!(
+            matches!(request.send(), Err(RequestError::Request(message)) if message == "Invalid HTTP request header"),
+            "{byte}"
+        );
+    }
+    let mut request: HttpRequest = HttpRequest::get("http://127.0.0.1:9/");
+    request.set_header("X-Foo", "bar\r\nX-Injected: evil");
+    assert!(request.header_bytes(0).is_err());
+    assert!(request.send().is_err());
+}
+
+#[test]
+fn client_rejects_invalid_header_names_before_sending() {
+    for name in [
+        "",
+        "X:Injected",
+        "X\r\nInjected",
+        "X Foo",
+        "X\tFoo",
+        "X\0Foo",
+        "X\x7fFoo",
+        "X(Foo)",
+        "X/Foo",
+        "X@Foo",
+        "X\\Foo",
+        "X\"Foo",
+        "X[Foo]",
+        "X{Foo}",
+        "X=Foo",
+        "X?Foo",
+        "X,Foo",
+        "X;Foo",
+        "X<Foo>",
+        "X-é",
+    ] {
+        let mut request: HttpRequest = HttpRequest::get("http://127.0.0.1:9/");
+        request.set_header(name, "value");
+        assert!(request.header_bytes(0).is_err(), "{name:?}");
+        assert!(
+            matches!(request.send(), Err(RequestError::Request(message)) if message == "Invalid HTTP request header"),
+            "{name:?}"
+        );
+    }
+    for byte in 0u8..=31 {
+        let name: String = format!("X{}Foo", char::from(byte));
+        let mut request: HttpRequest = HttpRequest::get("http://127.0.0.1:9/");
+        request.set_header(name, "value");
+        assert!(request.header_bytes(0).is_err(), "{byte}");
+    }
+}
+
+#[test]
+fn client_accepts_header_tokens_tabs_and_case_insensitive_defaults() {
+    let mut request: HttpRequest = HttpRequest::get("http://example.test/");
+    request.set_header("!#$%&'*+-.^_`|~AZaz09", "a\tb café");
+    assert!(request.header_bytes(0).is_ok());
+    request.get_mut_headers().extend(HashMap::from([
+        ("hOsT".to_owned(), "override.test".to_owned()),
+        ("cOnTeNt-LeNgTh".to_owned(), "0".to_owned()),
+        ("aCcEpT".to_owned(), "text/plain".to_owned()),
+        ("uSeR-aGeNt".to_owned(), "client".to_owned()),
+    ]));
+    let headers: Vec<u8> = request.header_bytes(0).unwrap();
+    assert_eq!(
+        response_header_value(&headers, b"host").unwrap(),
+        Some(b"override.test".as_slice())
+    );
+    assert_eq!(
+        response_header_value(&headers, b"content-length").unwrap(),
+        Some(b"0".as_slice())
+    );
+    assert_eq!(
+        response_header_value(&headers, b"accept").unwrap(),
+        Some(b"text/plain".as_slice())
+    );
+    assert_eq!(
+        response_header_value(&headers, b"user-agent").unwrap(),
+        Some(b"client".as_slice())
+    );
+}
+
+#[test]
+fn client_rejects_request_target_controls_and_spaces() {
+    for byte in (0u8..=32).chain([127]) {
+        let path: String = format!("http://127.0.0.1:9/a{}b", char::from(byte));
+        let mut request: HttpRequest = HttpRequest::get(path);
+        assert!(matches!(
+            request.full_path(),
+            Err(RequestError::InvalidUrlPath(HttpStatus::BadRequest))
+        ));
+        assert!(matches!(
+            request.send(),
+            Err(RequestError::InvalidUrlPath(HttpStatus::BadRequest))
+        ));
+        let query: String = format!("http://127.0.0.1:9/a?x=a{}b", char::from(byte));
+        request.set_url(query);
+        assert!(matches!(
+            request.full_path(),
+            Err(RequestError::InvalidUrlQuery(HttpStatus::BadRequest))
+        ));
+        assert!(matches!(
+            request.send(),
+            Err(RequestError::InvalidUrlQuery(HttpStatus::BadRequest))
+        ));
+    }
+    let request: HttpRequest = HttpRequest::get("http://example.test/a%20b?x=%0d%0a");
+    assert_eq!(request.full_path().unwrap(), "/a%20b?x=%0d%0a");
+}
+
+#[test]
+fn client_rejects_non_http_or_missing_schemes_before_connecting() {
+    for url in [
+        "file:///etc/passwd",
+        "ftp://127.0.0.1:9/",
+        "gopher://127.0.0.1:9/",
+        "//127.0.0.1:9/",
+        "127.0.0.1:9/",
+        "://127.0.0.1:9/",
+        "",
+    ] {
+        let mut request: HttpRequest = HttpRequest::get(url);
+        assert!(
+            matches!(
+                request.send(),
+                Err(RequestError::InvalidUrlScheme(HttpStatus::BadRequest))
+            ),
+            "{url:?}"
+        );
+    }
+    for url in ["HtTp://example.test/", "hTtPs://example.test/"] {
+        assert!(HttpRequest::get(url).parse_url().is_ok());
+    }
+}
+
+#[test]
+fn client_rejects_missing_or_header_unsafe_hosts_before_connecting() {
+    for url in [
+        "http://",
+        "http:///path",
+        "http://:80/",
+        "http://user:pass@/",
+        "http://bad host/",
+        "http://bad\r\nhost/",
+        "http://bad\x00host/",
+        "http://bad\x7fhost/",
+        "http://host\\other/",
+    ] {
+        let mut request: HttpRequest = HttpRequest::get(url);
+        assert!(
+            matches!(
+                request.send(),
+                Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest))
+            ),
+            "{url:?}"
+        );
+    }
+    for byte in 0u8..=32 {
+        let url: String = format!("http://bad{}host/", char::from(byte));
+        let mut request: HttpRequest = HttpRequest::get(url);
+        assert!(
+            matches!(
+                request.send(),
+                Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest))
+            ),
+            "{byte}"
+        );
+    }
+}
+
+#[test]
+fn client_userinfo_never_enters_the_host_header_or_request_target() {
+    let request: HttpRequest = HttpRequest::get("http://user:pass@example.test:8080/path?ok=1");
+    assert_eq!(
+        request.parse_url().unwrap().get_host().as_deref(),
+        Some("example.test")
+    );
+    let headers: Vec<u8> = request.header_bytes(0).unwrap();
+    assert_eq!(
+        response_header_value(&headers, b"host").unwrap(),
+        Some(b"example.test".as_slice())
+    );
+    let target: String = request.full_path().unwrap();
+    assert_eq!(target, "/path?ok=1");
+    let wire: Vec<u8> = build_http_request("GET", target, headers, None, "HTTP/1.1".to_owned());
+    assert!(wire.starts_with(b"GET /path?ok=1 HTTP/1.1\r\n"));
+    assert!(find_pattern_case_insensitive(&wire, b"user:pass@").is_none());
+}
+
+#[test]
+fn client_header_injection_is_rejected_without_opening_sync_or_async_connections() {
+    let runtime: http_type::tokio::runtime::Runtime =
+        http_type::tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+    runtime.block_on(async {
+        let listener: http_type::tokio::net::TcpListener = http_type::tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url: String = format!("http://{}/", listener.local_addr().unwrap());
+        let mut request: HttpRequest = HttpRequest::get(url);
+        request.get_mut_config().set_timeout(100u64).set_buffer_size(64usize);
+        request.set_header("X-Foo", "bar\r\nX-Injected: evil");
+        assert!(matches!(request.send(), Err(RequestError::Request(message)) if message == "Invalid HTTP request header"));
+        let result: RequestResult = http_type::tokio::time::timeout(Duration::from_millis(100), request.send_async()).await.unwrap();
+        assert!(matches!(result, Err(RequestError::Request(message)) if message == "Invalid HTTP request header"));
+        assert!(http_type::tokio::time::timeout(Duration::from_millis(10), listener.accept()).await.is_err());
+    });
+}
+
+fn exchange_client_response(response: &'static [u8], synchronous: bool) -> RequestResult {
+    let runtime: http_type::tokio::runtime::Runtime =
+        http_type::tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+    runtime.block_on(async {
+        let listener: http_type::tokio::net::TcpListener =
+            http_type::tokio::net::TcpListener::bind("127.0.0.1:0")
+                .await
+                .unwrap();
+        let url: String = format!("http://{}/", listener.local_addr().unwrap());
+        let server: http_type::tokio::task::JoinHandle<()> = http_type::tokio::spawn(async move {
+            let mut stream: http_type::tokio::net::TcpStream = listener.accept().await.unwrap().0;
+            let mut wire: Vec<u8> = Vec::new();
+            let mut buffer: [u8; 128] = [0; 128];
+            loop {
+                let length: usize = stream.read(&mut buffer).await.unwrap();
+                assert!(length > 0);
+                wire.extend_from_slice(&buffer[..length]);
+                if find_double_crlf(&wire, 0).is_some() {
+                    break;
+                }
+            }
+            assert!(wire.starts_with(b"GET / HTTP/1.1\r\n"));
+            stream.write_all(response).await.unwrap();
+            stream.shutdown().await.unwrap();
+        });
+        let mut request: HttpRequest = HttpRequest::get(url);
+        request
+            .get_mut_config()
+            .set_timeout(1000u64)
+            .set_buffer_size(8usize);
+        let result: RequestResult = if synchronous {
+            http_type::tokio::task::spawn_blocking(move || request.send())
+                .await
+                .unwrap()
+        } else {
+            http_type::tokio::time::timeout(Duration::from_secs(1), request.send_async())
+                .await
+                .unwrap()
+        };
+        server.await.unwrap();
+        result
+    })
+}
+
+#[test]
+fn client_propagates_response_framing_errors_through_sync_and_async_sends() {
+    for synchronous in [true, false] {
+        for response in [
+            b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n"
+                .as_slice(),
+            b"HTTP/1.1 200 OK\r\nContent-Length: 5x\r\n\r\nhello".as_slice(),
+            b"HTTP/1.1 200 OK\r\nContent-Length: 99999999999999999999999999\r\n\r\n".as_slice(),
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: gzip\r\n\r\n".as_slice(),
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nffffffffffffffff\r\n".as_slice(),
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n+1\r\nx\r\n0\r\n\r\n".as_slice(),
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nxXX0\r\n\r\n".as_slice(),
+            b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nno".as_slice(),
+            b"HTTP/1.1 200 OK\r\nX-Test: a\0b\r\nContent-Length: 0\r\n\r\n".as_slice(),
+        ] {
+            assert!(
+                exchange_client_response(response, synchronous).is_err(),
+                "{synchronous}: {response:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn client_accepts_valid_fragmented_fixed_length_and_chunked_responses() {
+    for synchronous in [true, false] {
+        for response in [
+            b"HTTP/1.1 200 OK\r\nX-Content-Length: 999\r\nContent-Length: 5\r\n\r\nhello".as_slice(),
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1;foo=bar\r\nx\r\n0\r\nX-Trailer: yes\r\n\r\n".as_slice(),
+        ] {
+            assert!(exchange_client_response(response, synchronous).is_ok(), "{synchronous}: {response:?}");
+        }
+    }
+}

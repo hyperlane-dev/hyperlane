@@ -7,6 +7,9 @@ pub(crate) const PROTOCOL_BODY_CHUNK: usize = 8 * 1024;
 /// The character separating the path from the query in a request target.
 pub(crate) const QUESTION_MARK: char = '?';
 
+/// The character separating the userinfo from the host in an authority.
+pub(crate) const AT_SIGN: char = '@';
+
 /// The header naming the trailers section of a message.
 pub(crate) const TRAILER_HEADER: &str = "trailer";
 

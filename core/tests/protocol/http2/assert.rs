@@ -379,3 +379,65 @@ async fn http2_sse_chunk_reaches_the_client_before_the_handler_finishes() {
     route_gate(GateSlot::SseHttp2).release_sse();
     control.shutdown().await;
 }
+
+#[tokio::test]
+async fn http2_rejects_a_host_header_that_disagrees_with_the_authority() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http2, None)
+            .await
+            .expect("http2 plaintext server must start");
+    let (mut sender, connection) = h2_plaintext_session(port)
+        .await
+        .expect("h2 prior-knowledge handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    let target: String = format!("http://{TLS_SERVER_NAME}:{port}{VERSION_ROUTE_PATH}");
+    let outcome: Option<(u16, Vec<u8>)> =
+        h2_request_with_host_header(&mut sender, "GET", &target, "other.example")
+            .await
+            .expect("an h2 request with a mismatched host header must be answered");
+    let accepted: bool = match outcome {
+        Some((status, _body)) => status == 200,
+        None => false,
+    };
+    assert!(
+        !accepted,
+        "a host header naming another host must never reach the route"
+    );
+    drop(sender);
+    driving.abort();
+    control.shutdown().await;
+}
+
+#[tokio::test]
+async fn http2_accepts_a_host_header_that_agrees_with_the_authority() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http2, None)
+            .await
+            .expect("http2 plaintext server must start");
+    let (mut sender, connection) = h2_plaintext_session(port)
+        .await
+        .expect("h2 prior-knowledge handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    let target: String = format!("http://{TLS_SERVER_NAME}:{port}{VERSION_ROUTE_PATH}");
+    let outcome: Option<(u16, Vec<u8>)> = h2_request_with_host_header(
+        &mut sender,
+        "GET",
+        &target,
+        &format!("{TLS_SERVER_NAME}:{port}"),
+    )
+    .await
+    .expect("an h2 request with a matching host header must be answered");
+    let (status, body): (u16, Vec<u8>) =
+        outcome.expect("a matching host header must be answered with a response");
+    assert_eq!(
+        status, 200,
+        "a host header naming the same host must still reach the route, got: {body:?}"
+    );
+    drop(sender);
+    driving.abort();
+    control.shutdown().await;
+}

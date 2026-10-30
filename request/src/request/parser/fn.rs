@@ -108,42 +108,105 @@ pub(crate) fn build_http_request(
 ///
 /// # Returns
 ///
-/// - `Vec<u8>`: The concatenated payload of every decoded chunk.
-pub(crate) fn parse_chunked_body(body_bytes: &[u8]) -> Vec<u8> {
+/// - `Result<Vec<u8>, RequestError>` - The complete decoded payload, or invalid or incomplete framing.
+pub(crate) fn parse_chunked_body(body_bytes: &[u8]) -> Result<Vec<u8>, RequestError> {
+    let body_end: usize = chunked_body_end(body_bytes)?.ok_or(
+        RequestError::HttpRequestPartsInsufficient(HttpStatus::BadRequest),
+    )?;
     let mut result: Vec<u8> = Vec::new();
     let mut pos: usize = 0;
-    while pos < body_bytes.len() {
-        let chunk_size_end: usize = match body_bytes[pos..]
-            .windows(2)
-            .position(|window: &[u8]| window == HTTP_BR_BYTES)
-        {
-            Some(p) => pos + p,
-            None => break,
-        };
-        let chunk_size_str: &[u8] = &body_bytes[pos..chunk_size_end];
-        let chunk_size_str: &[u8] = match chunk_size_str.iter().position(|&b: &u8| b == b';') {
-            Some(p) => &chunk_size_str[..p],
-            None => chunk_size_str,
-        };
-        let chunk_size: usize = match from_utf8(chunk_size_str) {
-            Ok(s) => match usize::from_str_radix(s.trim(), 16) {
-                Ok(n) => n,
-                Err(_) => break,
-            },
-            Err(_) => break,
-        };
+    while pos < body_end {
+        let line_end: usize = find_crlf(body_bytes, pos).ok_or(
+            RequestError::HttpRequestPartsInsufficient(HttpStatus::BadRequest),
+        )?;
+        let chunk_size: usize = parse_chunk_size(&body_bytes[pos..line_end])?;
         if chunk_size == 0 {
             break;
         }
-        let chunk_data_start: usize = chunk_size_end + 2;
-        let chunk_data_end: usize = chunk_data_start + chunk_size;
-        if chunk_data_end > body_bytes.len() {
-            break;
-        }
-        result.extend_from_slice(&body_bytes[chunk_data_start..chunk_data_end]);
-        pos = chunk_data_end + 2;
+        let data_start: usize = line_end + HTTP_BR_BYTES.len();
+        let data_end: usize = data_start
+            .checked_add(chunk_size)
+            .ok_or(RequestError::ContentLengthTooLarge(HttpStatus::BadRequest))?;
+        result.extend_from_slice(&body_bytes[data_start..data_end]);
+        pos = data_end + HTTP_BR_BYTES.len();
     }
-    result
+    Ok(result)
+}
+
+/// Parse a strict hexadecimal chunk size, accepting optional extensions.
+///
+/// # Arguments
+///
+/// - `&[u8]` - The complete chunk-size line without its CRLF.
+///
+/// # Returns
+///
+/// - `Result<usize, RequestError>` - The bounded size, or an error for invalid syntax or overflow.
+pub(crate) fn parse_chunk_size(line: &[u8]) -> Result<usize, RequestError> {
+    if !is_valid_header_value(line) {
+        return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
+    }
+    let size_end: usize = line
+        .iter()
+        .position(|byte: &u8| *byte == CHUNK_EXTENSION_SEPARATOR)
+        .unwrap_or(line.len());
+    let size_bytes: &[u8] = &line[..size_end];
+    if size_bytes.is_empty() || !size_bytes.iter().all(u8::is_ascii_hexdigit) {
+        return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
+    }
+    let size: usize = from_utf8(size_bytes)
+        .ok()
+        .and_then(|value: &str| usize::from_str_radix(value, 16).ok())
+        .ok_or(RequestError::ContentLengthTooLarge(HttpStatus::BadRequest))?;
+    if size > MAX_RESPONSE_CHUNK_SIZE {
+        return Err(RequestError::ContentLengthTooLarge(HttpStatus::BadRequest));
+    }
+    Ok(size)
+}
+
+/// Validate chunk boundaries and locate the complete terminating trailer section.
+///
+/// # Arguments
+///
+/// - `&[u8]` - The chunked bytes received so far.
+///
+/// # Returns
+///
+/// - `Result<Option<usize>, RequestError>` - The completed body end, incomplete input, or invalid framing.
+pub(crate) fn chunked_body_end(body_bytes: &[u8]) -> Result<Option<usize>, RequestError> {
+    let mut pos: usize = 0;
+    while pos < body_bytes.len() {
+        let Some(line_end) = find_crlf(body_bytes, pos) else {
+            return Ok(None);
+        };
+        let chunk_size: usize = parse_chunk_size(&body_bytes[pos..line_end])?;
+        let data_start: usize = line_end + HTTP_BR_BYTES.len();
+        if chunk_size == 0 {
+            if body_bytes[data_start..].starts_with(HTTP_CARRIAGE_RETURN_LINE_FEED) {
+                return Ok(Some(data_start + HTTP_BR_BYTES.len()));
+            }
+            if let Some(trailer_end) = find_double_crlf(body_bytes, data_start) {
+                let end: usize = trailer_end + HTTP_BR_BYTES.len() * 2;
+                let _: Option<&[u8]> = response_header_value(&body_bytes[data_start..end], &[])?;
+                return Ok(Some(end));
+            }
+            return Ok(None);
+        }
+        let data_end: usize = data_start
+            .checked_add(chunk_size)
+            .ok_or(RequestError::ContentLengthTooLarge(HttpStatus::BadRequest))?;
+        let next: usize = data_end
+            .checked_add(HTTP_BR_BYTES.len())
+            .ok_or(RequestError::ContentLengthTooLarge(HttpStatus::BadRequest))?;
+        if next > body_bytes.len() {
+            return Ok(None);
+        }
+        if &body_bytes[data_end..next] != HTTP_BR_BYTES {
+            return Err(RequestError::Request(INVALID_RESPONSE_FRAMING.to_owned()));
+        }
+        pos = next;
+    }
+    Ok(None)
 }
 
 /// Locate `\r\n\r\n` (end of response headers) starting at `start`.
@@ -229,71 +292,165 @@ pub(crate) fn find_crlf(data: &[u8], start: usize) -> Option<usize> {
 ///
 /// # Returns
 ///
-/// - `usize`: The declared body length, or `0` when the header is missing.
-pub(crate) fn get_content_length(response_bytes: &[u8]) -> usize {
-    if let Some(pos) = find_pattern_case_insensitive(response_bytes, CONTENT_LENGTH_PATTERN) {
-        let value_start: usize = pos + CONTENT_LENGTH_PATTERN.len();
-        let value_start: usize = if response_bytes.get(value_start) == Some(&b' ') {
-            value_start + 1
-        } else {
-            value_start
-        };
-        if let Some(end_pos) = find_crlf(response_bytes, value_start) {
-            let value_bytes: &[u8] = &response_bytes[value_start..end_pos];
-            return parse_decimal_bytes(value_bytes);
-        }
-    }
-    0
-}
-
-/// Does the response use `Transfer-Encoding: chunked`?
-///
-/// # Arguments
-///
-/// - `&[u8]` - The raw response header bytes.
-///
-/// # Returns
-///
-/// - `bool`: `true` when the body is chunked, `false` otherwise.
-pub(crate) fn is_chunked_encoding(headers_bytes: &[u8]) -> bool {
-    if let Some(pos) = find_pattern_case_insensitive(headers_bytes, TRANSFER_ENCODING_PATTERN) {
-        let value_start: usize = pos + TRANSFER_ENCODING_PATTERN.len();
-        let value_start: usize = if headers_bytes.get(value_start) == Some(&b' ') {
-            value_start + 1
-        } else {
-            value_start
-        };
-        if let Some(end_pos) = find_crlf(headers_bytes, value_start) {
-            let value_bytes: &[u8] = &headers_bytes[value_start..end_pos];
-            return find_pattern_case_insensitive(value_bytes, CHUNKED_PATTERN).is_some();
-        }
-    }
-    false
-}
-
-/// Parse a byte slice as a decimal `usize` (skipping leading whitespace).
-///
-/// # Arguments
-///
-/// - `&[u8]` - The ASCII digits to parse.
-///
-/// # Returns
-///
-/// - `usize`: The parsed value, truncated at the first non-digit byte.
-pub(crate) fn parse_decimal_bytes(bytes: &[u8]) -> usize {
-    let mut result: usize = 0;
-    let mut started: bool = false;
-    for &byte in bytes {
-        match byte {
-            ASCII_ZERO..=ASCII_NINE => {
-                started = true;
-                result = result * 10 + (byte - ASCII_ZERO) as usize;
+/// - `Result<usize, RequestError>` - The body length, zero when absent, or invalid framing.
+pub(crate) fn get_content_length(response_bytes: &[u8]) -> Result<usize, RequestError> {
+    let value: Option<&[u8]> = response_header_value(
+        response_bytes,
+        &CONTENT_LENGTH_PATTERN[..CONTENT_LENGTH_PATTERN.len() - 1],
+    )?;
+    match value {
+        Some(bytes) => {
+            let length: usize = parse_decimal_bytes(bytes)?;
+            if length > isize::MAX as usize {
+                return Err(RequestError::ContentLengthTooLarge(HttpStatus::BadRequest));
             }
-            b' ' | b'\t' if !started => continue,
-            _ => break,
+            Ok(length)
+        }
+        None => Ok(0),
+    }
+}
+
+/// Determine whether the response has exactly one supported transfer coding.
+///
+/// # Arguments
+///
+/// - `&[u8]` - The raw response headers, optionally followed by a body.
+///
+/// # Returns
+///
+/// - `Result<bool, RequestError>` - Whether chunked framing is present, or an error for unsupported coding.
+pub(crate) fn is_chunked_encoding(headers_bytes: &[u8]) -> Result<bool, RequestError> {
+    let name: &[u8] = &TRANSFER_ENCODING_PATTERN[..TRANSFER_ENCODING_PATTERN.len() - 1];
+    match response_header_value(headers_bytes, name)? {
+        Some(value) if value.eq_ignore_ascii_case(CHUNKED_PATTERN) => Ok(true),
+        Some(_) => Err(RequestError::Request(INVALID_RESPONSE_FRAMING.to_owned())),
+        None => Ok(false),
+    }
+}
+
+/// Parse a nonempty sequence of decimal digits without truncation or overflow.
+///
+/// # Arguments
+///
+/// - `&[u8]` - The ASCII decimal digits, without surrounding whitespace.
+///
+/// # Returns
+///
+/// - `Result<usize, RequestError>` - The exact length, or an error for invalid digits or overflow.
+pub(crate) fn parse_decimal_bytes(bytes: &[u8]) -> Result<usize, RequestError> {
+    if bytes.is_empty()
+        || !bytes
+            .iter()
+            .all(|byte: &u8| (ASCII_ZERO..=ASCII_NINE).contains(byte))
+    {
+        return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
+    }
+    let mut result: usize = 0;
+    for &byte in bytes {
+        result = result
+            .checked_mul(10)
+            .and_then(|value: usize| value.checked_add((byte - ASCII_ZERO) as usize))
+            .ok_or(RequestError::ContentLengthTooLarge(HttpStatus::BadRequest))?;
+    }
+    Ok(result)
+}
+
+/// Check an HTTP field name against the nonempty RFC token grammar.
+///
+/// # Arguments
+///
+/// - `&[u8]` - The field name bytes.
+///
+/// # Returns
+///
+/// - `bool` - Whether every byte is an allowed token character.
+pub(crate) fn is_valid_header_name(name: &[u8]) -> bool {
+    !name.is_empty()
+        && name
+            .iter()
+            .all(|byte: &u8| byte.is_ascii_alphanumeric() || FIELD_NAME_PUNCTUATION.contains(byte))
+}
+
+/// Check a field value for forbidden control bytes, permitting horizontal tabs.
+///
+/// # Arguments
+///
+/// - `&[u8]` - The field value bytes.
+///
+/// # Returns
+///
+/// - `bool` - Whether the value can be serialized as one header line.
+pub(crate) fn is_valid_header_value(value: &[u8]) -> bool {
+    value
+        .iter()
+        .all(|byte: &u8| !byte.is_ascii_control() || *byte == TAB_U8)
+}
+
+/// Validate every outgoing field before opening a stream or serializing headers.
+///
+/// # Arguments
+///
+/// - `&HashMap<String, String>` - The caller-provided header map, with arbitrary key casing.
+///
+/// # Returns
+///
+/// - `Result<(), RequestError>` - Success for valid fields, or an error before bytes can be sent.
+pub(crate) fn validate_request_headers(
+    headers: &HashMap<String, String>,
+) -> Result<(), RequestError> {
+    for (name, value) in headers {
+        if !is_valid_header_name(name.as_bytes()) || !is_valid_header_value(value.as_bytes()) {
+            return Err(RequestError::Request(INVALID_REQUEST_HEADER.to_owned()));
         }
     }
-    result
+    Ok(())
+}
+
+/// Look up one complete field name, stopping at the header/body boundary.
+///
+/// # Arguments
+///
+/// - `&'a [u8]` - The response header block, optionally followed by body bytes.
+/// - `&[u8]` - The exact field name without its colon.
+///
+/// # Returns
+///
+/// - `Result<Option<&'a [u8]>, RequestError>` - The trimmed value, absence, or invalid or duplicate fields.
+pub(crate) fn response_header_value<'a>(
+    headers_bytes: &'a [u8],
+    field_name: &[u8],
+) -> Result<Option<&'a [u8]>, RequestError> {
+    let mut value: Option<&[u8]> = None;
+    let mut pos: usize = 0;
+    while pos < headers_bytes.len() {
+        let end: usize = find_crlf(headers_bytes, pos).unwrap_or(headers_bytes.len());
+        let line: &[u8] = &headers_bytes[pos..end];
+        if line.is_empty() {
+            break;
+        }
+        if !(pos == 0 && line.starts_with(HTTP_STATUS_PREFIX)) {
+            let separator: usize = line
+                .iter()
+                .position(|byte: &u8| *byte == COLON_U8)
+                .ok_or_else(|| RequestError::Request(INVALID_RESPONSE_FRAMING.to_owned()))?;
+            let name: &[u8] = &line[..separator];
+            let raw_value: &[u8] = &line[separator + 1..];
+            if !is_valid_header_name(name) || !is_valid_header_value(raw_value) {
+                return Err(RequestError::Request(INVALID_RESPONSE_FRAMING.to_owned()));
+            }
+            if name.eq_ignore_ascii_case(field_name) {
+                if value.is_some() {
+                    return Err(RequestError::Request(INVALID_RESPONSE_FRAMING.to_owned()));
+                }
+                value = Some(raw_value.trim_ascii());
+            }
+        }
+        if end == headers_bytes.len() {
+            break;
+        }
+        pos = end + HTTP_BR_BYTES.len();
+    }
+    Ok(value)
 }
 
 /// Parse the 3-byte ASCII status code from the response status line.
@@ -374,26 +531,29 @@ pub(crate) fn parse_response_headers(
     redirect_url: &mut Option<Vec<u8>>,
     is_chunked: &mut bool,
 ) -> Result<(), RequestError> {
-    if let Some(status_pos) = find_pattern_case_insensitive(headers_bytes, http_version_bytes) {
-        let status_code_start: usize = status_pos + http_version_bytes.len() + 1;
-        let status_code_end: usize = status_code_start + 3;
-        if status_code_end <= headers_bytes.len() {
-            let status_code: usize =
-                parse_status_code(&headers_bytes[status_code_start..status_code_end]);
-            if (300..=399).contains(&status_code)
-                && let Some(location_pos) =
-                    find_pattern_case_insensitive(headers_bytes, location_sign_key)
-            {
-                let start: usize = location_pos + location_sign_key.len();
-                if let Some(end_pos) = find_crlf(headers_bytes, start) {
-                    let mut url_vec: Vec<u8> = Vec::with_capacity(end_pos - start);
-                    url_vec.extend_from_slice(&headers_bytes[start..end_pos]);
-                    *redirect_url = Some(url_vec);
-                }
-            }
+    *redirect_url = None;
+    if headers_bytes
+        .get(..http_version_bytes.len())
+        .is_some_and(|prefix: &[u8]| {
+            find_pattern_case_insensitive(prefix, http_version_bytes) == Some(0)
+        })
+    {
+        let status_start: usize = http_version_bytes.len() + 1;
+        if let Some(status) = headers_bytes.get(status_start..status_start + 3)
+            && (300..=399).contains(&parse_status_code(status))
+        {
+            let name: &[u8] = &location_sign_key[..location_sign_key.len().saturating_sub(1)];
+            *redirect_url = response_header_value(headers_bytes, name)?.map(<[u8]>::to_vec);
         }
     }
-    *content_length = get_content_length(headers_bytes);
-    *is_chunked = is_chunked_encoding(headers_bytes);
+    *content_length = get_content_length(headers_bytes)?;
+    *is_chunked = is_chunked_encoding(headers_bytes)?;
+    if *is_chunked && response_header_value(headers_bytes, CONTENT_LENGTH.as_bytes())?.is_some() {
+        return Err(RequestError::Request(INVALID_RESPONSE_FRAMING.to_owned()));
+    }
+    let _: usize = headers_bytes
+        .len()
+        .checked_add(*content_length)
+        .ok_or(RequestError::ContentLengthTooLarge(HttpStatus::BadRequest))?;
     Ok(())
 }

@@ -55,6 +55,7 @@ pub fn build_protocol_request(
     request.set_method(protocol_method(method));
     request.set_version(version);
     fill_request_headers(&parts.headers, config, &mut request)?;
+    check_request_authority(&parts.headers, uri)?;
     request.set_host(resolve_request_host(&parts.headers, uri));
     request.get_mut_body().clear();
     request.get_mut_body().extend_from_slice(&body);
@@ -87,6 +88,154 @@ pub fn resolve_request_host(headers: &ProtocolHeaders, uri: &http::Uri) -> Strin
         }
     }
     EMPTY_STR.to_owned()
+}
+
+/// Checks that the request authority and the host header name the same host.
+///
+/// HTTP/2 and HTTP/3 carry the authority in a pseudo header, and a client may
+/// also send a `host` header beside it. RFC 9113 Section 8.3.1 makes a request
+/// that names two different entities malformed, because a proxy that trusts
+/// one value and an origin that trusts the other would route the same bytes
+/// to different hosts. The pseudo header wins when only one of the two is
+/// present.
+///
+/// The userinfo form is refused in both places, because RFC 9113 Section 8.3.1
+/// forbids it in `:authority` and RFC 9110 Section 7.2 forbids it in `host`, and
+/// a value that carries it names an entity other than the one it appears to.
+///
+/// # Arguments
+///
+/// - `&ProtocolHeaders` - The protocol request headers.
+/// - `&http::Uri` - The request target, carrying the authority.
+///
+/// # Returns
+///
+/// - `Result<(), RequestError>` - `Ok(())` when the authority is unambiguous, or
+///   `RequestError::InvalidUrlHost` when it is not.
+pub fn check_request_authority(
+    headers: &ProtocolHeaders,
+    uri: &http::Uri,
+) -> Result<(), RequestError> {
+    let host_count: usize = headers.get_all(HOST).iter().count();
+    if host_count > 1 {
+        return Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest));
+    }
+    let authority: Option<&str> = uri
+        .authority()
+        .map(|authority: &http::uri::Authority| authority.as_str());
+    let host: Option<&str> = match headers.get(HOST) {
+        Some(value) => match value.to_str() {
+            Ok(value) => Some(value),
+            Err(_) => return Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest)),
+        },
+        None => match headers.get(COLON_AUTHORITY) {
+            Some(value) => match value.to_str() {
+                Ok(value) => Some(value),
+                Err(_) => return Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest)),
+            },
+            None => None,
+        },
+    };
+    if let Some(authority) = authority
+        && authority.contains(AT_SIGN)
+    {
+        return Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest));
+    }
+    if let Some(host) = host
+        && host.contains(AT_SIGN)
+    {
+        return Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest));
+    }
+    let (Some(authority), Some(host)) = (authority, host) else {
+        return Ok(());
+    };
+    let scheme: Option<&str> = uri.scheme_str();
+    if !same_authority(authority, host, scheme) {
+        return Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest));
+    }
+    Ok(())
+}
+
+/// Reports whether two authority values name the same host.
+///
+/// RFC 9113 Section 8.3.1 asks for the two values to be normalized before they
+/// are compared, and RFC 3986 Section 6.2.3 defines the scheme based
+/// normalization that a server must apply: the host is compared without regard
+/// to case, and a port that is the default for the scheme is the same as no
+/// port at all.
+///
+/// The `http` crate accepts authority values it cannot interpret, such as a
+/// port that is not a number, so the values are split here instead of being
+/// compared through the crate's parser.
+///
+/// # Arguments
+///
+/// - `&str` - The authority from the pseudo header.
+/// - `&str` - The authority from the host header.
+/// - `Option<&str>` - The scheme of the request, used to resolve the default port.
+///
+/// # Returns
+///
+/// - `bool` - `true` when both values name the same host.
+pub fn same_authority(authority: &str, host: &str, scheme: Option<&str>) -> bool {
+    let authority: (String, Option<String>) = normalize_authority(authority, scheme);
+    let host: (String, Option<String>) = normalize_authority(host, scheme);
+    authority == host
+}
+
+/// Normalizes an authority value for comparison.
+///
+/// The host is lowercased and a port that is the default for the scheme is
+/// dropped, so `EXAMPLE.com` and `example.com:443` name the same host for an
+/// `https` request.
+///
+/// # Arguments
+///
+/// - `&str` - The authority value.
+/// - `Option<&str>` - The scheme of the request, used to resolve the default port.
+///
+/// # Returns
+///
+/// - `(String, Option<String>)` - The normalized host, and the normalized port.
+pub fn normalize_authority(authority: &str, scheme: Option<&str>) -> (String, Option<String>) {
+    let (host, port): (&str, Option<&str>) = split_authority_port(authority);
+    let host: String = host.to_ascii_lowercase();
+    let port: Option<String> = port.map(|port: &str| port.to_owned());
+    let default_port: Option<&str> = match scheme {
+        Some("http") => Some(DEFAULT_HTTP_PORT_STR),
+        Some("https") => Some(DEFAULT_HTTPS_PORT_STR),
+        _ => None,
+    };
+    match (port, default_port) {
+        (Some(port), Some(default_port)) if port == default_port => (host, None),
+        (port, _) => (host, port),
+    }
+}
+
+/// Splits an authority value into its host and its optional port.
+///
+/// # Arguments
+///
+/// - `&str` - The authority value.
+///
+/// # Returns
+///
+/// - `(&str, Option<&str>)` - The host, and the port when the value carries one.
+pub fn split_authority_port(authority: &str) -> (&str, Option<&str>) {
+    let authority: &str = authority.trim();
+    if authority.starts_with('[') {
+        return match authority.find(']') {
+            Some(end) => match authority[end + 1..].strip_prefix(':') {
+                Some(port) => (&authority[..end + 1], Some(port)),
+                None => (authority, None),
+            },
+            None => (authority, None),
+        };
+    }
+    match authority.rsplit_once(':') {
+        Some((host, port)) if !host.is_empty() && !host.contains(':') => (host, Some(port)),
+        _ => (authority, None),
+    }
 }
 
 /// Extracts the query string from a protocol request target.
