@@ -411,11 +411,11 @@ impl Stream {
         Request::fill_http_querys(query, request.get_mut_querys());
         let path_slice: &str = Request::get_http_path(path, query_index, hash_index);
         request.get_mut_path().push_str(path_slice);
+        request.set_version(version);
         let content_size: usize = request
             .get_http_headers(&mut reader, &config, header_line_buffer)
             .await?;
         request.set_method(method);
-        request.set_version(version);
         Request::fill_http_body(&mut reader, request.get_mut_body(), content_size).await?;
         // Preserve bytes read ahead for the next pipelined request: they have
         // already left the socket and cannot be read again.

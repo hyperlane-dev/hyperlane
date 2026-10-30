@@ -95,6 +95,7 @@ impl From<ResponseError> for RequestError {
     }
 }
 
+/// Inherent implementation of [`RequestError`].
 impl RequestError {
     /// Gets the HTTP status associated with this error.
     ///
@@ -195,6 +196,7 @@ impl Default for RequestConfig {
     }
 }
 
+/// Inherent implementation of [`RequestConfig`].
 impl RequestConfig {
     /// Creates a new `RequestConfig` from a JSON string.
     ///
@@ -274,6 +276,7 @@ impl Default for Request {
     }
 }
 
+/// Inherent implementation of [`Request`].
 impl Request {
     /// Resets the request to its default state while retaining allocated capacity.
     ///
@@ -347,12 +350,22 @@ impl Request {
             .ok_or(RequestError::HttpRequestPartsInsufficient(
                 HttpStatus::BadRequest,
             ))?;
+        if parts.next().is_some() {
+            return Err(RequestError::HttpRequestPartsInsufficient(
+                HttpStatus::BadRequest,
+            ));
+        }
         let method: RequestMethod = method_str
             .parse::<RequestMethod>()
             .unwrap_or(Method::Unknown(method_str.to_string()));
-        let version: RequestVersion = version_str
-            .parse::<RequestVersion>()
-            .unwrap_or(RequestVersion::Unknown(version_str.to_string()));
+        let version: RequestVersion = match version_str.parse::<RequestVersion>() {
+            Ok(RequestVersion::Unknown(_)) | Err(_) => {
+                return Err(RequestError::HttpRequestPartsInsufficient(
+                    HttpStatus::BadRequest,
+                ));
+            }
+            Ok(version) => version,
+        };
         Ok((method, full_path, version))
     }
 
@@ -541,6 +554,9 @@ impl Request {
         value: &str,
         max_size: usize,
     ) -> Result<usize, RequestError> {
+        if value.is_empty() || !value.bytes().all(|byte: u8| byte.is_ascii_digit()) {
+            return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
+        }
         let length: usize = value.parse::<usize>()?;
         if length > max_size && max_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE {
             return Err(RequestError::ContentLengthTooLarge(
@@ -581,44 +597,80 @@ impl Request {
     where
         R: AsyncBufReadExt + Unpin,
     {
-        let Request { headers, host, .. } = self;
+        let Request {
+            headers,
+            host,
+            version,
+            ..
+        } = self;
         let max_header_count: usize = config.get_max_header_count();
         let max_header_key_size: usize = config.get_max_header_key_size();
         let max_header_value_size: usize = config.get_max_header_value_size();
         let max_body_size: usize = config.get_max_body_size();
         let mut content_size: usize = 0;
         let mut header_count: usize = 0;
+        let mut content_length_seen: bool = false;
+        let mut host_seen: bool = false;
         loop {
             header_line_buffer.clear();
             AsyncBufReadExt::read_line(reader, header_line_buffer).await?;
-            let header_line: &str = header_line_buffer.trim();
+            let header_line: &str = header_line_buffer
+                .strip_suffix(HTTP_HEADER_LINE_FEED)
+                .ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
+            let header_line: &str = header_line
+                .strip_suffix(HTTP_HEADER_CARRIAGE_RETURN)
+                .unwrap_or(header_line);
             if header_line.is_empty() {
                 break;
             }
+            if header_line.starts_with(HTTP_HEADER_OPTIONAL_WHITESPACE) {
+                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+            }
             header_count += 1;
             Self::check_http_header_count(header_count, max_header_count)?;
-            let (key_part, value_part): (&str, &str) = match header_line.split_once(COLON) {
-                Some(parts) => parts,
-                None => continue,
-            };
-            let key_trimmed: &str = key_part.trim();
-            if key_trimmed.is_empty() {
-                continue;
+            let (key, value_part): (&str, &str) = header_line
+                .split_once(COLON)
+                .ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
+            let valid_key: bool = key.bytes().all(|byte: u8| {
+                byte.is_ascii_alphanumeric() || HTTP_HEADER_TOKEN_PUNCTUATION.contains(&byte)
+            });
+            if key.is_empty() || !valid_key {
+                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
             }
-            Self::check_http_header_key_size(key_trimmed, max_header_key_size)?;
-            let value: &str = value_part.trim();
+            Self::check_http_header_key_size(key, max_header_key_size)?;
+            if value_part.bytes().any(|byte: u8| {
+                (byte < HTTP_HEADER_CONTROL_LIMIT && byte != HTTP_HEADER_TAB)
+                    || byte == HTTP_HEADER_DELETE
+            }) {
+                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+            }
+            let value: &str = value_part.trim_matches(HTTP_HEADER_OPTIONAL_WHITESPACE);
             Self::check_http_header_value_size(value, max_header_value_size)?;
-            match key_trimmed {
+            match key {
+                key if key.eq_ignore_ascii_case(HTTP_HEADER_TRANSFER_ENCODING) => {
+                    return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                }
                 key if key.eq_ignore_ascii_case(HOST) => {
+                    if host_seen {
+                        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                    }
+                    host_seen = true;
                     host.clear();
                     host.push_str(value);
                 }
                 key if key.eq_ignore_ascii_case(CONTENT_LENGTH) => {
+                    if content_length_seen {
+                        return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
+                    }
+                    content_length_seen = true;
                     content_size = Self::check_http_body_size(value, max_body_size)?;
                 }
                 _ => {}
             }
-            Self::insert_http_header(headers, key_trimmed, value);
+            Self::insert_http_header(headers, key, value);
+        }
+        if *version == HTTP_HOST_REQUIRED_VERSION && !host_seen {
+            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
         }
         Ok(content_size)
     }

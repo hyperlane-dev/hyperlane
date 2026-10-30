@@ -128,3 +128,134 @@ fn request_target_adds_only_nonempty_queries() {
     assert_eq!(request_target("/path", Some("")), "/path");
     assert_eq!(request_target("/path", None), "/path");
 }
+
+fn authority_headers(pairs: &[(&str, &str)]) -> ProtocolHeaders {
+    let mut headers: ProtocolHeaders = ProtocolHeaders::new();
+    for (name, value) in pairs {
+        headers.append(
+            http::HeaderName::try_from(*name).expect("the header name must be valid"),
+            http::HeaderValue::try_from(*value).expect("the header value must be valid"),
+        );
+    }
+    headers
+}
+
+fn authority_uri(authority: &str) -> http::Uri {
+    http::Uri::try_from(format!("http://{authority}/path")).expect("the authority must build")
+}
+
+#[test]
+fn an_authority_that_disagrees_with_the_host_header_is_rejected() {
+    let headers: ProtocolHeaders = authority_headers(&[("host", "other.example")]);
+    let uri: http::Uri = authority_uri("authority.example");
+    assert!(matches!(
+        check_request_authority(&headers, &uri),
+        Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest))
+    ));
+}
+
+#[test]
+fn an_authority_that_agrees_with_the_host_header_is_accepted() {
+    let headers: ProtocolHeaders = authority_headers(&[("host", "authority.example")]);
+    let uri: http::Uri = authority_uri("authority.example");
+    assert!(check_request_authority(&headers, &uri).is_ok());
+}
+
+#[test]
+fn an_authority_that_differs_from_the_host_header_only_by_case_is_accepted() {
+    let headers: ProtocolHeaders = authority_headers(&[("host", "AUTHORITY.example")]);
+    let uri: http::Uri = authority_uri("authority.example");
+    assert!(check_request_authority(&headers, &uri).is_ok());
+}
+
+#[test]
+fn an_authority_and_a_host_header_that_name_different_ports_are_rejected() {
+    let headers: ProtocolHeaders = authority_headers(&[("host", "authority.example:8080")]);
+    let uri: http::Uri = authority_uri("authority.example");
+    assert!(matches!(
+        check_request_authority(&headers, &uri),
+        Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest))
+    ));
+}
+
+#[test]
+fn a_default_port_matches_an_authority_that_carries_no_port() {
+    let headers: ProtocolHeaders = authority_headers(&[("host", "authority.example:443")]);
+    let uri: http::Uri =
+        http::Uri::try_from("https://authority.example/path").expect("the uri must build");
+    assert!(check_request_authority(&headers, &uri).is_ok());
+}
+
+#[test]
+fn an_authority_that_carries_userinfo_is_rejected() {
+    let uri: http::Uri = authority_uri("user@authority.example");
+    let headers: ProtocolHeaders = authority_headers(&[("host", "user@authority.example")]);
+    assert!(matches!(
+        check_request_authority(&headers, &uri),
+        Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest))
+    ));
+}
+
+#[test]
+fn a_host_header_that_carries_userinfo_is_rejected() {
+    let uri: http::Uri = authority_uri("authority.example");
+    let headers: ProtocolHeaders = authority_headers(&[("host", "user@authority.example")]);
+    assert!(matches!(
+        check_request_authority(&headers, &uri),
+        Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest))
+    ));
+}
+
+#[test]
+fn two_host_headers_are_rejected() {
+    let uri: http::Uri = authority_uri("authority.example");
+    let headers: ProtocolHeaders =
+        authority_headers(&[("host", "authority.example"), ("host", "authority.example")]);
+    assert!(matches!(
+        check_request_authority(&headers, &uri),
+        Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest))
+    ));
+}
+
+#[test]
+fn a_request_without_a_host_header_is_accepted() {
+    let uri: http::Uri = authority_uri("authority.example");
+    let headers: ProtocolHeaders = ProtocolHeaders::new();
+    assert!(check_request_authority(&headers, &uri).is_ok());
+}
+
+#[test]
+fn an_authority_is_split_into_its_host_and_its_optional_port() {
+    assert_eq!(split_authority_port("example.com"), ("example.com", None));
+    assert_eq!(
+        split_authority_port("example.com:8080"),
+        ("example.com", Some("8080"))
+    );
+    assert_eq!(split_authority_port("[::1]:8080"), ("[::1]", Some("8080")));
+    assert_eq!(split_authority_port("[::1]"), ("[::1]", None));
+    assert_eq!(split_authority_port(" example.com "), ("example.com", None));
+}
+
+#[test]
+fn an_authority_is_normalized_by_case_and_by_the_scheme_default_port() {
+    assert_eq!(
+        normalize_authority("EXAMPLE.com", Some("http")),
+        ("example.com".to_string(), None)
+    );
+    assert_eq!(
+        normalize_authority("example.com:80", Some("http")),
+        ("example.com".to_string(), None)
+    );
+    assert_eq!(
+        normalize_authority("example.com:443", Some("https")),
+        ("example.com".to_string(), None)
+    );
+    assert_eq!(
+        normalize_authority("example.com:80", Some("https")),
+        ("example.com".to_string(), Some("80".to_string()))
+    );
+    assert_eq!(
+        normalize_authority("example.com:8080", None),
+        ("example.com".to_string(), Some("8080".to_string()))
+    );
+}
