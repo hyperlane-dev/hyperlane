@@ -47,17 +47,17 @@ members = [
 ]
 
 [workspace.dependencies]
-hyperlane = { path = ".", version = "22.0.10" }
-http-type = { path = "type", version = "22.0.10" }
-hyperlane-cli = { path = "cli", version = "22.0.10" }
-hyperlane-core = { path = "core", version = "22.0.10" }
-http-request = { path = "request", version = "22.0.10" }
-http-compress = { path = "compress", version = "22.0.10" }
-http-constant = { path = "constant", version = "22.0.10" }
-hyperlane-macros = { path = "macros", version = "22.0.10" }
-hyperlane-performance = { path = "performance", version = "22.0.10" }
-hyperlane-plugin-logger = { path = "plugin/logger", version = "22.0.10" }
-hyperlane-plugin-websocket = { path = "plugin/websocket", version = "22.0.10" }
+hyperlane = { path = ".", version = "22.0.11" }
+http-type = { path = "type", version = "22.0.11" }
+hyperlane-cli = { path = "cli", version = "22.0.11" }
+hyperlane-core = { path = "core", version = "22.0.11" }
+http-request = { path = "request", version = "22.0.11" }
+http-compress = { path = "compress", version = "22.0.11" }
+http-constant = { path = "constant", version = "22.0.11" }
+hyperlane-macros = { path = "macros", version = "22.0.11" }
+hyperlane-performance = { path = "performance", version = "22.0.11" }
+hyperlane-plugin-logger = { path = "plugin/logger", version = "22.0.11" }
+hyperlane-plugin-websocket = { path = "plugin/websocket", version = "22.0.11" }
 
 h3 = "0.0.8"
 h2 = "0.4.20"
