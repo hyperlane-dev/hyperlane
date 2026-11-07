@@ -123,9 +123,9 @@ fn bounded_body_rejects_excess_without_mutating_existing_bytes() {
 }
 
 #[test]
-fn request_target_adds_only_nonempty_queries() {
+fn request_target_distinguishes_absent_and_empty_queries() {
     assert_eq!(request_target("/path", Some("q=a%20b")), "/path?q=a%20b");
-    assert_eq!(request_target("/path", Some("")), "/path");
+    assert_eq!(request_target("/path", Some("")), "/path?");
     assert_eq!(request_target("/path", None), "/path");
 }
 

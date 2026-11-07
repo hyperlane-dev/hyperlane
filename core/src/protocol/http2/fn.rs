@@ -88,6 +88,7 @@ pub(crate) async fn h2_request_task(
         .await;
         return;
     }
+    let target: String = request_target(parts.uri.path(), parts.uri.query());
     let built: Result<Request, RequestError> = build_protocol_request(
         &request_config,
         ProtocolRequestHead {
@@ -116,7 +117,7 @@ pub(crate) async fn h2_request_task(
     };
     let is_head: bool = request.get_method().is_head();
     let (stream, peer): (Stream, DuplexStream) = build_duplex_transport(request_config, peers);
-    let lifecycle: ServerLifecycle = ServerLifecycle::new(server, request);
+    let lifecycle: ServerLifecycle = ServerLifecycle::new(server, request, target);
     let joined: Result<((), ()), ResponseError> = futures::try_join!(
         async {
             lifecycle.run(stream).await;

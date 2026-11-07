@@ -640,6 +640,7 @@ impl Server {
     /// - `&mut Stream` - The `Stream` for the current request.
     /// - `&mut Context` - The `Context` for the current request.
     /// - `Request` - The incoming request to be processed.
+    /// - `Option<String>` - The original target supplied by a multiplexed protocol.
     ///
     /// # Returns
     ///
@@ -649,13 +650,24 @@ impl Server {
         stream: &mut Stream,
         ctx: &mut Context,
         request: Request,
+        target: Option<String>,
     ) -> bool {
+        let target: Option<String> = target.or_else(|| {
+            stream
+                .get_line_buffer()
+                .split_ascii_whitespace()
+                .nth(1)
+                .map(str::to_owned)
+        });
         let keep_alive: bool = request.is_enable_keep_alive();
         let version: RequestVersion = request.get_version().clone();
         ctx.set_request(request);
         ctx.get_mut_response().reset().set_version(version);
         ctx.clear_route_params();
         ctx.clear_attribute();
+        if let Some(target) = target {
+            ctx.set_request_target(target);
+        }
         stream.set_closed(false);
         if self.handle_request_middleware(stream, ctx).await {
             return stream.is_keep_alive(keep_alive);
@@ -692,14 +704,14 @@ impl Server {
     /// - `&mut Context` - The `Context` for the current request.
     /// - `Request` - The initial request that established the keep-alive connection.
     async fn handle_http_requests(&self, stream: &mut Stream, ctx: &mut Context, request: Request) {
-        if !self.request_hook(stream, ctx, request).await {
+        if !self.request_hook(stream, ctx, request, None).await {
             return;
         }
         loop {
             let mut reused_request: Request = mem::take(ctx.get_mut_request());
             match stream.try_fill_http_request(&mut reused_request).await {
                 Ok(()) => {
-                    if !self.request_hook(stream, ctx, reused_request).await {
+                    if !self.request_hook(stream, ctx, reused_request, None).await {
                         return;
                     }
                 }
@@ -780,6 +792,7 @@ impl Server {
     /// - `&mut Stream` - The stream the pipeline writes its response onto.
     /// - `&mut Context` - The context for the current request.
     /// - `Request` - The request converted from the protocol head and body.
+    /// - `String` - The complete original target before query-map conversion.
     ///
     /// # Returns
     ///
@@ -789,9 +802,10 @@ impl Server {
         stream: &mut Stream,
         ctx: &mut Context,
         request: Request,
+        target: String,
     ) {
         let panicked: Option<PanicData> = catch_connection_panic(async {
-            let _keep_alive: bool = self.request_hook(stream, ctx, request).await;
+            let _keep_alive: bool = self.request_hook(stream, ctx, request, Some(target)).await;
         })
         .await;
         let Some(panic) = panicked else {

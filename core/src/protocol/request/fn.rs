@@ -526,13 +526,13 @@ pub fn push_bounded_body(
 /// - `String` - The target including its query string and query separator.
 pub fn request_target(path: &str, query: Option<&str>) -> String {
     match query {
-        Some(query) if !query.is_empty() => {
+        Some(query) => {
             let mut target: String = String::with_capacity(path.len() + query.len() + 1);
             target.push_str(path);
             target.push(QUESTION_MARK);
             target.push_str(query);
             target
         }
-        _ => path.to_owned(),
+        None => path.to_owned(),
     }
 }
