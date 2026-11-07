@@ -237,6 +237,28 @@ impl Context {
         self.try_get_route_param(name).unwrap()
     }
 
+    /// Returns the original wire request target before routing or query-map conversion.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<String>` - The unchanged path and query, or none for a manually constructed context.
+    pub fn get_request_target(&self) -> Option<String> {
+        self.try_get_attribute(REQUEST_TARGET_ATTRIBUTE)
+    }
+
+    /// Stores the original target for the current request before user middleware runs.
+    ///
+    /// # Arguments
+    ///
+    /// - `String` - The unmodified target supplied by the protocol transport.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Self` - The context retaining its request-local target snapshot.
+    pub(crate) fn set_request_target(&mut self, target: String) -> &mut Self {
+        self.set_attribute(REQUEST_TARGET_ATTRIBUTE, target)
+    }
+
     /// Attempts to retrieve a specific attribute by its key, casting it to the specified type.
     ///
     /// # Arguments

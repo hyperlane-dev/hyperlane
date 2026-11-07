@@ -8,9 +8,14 @@ impl ServerLifecycle {
     ///
     /// - `Arc<Server>` - The server whose pipeline serves the request.
     /// - `Request` - The request converted from the protocol head and body.
+    /// - `String` - The complete original request target.
     ///
-    pub(crate) fn new(server: Arc<Server>, request: Request) -> Self {
-        Self { server, request }
+    pub(crate) fn new(server: Arc<Server>, request: Request, target: String) -> Self {
+        Self {
+            server,
+            request,
+            target,
+        }
     }
 
     /// Runs the pipeline and returns once the handler and its writes finish.
@@ -23,7 +28,7 @@ impl ServerLifecycle {
     pub(crate) async fn run(self, mut stream: Stream) {
         let mut ctx: Context = Context::default();
         self.get_server()
-            .run_protocol_lifecycle(&mut stream, &mut ctx, self.get_request())
+            .run_protocol_lifecycle(&mut stream, &mut ctx, self.get_request(), self.get_target())
             .await;
     }
 }

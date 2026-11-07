@@ -32,6 +32,12 @@ cargo add hyperlane
 git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
 ```
 
+## Request targets
+
+Use `Context::get_request_target()` for an original path and query that retain
+their exact spelling across HTTP/1.1, HTTP/2 and HTTP/3. See
+[Original request targets](docs/request-target.md) for lifecycle and compatibility details.
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

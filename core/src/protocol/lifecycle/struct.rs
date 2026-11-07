@@ -23,4 +23,9 @@ pub(crate) struct ServerLifecycle {
     #[get_mut(skip)]
     #[set(pub(crate))]
     pub(super) request: Request,
+    /// The original URI target before protocol parsing split its query fields.
+    #[get(type(clone), pub(super))]
+    #[get_mut(skip)]
+    #[set(skip)]
+    pub(super) target: String,
 }
