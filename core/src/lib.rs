@@ -43,7 +43,7 @@ use std::{
     pin::Pin,
     ptr,
     str::{Split, SplitWhitespace, Utf8Error, from_utf8},
-    sync::Arc,
+    sync::{Arc, OnceLock},
     task::{self, Poll},
     time::Duration,
 };

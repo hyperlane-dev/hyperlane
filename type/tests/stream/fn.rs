@@ -345,6 +345,22 @@ async fn test_http_request_accepts_http_1_0_without_host() {
 }
 
 #[tokio::test]
+async fn test_http_request_preserves_known_and_unknown_methods_on_keep_alive() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+    client
+        .write_all(b"GET /one HTTP/1.1\r\nHost: localhost\r\n\r\nCUSTOM /two HTTP/1.1\r\nHost: localhost\r\n\r\n")
+        .await
+        .unwrap();
+    let mut stream: Stream =
+        Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+    let mut request: Request = Request::default();
+    stream.try_fill_http_request(&mut request).await.unwrap();
+    assert_eq!(request.get_method(), &Method::Get);
+    stream.try_fill_http_request(&mut request).await.unwrap();
+    assert_eq!(request.get_method(), &Method::Unknown("CUSTOM".to_owned()));
+}
+
+#[tokio::test]
 async fn test_http_request_accepts_decimal_content_length_with_optional_whitespace() {
     for value in ["5 ", "\t0005\t "] {
         let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);

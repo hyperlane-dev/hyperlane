@@ -45,6 +45,40 @@ fn response_header_operations() {
 }
 
 #[test]
+fn response_set_header_reuses_entry_and_replaces_repeated_values() {
+    let mut response: Response = Response::default();
+    response.add_header("x-custom", "first");
+    response.add_header("x-custom", "second");
+    response.set_header("x-custom", "replacement");
+    assert_eq!(response.get_header_size("x-custom"), 1);
+    assert_eq!(response.get_header_back("x-custom"), "replacement");
+    response.set_header("x-custom", "again");
+    assert_eq!(response.get_header_back("x-custom"), "again");
+    response.set_header("content-length", "incorrect");
+    assert!(!response.has_header("content-length"));
+    response.reset();
+    response.set_header("x-custom", "next request");
+    assert_eq!(response.get_header_back("x-custom"), "next request");
+}
+
+#[test]
+fn response_build_fills_empty_default_headers() {
+    let mut response: Response = Response::default();
+    response
+        .get_mut_headers()
+        .insert("connection".to_owned(), VecDeque::new());
+    response
+        .get_mut_headers()
+        .insert("content-type".to_owned(), VecDeque::new());
+    let _: Vec<u8> = response.build();
+    assert_eq!(response.get_header_back("connection"), "keep-alive");
+    assert_eq!(
+        response.get_header_back("content-type"),
+        "text/html; charset=utf-8"
+    );
+}
+
+#[test]
 fn response_add_header() {
     let mut response: Response = Response::default();
     response.add_header("x-custom", "value1");
