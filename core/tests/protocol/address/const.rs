@@ -2,6 +2,7 @@ pub(crate) const TARGET_ROUTE_PATH: &str = "/target";
 pub(crate) const TARGET_ECHO_HEADER: &str = "x-request-target";
 pub(crate) const TARGET_SPOOF_HEADER: &str = "hyperlane.request.target";
 pub(crate) const TARGET_SPOOF_VALUE: &str = "/untrusted?fake=1";
+pub(crate) const TARGET_TEMP_ATTRIBUTE: &str = "request-local-marker";
 pub(crate) const TARGET_REWRITTEN_PATH: &str = "/rewritten";
 pub(crate) const TRAILING_QUESTION_TARGET: &str = "/target?";
 

@@ -185,6 +185,27 @@ impl Lifetime for Context {
 
 /// Implementation of methods for `Context` structure.
 impl Context {
+    /// Returns the stable map key for the original request target.
+    ///
+    /// # Returns
+    ///
+    /// - `&'static str` - The attribute key used by the public attribute API.
+    fn request_target_key() -> &'static str {
+        static KEY: OnceLock<String> = OnceLock::new();
+        KEY.get_or_init(|| Attribute::External(REQUEST_TARGET_ATTRIBUTE.to_owned()).to_string())
+    }
+
+    /// Clears request-local attributes while retaining the target's buffers.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Self` - The context ready for the next request.
+    pub(crate) fn reset_request_attributes(&mut self) -> &mut Self {
+        self.get_mut_attributes()
+            .retain(|key: &String, _: &mut ArcAnySendSync| key == Self::request_target_key());
+        self
+    }
+
     /// Clears all route parameters while retaining the map's allocated capacity.
     ///
     /// Used between keep-alive requests on the same connection to avoid
@@ -243,20 +264,44 @@ impl Context {
     ///
     /// - `Option<String>` - The unchanged path and query, or none for a manually constructed context.
     pub fn get_request_target(&self) -> Option<String> {
-        self.try_get_attribute(REQUEST_TARGET_ATTRIBUTE)
+        self.get_attributes()
+            .get(Self::request_target_key())
+            .and_then(|arc: &ArcAnySendSync| arc.downcast_ref::<String>())
+            .cloned()
     }
 
     /// Stores the original target for the current request before user middleware runs.
     ///
     /// # Arguments
     ///
-    /// - `String` - The unmodified target supplied by the protocol transport.
+    /// - `T` - The unmodified target supplied by the protocol transport.
     ///
     /// # Returns
     ///
     /// - `&mut Self` - The context retaining its request-local target snapshot.
-    pub(crate) fn set_request_target(&mut self, target: String) -> &mut Self {
-        self.set_attribute(REQUEST_TARGET_ATTRIBUTE, target)
+    pub(crate) fn set_request_target<T>(&mut self, target: T) -> &mut Self
+    where
+        T: AsRef<str> + Into<String>,
+    {
+        if let Some(arc) = self
+            .get_mut_attributes()
+            .get_mut(Self::request_target_key())
+        {
+            if let Some(stored) = Arc::get_mut(arc)
+                .and_then(|value: &mut (dyn Any + Send + Sync)| value.downcast_mut::<String>())
+            {
+                stored.clear();
+                stored.push_str(target.as_ref());
+                return self;
+            }
+            *arc = Arc::new(target.into());
+            return self;
+        }
+        self.get_mut_attributes().insert(
+            Self::request_target_key().to_owned(),
+            Arc::new(target.into()),
+        );
+        self
     }
 
     /// Attempts to retrieve a specific attribute by its key, casting it to the specified type.

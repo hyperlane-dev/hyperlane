@@ -652,21 +652,23 @@ impl Server {
         request: Request,
         target: Option<String>,
     ) -> bool {
-        let target: Option<String> = target.or_else(|| {
-            stream
-                .get_line_buffer()
-                .split_ascii_whitespace()
-                .nth(1)
-                .map(str::to_owned)
-        });
         let keep_alive: bool = request.is_enable_keep_alive();
         let version: RequestVersion = request.get_version().clone();
         ctx.set_request(request);
         ctx.get_mut_response().reset().set_version(version);
         ctx.clear_route_params();
-        ctx.clear_attribute();
-        if let Some(target) = target {
-            ctx.set_request_target(target);
+        ctx.reset_request_attributes();
+        match target {
+            Some(target) => {
+                ctx.set_request_target(target);
+            }
+            None => {
+                if let Some(target) = stream.get_line_buffer().split_ascii_whitespace().nth(1) {
+                    ctx.set_request_target(target);
+                } else {
+                    ctx.clear_attribute();
+                }
+            }
         }
         stream.set_closed(false);
         if self.handle_request_middleware(stream, ctx).await {

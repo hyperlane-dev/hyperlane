@@ -357,7 +357,7 @@ impl Request {
         }
         let method: RequestMethod = method_str
             .parse::<RequestMethod>()
-            .unwrap_or(Method::Unknown(method_str.to_string()));
+            .unwrap_or_else(|_: ()| Method::Unknown(method_str.to_owned()));
         let version: RequestVersion = match version_str.parse::<RequestVersion>() {
             Ok(RequestVersion::Unknown(_)) | Err(_) => {
                 return Err(RequestError::HttpRequestPartsInsufficient(
@@ -1214,8 +1214,10 @@ impl Request {
     /// - `UpgradeType` - The parsed upgrade type.
     #[inline(always)]
     pub fn get_upgrade_type(&self) -> UpgradeType {
-        self.try_get_header_back(UPGRADE)
-            .and_then(|data: String| data.parse::<UpgradeType>().ok())
+        self.get_headers()
+            .get(UPGRADE)
+            .and_then(|values: &VecDeque<String>| values.back())
+            .and_then(|data: &String| data.parse::<UpgradeType>().ok())
             .unwrap_or_default()
     }
 
@@ -1445,7 +1447,11 @@ impl Request {
     /// - `bool` - Whether keep-alive should be enabled.
     #[inline(always)]
     pub fn is_enable_keep_alive(&self) -> bool {
-        if let Some(connection_value) = self.try_get_header_back(CONNECTION) {
+        if let Some(connection_value) = self
+            .get_headers()
+            .get(CONNECTION)
+            .and_then(|values: &VecDeque<String>| values.back())
+        {
             if connection_value.eq_ignore_ascii_case(KEEP_ALIVE) {
                 return true;
             } else if connection_value.eq_ignore_ascii_case(CLOSE) {

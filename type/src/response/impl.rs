@@ -72,6 +72,7 @@ impl Default for Response {
     }
 }
 
+/// Inherent implementation of [`Response`].
 impl Response {
     /// Pushes a header with a key and value as_ref the response string.
     ///
@@ -367,13 +368,13 @@ impl Response {
     ///
     /// # Arguments
     ///
-    /// - `&ResponseHeadersKey` - The header key to inspect.
+    /// - `&str` - The header key to inspect.
     ///
     /// # Returns
     ///
     /// - `bool` - `true` if the header is empty or not allowed, `false` if the header can be set.
     #[inline(always)]
-    fn should_skip_header(&self, key: &ResponseHeadersKey) -> bool {
+    fn should_skip_header(&self, key: &str) -> bool {
         key.trim().is_empty() || key == CONTENT_LENGTH
     }
 
@@ -395,13 +396,25 @@ impl Response {
         K: AsRef<str>,
         V: AsRef<str>,
     {
+        let key: &str = key.as_ref();
+        let value: &str = value.as_ref();
+        if let Some(values) = self.get_mut_headers().get_mut(key) {
+            values.truncate(1);
+            if let Some(slot) = values.front_mut() {
+                slot.clear();
+                slot.push_str(value);
+            } else {
+                values.push_back(value.to_owned());
+            }
+            return self;
+        }
         // A recycled entry carries the buffers of the name and of the value,
         // so a response that sets the same headers over and over stops
         // allocating for them.
         let (mut name, mut values): (String, VecDeque<String>) =
             take_header_entry().unwrap_or_else(|| (String::new(), VecDeque::new()));
         name.clear();
-        name.push_str(key.as_ref());
+        name.push_str(key);
         // A recycled entry may carry the values of a header that was sent
         // more than once. Those values belong to that header, so only the
         // first one is kept and the rest are dropped.
@@ -437,14 +450,11 @@ impl Response {
         K: AsRef<str>,
         V: AsRef<str>,
     {
-        let key: ResponseHeadersKey = key.as_ref().to_owned();
-        if self.should_skip_header(&key) {
+        let key: &str = key.as_ref();
+        if self.should_skip_header(key) {
             return self;
         }
-        let mut deque: VecDeque<String> = VecDeque::with_capacity(1);
-        deque.push_back(value.as_ref().to_owned());
-        self.headers.insert(key, deque);
-        self
+        self.set_header_without_check(key, value)
     }
 
     /// Adds a header to the response.
@@ -668,20 +678,31 @@ impl Response {
             self.set_reason_phrase(HttpStatus::phrase(self.get_status_code()));
         }
         let compress_type_opt: Option<Compress> = self
-            .try_get_header_back(CONTENT_ENCODING)
-            .map(|data: String| data.parse::<Compress>().unwrap_or_default());
-        if self.try_get_header_back(CONNECTION).is_none() {
+            .get_headers()
+            .get(CONTENT_ENCODING)
+            .and_then(|values: &VecDeque<String>| values.back())
+            .map(|data: &String| data.parse::<Compress>().unwrap_or_default());
+        if self
+            .get_headers()
+            .get(CONNECTION)
+            .and_then(|values: &VecDeque<String>| values.back())
+            .is_none()
+        {
             self.set_header_without_check(CONNECTION, KEEP_ALIVE);
         }
-        let owned_content_type: Option<String> = self.try_get_header_back(CONTENT_TYPE);
-        let content_type: &str = match owned_content_type {
-            Some(ref value) => value.as_str(),
-            None => {
-                let default: &str = default_content_type();
-                self.set_header_without_check(CONTENT_TYPE, default);
-                default
-            }
-        };
+        if self
+            .get_headers()
+            .get(CONTENT_TYPE)
+            .and_then(|values: &VecDeque<String>| values.back())
+            .is_none()
+        {
+            self.set_header_without_check(CONTENT_TYPE, default_content_type());
+        }
+        let is_event_stream: bool = self
+            .get_headers()
+            .get(CONTENT_TYPE)
+            .and_then(|values: &VecDeque<String>| values.back())
+            .is_some_and(|value: &String| value.eq_ignore_ascii_case(TEXT_EVENT_STREAM));
         let compressed_body: Option<Vec<u8>> = match compress_type_opt {
             Some(compress_type) if !compress_type.is_unknown() => Some(
                 compress_type
@@ -693,7 +714,7 @@ impl Response {
         let body_len: usize = compressed_body
             .as_ref()
             .map_or_else(|| self.get_body().len(), Vec::len);
-        if !content_type.eq_ignore_ascii_case(TEXT_EVENT_STREAM) {
+        if !is_event_stream {
             // The length is written into a pooled string, so announcing it
             // does not allocate a fresh one for every response.
             let mut length: String = take_recycled_string().unwrap_or_default();
