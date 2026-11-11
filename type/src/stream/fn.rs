@@ -28,29 +28,6 @@ pub(crate) fn return_header_entry(entry: (String, VecDeque<String>)) {
     });
 }
 
-/// Takes a recycled string from the pool.
-///
-/// # Returns
-///
-/// - `Option<String>` - The recycled string, or `None` when the pool is empty.
-pub(crate) fn take_recycled_string() -> Option<String> {
-    STRING_POOL.with(|pool: &RefCell<Vec<String>>| pool.borrow_mut().pop())
-}
-
-/// Returns a string to the pool for reuse.
-///
-/// # Arguments
-///
-/// - `String` - The string to recycle.
-pub(crate) fn return_recycled_string(value: String) {
-    STRING_POOL.with(|pool: &RefCell<Vec<String>>| {
-        let mut pool: RefMut<'_, Vec<String>> = pool.borrow_mut();
-        if pool.len() < MAX_POOLED_HEADER_ENTRIES {
-            pool.push(value);
-        }
-    });
-}
-
 /// Polls a future exactly once.
 ///
 /// # Arguments

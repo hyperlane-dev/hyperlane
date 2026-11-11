@@ -24,6 +24,27 @@ impl fmt::Display for HttpVersion {
     }
 }
 
+impl HttpVersion {
+    /// Returns the version's text without copying it.
+    ///
+    /// The text of a known version is a constant, so a caller that only reads
+    /// it borrows it rather than allocating a copy for every response.
+    ///
+    /// # Returns
+    ///
+    /// - `&str` - The version's text.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Http0_9 => HTTP_VERSION_0_9,
+            Self::Http1_0 => HTTP_VERSION_1_0,
+            Self::Http1_1 => HTTP_VERSION_1_1,
+            Self::Http2 => HTTP_VERSION_2,
+            Self::Http3 => HTTP_VERSION_3,
+            Self::Unknown(version) => version,
+        }
+    }
+}
+
 /// Implements the `FromStr` trait for `HttpVersion`, allowing conversion from a string slice.
 impl FromStr for HttpVersion {
     /// The error type returned when conversion fails.

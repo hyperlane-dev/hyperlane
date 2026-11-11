@@ -19,3 +19,31 @@ pub(crate) fn default_content_type() -> &'static str {
         content_type
     })
 }
+
+/// Renders a body length into the digits of a caller-owned buffer.
+///
+/// The length is announced on every response, so it is rendered without
+/// allocating: the digits are written into the buffer the caller owns and the
+/// caller copies them into the header.
+///
+/// # Arguments
+///
+/// - `usize` - The length to render.
+/// - `&mut [u8]` - The buffer the digits are written into.
+///
+/// # Returns
+///
+/// - `&str` - The rendered digits.
+pub(crate) fn render_length(length: usize, buffer: &mut [u8]) -> &str {
+    let mut cursor: usize = buffer.len();
+    let mut remaining: usize = length;
+    loop {
+        cursor -= 1;
+        buffer[cursor] = b'0' + u8::try_from(remaining % B_10).unwrap_or_default();
+        remaining /= B_10;
+        if remaining == 0 {
+            break;
+        }
+    }
+    from_utf8(&buffer[cursor..]).unwrap_or_default()
+}

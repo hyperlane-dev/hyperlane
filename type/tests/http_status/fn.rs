@@ -252,3 +252,26 @@ fn test_http_status_special_codes() {
     assert_eq!(HttpStatus::Unknown.code(), 0);
     assert_eq!(HttpStatus::Unknown.to_string(), "Unknown");
 }
+
+#[test]
+fn test_http_status_phrase_ref_borrows_the_same_phrase() {
+    assert_eq!(HttpStatus::phrase_ref(200), HttpStatus::phrase(200));
+    assert_eq!(HttpStatus::phrase_ref(404), HttpStatus::phrase(404));
+    assert_eq!(HttpStatus::phrase_ref(500), HttpStatus::phrase(500));
+    assert_eq!(HttpStatus::phrase_ref(0), HttpStatus::phrase(0));
+    assert_eq!(HttpStatus::phrase_ref(999), HttpStatus::phrase(999));
+}
+
+#[test]
+fn test_http_version_as_str_borrows_the_same_text() {
+    assert_eq!(
+        HttpVersion::Http1_1.as_str(),
+        HttpVersion::Http1_1.to_string()
+    );
+    assert_eq!(
+        HttpVersion::Http1_0.as_str(),
+        HttpVersion::Http1_0.to_string()
+    );
+    assert_eq!(HttpVersion::Http2.as_str(), HttpVersion::Http2.to_string());
+    assert_eq!(HttpVersion::Http3.as_str(), HttpVersion::Http3.to_string());
+}

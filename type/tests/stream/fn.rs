@@ -822,18 +822,6 @@ fn header_entry_pool_preserves_duplicate_value_order() {
     assert!(take_header_entry().is_none());
 }
 
-#[test]
-fn string_pool_returns_the_same_allocation() {
-    STRING_POOL.with(|pool: &RefCell<Vec<String>>| pool.borrow_mut().clear());
-    let value: String = String::from("content length");
-    let address: *const u8 = value.as_ptr();
-    return_recycled_string(value);
-    let recycled: String = take_recycled_string().unwrap();
-    assert_eq!(recycled, "content length");
-    assert_eq!(recycled.as_ptr(), address);
-    assert!(take_recycled_string().is_none());
-}
-
 #[tokio::test]
 async fn websocket_discards_fragment_state_after_close_error() {
     let (mut client, server): (DuplexStream, DuplexStream) = duplex(1024);

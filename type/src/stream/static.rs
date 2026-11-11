@@ -17,9 +17,4 @@ thread_local! {
     /// against each other inside the allocator.
     pub(crate) static HEADER_ENTRY_POOL: RefCell<Vec<(String, VecDeque<String>)>> =
         const { RefCell::new(Vec::new()) };
-    /// Thread-local pool of recycled strings.
-    ///
-    /// Used for the short lived strings a response builds, such as the
-    /// content length it announces.
-    pub(crate) static STRING_POOL: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
 }

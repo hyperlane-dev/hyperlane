@@ -48,7 +48,7 @@ use std::{
     cell::{RefCell, RefMut},
     collections::{HashMap, HashSet, VecDeque, hash_map::Entry},
     error::Error,
-    fmt::{self, Debug, Display, Formatter, Write},
+    fmt::{self, Debug, Display, Formatter},
     future::{self, Future},
     hash::Hash,
     io::{self, ErrorKind},

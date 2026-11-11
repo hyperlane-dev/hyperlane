@@ -27,6 +27,48 @@ fn response_keeps_the_reason_phrase_that_was_set() {
 }
 
 #[test]
+fn response_reset_restores_the_phrase_of_the_default_status() {
+    let mut response: Response = Response::default();
+    response.set_status_code(404);
+    let _: Vec<u8> = response.build();
+    assert_eq!(response.get_reason_phrase(), "Not Found");
+    response.reset();
+    assert_eq!(response.get_reason_phrase(), "OK");
+}
+
+#[test]
+fn response_build_writes_the_status_line_and_the_headers() {
+    let mut response: Response = Response::default();
+    response.set_header("connection", "keep-alive");
+    let data: Vec<u8> = response.build();
+    let text: String = String::from_utf8_lossy(&data).into_owned();
+    assert!(text.starts_with("HTTP/1.1 200 OK\r\n"), "{text:?}");
+    assert!(text.contains("connection:keep-alive\r\n"), "{text:?}");
+    assert!(text.contains("content-length:0\r\n"), "{text:?}");
+    assert!(text.ends_with("\r\n\r\n"), "{text:?}");
+}
+
+#[test]
+fn response_build_announces_the_length_of_the_body() {
+    let mut response: Response = Response::default();
+    response.set_body("hello");
+    let data: Vec<u8> = response.build();
+    let text: String = String::from_utf8_lossy(&data).into_owned();
+    assert!(text.contains("content-length:5\r\n"), "{text:?}");
+    assert!(text.ends_with("hello"), "{text:?}");
+}
+
+#[test]
+fn response_build_announces_the_length_of_a_large_body() {
+    let mut response: Response = Response::default();
+    let body: Vec<u8> = vec![b'x'; 1234];
+    response.set_body(body);
+    let data: Vec<u8> = response.build();
+    let text: String = String::from_utf8_lossy(&data).into_owned();
+    assert!(text.contains("content-length:1234\r\n"), "{text:?}");
+}
+
+#[test]
 fn response_header_operations() {
     let mut response: Response = Response::default();
     response.set_header("content-type", "application/json");

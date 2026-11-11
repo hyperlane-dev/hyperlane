@@ -74,19 +74,19 @@ impl Default for Response {
 
 /// Inherent implementation of [`Response`].
 impl Response {
-    /// Pushes a header with a key and value as_ref the response string.
+    /// Pushes a header with a key and value as_ref the response bytes.
     ///
     /// # Arguments
     ///
-    /// - `&mut String` - A mutable reference to the string where the header will be added.
+    /// - `&mut Vec<u8>` - A mutable reference to the bytes where the header will be added.
     /// - `&str` - The header key as a string slice (`&str`).
     /// - `&str` - The header value as a string slice (`&str`).
     #[inline(always)]
-    fn push_header(response_string: &mut String, key: &str, value: &str) {
-        response_string.push_str(key);
-        response_string.push_str(COLON);
-        response_string.push_str(value);
-        response_string.push_str(HTTP_BR);
+    fn push_header(response_bytes: &mut Vec<u8>, key: &str, value: &str) {
+        response_bytes.extend_from_slice(key.as_bytes());
+        response_bytes.extend_from_slice(COLON.as_bytes());
+        response_bytes.extend_from_slice(value.as_bytes());
+        response_bytes.extend_from_slice(HTTP_BR.as_bytes());
     }
 
     /// Tries to retrieve the value of a response header by its key.
@@ -561,8 +561,12 @@ impl Response {
     pub fn reset(&mut self) -> &mut Self {
         let http_status: HttpStatus = HttpStatus::default();
         self.set_status_code(http_status.code());
-        self.get_mut_reason_phrase().clear();
-        let _: fmt::Result = write!(self.get_mut_reason_phrase(), "{}", http_status);
+        // The phrase is written into the existing buffer rather than
+        // replaced, so a response that is reset over and over stops
+        // allocating for it.
+        let stored: &mut ResponseReasonPhrase = self.get_mut_reason_phrase();
+        stored.clear();
+        stored.push_str(HttpStatus::phrase_ref(http_status.code()));
         self.recycle_headers();
         self.get_mut_body().clear();
         self
@@ -675,7 +679,13 @@ impl Response {
     /// - `ResponseData` - The complete HTTP response bytes.
     pub fn build(&mut self) -> ResponseData {
         if self.get_reason_phrase().is_empty() || self.get_reason_phrase().as_str() == OK {
-            self.set_reason_phrase(HttpStatus::phrase(self.get_status_code()));
+            // The phrase is written into the existing buffer rather than
+            // replaced, so a response that announces the same status over and
+            // over stops allocating for it.
+            let phrase: &'static str = HttpStatus::phrase_ref(self.get_status_code());
+            let stored: &mut ResponseReasonPhrase = self.get_mut_reason_phrase();
+            stored.clear();
+            stored.push_str(phrase);
         }
         let compress_type_opt: Option<Compress> = self
             .get_headers()
@@ -715,13 +725,12 @@ impl Response {
             .as_ref()
             .map_or_else(|| self.get_body().len(), Vec::len);
         if !is_event_stream {
-            // The length is written into a pooled string, so announcing it
-            // does not allocate a fresh one for every response.
-            let mut length: String = take_recycled_string().unwrap_or_default();
-            length.clear();
-            let _: fmt::Result = write!(length, "{body_len}");
-            self.set_header_without_check(CONTENT_LENGTH, length.as_str());
-            return_recycled_string(length);
+            // The length is rendered into a stack buffer and then copied into
+            // the header's own buffer, so announcing the length allocates
+            // nothing beyond what the header already holds.
+            let mut digits: [u8; B_20] = [0; B_20];
+            let rendered: &str = render_length(body_len, &mut digits);
+            self.set_header_without_check(CONTENT_LENGTH, rendered);
         }
         let mut head_size: usize = self.get_reason_phrase().len() + B_16 + HTTP_BR.len();
         head_size += self
@@ -737,24 +746,24 @@ impl Response {
                     .sum::<usize>()
             })
             .sum::<usize>();
-        let mut response_string: String = String::with_capacity(head_size + body_len);
-        let _: fmt::Result = write!(
-            response_string,
-            "{} {} {}{HTTP_BR}",
-            self.get_version(),
-            self.get_status_code(),
-            self.get_reason_phrase()
-        );
+        let mut response_bytes: Vec<u8> = Vec::with_capacity(head_size + body_len);
+        response_bytes.extend_from_slice(self.get_version().as_str().as_bytes());
+        response_bytes.push(b' ');
+        let mut code: [u8; B_20] = [0; B_20];
+        response_bytes
+            .extend_from_slice(render_length(self.get_status_code(), &mut code).as_bytes());
+        response_bytes.push(b' ');
+        response_bytes.extend_from_slice(self.get_reason_phrase().as_bytes());
+        response_bytes.extend_from_slice(HTTP_BR.as_bytes());
         self.get_headers()
             .iter()
             .for_each(|header_entry: (&String, &VecDeque<String>)| {
                 let (header_key, header_values): (&String, &VecDeque<String>) = header_entry;
                 for header_value in header_values.iter() {
-                    Self::push_header(&mut response_string, header_key, header_value);
+                    Self::push_header(&mut response_bytes, header_key, header_value);
                 }
             });
-        response_string.push_str(HTTP_BR);
-        let mut response_bytes: Vec<u8> = response_string.into_bytes();
+        response_bytes.extend_from_slice(HTTP_BR.as_bytes());
         match &compressed_body {
             Some(body) => response_bytes.extend_from_slice(body),
             None => response_bytes.extend_from_slice(self.get_body()),
