@@ -39,7 +39,7 @@ pub(crate) fn render_length(length: usize, buffer: &mut [u8]) -> &str {
     let mut remaining: usize = length;
     loop {
         cursor -= 1;
-        buffer[cursor] = b'0' + u8::try_from(remaining % B_10).unwrap_or_default();
+        buffer[cursor] = u8::try_from(B_48 + remaining % B_10).unwrap_or_default();
         remaining /= B_10;
         if remaining == 0 {
             break;

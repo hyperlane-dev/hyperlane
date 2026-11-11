@@ -49,6 +49,48 @@ fn response_build_writes_the_status_line_and_the_headers() {
 }
 
 #[test]
+fn response_build_writes_the_exact_bytes() {
+    let mut response: Response = Response::default();
+    response.set_header("connection", "keep-alive");
+    response.set_status_code(200);
+    let data: Vec<u8> = response.build();
+    assert_eq!(
+        String::from_utf8_lossy(&data),
+        "HTTP/1.1 200 OK\r\ncontent-length:0\r\nconnection:keep-alive\r\n\
+         content-type:text/html; charset=utf-8\r\n\r\n"
+    );
+}
+
+#[test]
+fn response_build_writes_the_exact_bytes_of_a_response_with_a_body() {
+    let mut response: Response = Response::default();
+    response.set_status_code(404);
+    response.set_body("hello");
+    let data: Vec<u8> = response.build();
+    assert_eq!(
+        String::from_utf8_lossy(&data),
+        "HTTP/1.1 404 Not Found\r\ncontent-length:5\r\nconnection:keep-alive\r\n\
+         content-type:text/html; charset=utf-8\r\n\r\nhello"
+    );
+}
+
+#[test]
+fn response_build_writes_the_exact_bytes_of_a_response_with_a_long_length() {
+    let mut response: Response = Response::default();
+    response.set_body(vec![b'x'; 1234]);
+    let data: Vec<u8> = response.build();
+    let text: String = String::from_utf8_lossy(&data).into_owned();
+    assert!(
+        text.starts_with(
+            "HTTP/1.1 200 OK\r\ncontent-length:1234\r\nconnection:keep-alive\r\n\
+             content-type:text/html; charset=utf-8\r\n\r\n"
+        ),
+        "{text:?}"
+    );
+    assert_eq!(data.len(), 1336);
+}
+
+#[test]
 fn response_build_announces_the_length_of_the_body() {
     let mut response: Response = Response::default();
     response.set_body("hello");
