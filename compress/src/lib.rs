@@ -12,10 +12,9 @@ mod gzip;
 #[cfg(test)]
 #[path = "../tests/mod.rs"]
 mod tests;
+mod xx_hash3_64;
 
-pub use compress::*;
-
-pub use twox_hash::XxHash3_64;
+pub use {compress::*, xx_hash3_64::*};
 
 use std::{
     borrow::Cow,
@@ -33,4 +32,5 @@ use {
         read::{DeflateDecoder, GzDecoder},
         write::{DeflateEncoder, GzEncoder},
     },
+    twox_hash::xxhash3_64::{DEFAULT_SECRET_LENGTH, RawHasher, SecretBuffer},
 };

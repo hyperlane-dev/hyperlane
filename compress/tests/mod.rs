@@ -1,4 +1,5 @@
 mod compress;
+mod xx_hash3_64;
 
 use super::*;
 
@@ -7,4 +8,4 @@ use std::{
     collections::{HashMap, HashSet},
 };
 
-use {core::hash::BuildHasherDefault, twox_hash::XxHash3_64};
+use {core::hash::BuildHasherDefault, core::hash::Hasher};

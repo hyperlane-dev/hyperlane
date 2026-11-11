@@ -13,6 +13,7 @@ impl Default for Context {
             request: Request::default(),
             response: Response::default(),
             route_params: RouteParams::default(),
+            original_target: None,
             attributes: ThreadSafeAttributeStore::default(),
         }
     }
@@ -185,24 +186,18 @@ impl Lifetime for Context {
 
 /// Implementation of methods for `Context` structure.
 impl Context {
-    /// Returns the stable map key for the original request target.
+    /// Clears the attributes the application set for the previous request.
     ///
-    /// # Returns
-    ///
-    /// - `&'static str` - The attribute key used by the public attribute API.
-    fn request_target_key() -> &'static str {
-        static KEY: OnceLock<String> = OnceLock::new();
-        KEY.get_or_init(|| Attribute::External(REQUEST_TARGET_ATTRIBUTE.to_owned()).to_string())
-    }
-
-    /// Clears request-local attributes while retaining the target's buffers.
+    /// The original request target lives in its own field, so every attribute
+    /// in the map is request-local and the map is emptied outright. The map
+    /// keeps its capacity, so a connection that sets the same attributes over
+    /// and over stops allocating for them.
     ///
     /// # Returns
     ///
     /// - `&mut Self` - The context ready for the next request.
     pub(crate) fn reset_request_attributes(&mut self) -> &mut Self {
-        self.get_mut_attributes()
-            .retain(|key: &String, _: &mut ArcAnySendSync| key == Self::request_target_key());
+        self.get_mut_attributes().clear();
         self
     }
 
@@ -264,10 +259,16 @@ impl Context {
     ///
     /// - `Option<String>` - The unchanged path and query, or none for a manually constructed context.
     pub fn get_request_target(&self) -> Option<String> {
-        self.get_attributes()
-            .get(Self::request_target_key())
-            .and_then(|arc: &ArcAnySendSync| arc.downcast_ref::<String>())
-            .cloned()
+        self.get_request_target_ref().cloned()
+    }
+
+    /// Returns the original wire request target without copying it.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<&String>` - The unchanged path and query, or none for a manually constructed context.
+    pub(crate) fn get_request_target_ref(&self) -> Option<&String> {
+        self.original_target.as_ref()
     }
 
     /// Stores the original target for the current request before user middleware runs.
@@ -283,28 +284,23 @@ impl Context {
     where
         T: AsRef<str> + Into<String>,
     {
-        if let Some(arc) = self
-            .get_mut_attributes()
-            .get_mut(Self::request_target_key())
-        {
-            if let Some(stored) = Arc::get_mut(arc)
-                .and_then(|value: &mut (dyn Any + Send + Sync)| value.downcast_mut::<String>())
-            {
-                stored.clear();
-                stored.push_str(target.as_ref());
-                return self;
+        let stored: &mut Option<String> = &mut self.original_target;
+        match stored {
+            Some(existing) => {
+                existing.clear();
+                existing.push_str(target.as_ref());
             }
-            *arc = Arc::new(target.into());
-            return self;
+            None => {
+                *stored = Some(target.into());
+            }
         }
-        self.get_mut_attributes().insert(
-            Self::request_target_key().to_owned(),
-            Arc::new(target.into()),
-        );
         self
     }
 
     /// Attempts to retrieve a specific attribute by its key, casting it to the specified type.
+    ///
+    /// The original request target is readable under its own key, because the
+    /// framework stores it in its own field rather than in the attribute map.
     ///
     /// # Arguments
     ///
@@ -319,8 +315,23 @@ impl Context {
         V: AnySendSyncClone,
         K: AsRef<str>,
     {
+        let key: &str = key.as_ref();
+        if key == REQUEST_TARGET_ATTRIBUTE {
+            let target: Option<&String> = self.get_request_target_ref();
+            return match target {
+                Some(target) => {
+                    // The target is held as a plain string, so it is boxed
+                    // here to take the same downcast the map takes. This path
+                    // is not on the request path: the framework stores and
+                    // reads the target through its own field.
+                    let value: ArcAnySendSync = Arc::new(target.clone());
+                    value.downcast_ref::<V>().cloned()
+                }
+                None => None,
+            };
+        }
         self.get_attributes()
-            .get(&Attribute::External(key.as_ref().to_owned()).to_string())
+            .get(&Attribute::External(key.to_owned()).to_string())
             .and_then(|arc: &ArcAnySendSync| arc.downcast_ref::<V>())
             .cloned()
     }

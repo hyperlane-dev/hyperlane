@@ -12,6 +12,15 @@ pub struct Context {
     pub response: Response,
     /// Parameters extracted from the route path.
     pub route_params: RouteParams,
+    /// The original wire request target, before routing or query-map conversion.
+    ///
+    /// The target is read on every request and written on every request, so it
+    /// lives in its own field rather than in the attribute map: the map would
+    /// cost a hash, an allocation and a downcast for every request, and the
+    /// attribute map is for the attributes the application sets.
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) original_target: Option<String>,
     /// A collection of custom attributes for sharing data within the request lifecycle.
     pub attributes: ThreadSafeAttributeStore,
 }
