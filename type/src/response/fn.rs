@@ -9,7 +9,6 @@ use super::*;
 ///
 /// - `&'static str` - The default content type.
 pub(crate) fn default_content_type() -> &'static str {
-    static DEFAULT_CONTENT_TYPE: OnceLock<String> = OnceLock::new();
     DEFAULT_CONTENT_TYPE.get_or_init(|| {
         let mut content_type: String =
             String::with_capacity(TEXT_HTML.len() + SEMICOLON_SPACE.len() + CHARSET_UTF_8.len());
