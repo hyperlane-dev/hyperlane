@@ -4,3 +4,4 @@ target
 Cargo.lock
 performance/results/
 performance/results2/
+.codegraph/
