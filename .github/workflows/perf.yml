@@ -59,20 +59,20 @@ jobs:
         run: |
           set -e
           cargo fetch
-          cargo run --locked -q -p hyperlane-performance -- instrument .
-          cargo run --locked -q -p hyperlane-performance -- build candidate .
-          cargo run --locked -q -p hyperlane-performance -- build baseline "${{ runner.temp }}/baseline"
+          cargo run --locked -q -p hyperlane-performance --bin hyperlane-performance -- instrument .
+          cargo run --locked -q -p hyperlane-performance --bin hyperlane-performance -- build candidate .
+          cargo run --locked -q -p hyperlane-performance --bin hyperlane-performance -- build baseline "${{ runner.temp }}/baseline"
 
       - name: Measure
         run: |
           set -e
-          cargo run --locked -q -p hyperlane-performance -- bench candidate baseline
+          cargo run --locked -q -p hyperlane-performance --bin hyperlane-performance -- bench candidate baseline
 
       - name: Report
         run: |
           set -e
           set -o pipefail
-          cargo run --locked -q -p hyperlane-performance -- report | tee "${{ github.workspace }}/performance/results/report.txt"
+          cargo run --locked -q -p hyperlane-performance --bin hyperlane-performance -- report | tee "${{ github.workspace }}/performance/results/report.txt"
 
       - name: Upload the measurements
         if: always()
