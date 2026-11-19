@@ -137,7 +137,7 @@ pub(crate) async fn h3_request_task(env: H3RequestEnv, resolver: RequestResolver
 /// # Returns
 ///
 /// - `Result<(), RequestError>` - `Ok(())` once the body is complete and matches
-pub(crate) async fn collect_h3_body(
+async fn collect_h3_body(
     framer: &mut H3Framer,
     request_config: &RequestConfig,
     headers: &ProtocolHeaders,
@@ -145,14 +145,16 @@ pub(crate) async fn collect_h3_body(
 ) -> Result<(), RequestError> {
     let max_body_size: usize = request_config.get_max_body_size();
     let declared: Option<usize> = declared_content_length(headers, max_body_size)?;
+    let send_continue: bool =
+        declared != Some(0) && headers.contains_key(EXPECT) && has_continue_expectation(headers);
     let read_timeout_ms: u64 = request_config.get_read_timeout_ms();
     if read_timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
-        collect_h3_body_until_end(framer, max_body_size, body).await?;
+        collect_h3_body_until_end(framer, max_body_size, body, send_continue).await?;
     } else {
         let bound: Duration = Duration::from_millis(read_timeout_ms);
         match timeout(
             bound,
-            collect_h3_body_until_end(framer, max_body_size, body),
+            collect_h3_body_until_end(framer, max_body_size, body, send_continue),
         )
         .await
         {
@@ -169,6 +171,26 @@ pub(crate) async fn collect_h3_body(
     }
 }
 
+/// Sends the informational HEADERS frame without finishing the request stream.
+///
+/// # Arguments
+///
+/// - `&mut H3Framer` - The framer holding the open request stream.
+/// # Returns
+///
+/// - `Result<(), RequestError>` - Whether the informational frame could be sent.
+#[cold]
+async fn send_h3_continue(framer: &mut H3Framer) -> Result<(), RequestError> {
+    let request_stream: &mut RequestH3Stream = framer
+        .get_mut_request_stream()
+        .as_mut()
+        .ok_or_else(|| RequestError::Request(CONTENT_LENGTH_MISMATCH.to_owned()))?;
+    request_stream
+        .send_response(continue_response())
+        .await
+        .map_err(|error: StreamError| RequestError::Request(error.to_string()))
+}
+
 /// Drains an HTTP/3 request stream until end of body or a limit is violated.
 ///
 /// The stream stays owned by the framer and is borrowed across each await, so a
@@ -180,6 +202,7 @@ pub(crate) async fn collect_h3_body(
 /// - `&mut H3Framer` - The framer holding the request stream's receive half.
 /// - `usize` - The maximum number of body bytes to accept.
 /// - `&mut Vec<u8>` - The buffer to collect the body into.
+/// - `bool` - Whether to send a 100 Continue before reading the body.
 ///
 /// # Returns
 ///
@@ -188,7 +211,11 @@ async fn collect_h3_body_until_end(
     framer: &mut H3Framer,
     max_body_size: usize,
     body: &mut Vec<u8>,
+    send_continue: bool,
 ) -> Result<(), RequestError> {
+    if send_continue {
+        send_h3_continue(framer).await?;
+    }
     loop {
         let Some(request_stream) = framer.get_mut_request_stream().as_mut() else {
             return Err(RequestError::Request(CONTENT_LENGTH_MISMATCH.to_owned()));
@@ -234,16 +261,14 @@ pub(crate) async fn h3_fail_request(
     let mut request: Request = Request::default();
     request.set_version(version.clone());
     ctx.set_request(request);
-    ctx.get_mut_response().reset().set_version(version);
+    ctx.get_mut_response().reset().set_version(version.clone());
     let (mut stream, peer): (Stream, DuplexStream) =
         build_duplex_transport(env.request_config, env.peers);
     let is_head: bool = false;
     let server: Arc<Server> = env.server.clone();
     let (_, pump_result): ((), Result<(), ResponseError>) = join!(
         async move {
-            server
-                .handle_request_error(&mut stream, &mut ctx, &error)
-                .await;
+            reply_to_request_error(&server, &mut stream, &mut ctx, &error, Some(version)).await;
             drop(stream);
         },
         pump_response(framer, peer, RESPONSE_HEAD_MAX, is_head)

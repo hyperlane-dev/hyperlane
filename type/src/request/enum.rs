@@ -1,5 +1,13 @@
 use super::*;
 
+/// How the HTTP/1 request body is delimited on the wire.
+pub(crate) enum RequestFraming {
+    /// The declared byte count, or zero when no body is present.
+    Fixed(usize),
+    /// A chunked transfer coding with an explicit terminating chunk.
+    Chunked,
+}
+
 #[derive(Clone, Debug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
 pub enum RequestError {
     /// HTTP read error with HTTP status

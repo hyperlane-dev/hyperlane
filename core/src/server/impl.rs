@@ -654,6 +654,7 @@ impl Server {
     ) -> bool {
         let keep_alive: bool = request.is_enable_keep_alive();
         let version: RequestVersion = request.get_version().clone();
+        ctx.set_original_head(Some(request.get_method().is_head()));
         ctx.set_request(request);
         ctx.get_mut_response().reset().set_version(version);
         ctx.clear_route_params();
@@ -718,8 +719,9 @@ impl Server {
                     }
                 }
                 Err(error) => {
-                    ctx.set_request(reused_request);
-                    self.handle_request_error(stream, ctx, &error).await;
+                    ctx.set_original_head(None).set_request(reused_request);
+                    let version: Option<HttpVersion> = h1_error_response_version(stream, &error);
+                    Box::pin(reply_to_request_error(self, stream, ctx, &error, version)).await;
                     return;
                 }
             }
@@ -743,7 +745,8 @@ impl Server {
                 self.handle_http_requests(stream, ctx, request).await;
             }
             Err(error) => {
-                self.handle_request_error(stream, ctx, &error).await;
+                let version: Option<HttpVersion> = h1_error_response_version(stream, &error);
+                Box::pin(reply_to_request_error(self, stream, ctx, &error, version)).await;
             }
         }
     }

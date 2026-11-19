@@ -668,30 +668,64 @@ impl Response {
         self.try_get_cookie(key).unwrap()
     }
 
+    /// Removes framing fields before a header-only response is serialized.
+    #[cold]
+    fn clear_framing_headers(&mut self) {
+        self.get_mut_headers()
+            .retain(|name: &String, _: &mut ResponseHeadersValue| {
+                !name.eq_ignore_ascii_case(CONTENT_LENGTH)
+                    && !name.eq_ignore_ascii_case(TRANSFER_ENCODING)
+            });
+    }
+
     /// Builds the full HTTP response as a byte vector.
     ///
     /// This method constructs the complete HTTP response, including the status line,
     /// headers, and body. It handles content encoding, content type, connection
     /// management, and content length.
+    /// Informational, 204, 205, and 304 responses never serialize the body.
+    /// A 205 response declares a zero length; the other bodyless statuses
+    /// omit framing headers. For 304, the body cannot establish the length
+    /// of the selected representation.
     ///
     /// # Returns
     ///
     /// - `ResponseData` - The complete HTTP response bytes.
+    #[inline]
     pub fn build(&mut self) -> ResponseData {
+        Self::build_wire::<true>(self)
+    }
+
+    /// Builds an HTTP response to `HEAD` without serializing or compressing its body.
+    ///
+    /// Set the body to the matching `GET` representation if its length is known.
+    /// An empty buffer, an event stream, or a body that would be compressed does
+    /// not establish that length, so the generated response omits it.
+    ///
+    /// # Returns
+    ///
+    /// - `ResponseData` - The status line and headers ending at the header terminator.
+    #[must_use]
+    pub fn build_head(&mut self) -> ResponseData {
+        Self::build_wire::<false>(self)
+    }
+
+    /// Serializes either a full response or the header-only response to `HEAD`.
+    ///
+    /// # Returns
+    ///
+    /// - `ResponseData` - The encoded HTTP response.
+    fn build_wire<const INCLUDE_BODY: bool>(&mut self) -> ResponseData {
+        let status_code: ResponseStatusCode = self.get_status_code();
         if self.get_reason_phrase().is_empty() || self.get_reason_phrase().as_str() == OK {
             // The phrase is written into the existing buffer rather than
             // replaced, so a response that announces the same status over and
             // over stops allocating for it.
-            let phrase: &'static str = HttpStatus::phrase_ref(self.get_status_code());
+            let phrase: &'static str = HttpStatus::phrase_ref(status_code);
             let stored: &mut ResponseReasonPhrase = self.get_mut_reason_phrase();
             stored.clear();
             stored.push_str(phrase);
         }
-        let compress_type_opt: Option<Compress> = self
-            .get_headers()
-            .get(CONTENT_ENCODING)
-            .and_then(|values: &VecDeque<String>| values.back())
-            .map(|data: &String| data.parse::<Compress>().unwrap_or_default());
         if self
             .get_headers()
             .get(CONNECTION)
@@ -700,38 +734,62 @@ impl Response {
         {
             self.set_header_without_check(CONNECTION, KEEP_ALIVE);
         }
-        if self
-            .get_headers()
-            .get(CONTENT_TYPE)
-            .and_then(|values: &VecDeque<String>| values.back())
-            .is_none()
-        {
-            self.set_header_without_check(CONTENT_TYPE, default_content_type());
-        }
-        let is_event_stream: bool = self
-            .get_headers()
-            .get(CONTENT_TYPE)
-            .and_then(|values: &VecDeque<String>| values.back())
-            .is_some_and(|value: &String| value.eq_ignore_ascii_case(TEXT_EVENT_STREAM));
-        let compressed_body: Option<Vec<u8>> = match compress_type_opt {
-            Some(compress_type) if !compress_type.is_unknown() => Some(
-                compress_type
-                    .encode(self.get_body(), DEFAULT_BUFFER_SIZE)
-                    .into_owned(),
-            ),
-            _ => None,
+        let compressed_body: Option<ResponseBody>;
+        let body: &[u8] = match status_code {
+            100..=199 | 204 | 205 | 304 => {
+                self.clear_framing_headers();
+                if status_code == HttpStatus::ResetContent.code() {
+                    self.set_header_without_check(CONTENT_LENGTH, ZERO_STR);
+                }
+                &[]
+            }
+            _ => {
+                let content_type: Option<&String> = self
+                    .get_headers()
+                    .get(CONTENT_TYPE)
+                    .and_then(|values: &ResponseHeadersValue| values.back());
+                let is_event_stream: bool = if let Some(value) = content_type {
+                    value.eq_ignore_ascii_case(TEXT_EVENT_STREAM)
+                } else {
+                    self.set_header_without_check(CONTENT_TYPE, default_content_type());
+                    false
+                };
+                let compress_type: Option<Compress> = self
+                    .get_headers()
+                    .get(CONTENT_ENCODING)
+                    .and_then(|values: &ResponseHeadersValue| values.back())
+                    .map(|value: &String| value.parse::<Compress>().unwrap_or_default());
+                if INCLUDE_BODY {
+                    compressed_body = match compress_type {
+                        Some(encoding) if !encoding.is_unknown() => Some(
+                            encoding
+                                .encode(self.get_body(), DEFAULT_BUFFER_SIZE)
+                                .into_owned(),
+                        ),
+                        _ => None,
+                    };
+                    if !is_event_stream {
+                        let body_len: usize = compressed_body
+                            .as_ref()
+                            .map_or_else(|| self.get_body().len(), Vec::len);
+                        self.set_wire_content_length(body_len);
+                    }
+                    compressed_body
+                        .as_deref()
+                        .unwrap_or_else(|| self.get_body().as_slice())
+                } else {
+                    self.clear_framing_headers();
+                    let body_len: usize = self.get_body().len();
+                    if body_len != 0
+                        && !is_event_stream
+                        && !compress_type.is_some_and(|encoding: Compress| !encoding.is_unknown())
+                    {
+                        self.set_wire_content_length(body_len);
+                    }
+                    &[]
+                }
+            }
         };
-        let body_len: usize = compressed_body
-            .as_ref()
-            .map_or_else(|| self.get_body().len(), Vec::len);
-        if !is_event_stream {
-            // The length is rendered into a stack buffer and then copied into
-            // the header's own buffer, so announcing the length allocates
-            // nothing beyond what the header already holds.
-            let mut digits: [u8; B_20] = [0; B_20];
-            let rendered: &str = render_length(body_len, &mut digits);
-            self.set_header_without_check(CONTENT_LENGTH, rendered);
-        }
         let mut head_size: usize = self.get_reason_phrase().len() + B_16 + HTTP_BR.len();
         head_size += self
             .get_headers()
@@ -746,12 +804,11 @@ impl Response {
                     .sum::<usize>()
             })
             .sum::<usize>();
-        let mut response_bytes: Vec<u8> = Vec::with_capacity(head_size + body_len);
+        let mut response_bytes: Vec<u8> = Vec::with_capacity(head_size + body.len());
         response_bytes.extend_from_slice(self.get_version().as_str().as_bytes());
         response_bytes.push(b' ');
         let mut code: [u8; B_20] = [0; B_20];
-        response_bytes
-            .extend_from_slice(render_length(self.get_status_code(), &mut code).as_bytes());
+        response_bytes.extend_from_slice(render_length(status_code, &mut code).as_bytes());
         response_bytes.push(b' ');
         response_bytes.extend_from_slice(self.get_reason_phrase().as_bytes());
         response_bytes.extend_from_slice(HTTP_BR.as_bytes());
@@ -764,10 +821,19 @@ impl Response {
                 }
             });
         response_bytes.extend_from_slice(HTTP_BR.as_bytes());
-        match &compressed_body {
-            Some(body) => response_bytes.extend_from_slice(body),
-            None => response_bytes.extend_from_slice(self.get_body()),
-        }
+        response_bytes.extend_from_slice(body);
         response_bytes
+    }
+
+    /// Sets the generated content length using a stack buffer.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - The selected representation's length in bytes.
+    #[inline(always)]
+    fn set_wire_content_length(&mut self, body_len: usize) {
+        let mut digits: [u8; B_20] = [0; B_20];
+        let rendered: &str = render_length(body_len, &mut digits);
+        self.set_header_without_check(CONTENT_LENGTH, rendered);
     }
 }

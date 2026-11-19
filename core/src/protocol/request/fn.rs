@@ -438,6 +438,55 @@ pub fn declared_content_length(
     Ok(Some(declared))
 }
 
+/// Reports whether any Expect field requests a 100 Continue response.
+///
+/// # Arguments
+///
+/// - `&ProtocolHeaders` - The request headers.
+/// # Returns
+///
+/// - `bool` - Whether an unparameterized continue expectation is present.
+#[cold]
+pub(crate) fn has_continue_expectation(headers: &ProtocolHeaders) -> bool {
+    headers
+        .get_all(EXPECT)
+        .iter()
+        .any(|value: &HeaderValue| contains_continue_member(value.as_bytes()))
+}
+
+/// Matches a bare list member without splitting quoted extension values.
+///
+/// # Arguments
+///
+/// - `&[u8]` - One Expect field value.
+/// # Returns
+///
+/// - `bool` - Whether the field contains the continue token.
+fn contains_continue_member(value: &[u8]) -> bool {
+    let token: &[u8] = CONTINUE_EXPECT.as_bytes();
+    let mut start: usize = 0;
+    let mut quoted: bool = false;
+    let mut escaped: bool = false;
+    for (offset, byte) in value.iter().copied().enumerate() {
+        match byte {
+            _ if escaped => escaped = false,
+            b'\\' if quoted => escaped = true,
+            b'"' => quoted = !quoted,
+            COMMA_U8 if !quoted => {
+                if value[start..offset]
+                    .trim_ascii()
+                    .eq_ignore_ascii_case(token)
+                {
+                    return true;
+                }
+                start = offset + 1;
+            }
+            _ => {}
+        }
+    }
+    value[start..].trim_ascii().eq_ignore_ascii_case(token)
+}
+
 /// Parses a declared body length from one header field value.
 ///
 /// The length is a run of ASCII digits and nothing else. `str::parse` accepts

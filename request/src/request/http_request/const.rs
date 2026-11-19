@@ -13,7 +13,7 @@ pub(crate) const TRANSFER_ENCODING_PATTERN: &[u8] = b"transfer-encoding:";
 /// Used for case-sensitive matching of the chunked transfer encoding value.
 pub(crate) const CHUNKED_PATTERN: &[u8] = b"chunked";
 
-/// Error message used when the request method is neither GET nor POST.
+/// Error message used when the request method is unsupported.
 pub(crate) const METHOD_NOT_ALLOWED: &str = "Method Not Allowed";
 
 /// Error message used when a redirect was signalled but no target was found.

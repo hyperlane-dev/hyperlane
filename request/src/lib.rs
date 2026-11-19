@@ -48,3 +48,5 @@ pub use {
 
 pub use common::*;
 pub use lombok_macros::*;
+
+use http_type::{GET, HEAD};

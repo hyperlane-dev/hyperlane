@@ -72,8 +72,14 @@ pub(crate) async fn h2_request_task(
     let (parts, mut recv_stream): (http::request::Parts, H2RecvStream) = request.into_parts();
     let mut framer: H2Framer = H2Framer::new(send_response);
     let mut body: Vec<u8> = Vec::new();
-    if let Err(error) =
-        collect_h2_body(&mut recv_stream, &request_config, &parts.headers, &mut body).await
+    if let Err(error) = collect_h2_body(
+        &mut framer,
+        &mut recv_stream,
+        &request_config,
+        &parts.headers,
+        &mut body,
+    )
+    .await
     {
         h2_fail_request(
             &H2RequestEnv {
@@ -157,16 +163,14 @@ pub(crate) async fn h2_fail_request(
     let mut request: Request = Request::default();
     request.set_version(version.clone());
     ctx.set_request(request);
-    ctx.get_mut_response().reset().set_version(version);
+    ctx.get_mut_response().reset().set_version(version.clone());
     let (mut stream, peer): (Stream, DuplexStream) =
         build_duplex_transport(env.request_config, env.peers);
     let is_head: bool = false;
     let server: Arc<Server> = env.server.clone();
     let (_, pump_result): ((), Result<(), ResponseError>) = join!(
         async move {
-            server
-                .handle_request_error(&mut stream, &mut ctx, &error)
-                .await;
+            reply_to_request_error(&server, &mut stream, &mut ctx, &error, Some(version)).await;
             drop(stream);
         },
         pump_response(framer, peer, RESPONSE_HEAD_MAX, is_head)
@@ -188,6 +192,7 @@ pub(crate) async fn h2_fail_request(
 ///
 /// # Arguments
 ///
+/// - `&mut H2Framer` - The framer for an optional interim response.
 /// - `&mut H2RecvStream` - The receive half of the request stream.
 /// - `&RequestConfig` - The parsing limits to enforce.
 /// - `&ProtocolHeaders` - The protocol request headers carrying the declared length.
@@ -196,7 +201,8 @@ pub(crate) async fn h2_fail_request(
 /// # Returns
 ///
 /// - `Result<(), RequestError>` - `Ok(())` once the body is complete, or the
-pub(crate) async fn collect_h2_body(
+async fn collect_h2_body(
+    framer: &mut H2Framer,
     recv_stream: &mut H2RecvStream,
     request_config: &RequestConfig,
     headers: &ProtocolHeaders,
@@ -204,6 +210,16 @@ pub(crate) async fn collect_h2_body(
 ) -> Result<(), RequestError> {
     let max_body_size: usize = request_config.get_max_body_size();
     let declared: Option<usize> = declared_content_length(headers, max_body_size)?;
+    if declared != Some(0)
+        && headers.contains_key(EXPECT)
+        && !recv_stream.is_end_stream()
+        && has_continue_expectation(headers)
+        && let Some(sender) = framer.get_mut_send_response().as_mut()
+    {
+        sender
+            .send_informational(continue_response())
+            .map_err(|error: H2Error| RequestError::Request(error.to_string()))?;
+    }
     let read_timeout_ms: u64 = request_config.get_read_timeout_ms();
     if read_timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
         collect_h2_body_until_end(recv_stream, max_body_size, body).await?;

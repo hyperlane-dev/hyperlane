@@ -90,6 +90,138 @@ fn response_build_writes_the_exact_bytes_of_a_response_with_a_long_length() {
     assert_eq!(data.len(), 1336);
 }
 
+fn response_wire_parts(data: &[u8]) -> (&str, &[u8]) {
+    let separator: &[u8] = b"\r\n\r\n";
+    let end: usize = data
+        .windows(separator.len())
+        .position(|window: &[u8]| window == separator)
+        .expect("response has no header terminator");
+    let head: &str = str::from_utf8(&data[..end]).expect("response head is not UTF-8");
+    (head, &data[end + separator.len()..])
+}
+
+fn response_wire_header_values<'a>(head: &'a str, key: &str) -> Vec<&'a str> {
+    head.split("\r\n")
+        .skip(1)
+        .filter_map(|line: &str| line.split_once(':'))
+        .filter_map(|(name, value): (&str, &str)| {
+            name.eq_ignore_ascii_case(key).then_some(value.trim())
+        })
+        .collect()
+}
+
+#[test]
+fn response_build_early_hints_omits_body_and_framing_headers() {
+    let mut response: Response = Response::default();
+    response.set_status_code(103);
+    response.set_header(TRANSFER_ENCODING, CHUNKED);
+    response.set_body("discard me");
+
+    let data: ResponseData = response.build();
+    let (head, body): (&str, &[u8]) = response_wire_parts(&data);
+    let lengths: Vec<&str> = response_wire_header_values(head, CONTENT_LENGTH);
+    let encodings: Vec<&str> = response_wire_header_values(head, TRANSFER_ENCODING);
+
+    assert!(head.starts_with("HTTP/1.1 103 Early Hints\r\n"), "{head:?}");
+    assert_eq!(
+        (lengths, encodings, body),
+        (Vec::<&str>::new(), Vec::<&str>::new(), b"".as_slice()),
+        "{head:?}"
+    );
+}
+
+#[test]
+fn response_build_no_content_omits_body_and_framing_headers() {
+    let mut response: Response = Response::default();
+    response.set_status_code(204);
+    response
+        .get_mut_headers()
+        .insert(CONTENT_LENGTH.to_owned(), VecDeque::from(["10".to_owned()]));
+    response.set_header(TRANSFER_ENCODING, CHUNKED);
+    response.set_body("discard me");
+
+    let data: ResponseData = response.build();
+    let (head, body): (&str, &[u8]) = response_wire_parts(&data);
+    let lengths: Vec<&str> = response_wire_header_values(head, CONTENT_LENGTH);
+    let encodings: Vec<&str> = response_wire_header_values(head, TRANSFER_ENCODING);
+
+    assert!(head.starts_with("HTTP/1.1 204 No Content\r\n"), "{head:?}");
+    assert_eq!(
+        (lengths, encodings, body),
+        (Vec::<&str>::new(), Vec::<&str>::new(), b"".as_slice()),
+        "{head:?}"
+    );
+}
+
+#[test]
+fn response_build_reset_content_writes_zero_length_even_for_event_stream() {
+    let mut response: Response = Response::default();
+    response.set_status_code(205);
+    response.set_header(CONTENT_TYPE, TEXT_EVENT_STREAM);
+    response.set_header(TRANSFER_ENCODING, CHUNKED);
+    response.set_body("data: ignored\n\n");
+
+    let data: ResponseData = response.build();
+    let (head, body): (&str, &[u8]) = response_wire_parts(&data);
+    let lengths: Vec<&str> = response_wire_header_values(head, CONTENT_LENGTH);
+    let encodings: Vec<&str> = response_wire_header_values(head, TRANSFER_ENCODING);
+
+    assert!(
+        head.starts_with("HTTP/1.1 205 Reset Content\r\n"),
+        "{head:?}"
+    );
+    assert_eq!(
+        (lengths, encodings, body),
+        (vec!["0"], Vec::<&str>::new(), b"".as_slice()),
+        "{head:?}"
+    );
+}
+
+#[test]
+fn response_build_not_modified_preserves_etag_without_body_or_generated_length() {
+    let mut response: Response = Response::default();
+    response.set_status_code(304);
+    response.set_header(ETAG, "\"revision-1\"");
+    response.set_body("discard me");
+
+    let data: ResponseData = response.build();
+    let (head, body): (&str, &[u8]) = response_wire_parts(&data);
+    let lengths: Vec<&str> = response_wire_header_values(head, CONTENT_LENGTH);
+    let etags: Vec<&str> = response_wire_header_values(head, ETAG);
+
+    assert!(
+        head.starts_with("HTTP/1.1 304 Not Modified\r\n"),
+        "{head:?}"
+    );
+    assert_eq!(
+        (lengths, etags, body),
+        (Vec::<&str>::new(), vec!["\"revision-1\""], b"".as_slice()),
+        "{head:?}"
+    );
+}
+
+#[test]
+fn response_build_head_preserves_encoding_without_generating_a_length() {
+    let mut response: Response = Response::default();
+    response.set_body(b"representation");
+    let _: ResponseData = response.build();
+    response.set_header(CONTENT_ENCODING, GZIP);
+    let data: ResponseData = response.build_head();
+    let (head, body): (&str, &[u8]) = response_wire_parts(&data);
+    assert!(body.is_empty());
+    assert!(response_wire_header_values(head, CONTENT_LENGTH).is_empty());
+    assert_eq!(response_wire_header_values(head, CONTENT_ENCODING), [GZIP]);
+    assert_eq!(response.get_body(), b"representation");
+}
+
+#[test]
+fn response_build_head_omits_length_when_no_representation_was_provided() {
+    let data: ResponseData = Response::default().build_head();
+    let (head, body): (&str, &[u8]) = response_wire_parts(&data);
+    assert!(body.is_empty());
+    assert!(response_wire_header_values(head, CONTENT_LENGTH).is_empty());
+}
+
 #[test]
 fn response_build_announces_the_length_of_the_body() {
     let mut response: Response = Response::default();

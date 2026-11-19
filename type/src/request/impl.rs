@@ -586,14 +586,13 @@ impl Request {
     ///
     /// # Returns
     ///
-    /// - `Result<usize, RequestError>` - The content length parsed from the
-    ///   Content-Length header, or an error if parsing fails.
+    /// - `Result<RequestFraming, RequestError>` - The body framing, or an error if parsing fails.
     pub(crate) async fn get_http_headers<R>(
         &mut self,
         reader: &mut R,
         config: &RequestConfig,
         header_line_buffer: &mut String,
-    ) -> Result<usize, RequestError>
+    ) -> Result<RequestFraming, RequestError>
     where
         R: AsyncBufReadExt + Unpin,
     {
@@ -610,6 +609,7 @@ impl Request {
         let mut content_size: usize = 0;
         let mut header_count: usize = 0;
         let mut content_length_seen: bool = false;
+        let mut transfer_encoding_seen: bool = false;
         let mut host_seen: bool = false;
         loop {
             header_line_buffer.clear();
@@ -648,7 +648,10 @@ impl Request {
             Self::check_http_header_value_size(value, max_header_value_size)?;
             match key {
                 key if key.eq_ignore_ascii_case(HTTP_HEADER_TRANSFER_ENCODING) => {
-                    return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                    if *version != HTTP_HOST_REQUIRED_VERSION || content_length_seen {
+                        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                    }
+                    transfer_encoding_seen = true;
                 }
                 key if key.eq_ignore_ascii_case(HOST) => {
                     if host_seen {
@@ -659,6 +662,9 @@ impl Request {
                     host.push_str(value);
                 }
                 key if key.eq_ignore_ascii_case(CONTENT_LENGTH) => {
+                    if transfer_encoding_seen {
+                        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                    }
                     if content_length_seen {
                         return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
                     }
@@ -672,7 +678,24 @@ impl Request {
         if *version == HTTP_HOST_REQUIRED_VERSION && !host_seen {
             return Err(RequestError::HttpRead(HttpStatus::BadRequest));
         }
-        Ok(content_size)
+        if transfer_encoding_seen {
+            let values: &RequestHeadersValue = headers
+                .get(HTTP_HEADER_TRANSFER_ENCODING)
+                .ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
+            return r#fn::parse_transfer_encoding(values);
+        }
+        Ok(RequestFraming::Fixed(content_size))
+    }
+
+    /// Replaces wire chunk framing with the decoded content length.
+    #[cold]
+    pub(crate) fn normalize_chunked_headers(&mut self) {
+        let mut digits: [u8; B_20] = [0; B_20];
+        let length: &str = render_length(self.get_body().len(), &mut digits);
+        let headers: &mut RequestHeaders = self.get_mut_headers();
+        headers.remove(HTTP_HEADER_TRANSFER_ENCODING);
+        headers.remove(HTTP_HEADER_TRAILER);
+        Self::insert_http_header(headers, CONTENT_LENGTH, length);
     }
 
     /// Stores one header, reusing a pooled name and value where possible.
@@ -1124,6 +1147,87 @@ impl Request {
         } else {
             false
         }
+    }
+
+    /// Checks `If-None-Match` against the entity-tag of an existing representation.
+    ///
+    /// This explicitly invoked helper borrows normalized request headers and allocates nothing.
+    /// Strong and weak tags use case-sensitive weak comparison of their opaque values.
+    /// Repeated fields form one list; optional spaces, tabs, and empty list members are ignored.
+    /// A wildcard matches only when the entire field combination is a standalone `*`.
+    /// Missing headers, empty lists, invalid tags, or any malformed suffix return `false`,
+    /// even if an earlier tag matched. The current tag must be exactly one valid entity-tag,
+    /// without surrounding whitespace. Quoted commas and empty opaque values are valid;
+    /// backslashes are literal bytes, not escape characters.
+    ///
+    /// Call only for a representation that already exists. This does not send a response,
+    /// automatically generate a 304, or implement complete HTTP precondition evaluation.
+    /// Callers decide whether to send 304 for GET/HEAD or 412 for other methods and must
+    /// handle precondition ordering themselves. Do not use this for `If-Match`, which
+    /// requires strong comparison.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - The current representation's complete strong or weak entity-tag.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - Whether a completely valid `If-None-Match` matches the existing representation.
+    #[must_use]
+    pub fn matches_if_none_match(&self, current_etag: &str) -> bool {
+        let current: &[u8] = match r#fn::parse_entity_tag(current_etag.as_bytes()) {
+            Some((opaque, [])) => opaque,
+            _ => return false,
+        };
+        let values: &RequestHeadersValue = match self.get_headers().get(IF_NONE_MATCH) {
+            Some(values) => values,
+            None => return false,
+        };
+        if values.len() == 1
+            && values.front().is_some_and(|value: &String| {
+                value
+                    .trim_matches(&HTTP_HEADER_OPTIONAL_WHITESPACE[..])
+                    .as_bytes()
+                    == ENTITY_TAG_WILDCARD
+            })
+        {
+            return true;
+        }
+        let mut matched: bool = false;
+        for value in values {
+            let mut remaining: &[u8] = value.as_bytes();
+            while !remaining.is_empty() {
+                while remaining
+                    .first()
+                    .is_some_and(|byte: &u8| ENTITY_TAG_LIST_PADDING.contains(byte))
+                {
+                    remaining = &remaining[1..];
+                }
+                if remaining.is_empty() {
+                    break;
+                }
+                let (candidate, suffix): (&[u8], &[u8]) = match r#fn::parse_entity_tag(remaining) {
+                    Some(parsed) => parsed,
+                    None => return false,
+                };
+                matched |= candidate == current;
+                remaining = suffix;
+                while remaining
+                    .first()
+                    .is_some_and(|byte: &u8| ENTITY_TAG_OPTIONAL_WHITESPACE.contains(byte))
+                {
+                    remaining = &remaining[1..];
+                }
+                if remaining.is_empty() {
+                    break;
+                }
+                if remaining.first() != Some(&ENTITY_TAG_SEPARATOR) {
+                    return false;
+                }
+                remaining = &remaining[1..];
+            }
+        }
+        matched
     }
 
     /// Tries to parse cookies from the `Cookie` header.

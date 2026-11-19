@@ -1,5 +1,91 @@
 use super::*;
 
+/// Chooses an HTTP/1 reply version when the parser saw a request rather than an idle EOF.
+///
+/// # Arguments
+///
+/// - `&Stream` - The stream with its latest request line buffer.
+/// - `&RequestError` - The failure that ended parsing.
+/// # Returns
+///
+/// - `Option<HttpVersion>` - The response version, or no reply for an idle connection.
+#[cold]
+pub(crate) fn h1_error_response_version(
+    stream: &Stream,
+    error: &RequestError,
+) -> Option<HttpVersion> {
+    let line: &str = stream.get_line_buffer();
+    if line.is_empty()
+        && matches!(
+            error,
+            RequestError::HttpRequestPartsInsufficient(_) | RequestError::ReadTimeout(_)
+        )
+    {
+        return None;
+    }
+    if line.split_ascii_whitespace().nth(2) == Some(HTTP_VERSION_1_0) {
+        Some(HttpVersion::Http1_0)
+    } else {
+        Some(HttpVersion::Http1_1)
+    }
+}
+
+/// Reports a request failure on the wire unless a custom hook owns the response.
+///
+/// # Arguments
+///
+/// - `&Server` - The server that owns the request error hooks.
+/// - `&mut Stream` - The transport for the failed request.
+/// - `&mut Context` - The original context passed unchanged to custom hooks.
+/// - `&RequestError` - The failure that maps to the response status.
+/// - `Option<HttpVersion>` - The protocol version, or no default reply for an idle connection.
+#[cold]
+pub(crate) async fn reply_to_request_error(
+    server: &Server,
+    stream: &mut Stream,
+    ctx: &mut Context,
+    error: &RequestError,
+    version: Option<HttpVersion>,
+) {
+    if !server.get_request_error().is_empty() {
+        server.handle_request_error(stream, ctx, error).await;
+        return;
+    }
+    let Some(version) = version else { return };
+    if matches!(
+        error,
+        RequestError::ClientDisconnected(_)
+            | RequestError::ClientClosedConnection(_)
+            | RequestError::ServerClosedConnection(_)
+    ) {
+        return;
+    }
+    let h1: bool = version.is_http1_0() || version.is_http1_1();
+    let mut response: Response = Response::default();
+    response
+        .set_version(version)
+        .set_status_code(error.get_http_status_code());
+    if h1 {
+        response.set_header(CONNECTION, CLOSE);
+    }
+    let data: ResponseData = response.build();
+    if stream.try_send(data).await.is_ok() && h1 {
+        let _: Result<(), ResponseError> = stream.try_flush().await;
+    }
+}
+
+/// Builds the informational head without a body or framing fields.
+///
+/// # Returns
+///
+/// - `ProtocolResponse<()>` - The 100 Continue response head.
+#[cold]
+pub(crate) fn continue_response() -> ProtocolResponse<()> {
+    let mut response: ProtocolResponse<()> = ProtocolResponse::new(());
+    *response.status_mut() = StatusCode::CONTINUE;
+    response
+}
+
 /// Finds the end of an HTTP/1.1 response head inside buffered bytes.
 ///
 /// The header block is terminated by a bare line ending, so a complete head ends

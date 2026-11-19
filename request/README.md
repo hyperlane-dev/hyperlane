@@ -19,7 +19,9 @@
 - **Support for HTTP/HTTPS**: Supports both HTTP and HTTPS protocols.
 - **WebSocket Support**: Full WebSocket support with both synchronous and asynchronous APIs for real-time communication.
 - **Lightweight Design**: The `http_request` crate provides a simple and efficient API for building, sending, and handling HTTP requests while minimizing resource consumption.
-- **Supports Common HTTP Method**: Supports common HTTP methods such as GET and POST.
+- **HTTP Methods**: Supports GET, POST, and HEAD. Select HEAD with `set_method(Method::Head)`.
+  The client returns an empty body as soon as it reads the final response headers,
+  preserving representation metadata such as `Content-Length` and `Content-Encoding`.
 - **Flexible Request Building**: Offers rich configuration options through `RequestBuilder` to set request headers, bodies, and URLs.
 - **Simple Error Handling**: Utilizes the `Result` type to handle errors in requests and responses, making error handling straightforward.
 - **Custom Headers and Request Bodies**: Easily add custom headers and request bodies.

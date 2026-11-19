@@ -266,7 +266,7 @@ impl ServerHook for SendMiddleware {
     async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
         #[cfg(feature = "alloc-count")]
         count_request();
-        let data: Vec<u8> = ctx.get_mut_response().build();
+        let data: Vec<u8> = ctx.build_response();
         let _: Result<(), ResponseError> = stream.try_send(data).await;
         Status::Continue
     }

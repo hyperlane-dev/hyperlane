@@ -1,5 +1,87 @@
 use super::*;
 
+/// Decodes chunked request content on the same reader that owns pipelined bytes.
+///
+/// # Arguments
+///
+/// - `&mut PooledReader<'_>` - The reader positioned after the initial fields.
+/// - `&mut Request` - The request to populate with decoded content.
+/// - `&RequestConfig` - The request size limits.
+/// # Returns
+///
+/// - `Result<(), RequestError>` - Whether the complete chunked request was read.
+#[cold]
+pub(super) async fn fill_chunked_request(
+    reader: &mut PooledReader<'_>,
+    request: &mut Request,
+    config: &RequestConfig,
+) -> Result<(), RequestError> {
+    if expects_http_continue(request) {
+        let transport: &mut Box<dyn Transport> = reader.get_mut_stream();
+        transport.write_all(HTTP_CONTINUE_RESPONSE).await?;
+        transport.flush().await?;
+    }
+    fill_chunked_body(reader, request.get_mut_body(), config).await?;
+    request.normalize_chunked_headers();
+    Ok(())
+}
+
+/// Checks for the continue expectation on a request that has unread content.
+///
+/// # Arguments
+///
+/// - `&Request` - The request with a validated header section.
+///
+/// # Returns
+///
+/// - `bool` - Whether to send an HTTP/1.1 interim response.
+#[cold]
+pub(super) fn expects_http_continue(request: &Request) -> bool {
+    request.get_version().is_http1_1()
+        && request
+            .get_headers()
+            .get(EXPECT)
+            .is_some_and(|values: &RequestHeadersValue| {
+                values
+                    .iter()
+                    .any(|value: &String| contains_continue_member(value))
+            })
+}
+
+/// Finds the continue token without treating commas inside quoted values as separators.
+///
+/// # Arguments
+///
+/// - `&str` - One Expect field value.
+/// # Returns
+///
+/// - `bool` - Whether the field contains the bare continue expectation.
+fn contains_continue_member(value: &str) -> bool {
+    let mut start: usize = 0;
+    let mut quoted: bool = false;
+    let mut escaped: bool = false;
+    for (offset, byte) in value.bytes().enumerate() {
+        match byte {
+            _ if escaped => escaped = false,
+            b'\\' if quoted => escaped = true,
+            b'"' => quoted = !quoted,
+            COMMA_U8 if !quoted => {
+                if value[start..offset]
+                    .trim_matches([' ', '\t'])
+                    .eq_ignore_ascii_case(CONTINUE_EXPECT)
+                {
+                    return true;
+                }
+                start = offset + 1;
+            }
+            _ => {}
+        }
+    }
+    value[start..]
+        .trim_matches([' ', '\t'])
+        .eq_ignore_ascii_case(CONTINUE_EXPECT)
+}
+
 /// The number of header entries the pool keeps for reuse.
 pub(crate) const MAX_POOLED_HEADER_ENTRIES: usize = B_128;
 

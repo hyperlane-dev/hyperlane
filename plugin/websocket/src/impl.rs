@@ -404,15 +404,68 @@ where
     ///
     /// # Examples
     ///
-    /// ```rust,ignore
+    /// ```rust
+    /// use hyperlane::{Context, ServerHook, Status, Stream};
+    /// use hyperlane_plugin_websocket::WebSocketConfig;
+    /// # use hyperlane::{RequestConfig, Transport, tokio};
+    /// # use std::{io, net::SocketAddr, pin::Pin, task::{Context as TaskContext, Poll}};
+    /// # use tokio::io::{AsyncRead, AsyncWrite, DuplexStream, ReadBuf};
+    /// #
+    /// # #[derive(Debug)]
+    /// # struct MemoryTransport(DuplexStream);
+    /// #
+    /// # impl Transport for MemoryTransport {
+    /// #     fn peer_addr(&self) -> io::Result<SocketAddr> {
+    /// #         Err(io::ErrorKind::AddrNotAvailable.into())
+    /// #     }
+    /// #     fn local_addr(&self) -> io::Result<SocketAddr> {
+    /// #         Err(io::ErrorKind::AddrNotAvailable.into())
+    /// #     }
+    /// # }
+    /// #
+    /// # impl AsyncRead for MemoryTransport {
+    /// #     fn poll_read(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
+    /// #         Pin::new(&mut self.0).poll_read(cx, buf)
+    /// #     }
+    /// # }
+    /// #
+    /// # impl AsyncWrite for MemoryTransport {
+    /// #     fn poll_write(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+    /// #         Pin::new(&mut self.0).poll_write(cx, buf)
+    /// #     }
+    /// #     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>) -> Poll<io::Result<()>> {
+    /// #         Pin::new(&mut self.0).poll_flush(cx)
+    /// #     }
+    /// #     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>) -> Poll<io::Result<()>> {
+    /// #         Pin::new(&mut self.0).poll_shutdown(cx)
+    /// #     }
+    /// # }
+    ///
     /// struct MyConnectedHook;
+    ///
     /// impl ServerHook for MyConnectedHook {
-    ///     async fn new(_ctx: &Context) -> Self { Self }
-    ///     async fn handle(self, ctx: &Context) { /* ... */ }
+    ///     async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+    ///         Self
+    ///     }
+    ///
+    ///     async fn handle(self, _stream: &mut Stream, ctx: &mut Context) -> Status {
+    ///         ctx.set_attribute("connected", true);
+    ///         Status::Continue
+    ///     }
     /// }
     ///
-    /// let config = WebSocketConfig::new()
+    /// # let (transport, _peer): (DuplexStream, DuplexStream) = tokio::io::duplex(64);
+    /// # let mut stream: Stream = Stream::from_transport(MemoryTransport(transport), RequestConfig::default(), false);
+    /// # let mut ctx: Context = Context::default();
+    /// // Register the hook with the stream and context for this connection.
+    /// let config: WebSocketConfig<'_, String> = WebSocketConfig::new(&mut stream, &mut ctx)
     ///     .set_connected_hook::<MyConnectedHook>();
+    /// # let runtime: tokio::runtime::Runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
+    /// # runtime.block_on(async {
+    /// #     let status: Status = (config.connected_hook)(config.stream, config.context).await;
+    /// #     assert!(matches!(status, Status::Continue));
+    /// #     assert!(config.context.get_attribute::<bool, _>("connected"));
+    /// # });
     /// ```
     #[inline(always)]
     pub fn set_connected_hook<S>(mut self) -> Self
@@ -437,15 +490,68 @@ where
     ///
     /// # Examples
     ///
-    /// ```rust,ignore
+    /// ```rust
+    /// use hyperlane::{Context, ServerHook, Status, Stream};
+    /// use hyperlane_plugin_websocket::WebSocketConfig;
+    /// # use hyperlane::{RequestConfig, Transport, tokio};
+    /// # use std::{io, net::SocketAddr, pin::Pin, task::{Context as TaskContext, Poll}};
+    /// # use tokio::io::{AsyncRead, AsyncWrite, DuplexStream, ReadBuf};
+    /// #
+    /// # #[derive(Debug)]
+    /// # struct MemoryTransport(DuplexStream);
+    /// #
+    /// # impl Transport for MemoryTransport {
+    /// #     fn peer_addr(&self) -> io::Result<SocketAddr> {
+    /// #         Err(io::ErrorKind::AddrNotAvailable.into())
+    /// #     }
+    /// #     fn local_addr(&self) -> io::Result<SocketAddr> {
+    /// #         Err(io::ErrorKind::AddrNotAvailable.into())
+    /// #     }
+    /// # }
+    /// #
+    /// # impl AsyncRead for MemoryTransport {
+    /// #     fn poll_read(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
+    /// #         Pin::new(&mut self.0).poll_read(cx, buf)
+    /// #     }
+    /// # }
+    /// #
+    /// # impl AsyncWrite for MemoryTransport {
+    /// #     fn poll_write(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+    /// #         Pin::new(&mut self.0).poll_write(cx, buf)
+    /// #     }
+    /// #     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>) -> Poll<io::Result<()>> {
+    /// #         Pin::new(&mut self.0).poll_flush(cx)
+    /// #     }
+    /// #     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>) -> Poll<io::Result<()>> {
+    /// #         Pin::new(&mut self.0).poll_shutdown(cx)
+    /// #     }
+    /// # }
+    ///
     /// struct MyRequestHook;
+    ///
     /// impl ServerHook for MyRequestHook {
-    ///     async fn new(_ctx: &Context) -> Self { Self }
-    ///     async fn handle(self, ctx: &Context) { /* ... */ }
+    ///     async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+    ///         Self
+    ///     }
+    ///
+    ///     async fn handle(self, _stream: &mut Stream, ctx: &mut Context) -> Status {
+    ///         ctx.set_attribute("request_received", true);
+    ///         Status::Continue
+    ///     }
     /// }
     ///
-    /// let config = WebSocketConfig::new()
+    /// # let (transport, _peer): (DuplexStream, DuplexStream) = tokio::io::duplex(64);
+    /// # let mut stream: Stream = Stream::from_transport(MemoryTransport(transport), RequestConfig::default(), false);
+    /// # let mut ctx: Context = Context::default();
+    /// // Register the hook with the stream and context for this connection.
+    /// let config: WebSocketConfig<'_, String> = WebSocketConfig::new(&mut stream, &mut ctx)
     ///     .set_request_hook::<MyRequestHook>();
+    /// # let runtime: tokio::runtime::Runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
+    /// # runtime.block_on(async {
+    /// #     let status: Status = (config.request_hook)(config.stream, config.context).await;
+    /// #     assert!(matches!(status, Status::Continue));
+    /// #     assert!(config.context.get_attribute::<bool, _>("request_received"));
+    /// # });
     /// ```
     #[inline(always)]
     pub fn set_request_hook<S>(mut self) -> Self
@@ -470,15 +576,68 @@ where
     ///
     /// # Examples
     ///
-    /// ```rust,ignore
+    /// ```rust
+    /// use hyperlane::{Context, ServerHook, Status, Stream};
+    /// use hyperlane_plugin_websocket::WebSocketConfig;
+    /// # use hyperlane::{RequestConfig, Transport, tokio};
+    /// # use std::{io, net::SocketAddr, pin::Pin, task::{Context as TaskContext, Poll}};
+    /// # use tokio::io::{AsyncRead, AsyncWrite, DuplexStream, ReadBuf};
+    /// #
+    /// # #[derive(Debug)]
+    /// # struct MemoryTransport(DuplexStream);
+    /// #
+    /// # impl Transport for MemoryTransport {
+    /// #     fn peer_addr(&self) -> io::Result<SocketAddr> {
+    /// #         Err(io::ErrorKind::AddrNotAvailable.into())
+    /// #     }
+    /// #     fn local_addr(&self) -> io::Result<SocketAddr> {
+    /// #         Err(io::ErrorKind::AddrNotAvailable.into())
+    /// #     }
+    /// # }
+    /// #
+    /// # impl AsyncRead for MemoryTransport {
+    /// #     fn poll_read(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
+    /// #         Pin::new(&mut self.0).poll_read(cx, buf)
+    /// #     }
+    /// # }
+    /// #
+    /// # impl AsyncWrite for MemoryTransport {
+    /// #     fn poll_write(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+    /// #         Pin::new(&mut self.0).poll_write(cx, buf)
+    /// #     }
+    /// #     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>) -> Poll<io::Result<()>> {
+    /// #         Pin::new(&mut self.0).poll_flush(cx)
+    /// #     }
+    /// #     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>) -> Poll<io::Result<()>> {
+    /// #         Pin::new(&mut self.0).poll_shutdown(cx)
+    /// #     }
+    /// # }
+    ///
     /// struct MySendedHook;
+    ///
     /// impl ServerHook for MySendedHook {
-    ///     async fn new(_ctx: &Context) -> Self { Self }
-    ///     async fn handle(self, ctx: &Context) { /* ... */ }
+    ///     async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+    ///         Self
+    ///     }
+    ///
+    ///     async fn handle(self, _stream: &mut Stream, ctx: &mut Context) -> Status {
+    ///         ctx.set_attribute("message_sent", true);
+    ///         Status::Continue
+    ///     }
     /// }
     ///
-    /// let config = WebSocketConfig::new()
+    /// # let (transport, _peer): (DuplexStream, DuplexStream) = tokio::io::duplex(64);
+    /// # let mut stream: Stream = Stream::from_transport(MemoryTransport(transport), RequestConfig::default(), false);
+    /// # let mut ctx: Context = Context::default();
+    /// // Register the hook with the stream and context for this connection.
+    /// let config: WebSocketConfig<'_, String> = WebSocketConfig::new(&mut stream, &mut ctx)
     ///     .set_sended_hook::<MySendedHook>();
+    /// # let runtime: tokio::runtime::Runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
+    /// # runtime.block_on(async {
+    /// #     let status: Status = (config.sended_hook)(config.stream, config.context).await;
+    /// #     assert!(matches!(status, Status::Continue));
+    /// #     assert!(config.context.get_attribute::<bool, _>("message_sent"));
+    /// # });
     /// ```
     #[inline(always)]
     pub fn set_sended_hook<S>(mut self) -> Self
@@ -503,15 +662,68 @@ where
     ///
     /// # Examples
     ///
-    /// ```rust,ignore
+    /// ```rust
+    /// use hyperlane::{Context, ServerHook, Status, Stream};
+    /// use hyperlane_plugin_websocket::WebSocketConfig;
+    /// # use hyperlane::{RequestConfig, Transport, tokio};
+    /// # use std::{io, net::SocketAddr, pin::Pin, task::{Context as TaskContext, Poll}};
+    /// # use tokio::io::{AsyncRead, AsyncWrite, DuplexStream, ReadBuf};
+    /// #
+    /// # #[derive(Debug)]
+    /// # struct MemoryTransport(DuplexStream);
+    /// #
+    /// # impl Transport for MemoryTransport {
+    /// #     fn peer_addr(&self) -> io::Result<SocketAddr> {
+    /// #         Err(io::ErrorKind::AddrNotAvailable.into())
+    /// #     }
+    /// #     fn local_addr(&self) -> io::Result<SocketAddr> {
+    /// #         Err(io::ErrorKind::AddrNotAvailable.into())
+    /// #     }
+    /// # }
+    /// #
+    /// # impl AsyncRead for MemoryTransport {
+    /// #     fn poll_read(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
+    /// #         Pin::new(&mut self.0).poll_read(cx, buf)
+    /// #     }
+    /// # }
+    /// #
+    /// # impl AsyncWrite for MemoryTransport {
+    /// #     fn poll_write(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+    /// #         Pin::new(&mut self.0).poll_write(cx, buf)
+    /// #     }
+    /// #     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>) -> Poll<io::Result<()>> {
+    /// #         Pin::new(&mut self.0).poll_flush(cx)
+    /// #     }
+    /// #     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>) -> Poll<io::Result<()>> {
+    /// #         Pin::new(&mut self.0).poll_shutdown(cx)
+    /// #     }
+    /// # }
+    ///
     /// struct MyClosedHook;
+    ///
     /// impl ServerHook for MyClosedHook {
-    ///     async fn new(_ctx: &Context) -> Self { Self }
-    ///     async fn handle(self, ctx: &Context) { /* ... */ }
+    ///     async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+    ///         Self
+    ///     }
+    ///
+    ///     async fn handle(self, _stream: &mut Stream, ctx: &mut Context) -> Status {
+    ///         ctx.set_attribute("closed", true);
+    ///         Status::Continue
+    ///     }
     /// }
     ///
-    /// let config = WebSocketConfig::new()
+    /// # let (transport, _peer): (DuplexStream, DuplexStream) = tokio::io::duplex(64);
+    /// # let mut stream: Stream = Stream::from_transport(MemoryTransport(transport), RequestConfig::default(), false);
+    /// # let mut ctx: Context = Context::default();
+    /// // Register the hook with the stream and context for this connection.
+    /// let config: WebSocketConfig<'_, String> = WebSocketConfig::new(&mut stream, &mut ctx)
     ///     .set_closed_hook::<MyClosedHook>();
+    /// # let runtime: tokio::runtime::Runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
+    /// # runtime.block_on(async {
+    /// #     let status: Status = (config.closed_hook)(config.stream, config.context).await;
+    /// #     assert!(matches!(status, Status::Continue));
+    /// #     assert!(config.context.get_attribute::<bool, _>("closed"));
+    /// # });
     /// ```
     #[inline(always)]
     pub fn set_closed_hook<S>(mut self) -> Self

@@ -26,6 +26,30 @@ pub(crate) async fn start_limits_server(
     request_config: RequestConfig,
 ) -> Result<(ServerControlHook, u16), Box<ServerError>> {
     let mut server: Server = Server::default();
+    register_limits_hooks(&mut server);
+    run_limits_server(server, protocol, request_config).await
+}
+
+pub(super) async fn start_default_request_error_server(
+    protocol: ServerProtocol,
+    max_body_size: usize,
+) -> Result<(ServerControlHook, u16), Box<ServerError>> {
+    let mut server: Server = Server::default();
+    server.route::<BodyEchoRoute>(BODY_ECHO_ROUTE_PATH);
+    server.response_middleware::<LimitsResponseSender>();
+    run_limits_server(
+        server,
+        protocol,
+        limits_request_config(max_body_size, READ_TIMEOUT_MS),
+    )
+    .await
+}
+
+async fn run_limits_server(
+    mut server: Server,
+    protocol: ServerProtocol,
+    request_config: RequestConfig,
+) -> Result<(ServerControlHook, u16), Box<ServerError>> {
     let tls: Option<TlsConfig> = if protocol.is_quic() {
         Some(trusted_tls_config())
     } else {
@@ -33,11 +57,205 @@ pub(crate) async fn start_limits_server(
     };
     server.server_config(protocol_config(PLACEHOLDER_ADDRESS, protocol, tls));
     server.request_config(request_config);
-    register_limits_hooks(&mut server);
     let (control, port): (ServerControlHook, u16) = run_on_reserved_port(&mut server).await?;
     drop(server);
     sleep(Duration::from_millis(SERVER_BOOT_MILLIS)).await;
     Ok((control, port))
+}
+
+pub(super) fn http1_body_request(payload: &[u8]) -> Vec<u8> {
+    let mut request: Vec<u8> = format!(
+        "{POST} {BODY_ECHO_ROUTE_PATH} {HTTP_VERSION_1_1}{HTTP_BR}Host: {LOOPBACK_HOST}{HTTP_BR}\
+         {CONTENT_LENGTH}: {}{HTTP_DOUBLE_BR}",
+        payload.len(),
+    )
+    .into_bytes();
+    request.extend_from_slice(payload);
+    request
+}
+
+pub(super) async fn h2_oversized_body_then_get(
+    port: u16,
+) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+    let (mut sender, connection): (
+        h2::client::SendRequest<Bytes>,
+        h2::client::Connection<TcpStream, Bytes>,
+    ) = h2_plaintext_session(port).await?;
+    tokio::select! {
+        biased;
+        result = async {
+            let request: http::Request<()> =
+                h2_build_request(POST, &h2_target(port, BODY_ECHO_ROUTE_PATH), None)?;
+            let (response, mut send_stream): (h2::client::ResponseFuture, h2::SendStream<Bytes>) =
+                h2_open_stream(&mut sender, request, false)?;
+            h2_push_body(&mut send_stream, &oversized_payload(), true)?;
+            let reply: (u16, http::HeaderMap, Vec<u8>) = h2_await_response(response).await?;
+            let (status, _headers, _body): (u16, http::HeaderMap, Vec<u8>) =
+                h2_get(&mut sender, port, BODY_ECHO_ROUTE_PATH).await?;
+            if status != WIRE_OK_STATUS {
+                return Err(format!("later request on the same h2 connection returned {status}"));
+            }
+            Ok(reply)
+        } => result,
+        closed = connection => Err(format!("h2 connection ended during body limit test: {closed:?}")),
+    }
+}
+
+pub(super) async fn h3_oversized_body_then_get(
+    port: u16,
+) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await?;
+    let (mut driver, mut client): (
+        h3::client::Connection<h3_quinn::Connection, Bytes>,
+        h3::client::SendRequest<h3_quinn::OpenStreams, Bytes>,
+    ) = h3::client::new(h3_quinn::Connection::new(connection))
+        .await
+        .map_err(|error: h3::error::ConnectionError| format!("h3 handshake failed: {error}"))?;
+    let target: String = h3_target(port, BODY_ECHO_ROUTE_PATH);
+    tokio::select! {
+        biased;
+        result = async {
+            let reply: (u16, http::HeaderMap, Vec<u8>) =
+                h3_outcome_to_reply(h3_drive(&mut client, POST, &target, &oversized_payload()).await)?;
+            let (status, _headers, _body): (u16, http::HeaderMap, Vec<u8>) =
+                h3_outcome_to_reply(h3_drive(&mut client, GET, &target, &[]).await)?;
+            if status != WIRE_OK_STATUS {
+                return Err(format!("later request on the same h3 connection returned {status}"));
+            }
+            Ok(reply)
+        } => result,
+        closed = driver.wait_idle() => Err(format!("h3 connection ended during body limit test: {closed}")),
+    }
+}
+
+pub(super) async fn expect_exchange(
+    protocol: ServerProtocol,
+    content_length: usize,
+    upload: Option<&[u8]>,
+) -> (u16, Vec<u8>) {
+    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let (control, port): (ServerControlHook, u16) = start_limits_server(
+        protocol,
+        limits_request_config(MAX_BODY_SIZE, DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS),
+    )
+    .await
+    .expect("Expect test server must start");
+    let result: Result<Result<(u16, Vec<u8>), String>, tokio::time::error::Elapsed> =
+        timeout(Duration::from_secs(EXPECT_EXCHANGE_TIMEOUT_SECS), async {
+            match protocol {
+                ServerProtocol::Http2 => h2_expect_exchange(port, content_length, upload).await,
+                ServerProtocol::Http3 => h3_expect_exchange(port, content_length, upload).await,
+                _ => unreachable!("unsupported Expect test protocol"),
+            }
+        })
+        .await;
+    control.shutdown().await;
+    result
+        .expect("Expect exchange timed out while withholding or echoing the body")
+        .unwrap_or_else(|error: String| panic!("Expect exchange failed: {error}"))
+}
+
+fn expect_request(target: &str, content_length: usize) -> Result<http::Request<()>, String> {
+    http::Request::builder()
+        .method(POST)
+        .uri(target)
+        .header(EXPECT, CONTINUE_EXPECT)
+        .header(CONTENT_LENGTH, content_length.to_string())
+        .body(())
+        .map_err(|error: http::Error| format!("Expect request build failed: {error}"))
+}
+
+fn check_continue_head(head: &http::Response<()>) -> Result<(), String> {
+    if head.status() != http::StatusCode::CONTINUE || !head.headers().is_empty() {
+        return Err(format!("expected an empty 100 Continue head, got {head:?}"));
+    }
+    Ok(())
+}
+
+async fn h2_expect_exchange(
+    port: u16,
+    content_length: usize,
+    upload: Option<&[u8]>,
+) -> Result<(u16, Vec<u8>), String> {
+    let (mut sender, connection): (
+        h2::client::SendRequest<Bytes>,
+        h2::client::Connection<TcpStream, Bytes>,
+    ) = h2_plaintext_session(port).await?;
+    tokio::select! {
+        biased;
+        result = async {
+            let request: http::Request<()> =
+                expect_request(&h2_target(port, BODY_ECHO_ROUTE_PATH), content_length)?;
+            let (mut response, mut send_stream): (h2::client::ResponseFuture, h2::SendStream<Bytes>) =
+                h2_open_stream(&mut sender, request, false)?;
+            let interim: Option<http::Response<()>> = h2_next_informational(&mut response).await?;
+            if let Some(body) = upload {
+                let head: http::Response<()> = interim.ok_or_else(|| "expected 100 Continue before sending the body".to_owned())?;
+                check_continue_head(&head)?;
+                h2_push_body(&mut send_stream, body, true)?;
+                if let Some(head) = h2_next_informational(&mut response).await? {
+                    return Err(format!("expected the final response after 100 Continue, got {head:?}"));
+                }
+                let (status, _headers, echoed): (u16, http::HeaderMap, Vec<u8>) = h2_await_response(response).await?;
+                return Ok((status, echoed));
+            }
+            if let Some(head) = interim {
+                return Err(format!("oversized declaration received an informational response: {head:?}"));
+            }
+            let final_head: http::Response<h2::RecvStream> = response.await
+                .map_err(|error: h2::Error| format!("h2 rejection response failed: {error}"))?;
+            Ok((final_head.status().as_u16(), Vec::new()))
+        } => result,
+        closed = connection => Err(format!("h2 connection ended during Expect exchange: {closed:?}")),
+    }
+}
+
+async fn h2_next_informational(
+    response: &mut h2::client::ResponseFuture,
+) -> Result<Option<http::Response<()>>, String> {
+    poll_fn(|context: &mut task::Context<'_>| response.poll_informational(context))
+        .await
+        .transpose()
+        .map_err(|error: h2::Error| format!("h2 informational response failed: {error}"))
+}
+
+async fn h3_expect_exchange(
+    port: u16,
+    content_length: usize,
+    upload: Option<&[u8]>,
+) -> Result<(u16, Vec<u8>), String> {
+    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await?;
+    let (mut driver, mut client): (
+        h3::client::Connection<h3_quinn::Connection, Bytes>,
+        h3::client::SendRequest<h3_quinn::OpenStreams, Bytes>,
+    ) = h3::client::new(h3_quinn::Connection::new(connection))
+        .await
+        .map_err(|error: h3::error::ConnectionError| format!("h3 handshake failed: {error}"))?;
+    tokio::select! {
+        biased;
+        result = async {
+            let request: http::Request<()> =
+                expect_request(&h3_target(port, BODY_ECHO_ROUTE_PATH), content_length)?;
+            let mut stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> =
+                client.send_request(request).await
+                    .map_err(|error: h3::error::StreamError| format!("h3 send_request failed: {error}"))?;
+            let head: http::Response<()> = stream.recv_response().await
+                .map_err(|error: h3::error::StreamError| format!("h3 first response failed: {error}"))?;
+            let Some(body) = upload else {
+                return Ok((head.status().as_u16(), Vec::new()));
+            };
+            check_continue_head(&head)?;
+            stream.send_data(Bytes::copy_from_slice(body)).await
+                .map_err(|error: h3::error::StreamError| format!("h3 send_data failed: {error}"))?;
+            stream.finish().await
+                .map_err(|error: h3::error::StreamError| format!("h3 finish failed: {error}"))?;
+            let (status, _headers, echoed): (u16, http::HeaderMap, Vec<u8>) = h3_collect(&mut stream).await?;
+            Ok((status, echoed))
+        } => result,
+        closed = driver.wait_idle() => Err(format!("h3 connection ended during Expect exchange: {closed}")),
+    }
 }
 
 pub(crate) fn h2_build_request(
@@ -242,7 +460,11 @@ pub(crate) async fn h3_exchange(
     target: &str,
     body: &[u8],
 ) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
-    match h3_exchange_outcome(port, method, target, body).await {
+    h3_outcome_to_reply(h3_exchange_outcome(port, method, target, body).await)
+}
+
+fn h3_outcome_to_reply(outcome: LimitsOutcome) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+    match outcome {
         LimitsOutcome::Replied(status, headers, body) => Ok((status, headers, body)),
         LimitsOutcome::H3Reset(error) => Err(format!("h3 stream reset: {error:?}")),
         LimitsOutcome::TimedOut => Err("h3 exchange timed out".to_string()),
