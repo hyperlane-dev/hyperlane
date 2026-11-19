@@ -444,7 +444,20 @@ fn client_header_injection_is_rejected_without_opening_sync_or_async_connections
     });
 }
 
-fn exchange_client_response(response: &'static [u8], synchronous: bool) -> RequestResult {
+fn exchange_client_response(
+    response: &'static [u8],
+    synchronous: bool,
+    keep_open: bool,
+) -> RequestResult {
+    exchange_client_response_for_method(response, synchronous, keep_open, Method::Get)
+}
+
+fn exchange_client_response_for_method(
+    response: &'static [u8],
+    synchronous: bool,
+    keep_open: bool,
+    method: Method,
+) -> RequestResult {
     let runtime: http_type::tokio::runtime::Runtime =
         http_type::tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -456,6 +469,7 @@ fn exchange_client_response(response: &'static [u8], synchronous: bool) -> Reque
                 .await
                 .unwrap();
         let url: String = format!("http://{}/", listener.local_addr().unwrap());
+        let request_line: String = format!("{method} / HTTP/1.1\r\n");
         let server: http_type::tokio::task::JoinHandle<()> = http_type::tokio::spawn(async move {
             let mut stream: http_type::tokio::net::TcpStream = listener.accept().await.unwrap().0;
             let mut wire: Vec<u8> = Vec::new();
@@ -468,27 +482,78 @@ fn exchange_client_response(response: &'static [u8], synchronous: bool) -> Reque
                     break;
                 }
             }
-            assert!(wire.starts_with(b"GET / HTTP/1.1\r\n"));
+            assert!(wire.starts_with(request_line.as_bytes()));
             stream.write_all(response).await.unwrap();
-            stream.shutdown().await.unwrap();
+            if keep_open {
+                match stream.read(&mut buffer).await {
+                    Ok(length) => assert_eq!(length, 0),
+                    Err(error) => assert_eq!(error.kind(), io::ErrorKind::ConnectionReset),
+                }
+            } else {
+                stream.shutdown().await.unwrap();
+            }
         });
         let mut request: HttpRequest = HttpRequest::get(url);
         request
             .get_mut_config()
             .set_timeout(1000u64)
-            .set_buffer_size(8usize);
-        let result: RequestResult = if synchronous {
-            http_type::tokio::task::spawn_blocking(move || request.send())
-                .await
-                .unwrap()
-        } else {
-            http_type::tokio::time::timeout(Duration::from_secs(1), request.send_async())
-                .await
-                .unwrap()
-        };
-        server.await.unwrap();
-        result
+            .set_buffer_size(8usize)
+            .set_decode(true);
+        request.set_method(method);
+        http_type::tokio::time::timeout(Duration::from_secs(2), async move {
+            let result: RequestResult = if synchronous {
+                http_type::tokio::task::spawn_blocking(move || request.send())
+                    .await
+                    .unwrap()
+            } else {
+                request.send_async().await
+            };
+            server.await.unwrap();
+            result
+        })
+        .await
+        .expect("client and loopback peer did not finish the exchange")
     })
+}
+
+#[test]
+fn client_head_finishes_at_the_final_header_terminator() {
+    let cases: [(&[u8], &str, &str); 5] = [
+        (
+            b"HTTP/1.1 103 Early Hints\r\n\r\nHTTP/1.1 200 OK\r\nContent-Length: 42\r\n\r\n",
+            CONTENT_LENGTH,
+            "42",
+        ),
+        (
+            b"HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\n\r\n",
+            CONTENT_ENCODING,
+            "gzip",
+        ),
+        (
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n",
+            TRANSFER_ENCODING,
+            CHUNKED,
+        ),
+        (
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: gzip\r\n\r\n",
+            TRANSFER_ENCODING,
+            "gzip",
+        ),
+        (
+            b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n",
+            CONTENT_TYPE,
+            "text/plain",
+        ),
+    ];
+    for synchronous in [true, false] {
+        for (wire, name, value) in cases {
+            let response: HttpResponse =
+                exchange_client_response_for_method(wire, synchronous, true, Method::Head).unwrap();
+            assert_eq!(response.get_status_code(), 200);
+            assert!(response.bytes().is_empty());
+            assert_eq!(response.get_header(name), Some(value));
+        }
+    }
 }
 
 #[test]
@@ -507,10 +572,20 @@ fn client_propagates_response_framing_errors_through_sync_and_async_sends() {
             b"HTTP/1.1 200 OK\r\nX-Test: a\0b\r\nContent-Length: 0\r\n\r\n".as_slice(),
         ] {
             assert!(
-                exchange_client_response(response, synchronous).is_err(),
+                exchange_client_response(response, synchronous, false).is_err(),
                 "{synchronous}: {response:?}"
             );
         }
+    }
+}
+
+#[test]
+fn client_accepts_chunk_extension_whitespace_in_data_and_last_chunks() {
+    let wire: &[u8] = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n3 \t; name \t= \"a;b\"\r\nA\0\xff\r\n0\t; done\r\nX-Trailer: yes\r\n\r\n";
+    for synchronous in [true, false] {
+        let response: HttpResponse = exchange_client_response(wire, synchronous, true).unwrap();
+        assert_eq!(response.get_status_code(), 200);
+        assert_eq!(response.bytes(), b"A\0\xff");
     }
 }
 
@@ -521,7 +596,74 @@ fn client_accepts_valid_fragmented_fixed_length_and_chunked_responses() {
             b"HTTP/1.1 200 OK\r\nX-Content-Length: 999\r\nContent-Length: 5\r\n\r\nhello".as_slice(),
             b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1;foo=bar\r\nx\r\n0\r\nX-Trailer: yes\r\n\r\n".as_slice(),
         ] {
-            assert!(exchange_client_response(response, synchronous).is_ok(), "{synchronous}: {response:?}");
+            assert!(
+                exchange_client_response(response, synchronous, false).is_ok(),
+                "{synchronous}: {response:?}"
+            );
         }
     }
+}
+
+fn assert_client_returns_only_the_final_response(synchronous: bool) {
+    let wire: &[u8] = b"HTTP/1.1 100 Continue\r\nX-Interim: continue\r\n\r\n\
+        HTTP/1.1 103 Early Hints\r\nLink: </style.css>; rel=preload; as=style\r\n\r\n\
+        HTTP/1.1 200 OK\r\nContent-Length: 5\r\nX-Final: yes\r\n\r\nhello";
+    let response: HttpResponse = exchange_client_response(wire, synchronous, true).unwrap();
+    assert_eq!(response.get_status_code(), 200);
+    assert_eq!(response.get_header("x-final"), Some("yes"));
+    assert_eq!(response.get_header("x-interim"), None);
+    assert_eq!(response.get_header("link"), None);
+    assert_eq!(response.bytes(), b"hello");
+}
+
+#[test]
+fn client_sync_returns_only_the_final_response_after_100_and_103() {
+    assert_client_returns_only_the_final_response(true);
+}
+
+#[test]
+fn client_async_returns_only_the_final_response_after_100_and_103() {
+    assert_client_returns_only_the_final_response(false);
+}
+
+fn assert_client_finishes_bodyless_responses_without_eof(synchronous: bool) {
+    let no_content: &[u8] =
+        b"HTTP/1.1 204 No Content\r\nDate: Wed, 21 Oct 2015 07:28:00 GMT\r\n\r\n";
+    let not_modified: &[u8] = b"HTTP/1.1 304 Not Modified\r\nContent-Length: 42\r\n\r\n";
+    let response: HttpResponse = exchange_client_response(no_content, synchronous, true).unwrap();
+    assert_eq!(response.get_status_code(), 204);
+    assert_eq!(response.bytes(), b"");
+    let response: HttpResponse = exchange_client_response(not_modified, synchronous, true)
+        .expect("304 must complete at the header boundary despite its representation length");
+    assert_eq!(response.get_status_code(), 304);
+    assert_eq!(response.get_header("content-length"), Some("42"));
+    assert_eq!(response.bytes(), b"");
+}
+
+#[test]
+fn client_sync_finishes_bodyless_204_and_304_without_eof() {
+    assert_client_finishes_bodyless_responses_without_eof(true);
+}
+
+#[test]
+fn client_async_finishes_bodyless_204_and_304_without_eof() {
+    assert_client_finishes_bodyless_responses_without_eof(false);
+}
+
+fn assert_client_reads_close_delimited_body_through_eof(synchronous: bool) {
+    let wire: &[u8] = b"HTTP/1.0 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n\
+        first\r\n\r\nsecond\x00\xff";
+    let response: HttpResponse = exchange_client_response(wire, synchronous, false).unwrap();
+    assert_eq!(response.get_status_code(), 200);
+    assert_eq!(response.bytes(), b"first\r\n\r\nsecond\x00\xff");
+}
+
+#[test]
+fn client_sync_reads_close_delimited_body_through_eof() {
+    assert_client_reads_close_delimited_body_through_eof(true);
+}
+
+#[test]
+fn client_async_reads_close_delimited_body_through_eof() {
+    assert_client_reads_close_delimited_body_through_eof(false);
 }

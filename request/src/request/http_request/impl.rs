@@ -206,9 +206,11 @@ impl HttpRequest {
         let mut stream: BoxReadWrite = self.open_sync_stream(host, port)?;
         let method: Method = self.get_method();
         if method.is_get() {
-            self.send_get_request_sync(&mut stream)
+            self.send_bodyless_request_sync(&mut stream, false)
         } else if method.is_post() {
             self.send_post_request_sync(&mut stream)
+        } else if method.is_head() {
+            self.send_bodyless_request_sync(&mut stream, true)
         } else {
             Err(RequestError::Request(METHOD_NOT_ALLOWED.to_string()))
         }
@@ -227,9 +229,11 @@ impl HttpRequest {
         let mut stream: BoxAsyncReadWrite = self.open_async_stream(host, port).await?;
         let method: Method = self.get_method();
         if method.is_get() {
-            self.send_get_request_async(&mut stream).await
+            self.send_bodyless_request_async(&mut stream, false).await
         } else if method.is_post() {
             self.send_post_request_async(&mut stream).await
+        } else if method.is_head() {
+            self.send_bodyless_request_async(&mut stream, true).await
         } else {
             Err(RequestError::Request(METHOD_NOT_ALLOWED.to_string()))
         }
@@ -299,28 +303,31 @@ impl HttpRequest {
         }
     }
 
-    /// Write a GET request to the stream and read the response.
+    /// Writes a GET or HEAD request without a body and reads the response.
     ///
     /// # Arguments
     ///
-    /// - `&mut BoxReadWrite` - The connected stream used to write the request and read the response.
+    /// - `&mut BoxReadWrite` - The connected stream used to exchange the request and response.
+    /// - `bool` - Whether to send HEAD instead of GET.
     ///
     /// # Returns
     ///
-    /// - `Result<HttpResponse, RequestError>` - The parsed response, or a `RequestError` on I/O or parse failure.
-    fn send_get_request_sync(
+    /// - `Result<HttpResponse, RequestError>` - The parsed response or an exchange error.
+    fn send_bodyless_request_sync(
         &mut self,
         stream: &mut BoxReadWrite,
+        is_head: bool,
     ) -> Result<HttpResponse, RequestError> {
         let path: String = self.full_path()?;
         let header_bytes: Vec<u8> = self.header_bytes(0)?;
         let version: String = self.get_config().get_http_version().to_string();
-        let request: Vec<u8> = build_http_request("GET", path, header_bytes, None, version);
+        let method: &str = if is_head { HEAD } else { GET };
+        let request: Vec<u8> = build_http_request(method, path, header_bytes, None, version);
         stream
             .write_all(&request)
             .and_then(|_: ()| stream.flush())
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        self.read_response_sync(stream)
+        self.read_response_sync(stream, is_head)
     }
 
     /// Write a POST request with the encoded body to the stream and read the response.
@@ -351,14 +358,15 @@ impl HttpRequest {
             .write_all(&request)
             .and_then(|_: ()| stream.flush())
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        self.read_response_sync(stream)
+        self.read_response_sync(stream, false)
     }
 
-    /// Read a full response from the stream, handling content-length and chunked bodies.
+    /// Reads an HTTP/1 response using the framing for the request method.
     ///
     /// # Arguments
     ///
     /// - `&mut BoxReadWrite` - The connected stream to read the response from.
+    /// - `bool` - Whether this response answers a HEAD request.
     ///
     /// # Returns
     ///
@@ -366,22 +374,12 @@ impl HttpRequest {
     fn read_response_sync(
         &mut self,
         stream: &mut BoxReadWrite,
+        is_head: bool,
     ) -> Result<HttpResponse, RequestError> {
         let buffer_size: usize = self.get_config().buffer_size;
         let mut buffer: Vec<u8> = vec![0u8; buffer_size];
         let mut response_bytes: Vec<u8> = Vec::with_capacity(buffer_size.max(8192));
-        let mut headers_done: bool = false;
-        let mut content_length: usize = 0usize;
-        let mut redirect_url: Option<Vec<u8>> = None;
-        let mut headers_end_pos: usize = 0usize;
-        let mut is_chunked: bool = false;
-        let version_bytes: Vec<u8> = self
-            .config
-            .get_http_version()
-            .to_string()
-            .to_ascii_lowercase()
-            .into_bytes();
-        let location_key: Vec<u8> = format!("{}:", LOCATION.to_ascii_lowercase()).into_bytes();
+        let mut head: Option<FinalResponseHead> = None;
         loop {
             let n: usize = stream
                 .read(&mut buffer)
@@ -396,49 +394,28 @@ impl HttpRequest {
             }
             let old_len: usize = response_bytes.len();
             response_bytes.extend_from_slice(&buffer[..n]);
-            if !headers_done {
-                let search_start: usize = old_len.saturating_sub(3);
-                if let Some(pos) = find_double_crlf(&response_bytes, search_start) {
-                    headers_done = true;
-                    headers_end_pos = pos + 4;
-                    parse_response_headers(
-                        &response_bytes[..headers_end_pos],
-                        &version_bytes,
-                        &location_key,
-                        &mut content_length,
-                        &mut redirect_url,
-                        &mut is_chunked,
-                    )?;
-                }
+            if head.is_none() {
+                head = find_final_response_head(
+                    &mut response_bytes,
+                    old_len.saturating_sub(3),
+                    is_head,
+                )?;
             }
-            if headers_done {
-                if is_chunked {
-                    if Self::is_chunked_response_complete(&response_bytes[headers_end_pos..])? {
-                        break;
-                    }
-                } else if response_bytes.len() >= headers_end_pos + content_length {
-                    response_bytes.truncate(headers_end_pos + content_length);
-                    break;
-                }
+            if let Some((end, framing, _)) = &head
+                && response_body_is_complete(*framing, &response_bytes[*end..])?
+            {
+                break;
             }
         }
-        if !headers_done {
+        let Some((head_end, framing, mut redirect_url)) = head else {
             return Err(RequestError::HttpRequestPartsInsufficient(
                 HttpStatus::BadRequest,
             ));
-        }
-        if !is_chunked && response_bytes.len() < headers_end_pos + content_length {
-            return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
-        }
-        if is_chunked {
-            let body_bytes: Vec<u8> = response_bytes[headers_end_pos..].to_vec();
-            let decoded: Vec<u8> = parse_chunked_body(&body_bytes)?;
-            response_bytes.truncate(headers_end_pos);
-            response_bytes.extend_from_slice(&decoded);
-        }
-        let mut response: HttpResponse = HttpResponse::from_bytes(&response_bytes);
+        };
+        let mut response: HttpResponse =
+            finish_framed_response(&response_bytes, head_end, framing)?;
         if !self.get_config().get_redirect() || redirect_url.is_none() {
-            if self.get_config().get_decode() {
+            if !is_head && self.get_config().get_decode() {
                 response = response.decode(self.get_config().buffer_size);
             }
             return Ok(response);
@@ -478,19 +455,6 @@ impl HttpRequest {
             .set_max_redirect_times(remaining.saturating_sub(1));
         self.set_url(url);
         self.send_sync()
-    }
-
-    /// Check whether a chunked response body has received its terminating zero-length chunk.
-    ///
-    /// # Arguments
-    ///
-    /// - `&[u8]` - The raw chunked body bytes received so far.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<bool, RequestError>` - Completion state, or an error for invalid chunk framing.
-    fn is_chunked_response_complete(body_bytes: &[u8]) -> Result<bool, RequestError> {
-        chunked_body_end(body_bytes).map(|end: Option<usize>| end.is_some())
     }
 
     // ---------- async stream plumbing ----------
@@ -535,23 +499,26 @@ impl HttpRequest {
         }
     }
 
-    /// Write a GET request to the stream and read the response.
+    /// Writes a GET or HEAD request without a body and reads the response.
     ///
     /// # Arguments
     ///
-    /// - `&mut BoxAsyncReadWrite` - The connected stream used to write the request and read the response.
+    /// - `&mut BoxAsyncReadWrite` - The connected stream used to exchange the request and response.
+    /// - `bool` - Whether to send HEAD instead of GET.
     ///
     /// # Returns
     ///
-    /// - `Result<HttpResponse, RequestError>` - The parsed response, or a `RequestError` on I/O or parse failure.
-    async fn send_get_request_async(
+    /// - `Result<HttpResponse, RequestError>` - The parsed response or an exchange error.
+    async fn send_bodyless_request_async(
         &mut self,
         stream: &mut BoxAsyncReadWrite,
+        is_head: bool,
     ) -> Result<HttpResponse, RequestError> {
         let path: String = self.full_path()?;
         let header_bytes: Vec<u8> = self.header_bytes(0)?;
         let version: String = self.get_config().get_http_version().to_string();
-        let request: Vec<u8> = build_http_request("GET", path, header_bytes, None, version);
+        let method: &str = if is_head { HEAD } else { GET };
+        let request: Vec<u8> = build_http_request(method, path, header_bytes, None, version);
         stream
             .write_all(&request)
             .await
@@ -560,7 +527,7 @@ impl HttpRequest {
             .flush()
             .await
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        self.read_response_async(stream).await
+        self.read_response_async(stream, is_head).await
     }
 
     /// Write a POST request with the encoded body to the stream and read the response.
@@ -595,14 +562,15 @@ impl HttpRequest {
             .flush()
             .await
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        self.read_response_async(stream).await
+        self.read_response_async(stream, false).await
     }
 
-    /// Read a full response from the stream, handling content-length and chunked bodies.
+    /// Reads an HTTP/1 response using the framing for the request method.
     ///
     /// # Arguments
     ///
     /// - `&mut BoxAsyncReadWrite` - The connected stream to read the response from.
+    /// - `bool` - Whether this response answers a HEAD request.
     ///
     /// # Returns
     ///
@@ -610,22 +578,12 @@ impl HttpRequest {
     async fn read_response_async(
         &mut self,
         stream: &mut BoxAsyncReadWrite,
+        is_head: bool,
     ) -> Result<HttpResponse, RequestError> {
         let buffer_size: usize = self.get_config().buffer_size;
         let mut buffer: Vec<u8> = vec![0u8; buffer_size];
         let mut response_bytes: Vec<u8> = Vec::with_capacity(buffer_size.max(8192));
-        let mut headers_done: bool = false;
-        let mut content_length: usize = 0usize;
-        let mut redirect_url: Option<Vec<u8>> = None;
-        let mut headers_end_pos: usize = 0usize;
-        let mut is_chunked: bool = false;
-        let version_bytes: Vec<u8> = self
-            .config
-            .get_http_version()
-            .to_string()
-            .to_ascii_lowercase()
-            .into_bytes();
-        let location_key: Vec<u8> = format!("{}:", LOCATION.to_ascii_lowercase()).into_bytes();
+        let mut head: Option<FinalResponseHead> = None;
         loop {
             let n: usize = stream
                 .read(&mut buffer)
@@ -641,49 +599,28 @@ impl HttpRequest {
             }
             let old_len: usize = response_bytes.len();
             response_bytes.extend_from_slice(&buffer[..n]);
-            if !headers_done {
-                let search_start: usize = old_len.saturating_sub(3);
-                if let Some(pos) = find_double_crlf(&response_bytes, search_start) {
-                    headers_done = true;
-                    headers_end_pos = pos + 4;
-                    parse_response_headers(
-                        &response_bytes[..headers_end_pos],
-                        &version_bytes,
-                        &location_key,
-                        &mut content_length,
-                        &mut redirect_url,
-                        &mut is_chunked,
-                    )?;
-                }
+            if head.is_none() {
+                head = find_final_response_head(
+                    &mut response_bytes,
+                    old_len.saturating_sub(3),
+                    is_head,
+                )?;
             }
-            if headers_done {
-                if is_chunked {
-                    if Self::is_chunked_response_complete(&response_bytes[headers_end_pos..])? {
-                        break;
-                    }
-                } else if response_bytes.len() >= headers_end_pos + content_length {
-                    response_bytes.truncate(headers_end_pos + content_length);
-                    break;
-                }
+            if let Some((end, framing, _)) = &head
+                && response_body_is_complete(*framing, &response_bytes[*end..])?
+            {
+                break;
             }
         }
-        if !headers_done {
+        let Some((head_end, framing, mut redirect_url)) = head else {
             return Err(RequestError::HttpRequestPartsInsufficient(
                 HttpStatus::BadRequest,
             ));
-        }
-        if !is_chunked && response_bytes.len() < headers_end_pos + content_length {
-            return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
-        }
-        if is_chunked {
-            let body_bytes: Vec<u8> = response_bytes[headers_end_pos..].to_vec();
-            let decoded: Vec<u8> = parse_chunked_body(&body_bytes)?;
-            response_bytes.truncate(headers_end_pos);
-            response_bytes.extend_from_slice(&decoded);
-        }
-        let mut response: HttpResponse = HttpResponse::from_bytes(&response_bytes);
+        };
+        let mut response: HttpResponse =
+            finish_framed_response(&response_bytes, head_end, framing)?;
         if !self.get_config().get_redirect() || redirect_url.is_none() {
-            if self.get_config().get_decode() {
+            if !is_head && self.get_config().get_decode() {
                 response = response.decode(self.get_config().buffer_size);
             }
             return Ok(response);

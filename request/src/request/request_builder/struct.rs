@@ -8,25 +8,29 @@ use super::*;
 ///
 /// # Examples
 ///
-/// ```ignore
-/// use http_request::{RequestBuilder, Proxy};
+/// The built request can be sent with [`HttpRequest::send`] or
+/// [`HttpRequest::send_async`]. This example inspects it without making a network request.
 ///
-/// // sync GET
-/// let mut req = RequestBuilder::new()
+/// ```rust
+/// use http_request::{Method, Proxy, RequestBuilder};
+///
+/// let get = RequestBuilder::new()
 ///     .get("https://example.com/api")
 ///     .header("Accept", "application/json")
 ///     .timeout(5_000)
 ///     .build();
-/// let _resp = req.send();
+/// assert_eq!(get.get_method(), Method::Get);
+/// assert_eq!(get.get_config().get_timeout(), 5_000);
 ///
-/// // async POST with JSON body
-/// let req = RequestBuilder::new()
+/// let post = RequestBuilder::new()
 ///     .post("https://example.com/api")
-///     .body_json(&serde_json::json!({"k": "v"}))
+///     .body_json(&serde_json::json!({"key": "value"}))
 ///     .header("Content-Type", "application/json")
-///     .proxy(Proxy::https("127.0.0.1", 7890).auth("u", "p"))
+///     .proxy(Proxy::https("proxy.example.com", 7890))
 ///     .build();
-/// let _resp = req.send_async().await;
+/// assert_eq!(post.get_method(), Method::Post);
+/// assert_eq!(post.get_body().as_slice(), br#"{"key":"value"}"#);
+/// assert!(post.get_config().get_proxy().is_some());
 /// ```
 #[derive(Clone, Data, Debug, Default)]
 pub struct RequestBuilder {

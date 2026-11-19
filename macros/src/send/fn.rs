@@ -36,7 +36,7 @@ pub(crate) fn try_send_macro(
             }
             None => {
                 quote! {
-                    let _: ::std::result::Result<(), ::hyperlane::ResponseError> = #stream.try_send(#context.get_mut_response().build()).await;
+                    let _: ::std::result::Result<(), ::hyperlane::ResponseError> = #stream.try_send(#context.build_response()).await;
                 }
             }
         },
@@ -75,7 +75,7 @@ pub(crate) fn send_macro(attr: TokenStream, item: TokenStream, position: Positio
             }
             None => {
                 quote! {
-                    #stream.send(#context.get_mut_response().build()).await;
+                    #stream.send(#context.build_response()).await;
                 }
             }
         },

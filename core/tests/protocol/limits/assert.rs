@@ -1,6 +1,245 @@
 use super::*;
 
 #[tokio::test]
+async fn http1_default_request_error_replies_with_413_and_closes() {
+    let (control, port): (ServerControlHook, u16) =
+        start_default_request_error_server(ServerProtocol::Http1, HTTP1_BODY_LIMIT)
+            .await
+            .expect("http1 server without a request error hook must start");
+    let request: Vec<u8> = http1_body_request(HTTP1_OVERSIZED_BODY);
+    let result: io::Result<Vec<u8>> = raw_http1_exchange(port, &request).await;
+    control.shutdown().await;
+    let raw: Vec<u8> = result.expect("http1 must reply and close the connection");
+    let (head, body): (String, Vec<u8>) = response_head_and_body(&raw);
+    assert!(
+        head.starts_with(&format!("{HTTP_VERSION_1_1} {TOO_LARGE_STATUS} ")),
+        "expected 413, got {head:?}"
+    );
+    assert_eq!(http1_reply_header(&head, CONNECTION), Some(CLOSE));
+    assert_eq!(http1_reply_header(&head, CONTENT_LENGTH), Some("0"));
+    assert_eq!(
+        count_http1_responses(&raw),
+        1,
+        "expected a complete response with Content-Length"
+    );
+    assert!(body.is_empty(), "the default response must have no body");
+}
+
+#[tokio::test]
+async fn http1_default_request_error_sends_nothing_on_clean_eof() {
+    let (control, port): (ServerControlHook, u16) =
+        start_default_request_error_server(ServerProtocol::Http1, HTTP1_BODY_LIMIT)
+            .await
+            .expect("http1 server without a request error hook must start");
+    let result: Result<io::Result<()>, tokio::time::error::Elapsed> =
+        timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), async {
+            for after_request in [false, true] {
+                let mut stream: TcpStream = connect_tcp(port).await?;
+                if after_request {
+                    stream.write_all(&http1_body_request(&[])).await?;
+                    let (head, _body): (String, Vec<u8>) = read_http1_head(&mut stream, 0).await?;
+                    if !head.starts_with(&format!("{HTTP_VERSION_1_1} {OK_STATUS} ")) {
+                        return Err(io::Error::other(format!("expected 200 before EOF, got {head:?}")));
+                    }
+                }
+                stream.shutdown().await?;
+                let mut reply: Vec<u8> = Vec::new();
+                stream.read_to_end(&mut reply).await?;
+                if !reply.is_empty() {
+                    return Err(io::Error::other(format!(
+                        "clean EOF after_request={after_request} must not produce a reply, got {reply:?}"
+                    )));
+                }
+            }
+            Ok(())
+        })
+        .await;
+    control.shutdown().await;
+    result
+        .expect("clean EOF exchange must not time out")
+        .expect("clean EOF must be silent");
+}
+
+#[tokio::test]
+async fn http2_default_request_error_replies_with_413_and_keeps_connection_usable() {
+    assert_multiplexed_default_request_error(ServerProtocol::Http2).await;
+}
+
+#[tokio::test]
+async fn http3_default_request_error_replies_with_413_and_keeps_connection_usable() {
+    assert_multiplexed_default_request_error(ServerProtocol::Http3).await;
+}
+
+async fn assert_multiplexed_default_request_error(protocol: ServerProtocol) {
+    let (control, port): (ServerControlHook, u16) =
+        start_default_request_error_server(protocol, MAX_BODY_SIZE)
+            .await
+            .expect("server without a request error hook must start");
+    let reply: Result<DefaultErrorReply, tokio::time::error::Elapsed> =
+        timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), async {
+            match protocol {
+                ServerProtocol::Http2 => h2_oversized_body_then_get(port).await,
+                ServerProtocol::Http3 => h3_oversized_body_then_get(port).await,
+                _ => unreachable!("expected a multiplexed protocol"),
+            }
+        })
+        .await;
+    control.shutdown().await;
+    let (status, headers, body): (u16, http::HeaderMap, Vec<u8>) = reply
+        .expect("oversized POST and the subsequent GET must not time out")
+        .expect("both requests must receive complete HTTP responses on the same connection");
+    assert_eq!(status, TOO_LARGE_STATUS as u16);
+    assert_eq!(header_value(&headers, CONTENT_LENGTH).as_deref(), Some("0"));
+    assert!(!headers.contains_key(CONNECTION));
+    assert!(body.is_empty());
+}
+
+#[tokio::test]
+async fn default_request_error_does_not_override_the_existing_http1_hook() {
+    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    reset_signals();
+    let (control, port): (ServerControlHook, u16) = start_limits_server(
+        ServerProtocol::Http1,
+        limits_request_config(HTTP1_BODY_LIMIT, READ_TIMEOUT_MS),
+    )
+    .await
+    .expect("http1 server with a request error hook must start");
+    let request: Vec<u8> = http1_body_request(HTTP1_OVERSIZED_BODY);
+    let result: io::Result<Vec<u8>> = raw_http1_exchange(port, &request).await;
+    control.shutdown().await;
+    let raw: Vec<u8> = result.expect("the hook must reply to the oversized request");
+    let (head, body): (String, Vec<u8>) = response_head_and_body(&raw);
+    assert!(
+        request_error_seen(),
+        "the oversized request must reach the hook"
+    );
+    assert!(head.starts_with(&format!("{HTTP_VERSION_1_1} {TOO_LARGE_STATUS} ")));
+    assert_eq!(
+        http1_reply_header(&head, REQUEST_ERROR_MARKER_HEADER),
+        Some("seen")
+    );
+    assert_eq!(body, REQUEST_ERROR_BODY.as_bytes());
+}
+
+fn http1_reply_header<'a>(head: &'a str, name: &str) -> Option<&'a str> {
+    head.split(HTTP_BR).skip(1).find_map(|line: &str| {
+        let (key, value): (&str, &str) = line.split_once(':')?;
+        key.eq_ignore_ascii_case(name).then_some(value.trim())
+    })
+}
+
+#[tokio::test]
+async fn http1_expect_continue_releases_the_waiting_request_body() {
+    const CONTINUE_RESPONSE: &[u8] = b"HTTP/1.1 100 Continue\r\n\r\n";
+    const BODY: &[u8] = b"continue-payload";
+    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let (control, port): (ServerControlHook, u16) = start_limits_server(
+        ServerProtocol::Http1,
+        limits_request_config(MAX_BODY_SIZE, READ_TIMEOUT_MS),
+    )
+    .await
+    .expect("http1 limits server must start");
+    let result: Result<io::Result<Vec<u8>>, tokio::time::error::Elapsed> =
+        timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), async {
+            let mut stream: TcpStream = connect_tcp(port).await?;
+            let head: String = format!(
+                "{POST} {BODY_ECHO_ROUTE_PATH} {HTTP_VERSION_1_1}{HTTP_BR}Host: {LOOPBACK_HOST}{HTTP_BR}\
+                 {CONTENT_LENGTH}: {}{HTTP_BR}Expect: 100-CoNtInUe{HTTP_BR}\
+                 {CONNECTION}: {CLOSE}{HTTP_DOUBLE_BR}",
+                BODY.len(),
+            );
+            stream.write_all(head.as_bytes()).await?;
+            let mut interim: [u8; CONTINUE_RESPONSE.len()] = [0; CONTINUE_RESPONSE.len()];
+            stream.read_exact(&mut interim).await?;
+            if interim != CONTINUE_RESPONSE {
+                return Err(io::Error::other(format!(
+                    "expected 100 Continue before sending the body, received {:?}",
+                    String::from_utf8_lossy(&interim)
+                )));
+            }
+            stream.write_all(BODY).await?;
+            let mut response: Vec<u8> = Vec::new();
+            stream.read_to_end(&mut response).await?;
+            Ok(response)
+        })
+        .await;
+    control.shutdown().await;
+    let raw: Vec<u8> = result
+        .expect("http1 Expect exchange must not time out")
+        .expect("http1 Expect exchange must finish");
+    let (head, body): (String, Vec<u8>) = response_head_and_body(&raw);
+    assert!(
+        head.starts_with(&format!("{HTTP_VERSION_1_1} {OK_STATUS} ")),
+        "100 Continue must be followed directly by 200 OK, got {head:?}"
+    );
+    assert_eq!(body, BODY);
+}
+
+#[tokio::test]
+async fn http1_no_content_and_not_modified_end_at_the_next_response() {
+    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let (control, port): (ServerControlHook, u16) = start_limits_server(
+        ServerProtocol::Http1,
+        limits_request_config(MAX_BODY_SIZE, READ_TIMEOUT_MS),
+    )
+    .await
+    .expect("http1 limits server must start");
+    let mut request: Vec<u8> = Vec::new();
+    for path in [NO_CONTENT_ROUTE_PATH, NOT_MODIFIED_ROUTE_PATH] {
+        request.extend_from_slice(
+            format!("GET {path} {HTTP_VERSION_1_1}{HTTP_BR}Host: {LOOPBACK_HOST}{HTTP_DOUBLE_BR}")
+                .as_bytes(),
+        );
+    }
+    request.extend_from_slice(&http1_close_request(GET, HEAD_ROUTE_PATH));
+    let result: io::Result<Vec<u8>> = raw_http1_exchange(port, &request).await;
+    control.shutdown().await;
+    let raw: Vec<u8> = result.expect("http1 pipeline must finish");
+    let mut response: &str = str::from_utf8(&raw).expect("the test response must be ASCII");
+    for status in [NO_CONTENT_STATUS, NOT_MODIFIED_STATUS, OK_STATUS] {
+        let (head, rest): (&str, &str) = response
+            .split_once(HTTP_DOUBLE_BR)
+            .expect("each request must have a response head");
+        assert!(head.starts_with(&format!("{HTTP_VERSION_1_1} {status} ")));
+        if status != OK_STATUS {
+            assert!(!head.contains(CONTENT_LENGTH));
+        }
+        response = rest;
+    }
+    assert_eq!(response, HEAD_BODY_TEXT);
+}
+
+#[tokio::test]
+async fn http2_expect_continue_releases_the_waiting_request_body() {
+    let (status, body): (u16, Vec<u8>) =
+        expect_exchange(ServerProtocol::Http2, EXPECT_BODY.len(), Some(EXPECT_BODY)).await;
+    assert_eq!(status, WIRE_OK_STATUS);
+    assert_eq!(body, EXPECT_BODY);
+}
+
+#[tokio::test]
+async fn http3_expect_continue_releases_the_waiting_request_body() {
+    let (status, body): (u16, Vec<u8>) =
+        expect_exchange(ServerProtocol::Http3, EXPECT_BODY.len(), Some(EXPECT_BODY)).await;
+    assert_eq!(status, WIRE_OK_STATUS);
+    assert_eq!(body, EXPECT_BODY);
+}
+
+#[tokio::test]
+async fn http2_expect_oversized_body_is_rejected_without_continue() {
+    let (status, _body): (u16, Vec<u8>) =
+        expect_exchange(ServerProtocol::Http2, OVERSIZED_BODY_LEN, None).await;
+    assert_eq!(status, TOO_LARGE_STATUS as u16);
+}
+
+#[tokio::test]
+async fn http3_expect_oversized_body_is_rejected_without_continue() {
+    let (status, _body): (u16, Vec<u8>) =
+        expect_exchange(ServerProtocol::Http3, OVERSIZED_BODY_LEN, None).await;
+    assert_eq!(status, TOO_LARGE_STATUS as u16);
+}
+
+#[tokio::test]
 async fn http2_head_response_carries_headers_without_a_body() {
     let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();

@@ -115,9 +115,12 @@ fn chunked_body_parser_decodes_extensions_and_binary_payloads() {
 fn response_header_helpers_accept_case_insensitive_wire_names() {
     let headers: &[u8] =
         b"HTTP/1.1 200 OK\r\nCoNtEnT-LeNgTh: 12\r\nTransfer-Encoding: Chunked\r\n\r\n";
-    assert_eq!(get_content_length(headers).unwrap(), 12);
+    assert_eq!(get_content_length(headers).unwrap(), Some(12));
     assert!(is_chunked_encoding(headers).unwrap());
-    assert_eq!(get_content_length(b"HTTP/1.1 200 OK\r\n\r\n").unwrap(), 0);
+    assert_eq!(
+        get_content_length(b"HTTP/1.1 200 OK\r\n\r\n").unwrap(),
+        None
+    );
     assert!(!is_chunked_encoding(b"Content-Length: 0\r\n").unwrap());
 }
 
@@ -148,33 +151,21 @@ fn response_buffer_growth_covers_each_capacity_branch() {
 
 #[test]
 fn response_header_parser_extracts_redirect_length_and_chunked_state() {
-    let mut length: usize = 0;
-    let mut redirect: Option<Vec<u8>> = None;
-    let mut chunked: bool = false;
-    parse_response_headers(
+    let fixed: Option<ResponseHeadFields> = parse_response_headers(
         b"HTTP/1.1 302 Found\r\nLocation:/next\r\nContent-Length: 4\r\n\r\n",
-        b"http/1.1",
-        b"location:",
-        &mut length,
-        &mut redirect,
-        &mut chunked,
+        false,
     )
     .unwrap();
-    assert_eq!(length, 4);
-    assert_eq!(redirect, Some(b"/next".to_vec()));
-    assert!(!chunked);
-    parse_response_headers(
+    assert_eq!(
+        fixed,
+        Some((ResponseFraming::Fixed(4), Some(b"/next".to_vec())))
+    );
+    let chunked: Option<ResponseHeadFields> = parse_response_headers(
         b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n",
-        b"http/1.1",
-        b"location:",
-        &mut length,
-        &mut redirect,
-        &mut chunked,
+        false,
     )
     .unwrap();
-    assert_eq!(length, 0);
-    assert!(redirect.is_none());
-    assert!(chunked);
+    assert_eq!(chunked, Some((ResponseFraming::Chunked, None)));
 }
 
 #[test]
@@ -186,7 +177,7 @@ fn response_header_lookup_ignores_prefixed_names_and_body_fields() {
             .as_slice(),
         b"HTTP/1.1 200 OK\r\n\r\nContent-Length: 999\r\nTransfer-Encoding: chunked\r\n".as_slice(),
     ] {
-        assert_eq!(get_content_length(response).unwrap(), 0);
+        assert_eq!(get_content_length(response).unwrap(), None);
         assert!(!is_chunked_encoding(response).unwrap());
     }
     assert_eq!(
@@ -194,7 +185,7 @@ fn response_header_lookup_ignores_prefixed_names_and_body_fields() {
             b"HTTP/1.1 200 OK\r\nX-Content-Length: 999\r\nContent-Length: 5\r\n\r\n"
         )
         .unwrap(),
-        5
+        Some(5)
     );
 }
 
@@ -206,7 +197,7 @@ fn response_content_length_rejects_non_decimal_values() {
     }
     assert_eq!(
         get_content_length(b"Content-Length:\t 0005 \t\r\n\r\n").unwrap(),
-        5
+        Some(5)
     );
 }
 
@@ -235,20 +226,7 @@ fn response_framing_rejects_transfer_encoding_with_content_length() {
         b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nTransfer-Encoding: chunked\r\n\r\n".as_slice(),
         b"HTTP/1.1 200 OK\r\nTRANSFER-ENCODING: CHUNKED\r\ncontent-length: 5\r\n\r\n".as_slice(),
     ] {
-        let mut length: usize = 0;
-        let mut redirect: Option<Vec<u8>> = None;
-        let mut chunked: bool = false;
-        assert!(
-            parse_response_headers(
-                headers,
-                b"http/1.1",
-                b"location:",
-                &mut length,
-                &mut redirect,
-                &mut chunked
-            )
-            .is_err()
-        );
+        assert!(parse_response_headers(headers, false).is_err());
     }
 }
 
@@ -281,20 +259,7 @@ fn response_framing_rejects_duplicate_length_and_transfer_fields() {
         b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\ntransfer-encoding: chunked\r\n\r\n"
             .as_slice(),
     ] {
-        let mut length: usize = 0;
-        let mut redirect: Option<Vec<u8>> = None;
-        let mut chunked: bool = false;
-        assert!(
-            parse_response_headers(
-                headers,
-                b"http/1.1",
-                b"location:",
-                &mut length,
-                &mut redirect,
-                &mut chunked
-            )
-            .is_err()
-        );
+        assert!(parse_response_headers(headers, false).is_err());
     }
 }
 
@@ -321,6 +286,9 @@ fn chunked_body_rejects_invalid_or_excessive_chunk_sizes() {
         "-1",
         "0x1",
         " 1",
+        " 1 ;foo=bar",
+        "1 0 ;foo=bar",
+        "1\x0b;foo=bar",
         "1 ",
         "1\t",
         "g",
@@ -354,9 +322,12 @@ fn chunked_body_requires_data_and_final_trailer_delimiters() {
 
 #[test]
 fn response_redirect_uses_exact_location_header() {
-    let mut length: usize = 0;
-    let mut redirect: Option<Vec<u8>> = None;
-    let mut chunked: bool = false;
-    parse_response_headers(b"HTTP/1.1 302 Found\r\nX-Location: http://evil.test/\r\nLocation: http://safe.test/\r\nContent-Length: 0\r\n\r\n", b"http/1.1", b"location:", &mut length, &mut redirect, &mut chunked).unwrap();
-    assert_eq!(redirect, Some(b"http://safe.test/".to_vec()));
+    let head: Option<ResponseHeadFields> = parse_response_headers(b"HTTP/1.1 302 Found\r\nX-Location: http://evil.test/\r\nLocation: http://safe.test/\r\nContent-Length: 0\r\n\r\n", false).unwrap();
+    assert_eq!(
+        head,
+        Some((
+            ResponseFraming::Fixed(0),
+            Some(b"http://safe.test/".to_vec())
+        ))
+    );
 }

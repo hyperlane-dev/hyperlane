@@ -51,7 +51,8 @@ use std::{
 use {
     bytes::Bytes,
     futures::FutureExt,
-    h3::error::Code,
+    h3::error::{Code, StreamError},
+    http::{HeaderValue, StatusCode},
     inventory::collect,
     lombok_macros::*,
     quinn::{self, Endpoint, Incoming, VarInt},

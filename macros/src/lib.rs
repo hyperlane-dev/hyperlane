@@ -4124,8 +4124,8 @@ pub fn epilogue_macros(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Automatically tries to send data via stream after function execution.
 ///
 /// This attribute macro tries to send data to the client after the function completes execution.
-/// If no argument is provided, the response is built from the context automatically.
-/// If an argument is provided, it is used as the data expression to send.
+/// Without an argument, it sends the structured context response, omitting content for `HEAD`.
+/// An explicit data expression is sent unchanged.
 ///
 /// # Usage
 ///
@@ -4194,8 +4194,8 @@ pub fn try_send(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Automatically sends data via stream after function execution.
 ///
 /// This attribute macro sends data to the client after the function completes execution.
-/// If no argument is provided, the response is built from the context automatically.
-/// If an argument is provided, it is used as the data expression to send.
+/// Without an argument, it sends the structured context response, omitting content for `HEAD`.
+/// An explicit data expression is sent unchanged.
 ///
 /// # Usage
 ///

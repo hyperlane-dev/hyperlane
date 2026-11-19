@@ -1,16 +1,160 @@
 use super::*;
 
 #[tokio::test]
-async fn test_http_request_rejects_transfer_encoding() {
-    for headers in [
-        "Transfer-Encoding: chunked\r\n",
-        "transfer-encoding: identity\r\n",
-        "TRANSFER-ENCODING: gzip, chunked\r\n",
-        "Transfer-Encoding: \r\n",
-        "Content-Length: 0\r\nTransfer-Encoding: chunked\r\n",
-        "Transfer-Encoding: chunked\r\nContent-Length: 0\r\n",
+async fn http1_chunked_decodes_binary_and_preserves_the_next_request() {
+    let raw: &[u8] = b"POST /upload HTTP/1.1\r\nHost: localhost\r\n\
+        Transfer-Encoding: chunked\r\nTrailer: X-Checksum\r\n\r\n\
+        4;note=\"a;b\"\r\n\0\xff\r\n\r\n\
+        A\r\n0123456789\r\n\
+        0\r\nX-Checksum: sample\r\n\r\n\
+        GET /next HTTP/1.1\r\nHost: localhost\r\n\r\n";
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+    client.write_all(raw).await.unwrap();
+    client.shutdown().await.unwrap();
+    let mut config: RequestConfig = RequestConfig::default();
+    config.set_buffer_size(16);
+    let mut stream: Stream = Stream::from_transport(TestTransport::new(server), config, false);
+
+    let request: Request = stream.try_get_http_request().await.unwrap();
+    assert_eq!(request.get_path(), "/upload");
+    assert_eq!(request.get_body(), b"\0\xff\r\n0123456789");
+    assert_eq!(request.get_header_front(CONTENT_LENGTH), "14");
+    assert!(!request.has_header(TRANSFER_ENCODING));
+    assert!(!request.has_header("trailer"));
+    assert!(!request.has_header("x-checksum"));
+
+    let next: Request = stream.try_get_http_request().await.unwrap();
+    assert_eq!(next.get_path(), "/next");
+    assert_eq!(*next.get_method(), RequestMethod::Get);
+    assert!(next.get_body().is_empty());
+}
+
+#[tokio::test]
+async fn http1_chunked_enforces_the_cumulative_decoded_body_limit() {
+    let raw: &[u8] = b"POST /upload HTTP/1.1\r\nHost: localhost\r\n\
+        Transfer-Encoding: chunked\r\n\r\n3\r\nabc\r\n3\r\ndef\r\n0\r\n\r\n";
+    for max_body_size in [6_usize, 5] {
+        let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+        client.write_all(raw).await.unwrap();
+        client.shutdown().await.unwrap();
+        let mut config: RequestConfig = RequestConfig::default();
+        config.set_max_body_size(max_body_size);
+        let mut stream: Stream = Stream::from_transport(TestTransport::new(server), config, false);
+        let result: Result<Request, RequestError> = stream.try_get_http_request().await;
+        if max_body_size == 6 {
+            assert_eq!(result.unwrap().get_body(), b"abcdef");
+        } else {
+            assert_eq!(
+                result.unwrap_err().get_http_status(),
+                HttpStatus::PayloadTooLarge
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn http1_expect_omits_interim_when_continue_does_not_apply() {
+    const BODY: [u8; 128] = [b'x'; 128];
+    let cases: [(&str, &str, &[u8], usize); 4] = [
+        (HTTP_VERSION_1_1, CONTINUE_EXPECT, &[], 64),
+        (HTTP_VERSION_1_1, CONTINUE_EXPECT, &BODY, 4096),
+        (HTTP_VERSION_1_0, CONTINUE_EXPECT, &BODY, 64),
+        (
+            HTTP_VERSION_1_1,
+            "extension=\"value, 100-continue, end\"",
+            &BODY,
+            64,
+        ),
+    ];
+    for (version, expectation, body, buffer_size) in cases {
+        let head: String = format!(
+            "POST / {version}{HTTP_BR}{HOST}: localhost{HTTP_BR}{EXPECT}: {expectation}{HTTP_BR}{CONTENT_LENGTH}: {}{HTTP_DOUBLE_BR}",
+            body.len(),
+        );
+        let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+        client.write_all(head.as_bytes()).await.unwrap();
+        client.write_all(body).await.unwrap();
+        let mut config: RequestConfig = RequestConfig::default();
+        config.set_buffer_size(buffer_size);
+        let mut stream: Stream = Stream::from_transport(TestTransport::new(server), config, false);
+        let request: Request = stream.try_get_http_request().await.unwrap();
+        drop(stream);
+        let mut interim: Vec<u8> = Vec::new();
+        let read: usize = client.read_to_end(&mut interim).await.unwrap();
+        assert_eq!(request.get_body(), body);
+        assert_eq!(read, 0, "{version}: {expectation}");
+    }
+}
+
+#[tokio::test]
+async fn conditional_match_reads_mixed_case_repeated_fields_from_wire() {
+    for (headers, expected) in [
+        (
+            "If-None-Match: \"other\"\r\niF-nOnE-mAtCh: W/\"asset,revision\"\r\n",
+            true,
+        ),
+        ("IF-NONE-MATCH: \t*\t\r\n", true),
+        ("If-None-Match: \"asset,revision\", invalid\r\n", false),
+        (
+            "If-None-Match: \"asset,revision\"\r\nIf-None-Match: invalid\r\n",
+            false,
+        ),
+        (
+            "If-None-Match: \"asset,revision\"\r\nIf-None-Match: *\r\n",
+            false,
+        ),
+        ("If-None-Match: \"Asset,revision\"\r\n", false),
+        ("", false),
     ] {
-        let raw: String = format!("POST / HTTP/1.1\r\nHost: localhost\r\n{headers}\r\n0\r\n\r\n");
+        let raw: String = format!("GET /asset HTTP/1.1\r\nHost: localhost\r\n{headers}\r\n");
+        let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+        client.write_all(raw.as_bytes()).await.unwrap();
+        client.shutdown().await.unwrap();
+        let mut stream: Stream =
+            Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+        let request: Request = stream.try_get_http_request().await.unwrap();
+        assert_eq!(
+            request.matches_if_none_match("\"asset,revision\""),
+            expected,
+            "{headers:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn conditional_match_does_not_leak_across_keepalive_requests() {
+    let raw: &[u8] = b"GET /asset HTTP/1.1\r\nHost: localhost\r\nIf-None-Match: W/\"revision\"\r\n\r\nGET /asset HTTP/1.1\r\nHost: localhost\r\n\r\n";
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
+    client.write_all(raw).await.unwrap();
+    client.shutdown().await.unwrap();
+    let mut stream: Stream =
+        Stream::from_transport(TestTransport::new(server), RequestConfig::default(), false);
+    let first: Request = stream.try_get_http_request().await.unwrap();
+    assert!(first.matches_if_none_match("\"revision\""));
+    let second: Request = stream.try_get_http_request().await.unwrap();
+    assert!(!second.matches_if_none_match("\"revision\""));
+}
+
+#[tokio::test]
+async fn http1_rejects_unsupported_or_invalid_transfer_codings() {
+    let cases: [(&str, HttpStatus); 5] = [
+        ("transfer-encoding: identity\r\n", HttpStatus::BadRequest),
+        (
+            "TRANSFER-ENCODING: gzip, chunked\r\n",
+            HttpStatus::NotImplemented,
+        ),
+        ("Transfer-Encoding: \r\n", HttpStatus::BadRequest),
+        (
+            "Content-Length: 0\r\nTransfer-Encoding: chunked\r\n",
+            HttpStatus::BadRequest,
+        ),
+        (
+            "Transfer-Encoding: chunked\r\nContent-Length: 0\r\n",
+            HttpStatus::BadRequest,
+        ),
+    ];
+    for (headers, expected) in cases {
+        let raw: String = format!("POST / HTTP/1.1\r\nHost: localhost\r\n{headers}\r\n");
         let (mut client, server): (DuplexStream, DuplexStream) = duplex(4096);
         client.write_all(raw.as_bytes()).await.unwrap();
         client.shutdown().await.unwrap();
@@ -19,9 +163,9 @@ async fn test_http_request_rejects_transfer_encoding() {
         assert!(
             matches!(
                 stream.try_get_http_request().await,
-                Err(RequestError::HttpRead(HttpStatus::BadRequest))
+                Err(RequestError::HttpRead(status)) if status == expected
             ),
-            "accepted invalid request: {raw:?}"
+            "unexpected transfer coding result for {headers:?}"
         );
     }
 }

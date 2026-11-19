@@ -14,6 +14,7 @@ impl Default for Context {
             response: Response::default(),
             route_params: RouteParams::default(),
             original_target: None,
+            original_head: None,
             attributes: ThreadSafeAttributeStore::default(),
         }
     }
@@ -42,6 +43,31 @@ impl PartialEq for Context {
 
 /// Implementation of `Eq` trait for `Context`.
 impl Eq for Context {}
+
+/// Structured response serialization for [`Context`].
+impl Context {
+    /// Builds the response for the incoming request without sending it.
+    ///
+    /// A wire `HEAD` request receives only the status line and headers, even if
+    /// middleware rewrites the request method. A standalone context uses its
+    /// current request method. Explicit raw stream writes are not affected.
+    ///
+    /// # Returns
+    ///
+    /// - `ResponseData` - The serialized response bytes.
+    #[inline(always)]
+    #[must_use]
+    pub fn build_response(&mut self) -> ResponseData {
+        let is_head: bool = self
+            .try_get_original_head()
+            .unwrap_or_else(|| self.get_request().get_method().is_head());
+        if is_head {
+            self.get_mut_response().build_head()
+        } else {
+            self.get_mut_response().build()
+        }
+    }
+}
 
 /// Implementation of `From` trait for converting `usize` address into `&Context`.
 impl From<usize> for &'static Context {

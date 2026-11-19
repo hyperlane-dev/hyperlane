@@ -9,11 +9,16 @@ use super::*;
 ///
 /// # Examples
 ///
-/// ```ignore
-/// use http_request::Proxy;
+/// ```rust
+/// use http_request::{Proxy, ProxyType};
 ///
-/// let p = Proxy::https("proxy.example.com", 7890);
-/// let auth = Proxy::socks5("127.0.0.1", 1080).auth("user", "pass");
+/// let https = Proxy::https("proxy.example.com", 7890);
+/// assert_eq!(https.proxy_type, ProxyType::Https);
+/// assert_eq!(https.port, 7890);
+///
+/// let socks = Proxy::socks5("127.0.0.1", 1080).auth("example-user", "example-password");
+/// assert_eq!(socks.proxy_type, ProxyType::Socks5);
+/// assert_eq!(socks.username.as_deref(), Some("example-user"));
 /// ```
 #[derive(Clone, Data, Debug, Eq, PartialEq)]
 pub struct Proxy {

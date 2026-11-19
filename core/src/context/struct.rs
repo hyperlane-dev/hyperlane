@@ -21,6 +21,11 @@ pub struct Context {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) original_target: Option<String>,
+    /// Whether the original wire method was HEAD, independent of route rewrites.
+    #[get(pub(crate))]
+    #[get_mut(skip)]
+    #[set(pub(crate))]
+    pub(crate) original_head: Option<bool>,
     /// A collection of custom attributes for sharing data within the request lifecycle.
     pub attributes: ThreadSafeAttributeStore,
 }

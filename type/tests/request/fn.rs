@@ -366,3 +366,211 @@ fn request_get_cookies_panic() {
     let request: Request = Request::default();
     let _: Cookies = request.get_cookies();
 }
+
+fn request_with_if_none_match(values: &[&str]) -> Request {
+    let mut request: Request = Request::default();
+    let headers: RequestHeadersValue = values
+        .iter()
+        .map(|value: &&str| (*value).to_owned())
+        .collect();
+    request
+        .get_mut_headers()
+        .insert("if-none-match".to_owned(), headers);
+    request
+}
+
+#[test]
+fn request_if_none_match_requires_a_header_and_nonempty_tag_list() {
+    let request: Request = Request::default();
+    assert!(!request.matches_if_none_match("\"v1\""));
+    for values in [&[][..], &[""][..], &[" \t,"][..], &[",,", "\t"][..]] {
+        let request: Request = request_with_if_none_match(values);
+        assert!(!request.matches_if_none_match("\"v1\""), "{values:?}");
+    }
+}
+
+#[test]
+fn request_if_none_match_uses_case_sensitive_weak_comparison() {
+    for (header, current, expected) in [
+        ("\"v1\"", "\"v1\"", true),
+        ("\"v1\"", "\"v2\"", false),
+        ("\"V1\"", "\"v1\"", false),
+        ("W/\"v1\"", "\"v1\"", true),
+        ("\"v1\"", "W/\"v1\"", true),
+        ("W/\"v1\"", "W/\"v1\"", true),
+        ("\"\"", "\"\"", true),
+        ("W/\"\"", "\"\"", true),
+        ("\"\"", "W/\"\"", true),
+        ("\"a,b\"", "W/\"a,b\"", true),
+        ("\"a,b\"", "\"a\"", false),
+        ("\"a\\b\"", "W/\"a\\b\"", true),
+        ("\"é\"", "W/\"é\"", true),
+        ("\"*\"", "\"v1\"", false),
+        ("\"*\"", "\"*\"", true),
+    ] {
+        let request: Request = request_with_if_none_match(&[header]);
+        assert_eq!(
+            request.matches_if_none_match(current),
+            expected,
+            "{header:?} {current:?}"
+        );
+    }
+}
+
+#[test]
+fn request_if_none_match_combines_repeated_fields_and_preserves_quoted_commas() {
+    for values in [
+        &["\"old\", W/\"v1\", \"next\""][..],
+        &["\"old\"", "W/\"v1\"", "\"next\""][..],
+        &[" \t\"old\"\t,\t W/\"v1\" \t"][..],
+        &[",, \t\"old\",,", "", "\t, W/\"v1\", ,"][..],
+        &["\"before,after\", W/\"v1\""][..],
+        &["\"old\",", ", \"v1\",", "\t"][..],
+    ] {
+        let request: Request = request_with_if_none_match(values);
+        assert!(request.matches_if_none_match("\"v1\""), "{values:?}");
+        assert!(!request.matches_if_none_match("\"missing\""), "{values:?}");
+    }
+}
+
+#[test]
+fn request_if_none_match_wildcard_requires_a_standalone_complete_field() {
+    for header in ["*", " \t*\t "] {
+        let request: Request = request_with_if_none_match(&[header]);
+        assert!(request.matches_if_none_match("\"v1\""));
+        assert!(request.matches_if_none_match("W/\"\""));
+    }
+    for values in [
+        &["*, \"v1\""][..],
+        &["\"v1\", *"][..],
+        &["*", "\"v1\""][..],
+        &["\"v1\"", "*"][..],
+        &["*", "*"][..],
+        &["*,*"][..],
+        &["*,"][..],
+        &[",*"][..],
+        &["*", ""][..],
+        &["", "*"][..],
+        &["**"][..],
+        &["W/*"][..],
+    ] {
+        let request: Request = request_with_if_none_match(values);
+        assert!(!request.matches_if_none_match("\"v1\""), "{values:?}");
+    }
+}
+
+#[test]
+fn request_if_none_match_rejects_malformed_tags_and_bad_matching_suffixes() {
+    for header in [
+        "v1",
+        "w/\"v1\"",
+        "W/ \"v1\"",
+        "\"v1",
+        "\"v1\"junk",
+        "\"v1\" \"v2\"",
+        "\"v1\", junk",
+        "\"v1\", \"unfinished",
+        "\"v1\", w/\"v2\"",
+        "\"v1\", W/ \"v2\"",
+        "\"v1\", \"bad space\"",
+        "\"v1\", \"bad\tvalue\"",
+        "\"v1\", \"bad\rvalue\"",
+        "\"v1\", \"bad\nvalue\"",
+        "\"v1\", \"bad\0value\"",
+        "\"v1\", \"bad\u{7f}value\"",
+        "\"v1\"\r",
+        "\n\"v1\"",
+        "\"v1\"\u{a0}",
+        "\"v1\", \"escaped\\\"quote\"",
+    ] {
+        let request: Request = request_with_if_none_match(&[header]);
+        assert!(!request.matches_if_none_match("\"v1\""), "{header:?}");
+    }
+    for values in [
+        &["\"v1\"", "junk"][..],
+        &["\"v1\"", "\"unfinished"][..],
+        &["junk", "\"v1\""][..],
+        &["\"v", "1\""][..],
+    ] {
+        let request: Request = request_with_if_none_match(values);
+        assert!(!request.matches_if_none_match("\"v1\""), "{values:?}");
+    }
+}
+
+#[test]
+fn request_if_none_match_validates_current_entity_tag_even_with_a_wildcard() {
+    for current in [
+        "",
+        "*",
+        "v1",
+        "w/\"v1\"",
+        "W/ \"v1\"",
+        "\"v1",
+        "\"v1\"junk",
+        "\"v1\", \"v2\"",
+        " \"v1\"",
+        "\"v1\"\t",
+        "\"bad space\"",
+        "\"bad\tvalue\"",
+        "\"bad\0value\"",
+        "\"bad\rvalue\"",
+        "\"bad\nvalue\"",
+        "\"bad\u{7f}value\"",
+    ] {
+        for header in ["*", "\"v1\""] {
+            let request: Request = request_with_if_none_match(&[header]);
+            assert!(
+                !request.matches_if_none_match(current),
+                "{header:?} {current:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn request_if_none_match_validates_every_ascii_opaque_byte() {
+    for byte in 0u8..=127 {
+        let tag: String = format!("\"{}\"", char::from(byte));
+        let expected: bool = byte == 0x21 || (0x23..=0x7e).contains(&byte);
+        let request: Request = request_with_if_none_match(&[&tag]);
+        assert_eq!(request.matches_if_none_match(&tag), expected, "{byte}");
+        let wildcard: Request = request_with_if_none_match(&["*"]);
+        assert_eq!(wildcard.matches_if_none_match(&tag), expected, "{byte}");
+    }
+}
+
+#[test]
+fn request_if_none_match_is_explicit_and_independent_of_request_method() {
+    for method in [
+        Method::Get,
+        Method::Head,
+        Method::Post,
+        Method::Put,
+        Method::Delete,
+    ] {
+        let mut request: Request = request_with_if_none_match(&["\"v1\""]);
+        request.set_method(method.clone());
+        assert!(request.matches_if_none_match("\"v1\""));
+        assert_eq!(request.get_method(), &method);
+        assert_eq!(request.get_header_front("if-none-match"), "\"v1\"");
+        assert!(request.get_body().is_empty());
+    }
+}
+
+#[test]
+fn request_if_none_match_handles_long_lists_tags_and_invalid_tails() {
+    let opaque: String = "x".repeat(1024 * 1024);
+    let current: String = format!("\"{opaque}\"");
+    let header: String = format!("W/{current}");
+    let request: Request = request_with_if_none_match(&[&header]);
+    assert!(request.matches_if_none_match(&current));
+    let header: String = format!("{}{current},", ", \t\"other\", ".repeat(20_000));
+    let request: Request = request_with_if_none_match(&[&header]);
+    assert!(request.matches_if_none_match(&current));
+    let malformed: String = format!("{header}W/\"unfinished");
+    let request: Request = request_with_if_none_match(&[&malformed]);
+    assert!(!request.matches_if_none_match(&current));
+    let empties: String = ", \t".repeat(100_000);
+    let request: Request = request_with_if_none_match(&[&empties]);
+    assert!(!request.matches_if_none_match(&current));
+}

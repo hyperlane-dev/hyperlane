@@ -9,6 +9,7 @@ mod attribute;
 mod body;
 mod box_leak;
 mod box_rwlock;
+mod chunked;
 mod content_type;
 mod cookie;
 mod file_extension;
@@ -42,6 +43,8 @@ pub use {
 };
 
 pub use {http_compress::*, http_constant::*, serde_json, tokio};
+
+pub(crate) use chunked::fill_chunked_body;
 
 use std::{
     any::Any,

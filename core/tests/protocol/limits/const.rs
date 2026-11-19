@@ -23,11 +23,15 @@ pub(crate) const TASK_PANIC_BODY: &str = "task-panic-handled";
 pub(crate) const REQUEST_ERROR_BODY: &str = "request-error-handled";
 
 pub(crate) const MAX_BODY_SIZE: usize = 1024;
+pub(super) const HTTP1_BODY_LIMIT: usize = 4;
+pub(super) const HTTP1_OVERSIZED_BODY: &[u8] = b"hello";
 pub(crate) const OVERSIZED_BODY_LEN: usize = 4096;
 pub(crate) const WRONG_CONTENT_LENGTH: usize = 512;
 pub(crate) const DECLARED_BODY_LEN: usize = 32;
 pub(crate) const DECLARED_BODY_TEXT: &str = "32";
 pub(crate) const READ_TIMEOUT_MS: u64 = 1500;
+pub(crate) const EXPECT_EXCHANGE_TIMEOUT_SECS: u64 = 5;
+pub(crate) const EXPECT_BODY: &[u8] = b"continue-payload";
 pub(crate) const CONCURRENT_BUDGET_MS: u64 = 1200;
 pub(crate) const INCOMPLETE_BODY_PREFIX: &[u8] = b"incomplete-";
 pub(crate) const BODY_ECHO_HEADER: &str = "x-body-len";

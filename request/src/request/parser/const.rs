@@ -25,6 +25,9 @@ pub(crate) const SCHEME_SEPARATOR: &str = "://";
 /// The prefix identifying the response status line.
 pub(crate) const HTTP_STATUS_PREFIX: &[u8] = b"HTTP/";
 
+/// The status code offset after the HTTP-version token and its space.
+pub(crate) const HTTP_STATUS_CODE_OFFSET: usize = 9;
+
 /// The non-alphanumeric bytes allowed in an HTTP field name.
 pub(crate) const FIELD_NAME_PUNCTUATION: &[u8] = b"!#$%&'*+-.^_`|~";
 

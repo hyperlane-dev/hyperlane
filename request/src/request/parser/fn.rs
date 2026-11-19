@@ -135,6 +135,9 @@ pub(crate) fn parse_chunked_body(body_bytes: &[u8]) -> Result<Vec<u8>, RequestEr
 
 /// Parse a strict hexadecimal chunk size, accepting optional extensions.
 ///
+/// RFC 9112 §7.1.1 permits bad whitespace before the extension delimiter,
+/// but not after a chunk size with no extension.
+///
 /// # Arguments
 ///
 /// - `&[u8]` - The complete chunk-size line without its CRLF.
@@ -146,11 +149,13 @@ pub(crate) fn parse_chunk_size(line: &[u8]) -> Result<usize, RequestError> {
     if !is_valid_header_value(line) {
         return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
     }
-    let size_end: usize = line
+    let extension_start: Option<usize> = line
         .iter()
-        .position(|byte: &u8| *byte == CHUNK_EXTENSION_SEPARATOR)
-        .unwrap_or(line.len());
-    let size_bytes: &[u8] = &line[..size_end];
+        .position(|byte: &u8| *byte == CHUNK_EXTENSION_SEPARATOR);
+    let size_bytes: &[u8] = match extension_start {
+        Some(end) => line[..end].trim_ascii_end(),
+        None => line,
+    };
     if size_bytes.is_empty() || !size_bytes.iter().all(u8::is_ascii_hexdigit) {
         return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
     }
@@ -284,7 +289,7 @@ pub(crate) fn find_crlf(data: &[u8], start: usize) -> Option<usize> {
     None
 }
 
-/// Extract `Content-Length` value from response bytes (0 if missing).
+/// Extract `Content-Length` from the response fields, distinguishing absence from zero.
 ///
 /// # Arguments
 ///
@@ -292,8 +297,8 @@ pub(crate) fn find_crlf(data: &[u8], start: usize) -> Option<usize> {
 ///
 /// # Returns
 ///
-/// - `Result<usize, RequestError>` - The body length, zero when absent, or invalid framing.
-pub(crate) fn get_content_length(response_bytes: &[u8]) -> Result<usize, RequestError> {
+/// - `Result<Option<usize>, RequestError>` - The declared length, absence, or invalid framing.
+pub(crate) fn get_content_length(response_bytes: &[u8]) -> Result<Option<usize>, RequestError> {
     let value: Option<&[u8]> = response_header_value(
         response_bytes,
         &CONTENT_LENGTH_PATTERN[..CONTENT_LENGTH_PATTERN.len() - 1],
@@ -304,9 +309,9 @@ pub(crate) fn get_content_length(response_bytes: &[u8]) -> Result<usize, Request
             if length > isize::MAX as usize {
                 return Err(RequestError::ContentLengthTooLarge(HttpStatus::BadRequest));
             }
-            Ok(length)
+            Ok(Some(length))
         }
-        None => Ok(0),
+        None => Ok(None),
     }
 }
 
@@ -506,54 +511,152 @@ pub(crate) fn calculate_buffer_capacity(
     }
 }
 
-/// Parse the response status line + headers to extract the 3-digit status code,
-/// the `Content-Length`, the redirect URL (if any), and whether the body is
-/// chunked. All three out-params are populated; only `redirect_url` may be
-/// `None`.
+/// Resolve HTTP/1 response framing from a complete field section.
+///
+/// For HEAD, framing fields are representation metadata (RFC 9112 §6.3).
 ///
 /// # Arguments
 ///
 /// - `&[u8]` - The raw response header bytes.
-/// - `&[u8]` - The lower-cased HTTP version bytes used to locate the status line.
-/// - `&[u8]` - The lower-cased `Location` header name, including its colon.
-/// - `&mut usize` - Receives the declared content length.
-/// - `&mut Option<Vec<u8>>` - Receives the redirect target, or stays `None`.
-/// - `&mut bool` - Receives whether the body is chunked.
+/// - `bool` - Whether the response answers a HEAD request.
 ///
 /// # Returns
 ///
-/// - `Result<(), RequestError>`: `Ok(())` once the out-parameters are populated.
+/// - `Result<Option<ResponseHeadFields>, RequestError>` - The final framing and redirect, or `None` for an interim response.
 pub(crate) fn parse_response_headers(
     headers_bytes: &[u8],
-    http_version_bytes: &[u8],
-    location_sign_key: &[u8],
-    content_length: &mut usize,
-    redirect_url: &mut Option<Vec<u8>>,
-    is_chunked: &mut bool,
-) -> Result<(), RequestError> {
-    *redirect_url = None;
+    is_head: bool,
+) -> Result<Option<ResponseHeadFields>, RequestError> {
+    let status_start: usize = HTTP_STATUS_CODE_OFFSET;
+    let status_code: usize = headers_bytes
+        .get(status_start..status_start + 3)
+        .map_or(0, parse_status_code);
     if headers_bytes
-        .get(..http_version_bytes.len())
-        .is_some_and(|prefix: &[u8]| {
-            find_pattern_case_insensitive(prefix, http_version_bytes) == Some(0)
+        .get(..HTTP_STATUS_PREFIX.len())
+        .is_none_or(|prefix: &[u8]| {
+            find_pattern_case_insensitive(prefix, HTTP_STATUS_PREFIX).is_none()
         })
+        || headers_bytes.get(status_start - 1) != Some(&SPACE_U8)
+        || !(100..=599).contains(&status_code)
+        || !matches!(headers_bytes.get(status_start + 3), Some(b' ' | b'\r'))
     {
-        let status_start: usize = http_version_bytes.len() + 1;
-        if let Some(status) = headers_bytes.get(status_start..status_start + 3)
-            && (300..=399).contains(&parse_status_code(status))
-        {
-            let name: &[u8] = &location_sign_key[..location_sign_key.len().saturating_sub(1)];
-            *redirect_url = response_header_value(headers_bytes, name)?.map(<[u8]>::to_vec);
-        }
-    }
-    *content_length = get_content_length(headers_bytes)?;
-    *is_chunked = is_chunked_encoding(headers_bytes)?;
-    if *is_chunked && response_header_value(headers_bytes, CONTENT_LENGTH.as_bytes())?.is_some() {
         return Err(RequestError::Request(INVALID_RESPONSE_FRAMING.to_owned()));
     }
-    let _: usize = headers_bytes
-        .len()
-        .checked_add(*content_length)
-        .ok_or(RequestError::ContentLengthTooLarge(HttpStatus::BadRequest))?;
-    Ok(())
+    let framing: ResponseFraming = if is_head {
+        let _: Option<&[u8]> = response_header_value(headers_bytes, &[])?;
+        ResponseFraming::Fixed(0)
+    } else {
+        let length: Option<usize> = get_content_length(headers_bytes)?;
+        let chunked: bool = is_chunked_encoding(headers_bytes)?;
+        match (length, chunked) {
+            (Some(_), true) => {
+                return Err(RequestError::Request(INVALID_RESPONSE_FRAMING.to_owned()));
+            }
+            (None, true) => ResponseFraming::Chunked,
+            (Some(length), false) => ResponseFraming::Fixed(length),
+            (None, false) => ResponseFraming::Close,
+        }
+    };
+    if status_code == HttpStatus::SwitchingProtocols.code()
+        || status_code == HttpStatus::NoContent.code()
+        || status_code == HttpStatus::NotModified.code()
+    {
+        return Ok(Some((ResponseFraming::Fixed(0), None)));
+    }
+    if status_code < HttpStatus::Ok.code() {
+        return Ok(None);
+    }
+
+    let redirect: Option<Vec<u8>> = if (300..=399).contains(&status_code) {
+        response_header_value(headers_bytes, LOCATION.as_bytes())?.map(<[u8]>::to_vec)
+    } else {
+        None
+    };
+    Ok(Some((framing, redirect)))
+}
+
+/// Finds the final response head and removes any preceding informational heads.
+///
+/// # Arguments
+///
+/// - `&mut Vec<u8>` - The accumulated response bytes.
+/// - `usize` - The earliest position where a new header terminator could start.
+/// - `bool` - Whether the response answers a HEAD request.
+///
+/// # Returns
+///
+/// - `Result<Option<FinalResponseHead>, RequestError>` - The framing of the final response, or `None` when more bytes are needed.
+pub(crate) fn find_final_response_head(
+    bytes: &mut Vec<u8>,
+    mut search_start: usize,
+    is_head: bool,
+) -> Result<Option<FinalResponseHead>, RequestError> {
+    let mut start: usize = 0;
+    while let Some(position) = find_double_crlf(bytes, search_start) {
+        let end: usize = position + HTTP_BR_BYTES.len() * 2;
+        if let Some((framing, redirect)) = parse_response_headers(&bytes[start..end], is_head)? {
+            if start != 0 {
+                drop(bytes.drain(..start));
+            }
+            return Ok(Some((end - start, framing, redirect)));
+        }
+        start = end;
+        search_start = end;
+    }
+    if start != 0 {
+        drop(bytes.drain(..start));
+    }
+    Ok(None)
+}
+
+/// Reports whether the final response body is complete without waiting for EOF.
+///
+/// # Arguments
+///
+/// - `ResponseFraming` - The final body framing.
+/// - `&[u8]` - The bytes following the response head.
+///
+/// # Returns
+///
+/// - `Result<bool, RequestError>` - Whether the body is complete, or a framing error.
+#[inline]
+pub(crate) fn response_body_is_complete(
+    framing: ResponseFraming,
+    bytes: &[u8],
+) -> Result<bool, RequestError> {
+    match framing {
+        ResponseFraming::Fixed(length) => Ok(bytes.len() >= length),
+        ResponseFraming::Chunked => Ok(chunked_body_end(bytes)?.is_some()),
+        ResponseFraming::Close => Ok(false),
+    }
+}
+
+/// Separates response fields from the decoded framing and preserves the body bytes.
+///
+/// # Arguments
+///
+/// - `&[u8]` - The accumulated final response of a completed read.
+/// - `usize` - The end of the final response head.
+/// - `ResponseFraming` - The final body framing.
+///
+/// # Returns
+///
+/// - `Result<HttpResponse, RequestError>` - The response, or an incomplete or invalid body error.
+pub(crate) fn finish_framed_response(
+    bytes: &[u8],
+    head_end: usize,
+    framing: ResponseFraming,
+) -> Result<HttpResponse, RequestError> {
+    let payload: &[u8] = &bytes[head_end..];
+    let body: ResponseBody = match framing {
+        ResponseFraming::Fixed(length) => payload
+            .get(..length)
+            .ok_or(RequestError::InvalidContentLength(HttpStatus::BadRequest))?
+            .to_vec(),
+        ResponseFraming::Chunked => parse_chunked_body(payload)?,
+        ResponseFraming::Close => payload.to_vec(),
+    };
+    let mut response: HttpResponse = HttpResponse::from_bytes(&bytes[..head_end]);
+    response.body = body;
+    Ok(response)
 }

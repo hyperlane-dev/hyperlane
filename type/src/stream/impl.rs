@@ -412,11 +412,26 @@ impl Stream {
         let path_slice: &str = Request::get_http_path(path, query_index, hash_index);
         request.get_mut_path().push_str(path_slice);
         request.set_version(version);
-        let content_size: usize = request
+        let framing: RequestFraming = request
             .get_http_headers(&mut reader, &config, header_line_buffer)
             .await?;
         request.set_method(method);
-        Request::fill_http_body(&mut reader, request.get_mut_body(), content_size).await?;
+        match framing {
+            RequestFraming::Fixed(0) => {}
+            RequestFraming::Fixed(content_size) => {
+                if content_size > reader.get_end() - reader.get_start()
+                    && expects_http_continue(request)
+                {
+                    let transport: &mut Box<dyn Transport> = reader.get_mut_stream();
+                    transport.write_all(HTTP_CONTINUE_RESPONSE).await?;
+                    transport.flush().await?;
+                }
+                Request::fill_http_body(&mut reader, request.get_mut_body(), content_size).await?;
+            }
+            RequestFraming::Chunked => {
+                Box::pin(fill_chunked_request(&mut reader, request, &config)).await?;
+            }
+        }
         // Preserve bytes read ahead for the next pipelined request: they have
         // already left the socket and cannot be read again.
         let reader_start: usize = reader.get_start();
@@ -438,6 +453,9 @@ impl Stream {
     /// Parses an HTTP request from a TCP stream into the given request.
     ///
     /// The request is reset and filled in place, reusing its allocations.
+    /// An HTTP/1.1 continue expectation can write an interim response after
+    /// header validation and before waiting for the body. A chunked body is
+    /// decoded, with trailers discarded and its content length normalized.
     /// If the timeout is DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS, no timeout is applied.
     ///
     /// # Arguments
