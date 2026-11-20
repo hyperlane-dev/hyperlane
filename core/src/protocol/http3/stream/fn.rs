@@ -50,6 +50,22 @@ fn is_grease_id(id: u64) -> bool {
     id >= 0x21 && (id - 0x21).is_multiple_of(0x1f)
 }
 
+/// Reports whether a frame type is reserved from HTTP/2 and forbidden in HTTP/3 (RFC 9114 §7.2.8).
+///
+/// # Arguments
+///
+/// - `u64` - The decoded frame type identifier.
+///
+/// # Returns
+///
+/// - `bool` - `true` when receiving the frame must close the connection with `H3_FRAME_UNEXPECTED`.
+#[inline(always)]
+fn is_reserved_h2_frame(id: u64) -> bool {
+    let low_reserved: bool = id == 0x02 || id == 0x06;
+    let high_reserved: bool = id == 0x08 || id == 0x09;
+    low_reserved || high_reserved
+}
+
 /// Serves one QUIC connection speaking HTTP/3 until it closes.
 ///
 /// Opens the server unidirectional control stream with a pre-encoded empty
@@ -76,9 +92,9 @@ pub(crate) async fn serve_h3_connection(
         }
         Err(_) => return,
     };
+    let control_state: H3ControlState = H3ControlState::default();
     let mut requests: FuturesUnordered<_> = FuturesUnordered::new();
     let mut uni_tasks: FuturesUnordered<_> = FuturesUnordered::new();
-    let control_state: Arc<H3ControlState> = Arc::new(H3ControlState::default());
     loop {
         tokio::select! {
             biased;
@@ -93,6 +109,7 @@ pub(crate) async fn serve_h3_connection(
                                     shared: Arc::clone(&env.shared),
                                     peers,
                                 },
+                                &connection,
                                 send,
                                 recv,
                             ))
@@ -106,9 +123,9 @@ pub(crate) async fn serve_h3_connection(
                 match uni {
                     Ok(recv) => {
                         uni_tasks.push(handle_h3_uni_stream(
-                            connection.clone(),
+                            &connection,
                             recv,
-                            Arc::clone(&control_state),
+                            &control_state,
                         ));
                     }
                     Err(_) => break,
@@ -249,6 +266,14 @@ async fn drive_h3_control_stream(connection: &QuicConnection, recv: &mut QuicRec
                 );
                 return;
             }
+            other if is_reserved_h2_frame(other) => {
+                return_h3_buffer(buf);
+                connection.close(
+                    VarInt::from_u32(H3_FRAME_UNEXPECTED),
+                    H3_REASON_RESERVED_FRAME,
+                );
+                return;
+            }
             _ => {
                 if skip_h3_payload(recv, &mut buf, &mut pos, payload_len)
                     .await
@@ -270,13 +295,13 @@ async fn drive_h3_control_stream(connection: &QuicConnection, recv: &mut QuicRec
 ///
 /// # Arguments
 ///
-/// - `QuicConnection` - The owning QUIC connection for closing on fatal stream errors.
+/// - `&QuicConnection` - The owning QUIC connection for closing on fatal stream errors.
 /// - `QuicRecvStream` - The incoming unidirectional stream.
-/// - `Arc<H3ControlState>` - Shared atomic flags recording peer critical streams immediately.
+/// - `&H3ControlState` - Atomic flags recording peer critical streams immediately.
 async fn handle_h3_uni_stream(
-    connection: QuicConnection,
+    connection: &QuicConnection,
     mut recv: QuicRecvStream,
-    state: Arc<H3ControlState>,
+    state: &H3ControlState,
 ) {
     let mut header_buf: [u8; 8] = [0; 8];
     let mut filled: usize = 0;
@@ -303,7 +328,7 @@ async fn handle_h3_uni_stream(
                 );
                 return;
             }
-            drive_h3_control_stream(&connection, &mut recv).await;
+            drive_h3_control_stream(connection, &mut recv).await;
         }
         H3_STREAM_QPACK_ENCODER => {
             if state.qpack_enc_seen.swap(true, AtomicOrdering::AcqRel) {
@@ -323,7 +348,15 @@ async fn handle_h3_uni_stream(
                         );
                         return;
                     }
-                    Ok(Some(_)) => {}
+                    Ok(Some(n)) => {
+                        if buf[..n].iter().any(|b: &u8| *b != QPACK_SET_CAPACITY_ZERO) {
+                            connection.close(
+                                VarInt::from_u32(H3_QPACK_ENCODER_STREAM_ERROR),
+                                H3_REASON_QPACK_DYNAMIC_UNSUPPORTED,
+                            );
+                            return;
+                        }
+                    }
                     Err(_) => return,
                 }
             }
@@ -504,6 +537,7 @@ async fn skip_h3_payload(
 ///
 /// # Arguments
 ///
+/// - `&QuicConnection` - The owning QUIC connection closed on connection-level frame violations.
 /// - `&mut QuicRecvStream` - The QUIC receive stream.
 /// - `&mut Vec<u8>` - The pooled read buffer.
 /// - `&mut usize` - Read cursor inside `buf`.
@@ -515,6 +549,7 @@ async fn skip_h3_payload(
 ///
 /// - `Result<Option<H3DecodedRequestMeta>, RequestError>` - `None` if peer closed before sending headers.
 async fn read_h3_request_headers(
+    connection: &QuicConnection,
     recv: &mut QuicRecvStream,
     buf: &mut Vec<u8>,
     pos: &mut usize,
@@ -526,12 +561,20 @@ async fn read_h3_request_headers(
         let Some((frame_type, payload_len)) = read_h3_frame_header(recv, buf, pos).await? else {
             return Ok(None);
         };
-        if is_grease_id(frame_type) {
+        if frame_type != H3_FRAME_HEADERS {
+            let forbidden: bool =
+                frame_type == H3_FRAME_DATA || H3_FORBIDDEN_REQUEST_FRAMES.contains(&frame_type);
+            if forbidden || is_reserved_h2_frame(frame_type) {
+                let reason: &[u8] = if is_reserved_h2_frame(frame_type) {
+                    H3_REASON_RESERVED_FRAME
+                } else {
+                    H3_REASON_UNEXPECTED_REQUEST_FRAME
+                };
+                connection.close(VarInt::from_u32(H3_FRAME_UNEXPECTED), reason);
+                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+            }
             skip_h3_payload(recv, buf, pos, payload_len).await?;
             continue;
-        }
-        if frame_type != H3_FRAME_HEADERS {
-            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
         }
         if payload_len > H3_MAX_HEADERS_FRAME_LEN {
             return Err(RequestError::HeaderValueTooLong(
@@ -549,35 +592,29 @@ async fn read_h3_request_headers(
     }
 }
 
-/// Collects HTTP/3 `DATA` frames into `body` while enforcing size limits and `Expect: 100-continue`.
+/// Collects HTTP/3 `DATA` frames into `body` while enforcing size limits.
 ///
 /// # Arguments
 ///
-/// - `&mut QuicSendStream` - The send stream for optional `100 Continue` emission.
+/// - `&QuicConnection` - The owning QUIC connection closed on connection-level frame violations.
 /// - `&mut QuicRecvStream` - The receive stream carrying `DATA` frames.
 /// - `&mut Vec<u8>` - The pooled read buffer containing any bytes already read after `HEADERS`.
 /// - `&mut usize` - Read cursor inside `buf`.
 /// - `usize` - Maximum permitted body length.
 /// - `&mut Vec<u8>` - Destination request body buffer.
-/// - `bool` - Whether to send `100 Continue` before reading body bytes.
 ///
 /// # Returns
 ///
 /// - `Result<(), RequestError>` - `Ok(())` when the request stream ends cleanly.
 async fn collect_h3_data_frames(
-    send: &mut QuicSendStream,
+    connection: &QuicConnection,
     recv: &mut QuicRecvStream,
     buf: &mut Vec<u8>,
     pos: &mut usize,
     max_body_size: usize,
     body: &mut Vec<u8>,
-    send_continue: bool,
 ) -> Result<(), RequestError> {
-    if send_continue {
-        send.write_all(H3_CONTINUE_FRAME)
-            .await
-            .map_err(|error: QuicWriteError| RequestError::Request(error.to_string()))?;
-    }
+    let mut trailers_seen: bool = false;
     loop {
         if *pos == buf.len() {
             buf.clear();
@@ -588,6 +625,13 @@ async fn collect_h3_data_frames(
         };
         match frame_type {
             H3_FRAME_DATA => {
+                if trailers_seen {
+                    connection.close(
+                        VarInt::from_u32(H3_FRAME_UNEXPECTED),
+                        H3_REASON_FRAME_AFTER_TRAILERS,
+                    );
+                    return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                }
                 if max_body_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE
                     && body.len().saturating_add(payload_len) > max_body_size
                 {
@@ -626,6 +670,14 @@ async fn collect_h3_data_frames(
                 }
             }
             H3_FRAME_HEADERS => {
+                if trailers_seen {
+                    connection.close(
+                        VarInt::from_u32(H3_FRAME_UNEXPECTED),
+                        H3_REASON_FRAME_AFTER_TRAILERS,
+                    );
+                    return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                }
+                trailers_seen = true;
                 skip_h3_payload(recv, buf, pos, payload_len).await?;
             }
             other if is_grease_id(other) => {
@@ -636,7 +688,17 @@ async fn collect_h3_data_frames(
             | H3_FRAME_CANCEL_PUSH
             | H3_FRAME_PUSH_PROMISE
             | H3_FRAME_MAX_PUSH_ID => {
-                let _: Result<(), _> = recv.stop(VarInt::from_u32(H3_FRAME_UNEXPECTED));
+                connection.close(
+                    VarInt::from_u32(H3_FRAME_UNEXPECTED),
+                    H3_REASON_UNEXPECTED_REQUEST_FRAME,
+                );
+                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+            }
+            other if is_reserved_h2_frame(other) => {
+                connection.close(
+                    VarInt::from_u32(H3_FRAME_UNEXPECTED),
+                    H3_REASON_RESERVED_FRAME,
+                );
                 return Err(RequestError::HttpRead(HttpStatus::BadRequest));
             }
             _ => {
@@ -651,10 +713,12 @@ async fn collect_h3_data_frames(
 /// # Arguments
 ///
 /// - `H3RequestEnv` - Shared server state, compiled pipeline and connection addresses.
+/// - `&QuicConnection` - The owning QUIC connection closed on connection-level frame violations.
 /// - `QuicSendStream` - The QUIC send stream for the response.
 /// - `QuicRecvStream` - The QUIC receive stream for the request.
 pub(crate) async fn h3_request_task(
     env: H3RequestEnv,
+    connection: &QuicConnection,
     mut send_stream: QuicSendStream,
     mut recv_stream: QuicRecvStream,
 ) {
@@ -669,6 +733,7 @@ pub(crate) async fn h3_request_task(
     let head_result: Result<Option<H3DecodedRequestMeta>, RequestError> =
         if read_timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
             read_h3_request_headers(
+                connection,
                 &mut recv_stream,
                 &mut read_buf,
                 &mut read_pos,
@@ -679,6 +744,7 @@ pub(crate) async fn h3_request_task(
             .await
         } else {
             let mut reading: Pin<&mut _> = pin!(read_h3_request_headers(
+                connection,
                 &mut recv_stream,
                 &mut read_buf,
                 &mut read_pos,
@@ -729,37 +795,35 @@ pub(crate) async fn h3_request_task(
     {
         body.reserve(expected.min(MAX_POOLED_BUFFER_CAPACITY));
     }
-    let body_result: Result<(), RequestError> =
-        if read_timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
+    let body_result: Result<(), RequestError> = {
+        let mut reading: Pin<&mut _> = pin!(async {
+            if meta.expect_continue {
+                send_stream
+                    .write_all(H3_CONTINUE_FRAME)
+                    .await
+                    .map_err(|error: QuicWriteError| RequestError::Request(error.to_string()))?;
+            }
             collect_h3_data_frames(
-                &mut send_stream,
+                connection,
                 &mut recv_stream,
                 &mut read_buf,
                 &mut read_pos,
                 max_body_size,
                 body,
-                meta.expect_continue,
             )
             .await
+        });
+        if read_timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
+            reading.await
+        } else if let Some(done) = poll_once_protocol(reading.as_mut()).await {
+            done
         } else {
-            let mut reading: Pin<&mut _> = pin!(collect_h3_data_frames(
-                &mut send_stream,
-                &mut recv_stream,
-                &mut read_buf,
-                &mut read_pos,
-                max_body_size,
-                body,
-                meta.expect_continue,
-            ));
-            if let Some(done) = poll_once_protocol(reading.as_mut()).await {
-                done
-            } else {
-                match timeout(Duration::from_millis(read_timeout_ms), reading).await {
-                    Ok(done) => done,
-                    Err(_) => Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
-                }
+            match timeout(Duration::from_millis(read_timeout_ms), reading).await {
+                Ok(done) => done,
+                Err(_) => Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
             }
-        };
+        }
+    };
     return_h3_buffer(read_buf);
     let body_check: Result<(), RequestError> =
         body_result.and_then(|()| match meta.declared_content_length {

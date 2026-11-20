@@ -34,6 +34,8 @@ pub(crate) struct UringAcceptSlot {
 pub(crate) struct UringConnSlot {
     /// Accepted TCP socket file descriptor.
     pub(crate) fd: RawFd,
+    /// Unique connection identity retained independently of the reusable slab index.
+    pub(crate) connection_id: u64,
     /// Fixed-address receive buffer passed to `opcode::Recv` (never reallocated while in flight).
     pub(crate) read_buf: Box<[u8]>,
     /// Offset of the first unread byte in `read_buf`.
@@ -58,6 +60,8 @@ pub(crate) struct UringConnSlot {
     pub(crate) close_inflight: bool,
     /// Whether a flush caller is waiting for accepted bytes to reach the socket.
     pub(crate) flush_pending: bool,
+    /// Whether a receive cancellation CQE must finish before this slot can be reused.
+    pub(crate) cancel_inflight: bool,
     /// Whether peer EOF (`Recv` returned `0`) has been observed.
     pub(crate) eof: bool,
     /// Whether `poll_shutdown` has been requested by the connection future.
@@ -96,6 +100,10 @@ pub(crate) struct UringReactor {
     pub(crate) wake_state: Arc<UringWakeState>,
     /// Count of currently active (non-None) connection slots for clean shutdown draining.
     pub(crate) active_slots: usize,
+    /// Next unique identity; zero means exhaustion and never permits identity reuse.
+    pub(crate) next_connection_id: u64,
+    /// Cached owning thread identity for constant-time transport ownership checks.
+    pub(crate) owner_thread: thread::ThreadId,
 }
 
 /// Zero-syscall [`Transport`] handle backed by the worker-local Linux `io_uring` reactor.
@@ -103,6 +111,10 @@ pub(crate) struct UringReactor {
 pub(crate) struct UringTcpTransport {
     /// Slab index inside the owning worker's [`UringReactor`].
     pub(crate) slot_id: usize,
+    /// Unique identity of the accepted connection, not just its reusable slab index.
+    pub(crate) connection_id: u64,
+    /// Owning reactor thread, preventing another worker's slab from being accessed.
+    pub(crate) owner_thread: thread::ThreadId,
     /// Real local and remote socket addresses captured at `Accept` time.
     pub(crate) peers: StreamPeers,
 }

@@ -83,6 +83,9 @@ async fn run_quic_shard_dispatcher(
     let mut metas: Vec<RecvMeta> = vec![RecvMeta::default(); BATCH_SIZE];
     let shard_count: usize = queues.len();
     let mut wakers_to_wake: [Option<Waker>; 64] = [const { None }; 64];
+    let mut staged: Vec<Vec<(usize, usize, usize, RecvMeta)>> = (0..shard_count)
+        .map(|_: usize| Vec::with_capacity(BATCH_SIZE))
+        .collect();
     loop {
         let batch_res: Option<io::Result<usize>> = tokio::select! {
             biased;
@@ -95,7 +98,7 @@ async fn run_quic_shard_dispatcher(
         let Ok(count) = received else {
             continue;
         };
-        let mut wake_mask: u64 = 0;
+        let mut touched_mask: u64 = 0;
         for idx in 0..count {
             let meta: RecvMeta = metas[idx];
             let total_len: usize = meta.len.min(buffers[idx].len());
@@ -107,14 +110,32 @@ async fn run_quic_shard_dispatcher(
             while offset < total_len {
                 let end: usize = (offset + stride).min(total_len);
                 let slice: &[u8] = &buffers[idx][offset..end];
-                offset = end;
                 let shard_idx: usize = route_quic_datagram(slice, shard_count);
                 let mut seg_meta: RecvMeta = meta;
                 seg_meta.len = slice.len();
                 seg_meta.stride = slice.len();
-                if let Ok(mut q) = queues[shard_idx].lock()
-                    && q.queue.len() < QUIC_SHARD_QUEUE_CAP
-                {
+                staged[shard_idx].push((idx, offset, end, seg_meta));
+                if shard_idx < 64 {
+                    touched_mask |= 1u64 << shard_idx;
+                }
+                offset = end;
+            }
+        }
+        let mut wake_mask: u64 = 0;
+        let mut iter_mask: u64 = touched_mask;
+        while iter_mask != 0 {
+            let shard_idx: usize = iter_mask.trailing_zeros() as usize;
+            iter_mask &= iter_mask - 1;
+            let batch: &mut Vec<(usize, usize, usize, RecvMeta)> = &mut staged[shard_idx];
+            if batch.is_empty() {
+                continue;
+            }
+            if let Ok(mut q) = queues[shard_idx].lock() {
+                for &(buf_idx, start, end, seg_meta) in batch.iter() {
+                    if q.queue.len() >= QUIC_SHARD_QUEUE_CAP {
+                        break;
+                    }
+                    let slice: &[u8] = &buffers[buf_idx][start..end];
                     let mut payload: Vec<u8> = q.pool.pop().unwrap_or_else(|| {
                         Vec::with_capacity(slice.len().max(QUIC_DATAGRAM_INIT_CAP))
                     });
@@ -124,19 +145,13 @@ async fn run_quic_shard_dispatcher(
                         data: payload,
                         meta: seg_meta,
                     });
-                    if shard_idx < 64 {
-                        if wakers_to_wake[shard_idx].is_none()
-                            && let Some(waker) = q.waker.take()
-                        {
-                            wakers_to_wake[shard_idx] = Some(waker);
-                            wake_mask |= 1u64 << shard_idx;
-                        }
-                    } else if let Some(waker) = q.waker.take() {
-                        drop(q);
-                        waker.wake();
-                    }
+                }
+                if let Some(waker) = q.waker.take() {
+                    wakers_to_wake[shard_idx] = Some(waker);
+                    wake_mask |= 1u64 << shard_idx;
                 }
             }
+            batch.clear();
         }
         let mut mask: u64 = wake_mask;
         while mask != 0 {

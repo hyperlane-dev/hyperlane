@@ -22,6 +22,7 @@ fn with_uring_slot(check: impl FnOnce(&mut UringTcpTransport)) -> bool {
     });
     let slot: UringConnSlot = UringConnSlot {
         fd: server.as_raw_fd(),
+        connection_id: 1,
         read_buf: vec![0; URING_IO_BUF_SIZE].into_boxed_slice(),
         read_pos: 0,
         read_len: 0,
@@ -34,6 +35,7 @@ fn with_uring_slot(check: impl FnOnce(&mut UringTcpTransport)) -> bool {
         send_inflight: false,
         close_inflight: false,
         flush_pending: false,
+        cancel_inflight: false,
         eof: false,
         write_shutdown: false,
         closing: false,
@@ -53,12 +55,19 @@ fn with_uring_slot(check: impl FnOnce(&mut UringTcpTransport)) -> bool {
         local_ready: Vec::new(),
         wake_state,
         active_slots: 1,
+        next_connection_id: 2,
+        owner_thread: thread::current().id(),
     };
     URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
         assert!(cell.borrow().is_none());
         *cell.borrow_mut() = Some(reactor);
     });
-    let mut transport: UringTcpTransport = UringTcpTransport { slot_id: 0, peers };
+    let mut transport: UringTcpTransport = UringTcpTransport {
+        slot_id: 0,
+        connection_id: 1,
+        owner_thread: thread::current().id(),
+        peers,
+    };
     let outcome: Result<(), Box<dyn Any + Send>> =
         catch_unwind(AssertUnwindSafe(|| check(&mut transport)));
     let reactor: Option<UringReactor> =
@@ -78,6 +87,8 @@ fn uring_flush_without_a_reactor_reports_broken_pipe() {
     let address: SocketAddr = SocketAddr::from((Ipv4Addr::LOCALHOST, 0));
     let mut transport: UringTcpTransport = UringTcpTransport {
         slot_id: 0,
+        connection_id: 1,
+        owner_thread: thread::current().id(),
         peers: StreamPeers {
             local: address,
             remote: address,
@@ -268,6 +279,179 @@ fn uring_shutdown_propagates_a_completed_send_error() {
         let mut context: task::Context<'_> = task::Context::from_waker(Waker::noop());
         let outcome: Poll<io::Result<()>> = Pin::new(transport).poll_shutdown(&mut context);
         assert!(matches!(outcome, Poll::Ready(Err(error)) if error.raw_os_error() == Some(EPIPE)));
+    });
+    if !exercised {
+        assert!(!uring_is_available());
+    }
+}
+
+#[test]
+fn uring_flush_prefetches_receive_without_reporting_early_success() {
+    let exercised: bool = with_uring_slot(|transport: &mut UringTcpTransport| {
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let slot: &mut UringConnSlot = guard.as_mut().unwrap().slots[0].as_mut().unwrap();
+            slot.write_buf[..4].copy_from_slice(b"test");
+            slot.write_len = 4;
+            slot.send_staged = true;
+        });
+        let mut context: task::Context<'_> = task::Context::from_waker(Waker::noop());
+        assert!(Pin::new(transport).poll_flush(&mut context).is_pending());
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let reactor: &mut UringReactor = guard.as_mut().unwrap();
+            let slot: &UringConnSlot = reactor.slots[0].as_ref().unwrap();
+            assert!(slot.send_inflight && slot.recv_inflight);
+            assert!(slot.flush_pending);
+            assert_eq!(reactor.ring.submission().len(), 2);
+        });
+    });
+    if !exercised {
+        assert!(!uring_is_available());
+    }
+}
+
+#[test]
+fn uring_shutdown_does_not_start_receive_prefetch() {
+    let exercised: bool = with_uring_slot(|transport: &mut UringTcpTransport| {
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let slot: &mut UringConnSlot = guard.as_mut().unwrap().slots[0].as_mut().unwrap();
+            slot.write_len = 4;
+            slot.send_staged = true;
+        });
+        let mut context: task::Context<'_> = task::Context::from_waker(Waker::noop());
+        assert!(Pin::new(transport).poll_shutdown(&mut context).is_pending());
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let slot: &UringConnSlot = guard.as_ref().unwrap().slots[0].as_ref().unwrap();
+            assert!(slot.send_inflight);
+            assert!(!slot.recv_inflight);
+        });
+    });
+    if !exercised {
+        assert!(!uring_is_available());
+    }
+}
+
+#[test]
+fn uring_close_before_cancel_cqe_cannot_reuse_a_slot() {
+    let exercised: bool = with_uring_slot(|_: &mut UringTcpTransport| {
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let reactor: &mut UringReactor = guard.as_mut().unwrap();
+            let slot: &mut UringConnSlot = reactor.slots[0].as_mut().unwrap();
+            slot.closing = true;
+            slot.close_inflight = true;
+            slot.cancel_inflight = true;
+            reactor.complete_close(0, 0);
+            assert_eq!(reactor.active_slots, 1);
+            assert!(reactor.free_slots.is_empty());
+            reactor.complete_cancel(0);
+            assert_eq!(reactor.active_slots, 0);
+            assert_eq!(reactor.free_slots, vec![0]);
+        });
+    });
+    if !exercised {
+        assert!(!uring_is_available());
+    }
+}
+
+#[test]
+fn uring_cancel_before_close_cqe_cannot_reuse_a_slot() {
+    let exercised: bool = with_uring_slot(|_: &mut UringTcpTransport| {
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let reactor: &mut UringReactor = guard.as_mut().unwrap();
+            let slot: &mut UringConnSlot = reactor.slots[0].as_mut().unwrap();
+            slot.closing = true;
+            slot.close_inflight = true;
+            slot.cancel_inflight = true;
+            reactor.complete_cancel(0);
+            assert_eq!(reactor.active_slots, 1);
+            assert!(reactor.free_slots.is_empty());
+            reactor.complete_close(0, 0);
+            assert_eq!(reactor.active_slots, 0);
+            assert_eq!(reactor.free_slots, vec![0]);
+        });
+    });
+    if !exercised {
+        assert!(!uring_is_available());
+    }
+}
+
+#[test]
+fn uring_reused_slot_rejects_a_retained_connection_identity() {
+    let exercised: bool = with_uring_slot(|transport: &mut UringTcpTransport| {
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let slot: &mut UringConnSlot = guard.as_mut().unwrap().slots[0].as_mut().unwrap();
+            slot.read_buf[..4].copy_from_slice(b"hide");
+            slot.read_len = 4;
+        });
+        let mut stale: UringTcpTransport = UringTcpTransport {
+            slot_id: transport.slot_id,
+            connection_id: 99,
+            owner_thread: transport.owner_thread,
+            peers: transport.peers,
+        };
+        let mut context: task::Context<'_> = task::Context::from_waker(Waker::noop());
+        let mut bytes: [u8; 4] = [0; 4];
+        let mut buffer: ReadBuf<'_> = ReadBuf::new(&mut bytes);
+        assert!(matches!(
+            Pin::new(&mut stale).poll_read(&mut context, &mut buffer),
+            Poll::Ready(Err(_))
+        ));
+        assert!(buffer.filled().is_empty());
+        assert!(matches!(
+            Pin::new(&mut stale).poll_write(&mut context, b"write"),
+            Poll::Ready(Err(_))
+        ));
+        assert!(matches!(
+            Pin::new(&mut stale).poll_write_vectored(&mut context, &[IoSlice::new(b"write")]),
+            Poll::Ready(Err(_))
+        ));
+        assert!(matches!(
+            Pin::new(&mut stale).poll_flush(&mut context),
+            Poll::Ready(Err(_))
+        ));
+        assert!(matches!(
+            Pin::new(&mut stale).poll_shutdown(&mut context),
+            Poll::Ready(Err(_))
+        ));
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let slot: &UringConnSlot = guard.as_ref().unwrap().slots[0].as_ref().unwrap();
+            assert_eq!(slot.read_pos, 0);
+            assert_eq!(slot.write_len, 0);
+            assert!(!slot.write_shutdown);
+            assert!(!slot.send_inflight && !slot.recv_inflight);
+        });
+    });
+    if !exercised {
+        assert!(!uring_is_available());
+    }
+}
+
+#[test]
+fn uring_handle_cannot_access_another_workers_matching_slab_index() {
+    let exercised: bool = with_uring_slot(|transport: &mut UringTcpTransport| {
+        let mut moved: UringTcpTransport = UringTcpTransport {
+            slot_id: transport.slot_id,
+            connection_id: transport.connection_id,
+            owner_thread: transport.owner_thread,
+            peers: transport.peers,
+        };
+        let worker: ThreadJoinHandle<bool> = thread::spawn(move || {
+            with_uring_slot(|_: &mut UringTcpTransport| {
+                let mut context: task::Context<'_> = task::Context::from_waker(Waker::noop());
+                let outcome: Poll<io::Result<()>> = Pin::new(&mut moved).poll_flush(&mut context);
+                assert!(
+                    matches!(outcome, Poll::Ready(Err(error)) if error.raw_os_error() == Some(EPIPE))
+                );
+            })
+        });
+        assert!(worker.join().unwrap());
     });
     if !exercised {
         assert!(!uring_is_available());

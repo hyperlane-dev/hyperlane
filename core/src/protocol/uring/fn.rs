@@ -311,6 +311,7 @@ fn run_uring_worker_thread(
     let configured_ttl: Option<u32> = env.shared.server.get_server_config().get_ttl();
     let is_v6: bool = local_addr.is_ipv6();
     let is_tls: bool = env.shared.tls_config.is_some();
+    let owner_thread: thread::ThreadId = thread::current().id();
     let mut accept_slots: Vec<UringAcceptSlot> = (0..accept_slot_count)
         .map(|_: usize| UringAcceptSlot {
             // SAFETY: `sockaddr_storage` is a plain C POD struct valid when zero-initialized.
@@ -330,6 +331,8 @@ fn run_uring_worker_thread(
             local_ready: Vec::with_capacity(256),
             wake_state: Arc::clone(&wake_state),
             active_slots: 0,
+            next_connection_id: 1,
+            owner_thread,
         };
         arm_eventfd_poll(&mut reactor);
         for (idx, slot) in accept_slots.iter_mut().enumerate() {
@@ -376,6 +379,15 @@ fn run_uring_worker_thread(
                             acc.inflight = false;
                             if res >= 0 && !shutdown_initiated {
                                 let fd: RawFd = res;
+                                if reactor.next_connection_id == 0 {
+                                    // SAFETY: The accepted descriptor is live and has no submitted I/O.
+                                    let _: c_int = unsafe { close(fd) };
+                                    arm_accept_slot(reactor, listener_fd, acc, idx);
+                                    continue;
+                                }
+                                let connection_id: u64 = reactor.next_connection_id;
+                                reactor.next_connection_id =
+                                    connection_id.checked_add(1).unwrap_or(0);
                                 if let Some(ttl) = configured_ttl {
                                     apply_socket_ttl(fd, ttl, is_v6);
                                 }
@@ -403,8 +415,12 @@ fn run_uring_worker_thread(
                                         }))
                                     })
                                     .clone();
-                                let transport: UringTcpTransport =
-                                    UringTcpTransport { slot_id, peers };
+                                let transport: UringTcpTransport = UringTcpTransport {
+                                    slot_id,
+                                    connection_id,
+                                    owner_thread,
+                                    peers,
+                                };
                                 let task: UringTaskFuture = if is_tls {
                                     Box::pin(run_uring_h1_tls(env.clone(), transport))
                                 } else {
@@ -412,6 +428,7 @@ fn run_uring_worker_thread(
                                 };
                                 reactor.slots[slot_id] = Some(UringConnSlot {
                                     fd,
+                                    connection_id,
                                     read_buf,
                                     read_pos: 0,
                                     read_len: 0,
@@ -424,6 +441,7 @@ fn run_uring_worker_thread(
                                     send_inflight: false,
                                     close_inflight: false,
                                     flush_pending: false,
+                                    cancel_inflight: false,
                                     eof: false,
                                     write_shutdown: false,
                                     closing: false,
@@ -466,6 +484,7 @@ fn run_uring_worker_thread(
                     }
                     URING_TAG_SEND => reactor.complete_send(idx, res),
                     URING_TAG_CLOSE => reactor.complete_close(idx, res),
+                    URING_TAG_CANCEL => reactor.complete_cancel(idx),
                     URING_TAG_EVENTFD => {
                         let mut counter: u64 = 0;
                         // SAFETY: Reading 8 bytes from a valid nonblocking eventfd drains the counter.
@@ -506,7 +525,7 @@ fn run_uring_worker_thread(
                             encode_uring_user_data(URING_TAG_ACCEPT, acc_idx),
                         )
                         .build()
-                        .user_data(encode_uring_user_data(URING_TAG_CANCEL, acc_idx));
+                        .user_data(encode_uring_user_data(URING_TAG_ACCEPT_CANCEL, acc_idx));
                         reactor.push_sqe(cancel);
                     }
                 }

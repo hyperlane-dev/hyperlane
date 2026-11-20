@@ -329,13 +329,35 @@ impl UringReactor {
                     retry = true;
                 } else {
                     slot.fd = -1;
-                    recycle = !slot.send_inflight && !slot.recv_inflight;
+                    recycle = !slot.send_inflight && !slot.recv_inflight && !slot.cancel_inflight;
                 }
             }
         }
         if recycle {
             self.recycle_slot(slot_id);
         } else if retry {
+            self.advance_close(slot_id);
+        }
+    }
+
+    /// Releases a receive cancellation only after its own CQE arrives.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - Connection slot whose cancellation completed.
+    pub(crate) fn complete_cancel(&mut self, slot_id: usize) {
+        let closing: bool = {
+            let Self { slots, .. } = self;
+            let Some(Some(slot)) = slots.get_mut(slot_id) else {
+                return;
+            };
+            if !slot.cancel_inflight {
+                return;
+            }
+            slot.cancel_inflight = false;
+            slot.closing
+        };
+        if closing {
             self.advance_close(slot_id);
         }
     }
@@ -367,11 +389,17 @@ impl UringReactor {
                     slot.send_staged = true;
                     staged = true;
                 } else if slot.recv_inflight {
+                    if slot.cancel_inflight {
+                        return;
+                    }
+                    slot.cancel_inflight = true;
                     next_sqe = Some(
                         opcode::AsyncCancel::new(encode_uring_user_data(URING_TAG_RECV, slot_id))
                             .build()
                             .user_data(encode_uring_user_data(URING_TAG_CANCEL, slot_id)),
                     );
+                } else if slot.cancel_inflight {
+                    return;
                 } else if slot.fd >= 0 {
                     slot.close_inflight = true;
                     next_sqe = Some(
@@ -466,7 +494,12 @@ impl AsyncRead for UringTcpTransport {
         _cx: &mut task::Context<'_>,
         output: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        let Self { slot_id, .. } = *self;
+        let Self {
+            slot_id,
+            connection_id,
+            owner_thread,
+            ..
+        } = *self;
         if output.remaining() == 0 {
             return Poll::Ready(Ok(()));
         }
@@ -478,9 +511,15 @@ impl AsyncRead for UringTcpTransport {
                     URING_REACTOR_UNAVAILABLE,
                 )));
             };
+            if reactor.owner_thread != owner_thread {
+                return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+            }
             let Some(Some(slot)) = reactor.slots.get_mut(slot_id) else {
                 return Poll::Ready(Ok(()));
             };
+            if slot.connection_id != connection_id {
+                return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+            }
             if slot.read_pos < slot.read_len {
                 let avail: usize = slot.read_len - slot.read_pos;
                 let take: usize = avail.min(output.remaining());
@@ -533,7 +572,12 @@ impl AsyncWrite for UringTcpTransport {
         _cx: &mut task::Context<'_>,
         bytes: &[u8],
     ) -> Poll<io::Result<usize>> {
-        let Self { slot_id, .. } = *self;
+        let Self {
+            slot_id,
+            connection_id,
+            owner_thread,
+            ..
+        } = *self;
         if bytes.is_empty() {
             return Poll::Ready(Ok(0));
         }
@@ -545,11 +589,17 @@ impl AsyncWrite for UringTcpTransport {
                     URING_REACTOR_UNAVAILABLE,
                 )));
             };
+            if reactor.owner_thread != owner_thread {
+                return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+            }
             let mut flush_entry: Option<squeue::Entry> = None;
             let result: Poll<io::Result<usize>> = {
                 let Some(Some(slot)) = reactor.slots.get_mut(slot_id) else {
                     return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
                 };
+                if slot.connection_id != connection_id {
+                    return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+                }
                 if let Some(errno) = slot.write_err.take() {
                     return Poll::Ready(Err(io::Error::from_raw_os_error(errno)));
                 }
@@ -609,7 +659,12 @@ impl AsyncWrite for UringTcpTransport {
         _cx: &mut task::Context<'_>,
         slices: &[IoSlice<'_>],
     ) -> Poll<io::Result<usize>> {
-        let Self { slot_id, .. } = *self;
+        let Self {
+            slot_id,
+            connection_id,
+            owner_thread,
+            ..
+        } = *self;
         let total: usize = slices.iter().map(|s: &IoSlice<'_>| s.len()).sum();
         if total == 0 {
             return Poll::Ready(Ok(0));
@@ -622,11 +677,17 @@ impl AsyncWrite for UringTcpTransport {
                     URING_REACTOR_UNAVAILABLE,
                 )));
             };
+            if reactor.owner_thread != owner_thread {
+                return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+            }
             let mut flush_entry: Option<squeue::Entry> = None;
             let result: Poll<io::Result<usize>> = {
                 let Some(Some(slot)) = reactor.slots.get_mut(slot_id) else {
                     return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
                 };
+                if slot.connection_id != connection_id {
+                    return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+                }
                 if let Some(errno) = slot.write_err.take() {
                     return Poll::Ready(Err(io::Error::from_raw_os_error(errno)));
                 }
@@ -719,7 +780,12 @@ impl AsyncWrite for UringTcpTransport {
     ///
     /// - `Poll<io::Result<()>>` - Pending while buffered or in-flight bytes remain, or the send error.
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut task::Context<'_>) -> Poll<io::Result<()>> {
-        let Self { slot_id, .. } = *self;
+        let Self {
+            slot_id,
+            connection_id,
+            owner_thread,
+            ..
+        } = *self;
         URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
             let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
             let Some(reactor) = guard.as_mut() else {
@@ -728,10 +794,17 @@ impl AsyncWrite for UringTcpTransport {
                     URING_REACTOR_UNAVAILABLE,
                 )));
             };
+            if reactor.owner_thread != owner_thread {
+                return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+            }
+            let mut read_ahead: Option<squeue::Entry> = None;
             let pending: bool = {
                 let Some(Some(slot)) = reactor.slots.get_mut(slot_id) else {
                     return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
                 };
+                if slot.connection_id != connection_id {
+                    return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+                }
                 if let Some(errno) = slot.write_err {
                     return Poll::Ready(Err(io::Error::from_raw_os_error(errno)));
                 }
@@ -743,10 +816,32 @@ impl AsyncWrite for UringTcpTransport {
                     slot.write_pos < slot.write_len || !slot.pending_write.is_empty();
                 let pending: bool = active || buffered;
                 slot.flush_pending = pending;
+                if pending
+                    && !slot.recv_inflight
+                    && !slot.eof
+                    && !slot.closing
+                    && !slot.write_shutdown
+                    && slot.read_err.is_none()
+                    && slot.read_pos == slot.read_len
+                {
+                    slot.recv_inflight = true;
+                    read_ahead = Some(
+                        opcode::Recv::new(
+                            types::Fd(slot.fd),
+                            slot.read_buf.as_mut_ptr(),
+                            slot.read_buf.len() as u32,
+                        )
+                        .build()
+                        .user_data(encode_uring_user_data(URING_TAG_RECV, slot_id)),
+                    );
+                }
                 pending
             };
             if pending {
                 reactor.flush_staged_send(slot_id, false);
+                if let Some(entry) = read_ahead {
+                    reactor.push_sqe(entry);
+                }
                 Poll::Pending
             } else {
                 Poll::Ready(Ok(()))
@@ -765,11 +860,18 @@ impl AsyncWrite for UringTcpTransport {
     ///
     /// - `Poll<io::Result<()>>` - Ready once pending writes are flushed and `SHUT_WR` is issued.
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<io::Result<()>> {
-        let Self { slot_id, .. } = *self;
+        let Self {
+            slot_id,
+            connection_id,
+            owner_thread,
+            ..
+        } = *self;
         URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
             let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
             if let Some(reactor) = guard.as_mut()
+                && reactor.owner_thread == owner_thread
                 && let Some(Some(slot)) = reactor.slots.get_mut(slot_id)
+                && slot.connection_id == connection_id
             {
                 slot.write_shutdown = true;
             }
@@ -783,9 +885,15 @@ impl AsyncWrite for UringTcpTransport {
             let Some(reactor) = guard.as_mut() else {
                 return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
             };
+            if reactor.owner_thread != owner_thread {
+                return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+            }
             let Some(Some(slot)) = reactor.slots.get_mut(slot_id) else {
                 return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
             };
+            if slot.connection_id != connection_id {
+                return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+            }
             // SAFETY: Flush completed and the slot still owns this live TCP descriptor.
             if unsafe { shutdown(slot.fd, SHUT_WR) } < 0 {
                 Poll::Ready(Err(io::Error::last_os_error()))

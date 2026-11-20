@@ -43,6 +43,34 @@ pub(crate) const H3_REASON_DECODER_CLOSED: &[u8] = b"qpack decoder stream closed
 /// QUIC close reason for client push stream forbidden.
 pub(crate) const H3_REASON_CLIENT_PUSH: &[u8] = b"client push stream forbidden";
 
+/// QUIC close reason for reserved HTTP/2 frame type received on HTTP/3.
+pub(crate) const H3_REASON_RESERVED_FRAME: &[u8] = b"reserved http2 frame forbidden";
+
+/// QUIC close reason for unexpected frame type received on a request stream.
+pub(crate) const H3_REASON_UNEXPECTED_REQUEST_FRAME: &[u8] = b"unexpected frame on request stream";
+
+/// QUIC close reason for frames arriving after trailing headers on a request stream.
+pub(crate) const H3_REASON_FRAME_AFTER_TRAILERS: &[u8] = b"frame after trailing headers";
+
+/// QUIC close reason for dynamic QPACK instruction when table capacity is zero.
+pub(crate) const H3_REASON_QPACK_DYNAMIC_UNSUPPORTED: &[u8] =
+    b"qpack dynamic table capacity exceeded";
+
+/// Control or server-only frames forbidden on incoming client request streams.
+pub(crate) const H3_FORBIDDEN_REQUEST_FRAMES: [u64; 5] = [
+    H3_FRAME_CANCEL_PUSH,
+    H3_FRAME_SETTINGS,
+    H3_FRAME_PUSH_PROMISE,
+    H3_FRAME_GOAWAY,
+    H3_FRAME_MAX_PUSH_ID,
+];
+
+/// HTTP/3 `QPACK_ENCODER_STREAM_ERROR` application error code (RFC 9204 §6).
+pub(crate) const H3_QPACK_ENCODER_STREAM_ERROR: u32 = 0x0201;
+
+/// QPACK encoder instruction byte setting dynamic table capacity to zero (RFC 9204 §4.3.1).
+pub(crate) const QPACK_SET_CAPACITY_ZERO: u8 = 0x20;
+
 /// HTTP/3 `DATA` frame type (RFC 9114 §7.2.1).
 pub(crate) const H3_FRAME_DATA: u64 = 0x00;
 

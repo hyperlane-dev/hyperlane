@@ -492,3 +492,146 @@ async fn http3_one_connection_answers_a_fast_stream_while_a_slow_stream_is_block
     assert_eq!(*order.lock().expect("order lock"), vec!["fast", "slow"]);
     control.shutdown().await;
 }
+
+#[tokio::test]
+async fn http3_rejects_data_frame_before_headers_on_request_stream() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("the HTTP/3 server must start");
+    let (endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await.unwrap();
+    let (mut send, _recv): (QuicSendStream, QuicRecvStream) = connection.open_bi().await.unwrap();
+    send.write_all(&[0x00, 0x02, b'h', b'i']).await.unwrap();
+    let _: Result<(), _> = send.finish();
+    let closed: Result<quinn::ConnectionError, Elapsed> =
+        timeout(Duration::from_secs(2), connection.closed()).await;
+    assert!(
+        matches!(
+            closed,
+            Ok(quinn::ConnectionError::ApplicationClosed(ref frame))
+                if frame.error_code == VarInt::from_u32(0x105)
+        ),
+        "DATA before HEADERS must close with H3_FRAME_UNEXPECTED (0x105), got: {closed:?}"
+    );
+    endpoint.wait_idle().await;
+    control.shutdown().await;
+}
+
+#[tokio::test]
+async fn http3_rejects_reserved_http2_frame_on_control_stream() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("the HTTP/3 server must start");
+    let (endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await.unwrap();
+    let mut ctrl: QuicSendStream = connection.open_uni().await.unwrap();
+    ctrl.write_all(&[0x00, 0x04, 0x00, 0x02, 0x00])
+        .await
+        .unwrap();
+    let closed: Result<quinn::ConnectionError, Elapsed> =
+        timeout(Duration::from_secs(2), connection.closed()).await;
+    assert!(
+        matches!(
+            closed,
+            Ok(quinn::ConnectionError::ApplicationClosed(ref frame))
+                if frame.error_code == VarInt::from_u32(0x105)
+        ),
+        "reserved HTTP/2 frame on control stream must close with H3_FRAME_UNEXPECTED (0x105), got: {closed:?}"
+    );
+    endpoint.wait_idle().await;
+    control.shutdown().await;
+}
+
+#[tokio::test]
+async fn http3_rejects_data_frame_after_trailing_headers() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("the HTTP/3 server must start");
+    let (endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await.unwrap();
+    let (mut send, _recv): (QuicSendStream, QuicRecvStream) = connection.open_bi().await.unwrap();
+    let mut qpack_get: Vec<u8> = vec![0x00, 0x00, 0xd1, 0xd7, 0xc1, 0x50, 9];
+    qpack_get.extend_from_slice(b"localhost");
+    let mut frame: Vec<u8> = Vec::new();
+    frame.push(0x01);
+    frame.push(qpack_get.len() as u8);
+    frame.extend_from_slice(&qpack_get);
+    frame.extend_from_slice(&[0x01, 0x02, 0x00, 0x00]);
+    frame.extend_from_slice(&[0x00, 0x01, b'x']);
+    send.write_all(&frame).await.unwrap();
+    let _: Result<(), _> = send.finish();
+    let closed: Result<quinn::ConnectionError, Elapsed> =
+        timeout(Duration::from_secs(2), connection.closed()).await;
+    assert!(
+        matches!(
+            closed,
+            Ok(quinn::ConnectionError::ApplicationClosed(ref frame))
+                if frame.error_code == VarInt::from_u32(0x105)
+        ),
+        "DATA after trailers must close with H3_FRAME_UNEXPECTED (0x105), got: {closed:?}"
+    );
+    endpoint.wait_idle().await;
+    control.shutdown().await;
+}
+
+#[tokio::test]
+async fn http3_rejects_dynamic_qpack_encoder_instruction_when_capacity_is_zero() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("the HTTP/3 server must start");
+    let (endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await.unwrap();
+    let mut encoder: QuicSendStream = connection.open_uni().await.unwrap();
+    encoder.write_all(&[0x02, 0x21]).await.unwrap();
+    let closed: Result<quinn::ConnectionError, Elapsed> =
+        timeout(Duration::from_secs(2), connection.closed()).await;
+    assert!(
+        matches!(
+            closed,
+            Ok(quinn::ConnectionError::ApplicationClosed(ref frame))
+                if frame.error_code == VarInt::from_u32(0x201)
+        ),
+        "dynamic QPACK encoder instruction when capacity is zero must close with QPACK_ENCODER_STREAM_ERROR (0x201), got: {closed:?}"
+    );
+    endpoint.wait_idle().await;
+    control.shutdown().await;
+}
+
+#[tokio::test]
+async fn http3_ignores_an_unknown_non_grease_frame_before_request_headers() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .unwrap();
+    let (endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await.unwrap();
+    let (mut send, mut recv): (QuicSendStream, QuicRecvStream) =
+        connection.open_bi().await.unwrap();
+    let mut block: Vec<u8> = vec![0, 0, 0xd1, 0xd7, 0x50, 9];
+    block.extend_from_slice(b"localhost");
+    block.push(0x51);
+    block.push(VERSION_ROUTE_PATH.len() as u8);
+    block.extend_from_slice(VERSION_ROUTE_PATH.as_bytes());
+    assert!(block.len() < 64);
+    let mut frames: Vec<u8> = vec![0x20, 0, 1, block.len() as u8];
+    frames.extend_from_slice(&block);
+    send.write_all(&frames).await.unwrap();
+    send.finish().unwrap();
+    let response: Vec<u8> = timeout(Duration::from_secs(2), recv.read_to_end(64 * 1024))
+        .await
+        .unwrap()
+        .unwrap();
+    let (frame_type, type_len): (u64, usize) = decode_varint(&response).unwrap();
+    let (_, length_len): (u64, usize) = decode_varint(&response[type_len..]).unwrap();
+    let start: usize = type_len + length_len;
+    assert_eq!(frame_type, 1);
+    assert_eq!(response.get(start..start + 3), Some(&[0, 0, 0xd9][..]));
+    assert!(connection.close_reason().is_none());
+    connection.close(VarInt::from_u32(H3_NO_ERROR), b"done");
+    endpoint.wait_idle().await;
+    control.shutdown().await;
+}
