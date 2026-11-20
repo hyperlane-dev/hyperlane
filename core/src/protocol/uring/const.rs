@@ -1,5 +1,5 @@
-/// Number of submission queue entries allocated per Linux `io_uring` worker ring.
-pub(crate) const URING_RING_ENTRIES: u32 = 2048;
+/// Candidate SQ sizes tried in descending order to accommodate tighter `RLIMIT_MEMLOCK` budgets.
+pub(crate) const URING_RING_ENTRY_CANDIDATES: [u32; 3] = [2048, 512, 128];
 
 /// Number of concurrent `Accept` SQEs armed on a single-worker `io_uring` thread.
 pub(crate) const URING_SINGLE_WORKER_ACCEPT_SLOTS: usize = 8;

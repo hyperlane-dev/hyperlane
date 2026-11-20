@@ -71,6 +71,12 @@ pub(crate) const H3_QPACK_ENCODER_STREAM_ERROR: u32 = 0x0201;
 /// QPACK encoder instruction byte setting dynamic table capacity to zero (RFC 9204 §4.3.1).
 pub(crate) const QPACK_SET_CAPACITY_ZERO: u8 = 0x20;
 
+/// HTTP/3 `QPACK_DECODER_STREAM_ERROR` application error code (RFC 9204 §6).
+pub(crate) const H3_QPACK_DECODER_STREAM_ERROR: u32 = 0x0202;
+
+/// QUIC close reason for invalid QPACK decoder instruction when table capacity is zero.
+pub(crate) const H3_REASON_QPACK_DECODER_INVALID: &[u8] = b"invalid qpack decoder instruction";
+
 /// HTTP/3 `DATA` frame type (RFC 9114 §7.2.1).
 pub(crate) const H3_FRAME_DATA: u64 = 0x00;
 

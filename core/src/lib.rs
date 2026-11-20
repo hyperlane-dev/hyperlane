@@ -114,14 +114,15 @@ use {
 use {
     io_uring::{IoUring, opcode, squeue, types},
     libc::{
-        AF_INET, AF_INET6, ECANCELED, EFD_CLOEXEC, EFD_NONBLOCK, EPIPE, IP_TTL, IPPROTO_IP,
-        IPPROTO_IPV6, IPV6_UNICAST_HOPS, MSG_MORE, MSG_WAITALL, POLLIN, SHUT_WR, SOCK_CLOEXEC,
-        SOCK_NONBLOCK, c_int, c_void, close, eventfd, read, setsockopt, shutdown, sockaddr,
-        sockaddr_in, sockaddr_in6, sockaddr_storage, socklen_t, write,
+        AF_INET, AF_INET6, EAGAIN, EBUSY, ECANCELED, EFD_CLOEXEC, EFD_NONBLOCK, EINTR, EPIPE,
+        IP_TTL, IPPROTO_IP, IPPROTO_IPV6, IPV6_UNICAST_HOPS, MSG_MORE, MSG_WAITALL, POLLIN,
+        SHUT_WR, SOCK_CLOEXEC, SOCK_NONBLOCK, c_int, c_void, close, eventfd, read, setsockopt,
+        shutdown, sockaddr, sockaddr_in, sockaddr_in6, sockaddr_storage, socklen_t, write,
     },
     std::{
         net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6},
         os::fd::{AsRawFd, RawFd},
+        sync::mpsc::{SyncSender, sync_channel},
         task::Wake,
     },
     tokio::runtime::{EnterGuard, Handle},

@@ -93,28 +93,63 @@ pub(crate) async fn serve_h3_connection(
         Err(_) => return,
     };
     let control_state: H3ControlState = H3ControlState::default();
-    let mut requests: FuturesUnordered<_> = FuturesUnordered::new();
-    let mut uni_tasks: FuturesUnordered<_> = FuturesUnordered::new();
+    let mut first_req: Pin<&mut Option<_>> = pin!(None);
+    let mut extra_reqs: Option<FuturesUnordered<_>> = None;
+    let mut first_uni: Pin<&mut Option<_>> = pin!(None);
+    let mut extra_unis: Option<FuturesUnordered<_>> = None;
     loop {
+        let has_extra_reqs: bool = extra_reqs
+            .as_ref()
+            .is_some_and(|queue: &FuturesUnordered<_>| !queue.is_empty());
+        let has_extra_unis: bool = extra_unis
+            .as_ref()
+            .is_some_and(|queue: &FuturesUnordered<_>| !queue.is_empty());
         tokio::select! {
             biased;
-            _ = requests.next(), if !requests.is_empty() => {}
-            _ = uni_tasks.next(), if !uni_tasks.is_empty() => {}
+            _ = async {
+                if let Some(fut) = first_req.as_mut().as_pin_mut() {
+                    let _: Result<(), Box<dyn Any + Send>> = fut.await;
+                }
+            }, if first_req.is_some() => {
+                first_req.set(None);
+            }
+            _ = async {
+                if let Some(queue) = extra_reqs.as_mut() {
+                    let _: Option<Result<(), Box<dyn Any + Send>>> = queue.next().await;
+                }
+            }, if has_extra_reqs => {}
+            _ = async {
+                if let Some(fut) = first_uni.as_mut().as_pin_mut() {
+                    fut.await;
+                }
+            }, if first_uni.is_some() => {
+                first_uni.set(None);
+            }
+            _ = async {
+                if let Some(queue) = extra_unis.as_mut() {
+                    let _: Option<()> = queue.next().await;
+                }
+            }, if has_extra_unis => {}
             accepted = connection.accept_bi() => {
                 match accepted {
                     Ok((send, recv)) => {
-                        requests.push(
-                            AssertUnwindSafe(h3_request_task(
-                                H3RequestEnv {
-                                    shared: Arc::clone(&env.shared),
-                                    peers,
-                                },
-                                &connection,
-                                send,
-                                recv,
-                            ))
-                            .catch_unwind(),
-                        );
+                        let req_env: H3RequestEnv = H3RequestEnv {
+                            shared: Arc::clone(&env.shared),
+                            peers,
+                        };
+                        if first_req.is_none() {
+                            first_req.set(Some(
+                                AssertUnwindSafe(h3_request_task(req_env, &connection, send, recv))
+                                    .catch_unwind(),
+                            ));
+                        } else {
+                            extra_reqs
+                                .get_or_insert_with(FuturesUnordered::new)
+                                .push(
+                                    AssertUnwindSafe(h3_request_task(req_env, &connection, send, recv))
+                                        .catch_unwind(),
+                                );
+                        }
                     }
                     Err(_) => break,
                 }
@@ -122,11 +157,17 @@ pub(crate) async fn serve_h3_connection(
             uni = connection.accept_uni() => {
                 match uni {
                     Ok(recv) => {
-                        uni_tasks.push(handle_h3_uni_stream(
-                            &connection,
-                            recv,
-                            &control_state,
-                        ));
+                        if first_uni.is_none() {
+                            first_uni.set(Some(handle_h3_uni_stream(
+                                &connection,
+                                recv,
+                                &control_state,
+                            )));
+                        } else {
+                            extra_unis
+                                .get_or_insert_with(FuturesUnordered::new)
+                                .push(handle_h3_uni_stream(&connection, recv, &control_state));
+                        }
                     }
                     Err(_) => break,
                 }
@@ -379,7 +420,19 @@ async fn handle_h3_uni_stream(
                         );
                         return;
                     }
-                    Ok(Some(_)) => {}
+                    Ok(Some(n)) => {
+                        if buf[..n].iter().any(|b: &u8| {
+                            let is_inc: bool = (*b & 0xc0) == 0x00;
+                            let is_ack: bool = (*b & 0x80) == 0x80;
+                            is_inc || is_ack
+                        }) {
+                            connection.close(
+                                VarInt::from_u32(H3_QPACK_DECODER_STREAM_ERROR),
+                                H3_REASON_QPACK_DECODER_INVALID,
+                            );
+                            return;
+                        }
+                    }
                     Err(_) => return,
                 }
             }

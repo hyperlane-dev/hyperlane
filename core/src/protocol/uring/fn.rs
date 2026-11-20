@@ -38,21 +38,23 @@ pub(crate) fn decode_uring_user_data(user_data: u64) -> (u64, usize) {
 ///
 /// - `Option<IoUring>` - A ready ring, or `None` when blocked by seccomp/kernel (`EPERM`/`ENOSYS`).
 pub(crate) fn try_create_uring() -> Option<IoUring> {
-    if let Ok(ring) = IoUring::builder()
-        .setup_single_issuer()
-        .setup_defer_taskrun()
-        .setup_coop_taskrun()
-        .build(URING_RING_ENTRIES)
-    {
-        return Some(ring);
+    for entries in URING_RING_ENTRY_CANDIDATES {
+        if let Ok(ring) = IoUring::builder()
+            .setup_single_issuer()
+            .setup_defer_taskrun()
+            .setup_coop_taskrun()
+            .build(entries)
+        {
+            return Some(ring);
+        }
+        if let Ok(ring) = IoUring::builder().setup_coop_taskrun().build(entries) {
+            return Some(ring);
+        }
+        if let Ok(ring) = IoUring::new(entries) {
+            return Some(ring);
+        }
     }
-    if let Ok(ring) = IoUring::builder()
-        .setup_coop_taskrun()
-        .build(URING_RING_ENTRIES)
-    {
-        return Some(ring);
-    }
-    IoUring::new(URING_RING_ENTRIES).ok()
+    None
 }
 
 /// Probes whether Linux `io_uring` is permitted in the current container/kernel environment.
@@ -296,6 +298,7 @@ fn poll_local_ready_slots() {
 /// - `Arc<UringWakeState>` - Shared wakeup channel for Tokio futures and graceful shutdown.
 /// - `Handle` - Parent Tokio runtime handle entered so user hooks can call Tokio APIs.
 /// - `usize` - Number of concurrent `Accept` SQEs armed on this worker.
+/// - `SyncSender<bool>` - Startup readiness channel reporting whether `io_uring` initialized.
 fn run_uring_worker_thread(
     env: ConnectionEnv,
     listener_fd: RawFd,
@@ -303,11 +306,14 @@ fn run_uring_worker_thread(
     wake_state: Arc<UringWakeState>,
     tokio_handle: Handle,
     accept_slot_count: usize,
+    ready_tx: SyncSender<bool>,
 ) {
     let _tokio_guard: EnterGuard<'_> = tokio_handle.enter();
     let Some(ring) = try_create_uring() else {
+        let _: Result<(), _> = ready_tx.send(false);
         return;
     };
+    let _: Result<(), _> = ready_tx.send(true);
     let configured_ttl: Option<u32> = env.shared.server.get_server_config().get_ttl();
     let is_v6: bool = local_addr.is_ipv6();
     let is_tls: bool = env.shared.tls_config.is_some();
@@ -354,7 +360,13 @@ fn run_uring_worker_thread(
             {
                 return true;
             }
-            let _: io::Result<usize> = reactor.submit_io();
+            if let Err(err) = reactor.submit_io() {
+                let raw: Option<i32> = err.raw_os_error();
+                let retryable_io: bool = raw == Some(EINTR) || raw == Some(EAGAIN);
+                if !retryable_io && raw != Some(EBUSY) {
+                    return true;
+                }
+            }
             cqe_batch.clear();
             for cqe in reactor.ring.completion() {
                 cqe_batch.push((cqe.user_data(), cqe.result()));
@@ -626,6 +638,7 @@ pub(crate) async fn try_serve_uring_tcp(
         let worker_env: ConnectionEnv = env.clone();
         let worker_wake: Arc<UringWakeState> = Arc::clone(&wake_state);
         let worker_tokio: Handle = tokio_handle.clone();
+        let (ready_tx, ready_rx) = sync_channel::<bool>(1);
         let thread_name: String = format!("{URING_THREAD_NAME_PREFIX}{worker_idx}");
         let spawned: io::Result<ThreadJoinHandle<()>> =
             ThreadBuilder::new().name(thread_name).spawn(move || {
@@ -636,12 +649,32 @@ pub(crate) async fn try_serve_uring_tcp(
                     worker_wake,
                     worker_tokio,
                     accept_slot_count,
+                    ready_tx,
                 );
             });
         match spawned {
             Ok(handle) => {
-                wake_states.push(wake_state);
-                handles.push(handle);
+                let initialized: bool =
+                    matches!(spawn_blocking(move || ready_rx.recv()).await, Ok(Ok(true)));
+                if initialized {
+                    wake_states.push(wake_state);
+                    handles.push(handle);
+                } else {
+                    wake_state.trigger_shutdown();
+                    let _: Result<Result<(), Box<dyn Any + Send>>, JoinError> =
+                        spawn_blocking(move || handle.join()).await;
+                    for wake in &wake_states {
+                        wake.trigger_shutdown();
+                    }
+                    for prev in handles {
+                        let _: Result<Result<(), Box<dyn Any + Send>>, JoinError> =
+                            spawn_blocking(move || prev.join()).await;
+                    }
+                    if let Ok(tokio_l) = TcpListener::from_std(std_listener) {
+                        return Err(vec![tokio_l]);
+                    }
+                    return Ok(());
+                }
             }
             Err(_) => {
                 for wake in &wake_states {

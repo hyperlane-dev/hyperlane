@@ -635,3 +635,27 @@ async fn http3_ignores_an_unknown_non_grease_frame_before_request_headers() {
     endpoint.wait_idle().await;
     control.shutdown().await;
 }
+
+#[tokio::test]
+async fn http3_rejects_qpack_decoder_insert_count_increment_when_capacity_is_zero() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("the HTTP/3 server must start");
+    let (endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await.unwrap();
+    let mut decoder: QuicSendStream = connection.open_uni().await.unwrap();
+    decoder.write_all(&[0x03, 0x01]).await.unwrap();
+    let closed: Result<quinn::ConnectionError, Elapsed> =
+        timeout(Duration::from_secs(2), connection.closed()).await;
+    assert!(
+        matches!(
+            closed,
+            Ok(quinn::ConnectionError::ApplicationClosed(ref frame))
+                if frame.error_code == VarInt::from_u32(0x202)
+        ),
+        "QPACK decoder insert-count increment when capacity is zero must close with QPACK_DECODER_STREAM_ERROR (0x202), got: {closed:?}"
+    );
+    endpoint.wait_idle().await;
+    control.shutdown().await;
+}

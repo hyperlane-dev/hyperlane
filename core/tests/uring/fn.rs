@@ -1,7 +1,7 @@
 use super::*;
 
 fn with_uring_slot(check: impl FnOnce(&mut UringTcpTransport)) -> bool {
-    let Some(ring) = try_create_uring() else {
+    let Ok(ring) = IoUring::new(16) else {
         assert!(!uring_is_available());
         eprintln!("io_uring unavailable; the missing-reactor regression remains active");
         return false;
