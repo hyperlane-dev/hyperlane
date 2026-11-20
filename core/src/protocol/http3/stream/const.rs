@@ -1,3 +1,48 @@
+/// QUIC close reason for malformed control frame.
+pub(crate) const H3_REASON_MALFORMED_CONTROL: &[u8] = b"malformed control frame";
+
+/// QUIC close reason for control stream closed.
+pub(crate) const H3_REASON_CONTROL_CLOSED: &[u8] = b"control stream closed";
+
+/// QUIC close reason for first control frame must be settings.
+pub(crate) const H3_REASON_MISSING_SETTINGS: &[u8] = b"first control frame must be settings";
+
+/// QUIC close reason for settings frame too large.
+pub(crate) const H3_REASON_SETTINGS_TOO_LARGE: &[u8] = b"settings frame too large";
+
+/// QUIC close reason for control stream closed during settings.
+pub(crate) const H3_REASON_SETTINGS_TRUNCATED: &[u8] = b"control stream closed during settings";
+
+/// QUIC close reason for control read error.
+pub(crate) const H3_REASON_CONTROL_READ: &[u8] = b"control read error";
+
+/// QUIC close reason for invalid settings payload.
+pub(crate) const H3_REASON_INVALID_SETTINGS: &[u8] = b"invalid settings payload";
+
+/// QUIC close reason for unexpected frame on control stream.
+pub(crate) const H3_REASON_UNEXPECTED_CONTROL: &[u8] = b"unexpected frame on control stream";
+
+/// QUIC close reason for control stream truncated.
+pub(crate) const H3_REASON_CONTROL_TRUNCATED: &[u8] = b"control stream truncated";
+
+/// QUIC close reason for duplicate control stream.
+pub(crate) const H3_REASON_DUPLICATE_CONTROL: &[u8] = b"duplicate control stream";
+
+/// QUIC close reason for duplicate qpack encoder stream.
+pub(crate) const H3_REASON_DUPLICATE_ENCODER: &[u8] = b"duplicate qpack encoder stream";
+
+/// QUIC close reason for qpack encoder stream closed.
+pub(crate) const H3_REASON_ENCODER_CLOSED: &[u8] = b"qpack encoder stream closed";
+
+/// QUIC close reason for duplicate qpack decoder stream.
+pub(crate) const H3_REASON_DUPLICATE_DECODER: &[u8] = b"duplicate qpack decoder stream";
+
+/// QUIC close reason for qpack decoder stream closed.
+pub(crate) const H3_REASON_DECODER_CLOSED: &[u8] = b"qpack decoder stream closed";
+
+/// QUIC close reason for client push stream forbidden.
+pub(crate) const H3_REASON_CLIENT_PUSH: &[u8] = b"client push stream forbidden";
+
 /// HTTP/3 `DATA` frame type (RFC 9114 §7.2.1).
 pub(crate) const H3_FRAME_DATA: u64 = 0x00;
 

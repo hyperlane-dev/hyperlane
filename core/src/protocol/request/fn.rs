@@ -546,8 +546,8 @@ fn contains_continue_member(value: &[u8]) -> bool {
     for (offset, byte) in value.iter().copied().enumerate() {
         match byte {
             _ if escaped => escaped = false,
-            b'\\' if quoted => escaped = true,
-            b'"' => quoted = !quoted,
+            HTTP_QUOTED_FIELD_ESCAPE if quoted => escaped = true,
+            HTTP_QUOTED_FIELD_QUOTE => quoted = !quoted,
             COMMA_U8 if !quoted => {
                 if value[start..offset]
                     .trim_ascii()

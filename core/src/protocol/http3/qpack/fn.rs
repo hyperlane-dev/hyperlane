@@ -568,15 +568,15 @@ pub(crate) fn decode_qpack_request(
                         return Err(RequestError::HttpRead(HttpStatus::BadRequest));
                     }
                     method = Some(match val_slice.as_bytes() {
-                        b"GET" => Method::Get,
-                        b"POST" => Method::Post,
-                        b"PUT" => Method::Put,
-                        b"DELETE" => Method::Delete,
-                        b"HEAD" => Method::Head,
-                        b"OPTIONS" => Method::Options,
-                        b"PATCH" => Method::Patch,
-                        b"CONNECT" => Method::Connect,
-                        b"TRACE" => Method::Trace,
+                        WIRE_METHOD_GET => Method::Get,
+                        WIRE_METHOD_POST => Method::Post,
+                        WIRE_METHOD_PUT => Method::Put,
+                        WIRE_METHOD_DELETE => Method::Delete,
+                        WIRE_METHOD_HEAD => Method::Head,
+                        WIRE_METHOD_OPTIONS => Method::Options,
+                        WIRE_METHOD_PATCH => Method::Patch,
+                        WIRE_METHOD_CONNECT => Method::Connect,
+                        WIRE_METHOD_TRACE => Method::Trace,
                         _ => Method::Unknown(val_slice.to_owned()),
                     });
                 }
@@ -708,9 +708,9 @@ pub(crate) fn decode_qpack_request(
             scheme_str.ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
         let scheme_bytes: &[u8] = scheme_value.as_bytes();
         let scheme_valid: bool = scheme_bytes.first().is_some_and(u8::is_ascii_alphabetic)
-            && scheme_bytes
-                .iter()
-                .all(|byte: &u8| byte.is_ascii_alphanumeric() || b"+-.".contains(byte));
+            && scheme_bytes.iter().all(|byte: &u8| {
+                byte.is_ascii_alphanumeric() || H3_SCHEME_PUNCTUATION.contains(byte)
+            });
         let scheme_ok: bool = has_path && scheme_valid && scheme_value.parse::<Scheme>().is_ok();
         if !scheme_ok {
             return Err(RequestError::HttpRead(HttpStatus::BadRequest));
@@ -804,20 +804,20 @@ pub(crate) fn decode_qpack_request(
 #[inline(always)]
 fn encode_qpack_header(name: &[u8], value: &[u8], out: &mut Vec<u8>) {
     match name {
-        b"content-type" => match value {
-            b"text/html; charset=utf-8" => {
+        QPACK_CONTENT_TYPE_NAME => match value {
+            QPACK_CONTENT_TYPE_HTML => {
                 out.push(0xC0 | 52);
                 return;
             }
-            b"text/plain" => {
+            QPACK_CONTENT_TYPE_PLAIN => {
                 out.push(0xC0 | 53);
                 return;
             }
-            b"text/plain;charset=utf-8" => {
+            QPACK_CONTENT_TYPE_PLAIN_UTF8 => {
                 out.push(0xC0 | 54);
                 return;
             }
-            b"application/json" => {
+            QPACK_CONTENT_TYPE_JSON => {
                 out.push(0xC0 | 46);
                 return;
             }
@@ -838,25 +838,25 @@ fn encode_qpack_header(name: &[u8], value: &[u8], out: &mut Vec<u8>) {
             out.extend_from_slice(value);
             return;
         }
-        b"set-cookie" => {
+        QPACK_SET_COOKIE_NAME => {
             out.push(0x50 | 14);
             encode_prefix_int(0x00, 7, value.len() as u64, out);
             out.extend_from_slice(value);
             return;
         }
-        b"location" => {
+        QPACK_LOCATION_NAME => {
             out.push(0x50 | 12);
             encode_prefix_int(0x00, 7, value.len() as u64, out);
             out.extend_from_slice(value);
             return;
         }
-        b"server" => {
+        QPACK_SERVER_NAME => {
             encode_prefix_int(0x50, 4, 92, out);
             encode_prefix_int(0x00, 7, value.len() as u64, out);
             out.extend_from_slice(value);
             return;
         }
-        b"date" => {
+        QPACK_DATE_NAME => {
             out.push(0x50 | 6);
             encode_prefix_int(0x00, 7, value.len() as u64, out);
             out.extend_from_slice(value);
@@ -901,9 +901,9 @@ fn encode_qpack_status(status_code: usize, out: &mut Vec<u8>) {
     }
     encode_prefix_int(0x50, 4, 25, out);
     let digits: [u8; 3] = [
-        (status_code / 100) as u8 + b'0',
-        ((status_code / 10) % 10) as u8 + b'0',
-        (status_code % 10) as u8 + b'0',
+        (status_code / 100) as u8 + ZERO_STR_U8,
+        ((status_code / 10) % 10) as u8 + ZERO_STR_U8,
+        (status_code % 10) as u8 + ZERO_STR_U8,
     ];
     out.push(3);
     out.extend_from_slice(&digits);

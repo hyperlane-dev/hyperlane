@@ -11,6 +11,9 @@ pub(crate) const URING_MULTI_WORKER_ACCEPT_SLOTS: usize = 2;
 /// Fixed heap buffer size for each connection's `Recv` and `Send` `io_uring` operations.
 pub(crate) const URING_IO_BUF_SIZE: usize = 16 * 1024;
 
+/// Maximum response tail size eligible for an in-kernel linked send and close.
+pub(crate) const URING_LINKED_SEND_LIMIT: usize = 4 * 1024;
+
 /// Maximum buffered outbound bytes queued while a `Send` SQE is already in flight.
 pub(crate) const URING_PENDING_WRITE_LIMIT: usize = 64 * 1024;
 

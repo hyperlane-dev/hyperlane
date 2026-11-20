@@ -1,3 +1,62 @@
+use super::*;
+
+/// Wire bytes for the GET request method.
+pub(crate) const WIRE_METHOD_GET: &[u8] = GET.as_bytes();
+
+/// Wire bytes for the POST request method.
+pub(crate) const WIRE_METHOD_POST: &[u8] = POST.as_bytes();
+
+/// Wire bytes for the PUT request method.
+pub(crate) const WIRE_METHOD_PUT: &[u8] = PUT.as_bytes();
+
+/// Wire bytes for the DELETE request method.
+pub(crate) const WIRE_METHOD_DELETE: &[u8] = DELETE.as_bytes();
+
+/// Wire bytes for the HEAD request method.
+pub(crate) const WIRE_METHOD_HEAD: &[u8] = HEAD.as_bytes();
+
+/// Wire bytes for the OPTIONS request method.
+pub(crate) const WIRE_METHOD_OPTIONS: &[u8] = OPTIONS.as_bytes();
+
+/// Wire bytes for the PATCH request method.
+pub(crate) const WIRE_METHOD_PATCH: &[u8] = PATCH.as_bytes();
+
+/// Wire bytes for the CONNECT request method.
+pub(crate) const WIRE_METHOD_CONNECT: &[u8] = CONNECT.as_bytes();
+
+/// Wire bytes for the TRACE request method.
+pub(crate) const WIRE_METHOD_TRACE: &[u8] = TRACE.as_bytes();
+
+/// Additional punctuation allowed in a URI scheme.
+pub(crate) const H3_SCHEME_PUNCTUATION: &[u8] = b"+-.";
+
+/// QPACK match key for the content type field.
+pub(crate) const QPACK_CONTENT_TYPE_NAME: &[u8] = CONTENT_TYPE.as_bytes();
+
+/// QPACK match key for the UTF-8 HTML media type.
+pub(crate) const QPACK_CONTENT_TYPE_HTML: &[u8] = STATIC_CT_HTML_UTF8.as_bytes();
+
+/// QPACK match key for the plain text media type.
+pub(crate) const QPACK_CONTENT_TYPE_PLAIN: &[u8] = TEXT_PLAIN.as_bytes();
+
+/// Compact UTF-8 plain text spelling in the QPACK static table.
+pub(crate) const QPACK_CONTENT_TYPE_PLAIN_UTF8: &[u8] = b"text/plain;charset=utf-8";
+
+/// QPACK match key for the JSON media type.
+pub(crate) const QPACK_CONTENT_TYPE_JSON: &[u8] = APPLICATION_JSON.as_bytes();
+
+/// QPACK match key for a cookie-setting field.
+pub(crate) const QPACK_SET_COOKIE_NAME: &[u8] = SET_COOKIE.as_bytes();
+
+/// QPACK match key for a redirect destination field.
+pub(crate) const QPACK_LOCATION_NAME: &[u8] = LOCATION.as_bytes();
+
+/// QPACK match key for the server identification field.
+pub(crate) const QPACK_SERVER_NAME: &[u8] = SERVER.as_bytes();
+
+/// QPACK match key for the response date field.
+pub(crate) const QPACK_DATE_NAME: &[u8] = DATE.as_bytes();
+
 /// RFC 9204 Appendix A static table entries `(name, value)`.
 pub(crate) const QPACK_STATIC_TABLE: [(&str, &str); 99] = [
     (":authority", ""),

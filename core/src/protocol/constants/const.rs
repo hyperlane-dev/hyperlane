@@ -1,3 +1,9 @@
+/// Byte delimiting a quoted HTTP field member.
+pub(crate) const HTTP_QUOTED_FIELD_QUOTE: u8 = b'"';
+
+/// Byte escaping the next character inside a quoted HTTP field member.
+pub(crate) const HTTP_QUOTED_FIELD_ESCAPE: u8 = b'\\';
+
 /// Pseudo-header prefix used by HTTP/2 and HTTP/3 header maps.
 pub(crate) const PSEUDO_HEADER_PREFIX: &str = ":";
 

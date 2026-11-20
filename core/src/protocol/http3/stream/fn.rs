@@ -182,7 +182,10 @@ async fn drive_h3_control_stream(connection: &QuicConnection, recv: &mut QuicRec
                 Ok(None) => None,
                 Err(_) => {
                     return_h3_buffer(buf);
-                    connection.close(VarInt::from_u32(H3_FRAME_ERROR), b"malformed control frame");
+                    connection.close(
+                        VarInt::from_u32(H3_FRAME_ERROR),
+                        H3_REASON_MALFORMED_CONTROL,
+                    );
                     return;
                 }
             };
@@ -190,7 +193,7 @@ async fn drive_h3_control_stream(connection: &QuicConnection, recv: &mut QuicRec
             return_h3_buffer(buf);
             connection.close(
                 VarInt::from_u32(H3_CLOSED_CRITICAL_STREAM),
-                b"control stream closed",
+                H3_REASON_CONTROL_CLOSED,
             );
             return;
         };
@@ -199,7 +202,7 @@ async fn drive_h3_control_stream(connection: &QuicConnection, recv: &mut QuicRec
                 return_h3_buffer(buf);
                 connection.close(
                     VarInt::from_u32(H3_MISSING_SETTINGS),
-                    b"first control frame must be settings",
+                    H3_REASON_MISSING_SETTINGS,
                 );
                 return;
             }
@@ -207,7 +210,7 @@ async fn drive_h3_control_stream(connection: &QuicConnection, recv: &mut QuicRec
                 return_h3_buffer(buf);
                 connection.close(
                     VarInt::from_u32(H3_FRAME_ERROR),
-                    b"settings frame too large",
+                    H3_REASON_SETTINGS_TOO_LARGE,
                 );
                 return;
             }
@@ -217,20 +220,20 @@ async fn drive_h3_control_stream(connection: &QuicConnection, recv: &mut QuicRec
                     return_h3_buffer(buf);
                     connection.close(
                         VarInt::from_u32(H3_CLOSED_CRITICAL_STREAM),
-                        b"control stream closed during settings",
+                        H3_REASON_SETTINGS_TRUNCATED,
                     );
                     return;
                 }
                 Err(_) => {
                     return_h3_buffer(buf);
-                    connection.close(VarInt::from_u32(H3_FRAME_ERROR), b"control read error");
+                    connection.close(VarInt::from_u32(H3_FRAME_ERROR), H3_REASON_CONTROL_READ);
                     return;
                 }
             }
             let end: usize = pos + payload_len;
             if let Err(code) = validate_h3_settings_payload(&buf[pos..end]) {
                 return_h3_buffer(buf);
-                connection.close(VarInt::from_u32(code), b"invalid settings payload");
+                connection.close(VarInt::from_u32(code), H3_REASON_INVALID_SETTINGS);
                 return;
             }
             pos = end;
@@ -242,7 +245,7 @@ async fn drive_h3_control_stream(connection: &QuicConnection, recv: &mut QuicRec
                 return_h3_buffer(buf);
                 connection.close(
                     VarInt::from_u32(H3_FRAME_UNEXPECTED),
-                    b"unexpected frame on control stream",
+                    H3_REASON_UNEXPECTED_CONTROL,
                 );
                 return;
             }
@@ -254,7 +257,7 @@ async fn drive_h3_control_stream(connection: &QuicConnection, recv: &mut QuicRec
                     return_h3_buffer(buf);
                     connection.close(
                         VarInt::from_u32(H3_CLOSED_CRITICAL_STREAM),
-                        b"control stream truncated",
+                        H3_REASON_CONTROL_TRUNCATED,
                     );
                     return;
                 }
@@ -296,7 +299,7 @@ async fn handle_h3_uni_stream(
             if state.control_seen.swap(true, AtomicOrdering::AcqRel) {
                 connection.close(
                     VarInt::from_u32(H3_STREAM_CREATION_ERROR),
-                    b"duplicate control stream",
+                    H3_REASON_DUPLICATE_CONTROL,
                 );
                 return;
             }
@@ -306,7 +309,7 @@ async fn handle_h3_uni_stream(
             if state.qpack_enc_seen.swap(true, AtomicOrdering::AcqRel) {
                 connection.close(
                     VarInt::from_u32(H3_STREAM_CREATION_ERROR),
-                    b"duplicate qpack encoder stream",
+                    H3_REASON_DUPLICATE_ENCODER,
                 );
                 return;
             }
@@ -316,7 +319,7 @@ async fn handle_h3_uni_stream(
                     Ok(Some(0)) | Ok(None) => {
                         connection.close(
                             VarInt::from_u32(H3_CLOSED_CRITICAL_STREAM),
-                            b"qpack encoder stream closed",
+                            H3_REASON_ENCODER_CLOSED,
                         );
                         return;
                     }
@@ -329,7 +332,7 @@ async fn handle_h3_uni_stream(
             if state.qpack_dec_seen.swap(true, AtomicOrdering::AcqRel) {
                 connection.close(
                     VarInt::from_u32(H3_STREAM_CREATION_ERROR),
-                    b"duplicate qpack decoder stream",
+                    H3_REASON_DUPLICATE_DECODER,
                 );
                 return;
             }
@@ -339,7 +342,7 @@ async fn handle_h3_uni_stream(
                     Ok(Some(0)) | Ok(None) => {
                         connection.close(
                             VarInt::from_u32(H3_CLOSED_CRITICAL_STREAM),
-                            b"qpack decoder stream closed",
+                            H3_REASON_DECODER_CLOSED,
                         );
                         return;
                     }
@@ -351,7 +354,7 @@ async fn handle_h3_uni_stream(
         H3_STREAM_PUSH => {
             connection.close(
                 VarInt::from_u32(H3_STREAM_CREATION_ERROR),
-                b"client push stream forbidden",
+                H3_REASON_CLIENT_PUSH,
             );
         }
         _ => {

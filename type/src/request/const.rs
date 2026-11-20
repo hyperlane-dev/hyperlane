@@ -1,5 +1,47 @@
 use super::*;
 
+/// Wire bytes for the GET request method.
+pub(crate) const WIRE_METHOD_GET: &[u8] = GET.as_bytes();
+
+/// Wire bytes for the POST request method.
+pub(crate) const WIRE_METHOD_POST: &[u8] = POST.as_bytes();
+
+/// Wire bytes for the PUT request method.
+pub(crate) const WIRE_METHOD_PUT: &[u8] = PUT.as_bytes();
+
+/// Wire bytes for the DELETE request method.
+pub(crate) const WIRE_METHOD_DELETE: &[u8] = DELETE.as_bytes();
+
+/// Wire bytes for the HEAD request method.
+pub(crate) const WIRE_METHOD_HEAD: &[u8] = HEAD.as_bytes();
+
+/// Wire bytes for the OPTIONS request method.
+pub(crate) const WIRE_METHOD_OPTIONS: &[u8] = OPTIONS.as_bytes();
+
+/// Wire bytes for the PATCH request method.
+pub(crate) const WIRE_METHOD_PATCH: &[u8] = PATCH.as_bytes();
+
+/// Wire bytes for the CONNECT request method.
+pub(crate) const WIRE_METHOD_CONNECT: &[u8] = CONNECT.as_bytes();
+
+/// Wire bytes for the TRACE request method.
+pub(crate) const WIRE_METHOD_TRACE: &[u8] = TRACE.as_bytes();
+
+/// Wire bytes for the HTTP version 1.1.
+pub(crate) const WIRE_VERSION_1_1: &[u8] = HTTP_VERSION_1_1.as_bytes();
+
+/// Wire bytes for the HTTP version 1.0.
+pub(crate) const WIRE_VERSION_1_0: &[u8] = HTTP_VERSION_1_0.as_bytes();
+
+/// Wire bytes for the HTTP version 0.9.
+pub(crate) const WIRE_VERSION_0_9: &[u8] = HTTP_VERSION_0_9.as_bytes();
+
+/// Wire bytes for the HTTP version 2.
+pub(crate) const WIRE_VERSION_2: &[u8] = HTTP_VERSION_2.as_bytes();
+
+/// Wire bytes for the HTTP version 3.
+pub(crate) const WIRE_VERSION_3: &[u8] = HTTP_VERSION_3.as_bytes();
+
 /// The horizontal tab allowed within a field value.
 pub(crate) const HTTP_HEADER_TAB: u8 = b'\t';
 

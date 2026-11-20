@@ -5,6 +5,8 @@ mod framing;
 mod protocol;
 mod route;
 mod server;
+#[cfg(target_os = "linux")]
+mod uring;
 
 use super::*;
 
@@ -16,6 +18,12 @@ use std::{
     path::PathBuf,
     sync::{Arc, Mutex, OnceLock},
     time::{Duration, Instant},
+};
+
+#[cfg(target_os = "linux")]
+use std::{
+    future::pending,
+    panic::{catch_unwind, resume_unwind},
 };
 
 use bytes::{Buf, Bytes};

@@ -242,6 +242,13 @@ fn poll_local_ready_slots() {
         };
         let mut cx: task::Context<'_> = task::Context::from_waker(&waker);
         let poll_res: Poll<()> = task.as_mut().poll(&mut cx);
+        let mut pending_task: Option<UringTaskFuture> = match poll_res {
+            Poll::Pending => Some(task),
+            Poll::Ready(()) => {
+                drop(task);
+                None
+            }
+        };
         URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
             let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
             let Some(reactor) = guard.as_mut() else {
@@ -257,7 +264,7 @@ fn poll_local_ready_slots() {
                             if slot.closing {
                                 true
                             } else {
-                                slot.task = Some(task);
+                                slot.task = pending_task.take();
                                 false
                             }
                         });
@@ -267,7 +274,6 @@ fn poll_local_ready_slots() {
                     }
                 }
                 Poll::Ready(()) => {
-                    drop(task);
                     if let Some(Some(slot)) = reactor.slots.get_mut(slot_id) {
                         slot.closing = true;
                     }
@@ -276,6 +282,7 @@ fn poll_local_ready_slots() {
                 }
             }
         });
+        drop(pending_task);
     }
 }
 
@@ -315,6 +322,7 @@ fn run_uring_worker_thread(
     URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
         let mut reactor: UringReactor = UringReactor {
             ring,
+            pending_submissions: VecDeque::new(),
             slots: Vec::with_capacity(256),
             free_slots: Vec::with_capacity(256),
             buf_pool: Vec::with_capacity(URING_MAX_POOLED_BUFS),
@@ -343,7 +351,7 @@ fn run_uring_worker_thread(
             {
                 return true;
             }
-            let _: io::Result<usize> = reactor.ring.submit_and_wait(1);
+            let _: io::Result<usize> = reactor.submit_io();
             cqe_batch.clear();
             for cqe in reactor.ring.completion() {
                 cqe_batch.push((cqe.user_data(), cqe.result()));
@@ -354,6 +362,7 @@ fn run_uring_worker_thread(
             break;
         }
         let mut shutdown_now: bool = false;
+        let mut retired_tasks: Vec<UringTaskFuture> = Vec::new();
         URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
             let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
             let Some(reactor) = guard.as_mut() else {
@@ -414,6 +423,7 @@ fn run_uring_worker_thread(
                                     recv_inflight: false,
                                     send_inflight: false,
                                     close_inflight: false,
+                                    flush_pending: false,
                                     eof: false,
                                     write_shutdown: false,
                                     closing: false,
@@ -454,96 +464,8 @@ fn run_uring_worker_thread(
                             reactor.schedule_local(idx);
                         }
                     }
-                    URING_TAG_SEND => {
-                        let mut next_send: Option<squeue::Entry> = None;
-                        let mut should_close: bool = false;
-                        let mut should_wake: bool = false;
-                        let mut should_recycle: bool = false;
-                        if let Some(Some(slot)) = reactor.slots.get_mut(idx) {
-                            slot.send_inflight = false;
-                            if slot.close_inflight {
-                                // Linked `Close` SQE already submitted; wait for `URING_TAG_CLOSE`.
-                                slot.write_pos = 0;
-                                slot.write_len = 0;
-                                slot.pending_write.clear();
-                            } else if slot.fd < 0 && slot.closing && !slot.recv_inflight {
-                                should_recycle = true;
-                            } else if res > 0 {
-                                slot.write_pos += res as usize;
-                                if slot.write_pos < slot.write_len {
-                                    let remain: usize = slot.write_len - slot.write_pos;
-                                    slot.send_inflight = true;
-                                    // SAFETY: `write_pos < write_len <= write_buf.len()`.
-                                    let ptr: *const u8 =
-                                        unsafe { slot.write_buf.as_ptr().add(slot.write_pos) };
-                                    next_send = Some(
-                                        opcode::Send::new(types::Fd(slot.fd), ptr, remain as u32)
-                                            .build()
-                                            .user_data(encode_uring_user_data(URING_TAG_SEND, idx)),
-                                    );
-                                } else {
-                                    slot.write_pos = 0;
-                                    slot.write_len = 0;
-                                    if !slot.pending_write.is_empty() {
-                                        let take: usize =
-                                            slot.pending_write.len().min(slot.write_buf.len());
-                                        slot.write_buf[..take]
-                                            .copy_from_slice(&slot.pending_write[..take]);
-                                        slot.pending_write.drain(..take);
-                                        slot.write_len = take;
-                                        slot.send_inflight = true;
-                                        next_send = Some(
-                                            opcode::Send::new(
-                                                types::Fd(slot.fd),
-                                                slot.write_buf.as_ptr(),
-                                                take as u32,
-                                            )
-                                            .build()
-                                            .user_data(encode_uring_user_data(URING_TAG_SEND, idx)),
-                                        );
-                                        should_wake = true;
-                                    } else if slot.closing {
-                                        should_close = true;
-                                    } else if slot.write_shutdown {
-                                        should_wake = true;
-                                    }
-                                }
-                            } else {
-                                slot.write_pos = 0;
-                                slot.write_len = 0;
-                                slot.pending_write.clear();
-                                slot.write_err = Some(if res == 0 { EPIPE } else { -res });
-                                if slot.closing {
-                                    should_close = true;
-                                } else {
-                                    should_wake = true;
-                                }
-                            }
-                        }
-                        if let Some(entry) = next_send {
-                            reactor.push_sqe(entry);
-                        }
-                        if should_recycle {
-                            reactor.recycle_slot(idx);
-                        } else if should_close {
-                            reactor.advance_close(idx);
-                        } else if should_wake {
-                            reactor.schedule_local(idx);
-                        }
-                    }
-                    URING_TAG_CLOSE => {
-                        let ready_to_recycle: bool = reactor
-                            .slots
-                            .get_mut(idx)
-                            .and_then(|opt: &mut Option<UringConnSlot>| opt.as_mut())
-                            .is_some_and(|slot: &mut UringConnSlot| {
-                                slot.close_inflight = false;
-                                !slot.send_inflight && !slot.recv_inflight
-                            });
-                        if ready_to_recycle {
-                            reactor.recycle_slot(idx);
-                        }
-                    }
+                    URING_TAG_SEND => reactor.complete_send(idx, res),
+                    URING_TAG_CLOSE => reactor.complete_close(idx, res),
                     URING_TAG_EVENTFD => {
                         let mut counter: u64 = 0;
                         // SAFETY: Reading 8 bytes from a valid nonblocking eventfd drains the counter.
@@ -592,7 +514,9 @@ fn run_uring_worker_thread(
                 for slot_id in 0..total_slots {
                     let needs_close: bool = if let Some(Some(slot)) = reactor.slots.get_mut(slot_id)
                     {
-                        slot.task = None;
+                        if let Some(task) = slot.task.take() {
+                            retired_tasks.push(task);
+                        }
                         slot.closing = true;
                         true
                     } else {
@@ -604,6 +528,7 @@ fn run_uring_worker_thread(
                 }
             }
         });
+        drop(retired_tasks);
         if !shutdown_initiated {
             poll_local_ready_slots();
         }

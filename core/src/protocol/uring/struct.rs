@@ -56,6 +56,8 @@ pub(crate) struct UringConnSlot {
     pub(crate) send_inflight: bool,
     /// Whether a `Close` SQE is currently in flight for this slot.
     pub(crate) close_inflight: bool,
+    /// Whether a flush caller is waiting for accepted bytes to reach the socket.
+    pub(crate) flush_pending: bool,
     /// Whether peer EOF (`Recv` returned `0`) has been observed.
     pub(crate) eof: bool,
     /// Whether `poll_shutdown` has been requested by the connection future.
@@ -78,6 +80,8 @@ pub(crate) struct UringConnSlot {
 pub(crate) struct UringReactor {
     /// Dedicated per-worker `io_uring` instance (`SINGLE_ISSUER | DEFER_TASKRUN`).
     pub(crate) ring: IoUring,
+    /// Complete submission groups retained when the kernel SQ has insufficient room.
+    pub(crate) pending_submissions: VecDeque<UringSubmission>,
     /// Connection slab indexed by `slot_id`.
     pub(crate) slots: Vec<Option<UringConnSlot>>,
     /// Free slab indices available for immediate reuse.

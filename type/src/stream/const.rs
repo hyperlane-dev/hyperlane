@@ -1,5 +1,11 @@
 use super::*;
 
+/// Byte delimiting a quoted HTTP field member.
+pub(crate) const HTTP_QUOTED_FIELD_QUOTE: u8 = b'"';
+
+/// Byte escaping the next character inside a quoted HTTP field member.
+pub(crate) const HTTP_QUOTED_FIELD_ESCAPE: u8 = b'\\';
+
 /// The diagnostic for a WebSocket read attempted before parser initialization.
 pub(crate) const WEBSOCKET_STATE_ERROR: &str = "WebSocket state must be initialized";
 

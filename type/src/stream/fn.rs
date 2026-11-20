@@ -63,8 +63,8 @@ fn contains_continue_member(value: &str) -> bool {
     for (offset, byte) in value.bytes().enumerate() {
         match byte {
             _ if escaped => escaped = false,
-            b'\\' if quoted => escaped = true,
-            b'"' => quoted = !quoted,
+            HTTP_QUOTED_FIELD_ESCAPE if quoted => escaped = true,
+            HTTP_QUOTED_FIELD_QUOTE => quoted = !quoted,
             COMMA_U8 if !quoted => {
                 if value[start..offset]
                     .trim_matches([' ', '\t'])

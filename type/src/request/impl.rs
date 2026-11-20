@@ -425,23 +425,23 @@ impl Request {
             (method_str, full_path, version_str)
         };
         let method: RequestMethod = match method_str.as_bytes() {
-            b"GET" => Method::Get,
-            b"POST" => Method::Post,
-            b"PUT" => Method::Put,
-            b"DELETE" => Method::Delete,
-            b"HEAD" => Method::Head,
-            b"OPTIONS" => Method::Options,
-            b"PATCH" => Method::Patch,
-            b"CONNECT" => Method::Connect,
-            b"TRACE" => Method::Trace,
+            WIRE_METHOD_GET => Method::Get,
+            WIRE_METHOD_POST => Method::Post,
+            WIRE_METHOD_PUT => Method::Put,
+            WIRE_METHOD_DELETE => Method::Delete,
+            WIRE_METHOD_HEAD => Method::Head,
+            WIRE_METHOD_OPTIONS => Method::Options,
+            WIRE_METHOD_PATCH => Method::Patch,
+            WIRE_METHOD_CONNECT => Method::Connect,
+            WIRE_METHOD_TRACE => Method::Trace,
             _ => Method::Unknown(method_str.to_owned()),
         };
         let version: RequestVersion = match version_str.as_bytes() {
-            b"HTTP/1.1" => HttpVersion::Http1_1,
-            b"HTTP/1.0" => HttpVersion::Http1_0,
-            b"HTTP/0.9" => HttpVersion::Http0_9,
-            b"HTTP/2" => HttpVersion::Http2,
-            b"HTTP/3" => HttpVersion::Http3,
+            WIRE_VERSION_1_1 => HttpVersion::Http1_1,
+            WIRE_VERSION_1_0 => HttpVersion::Http1_0,
+            WIRE_VERSION_0_9 => HttpVersion::Http0_9,
+            WIRE_VERSION_2 => HttpVersion::Http2,
+            WIRE_VERSION_3 => HttpVersion::Http3,
             _ => match version_str.parse::<RequestVersion>() {
                 Ok(RequestVersion::Unknown(_)) | Err(_) => {
                     return Err(RequestError::HttpRequestPartsInsufficient(
