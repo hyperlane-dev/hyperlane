@@ -38,6 +38,8 @@ fn with_uring_slot(check: impl FnOnce(&mut UringTcpTransport)) -> bool {
         cancel_inflight: false,
         eof: false,
         write_shutdown: false,
+        shutdown_inflight: false,
+        shutdown_done: false,
         closing: false,
         read_err: None,
         write_err: None,
@@ -326,6 +328,7 @@ fn uring_shutdown_does_not_start_receive_prefetch() {
             let guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
             let slot: &UringConnSlot = guard.as_ref().unwrap().slots[0].as_ref().unwrap();
             assert!(slot.send_inflight);
+            assert!(slot.shutdown_inflight);
             assert!(!slot.recv_inflight);
         });
     });

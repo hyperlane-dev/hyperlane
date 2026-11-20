@@ -47,6 +47,9 @@ pub(crate) const URING_TAG_CANCEL: u64 = 6;
 /// `user_data` tag for listener accept cancellations, distinct from connection cancellations.
 pub(crate) const URING_TAG_ACCEPT_CANCEL: u64 = 7;
 
+/// `user_data` tag for linked `opcode::Shutdown(SHUT_WR)` operations.
+pub(crate) const URING_TAG_SHUTDOWN: u64 = 8;
+
 /// Thread name prefix for dedicated Linux `io_uring` worker threads.
 pub(crate) const URING_THREAD_NAME_PREFIX: &str = "hyperlane-uring-";
 

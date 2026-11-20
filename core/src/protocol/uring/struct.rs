@@ -66,6 +66,10 @@ pub(crate) struct UringConnSlot {
     pub(crate) eof: bool,
     /// Whether `poll_shutdown` has been requested by the connection future.
     pub(crate) write_shutdown: bool,
+    /// Whether an `opcode::Shutdown(SHUT_WR)` SQE is currently in flight.
+    pub(crate) shutdown_inflight: bool,
+    /// Whether `SHUT_WR` has already succeeded for this connection.
+    pub(crate) shutdown_done: bool,
     /// Whether the connection future has finished and the slot is draining before `Close`.
     pub(crate) closing: bool,
     /// Pending OS read error delivered on the next `poll_read`.

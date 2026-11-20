@@ -277,7 +277,7 @@ impl UringReactor {
                 slot.send_staged = false;
                 wake = true;
             }
-            if slot.close_inflight {
+            if slot.close_inflight || slot.shutdown_inflight {
                 return;
             }
             closing = slot.closing;
@@ -329,7 +329,10 @@ impl UringReactor {
                     retry = true;
                 } else {
                     slot.fd = -1;
-                    recycle = !slot.send_inflight && !slot.recv_inflight && !slot.cancel_inflight;
+                    recycle = !slot.send_inflight
+                        && !slot.recv_inflight
+                        && !slot.cancel_inflight
+                        && !slot.shutdown_inflight;
                 }
             }
         }
@@ -362,6 +365,104 @@ impl UringReactor {
         }
     }
 
+    /// Applies an `opcode::Shutdown(SHUT_WR)` CQE and resumes pending shutdown or close steps.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - Connection slot index.
+    /// - `i32` - Kernel shutdown result, including negative errno values.
+    pub(crate) fn complete_shutdown(&mut self, slot_id: usize, result: i32) {
+        let closing: bool;
+        let mut staged: bool = false;
+        let mut wake: bool = false;
+        {
+            let Self { slots, .. } = self;
+            let Some(Some(slot)) = slots.get_mut(slot_id) else {
+                return;
+            };
+            slot.shutdown_inflight = false;
+            if result == 0 {
+                slot.shutdown_done = true;
+            } else if result != -ECANCELED && slot.write_err.is_none() {
+                slot.write_err = Some(-result);
+            }
+            closing = slot.closing;
+            if !closing && slot.write_err.is_none() && slot.fd >= 0 {
+                if slot.write_pos < slot.write_len && !slot.send_inflight {
+                    slot.send_staged = true;
+                    staged = true;
+                } else {
+                    wake = true;
+                }
+            } else if !closing {
+                wake = true;
+            }
+        }
+        if staged {
+            self.flush_staged_send_for_shutdown(slot_id);
+        }
+        if closing {
+            self.advance_close(slot_id);
+        } else if wake {
+            self.schedule_local(slot_id);
+        }
+    }
+
+    /// Submits staged bytes linked atomically with `opcode::Shutdown(SHUT_WR)` so response + `FIN` coalesce.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - Connection slot index.
+    pub(crate) fn flush_staged_send_for_shutdown(&mut self, slot_id: usize) {
+        let mut send_sqe: Option<squeue::Entry> = None;
+        let mut shutdown_sqe: Option<squeue::Entry> = None;
+        {
+            let Self { slots, .. } = self;
+            if let Some(Some(slot)) = slots.get_mut(slot_id)
+                && slot.send_staged
+                && !slot.send_inflight
+                && !slot.close_inflight
+                && !slot.shutdown_inflight
+                && slot.fd >= 0
+            {
+                slot.send_staged = false;
+                let len: usize = slot.write_len.saturating_sub(slot.write_pos);
+                if len == 0 {
+                    return;
+                }
+                let can_link_shutdown: bool = !slot.shutdown_done
+                    && slot.pending_write.is_empty()
+                    && len <= URING_LINKED_SEND_LIMIT;
+                slot.send_inflight = true;
+                // SAFETY: The initialized unsent interval is write_pos..write_len.
+                let data: *const u8 = unsafe { slot.write_buf.as_ptr().add(slot.write_pos) };
+                let mut send_op: opcode::Send =
+                    opcode::Send::new(types::Fd(slot.fd), data, len as u32);
+                if can_link_shutdown {
+                    send_op = send_op.flags(MSG_MORE | MSG_WAITALL);
+                }
+                let mut entry: squeue::Entry = send_op
+                    .build()
+                    .user_data(encode_uring_user_data(URING_TAG_SEND, slot_id));
+                if can_link_shutdown {
+                    entry = entry.flags(squeue::Flags::IO_LINK);
+                    slot.shutdown_inflight = true;
+                    shutdown_sqe = Some(
+                        opcode::Shutdown::new(types::Fd(slot.fd), SHUT_WR)
+                            .build()
+                            .user_data(encode_uring_user_data(URING_TAG_SHUTDOWN, slot_id)),
+                    );
+                }
+                send_sqe = Some(entry);
+            }
+        }
+        match (send_sqe, shutdown_sqe) {
+            (Some(send), Some(shut)) => self.push_linked_pair([send, shut]),
+            (Some(send), None) => self.push_sqe(send),
+            _ => {}
+        }
+    }
+
     /// Advances a closing connection slot until all in-flight I/O finishes, then submits `Close`.
     ///
     /// # Arguments
@@ -374,7 +475,8 @@ impl UringReactor {
         {
             let Self { slots, .. } = self;
             if let Some(Some(slot)) = slots.get_mut(slot_id) {
-                if slot.close_inflight || slot.send_inflight {
+                let active_close: bool = slot.close_inflight || slot.shutdown_inflight;
+                if active_close || slot.send_inflight {
                     return;
                 }
                 if slot.write_err.is_none() && slot.write_pos < slot.write_len {
@@ -859,7 +961,7 @@ impl AsyncWrite for UringTcpTransport {
     /// # Returns
     ///
     /// - `Poll<io::Result<()>>` - Ready once pending writes are flushed and `SHUT_WR` is issued.
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<io::Result<()>> {
+    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut task::Context<'_>) -> Poll<io::Result<()>> {
         let Self {
             slot_id,
             connection_id,
@@ -868,36 +970,60 @@ impl AsyncWrite for UringTcpTransport {
         } = *self;
         URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
             let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
-            if let Some(reactor) = guard.as_mut()
-                && reactor.owner_thread == owner_thread
-                && let Some(Some(slot)) = reactor.slots.get_mut(slot_id)
-                && slot.connection_id == connection_id
-            {
-                slot.write_shutdown = true;
-            }
-        });
-        match self.as_mut().poll_flush(cx) {
-            Poll::Ready(Ok(())) => {}
-            other => return other,
-        }
-        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
-            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
             let Some(reactor) = guard.as_mut() else {
                 return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
             };
             if reactor.owner_thread != owner_thread {
                 return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
             }
+            let mut link_staged: bool = false;
+            let mut still_pending: bool = false;
+            {
+                let Some(Some(slot)) = reactor.slots.get_mut(slot_id) else {
+                    return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+                };
+                if slot.connection_id != connection_id {
+                    return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+                }
+                slot.write_shutdown = true;
+                if let Some(errno) = slot.write_err {
+                    return Poll::Ready(Err(io::Error::from_raw_os_error(errno)));
+                }
+                if slot.fd < 0 || slot.close_inflight {
+                    return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+                }
+                if slot.shutdown_inflight {
+                    return Poll::Pending;
+                }
+                if slot.send_staged && !slot.send_inflight {
+                    link_staged = true;
+                    still_pending = true;
+                } else {
+                    let active: bool = slot.send_inflight || !slot.pending_write.is_empty();
+                    let buffered: bool = slot.write_pos < slot.write_len;
+                    if active || buffered {
+                        slot.flush_pending = true;
+                        still_pending = true;
+                    } else if slot.shutdown_done {
+                        return Poll::Ready(Ok(()));
+                    }
+                }
+            }
+            if link_staged {
+                reactor.flush_staged_send_for_shutdown(slot_id);
+                return Poll::Pending;
+            }
+            if still_pending {
+                return Poll::Pending;
+            }
             let Some(Some(slot)) = reactor.slots.get_mut(slot_id) else {
                 return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
             };
-            if slot.connection_id != connection_id {
-                return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
-            }
-            // SAFETY: Flush completed and the slot still owns this live TCP descriptor.
+            // SAFETY: Every send completed and the slot still owns this live TCP descriptor.
             if unsafe { shutdown(slot.fd, SHUT_WR) } < 0 {
                 Poll::Ready(Err(io::Error::last_os_error()))
             } else {
+                slot.shutdown_done = true;
                 Poll::Ready(Ok(()))
             }
         })

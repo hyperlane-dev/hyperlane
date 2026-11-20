@@ -456,6 +456,8 @@ fn run_uring_worker_thread(
                                     cancel_inflight: false,
                                     eof: false,
                                     write_shutdown: false,
+                                    shutdown_inflight: false,
+                                    shutdown_done: false,
                                     closing: false,
                                     read_err: None,
                                     write_err: None,
@@ -497,6 +499,7 @@ fn run_uring_worker_thread(
                     URING_TAG_SEND => reactor.complete_send(idx, res),
                     URING_TAG_CLOSE => reactor.complete_close(idx, res),
                     URING_TAG_CANCEL => reactor.complete_cancel(idx),
+                    URING_TAG_SHUTDOWN => reactor.complete_shutdown(idx, res),
                     URING_TAG_EVENTFD => {
                         let mut counter: u64 = 0;
                         // SAFETY: Reading 8 bytes from a valid nonblocking eventfd drains the counter.
