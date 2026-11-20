@@ -18,5 +18,6 @@ pub(crate) fn register_probe_hooks(server: &mut Server) -> &mut Server {
     server.route::<HopByHopStrippingRoute>(HOP_BY_HOP_CLEAN_ROUTE_PATH);
     server.route::<SocketMetadataRoute>(SOCKET_METADATA_ROUTE_PATH);
     server.route::<UnframedBodyRoute>(UNFRAMED_BODY_ROUTE_PATH);
+    server.route::<CancelledWriteRoute>(CANCELLED_WRITE_ROUTE_PATH);
     server
 }

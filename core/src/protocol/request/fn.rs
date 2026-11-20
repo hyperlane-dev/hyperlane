@@ -1,29 +1,24 @@
 use super::*;
 
-/// Builds a framework request from a protocol request head and body.
-///
-/// HTTP/2 and HTTP/3 both deliver a decoded header map plus a body stream, and
-/// both are converted here into the same request the HTTP/1.1 parser produces,
-/// so routing, middleware and hooks above this point cannot tell the protocols
-/// apart. The version stamped on the request is the real one, not the default.
-///
-/// Pseudo headers and hop by hop headers are dropped rather than trusted, and
-/// the security limits from the request config are enforced against the decoded
-/// values, so an oversized head is rejected exactly like an oversized HTTP/1.1
-/// head. A repeated header keeps every value instead of collapsing to the last.
+/// Populates an existing framework request and target buffer from a protocol
+/// request head and body without redundant allocations or copies.
 ///
 /// # Arguments
 ///
 /// - `&RequestConfig` - The parsing limits to enforce.
 /// - `ProtocolRequestHead` - The decoded head and the collected body.
+/// - `&mut Request` - The recycled request to populate in place.
+/// - `&mut String` - The recycled buffer receiving the original wire target.
 ///
 /// # Returns
 ///
-/// - `Result<Request, RequestError>` - The converted request, or the first limit violation.
-pub fn build_protocol_request(
+/// - `Result<(), RequestError>` - `Ok(())` on success, or the first limit violation.
+pub(crate) fn fill_protocol_request(
     config: &RequestConfig,
     head: ProtocolRequestHead,
-) -> Result<Request, RequestError> {
+    request: &mut Request,
+    target: &mut String,
+) -> Result<(), RequestError> {
     let ProtocolRequestHead {
         version,
         method,
@@ -31,7 +26,7 @@ pub fn build_protocol_request(
         body,
     } = head;
     let uri: &http::Uri = &parts.uri;
-    let target: String = request_target(uri.path(), uri.query());
+    write_request_target(uri.path(), uri.query(), target);
     let max_path_size: usize = config.get_max_path_size();
     if target.len() > max_path_size && max_path_size != DEFAULT_LOW_SECURITY_MAX_PATH_SIZE {
         return Err(RequestError::PathTooLong(HttpStatus::URITooLong));
@@ -42,52 +37,72 @@ pub fn build_protocol_request(
             HttpStatus::PayloadTooLarge,
         ));
     }
-    let mut request: Request = Request::default();
+    check_request_authority(&parts.headers, uri)?;
+    request.get_mut_querys().clear();
     let query_index: Option<usize> = target.find(QUESTION_MARK);
     let hash_index: Option<usize> = target.find(HASH);
     fill_request_querys(
-        split_target_query(&target, query_index, hash_index),
+        split_target_query(target, query_index, hash_index),
         request.get_mut_querys(),
     );
-    request
-        .get_mut_path()
-        .push_str(split_target_path(&target, query_index, hash_index));
+    let req_path: &mut String = request.get_mut_path();
+    req_path.clear();
+    req_path.push_str(split_target_path(target, query_index, hash_index));
     request.set_method(protocol_method(method));
     request.set_version(version);
-    fill_request_headers(&parts.headers, config, &mut request)?;
-    check_request_authority(&parts.headers, uri)?;
-    request.set_host(resolve_request_host(&parts.headers, uri));
-    request.get_mut_body().clear();
-    request.get_mut_body().extend_from_slice(&body);
-    Ok(request)
+    fill_request_headers(&parts.headers, config, request)?;
+    write_request_host(&parts.headers, uri, request.get_mut_host());
+    if !body.is_empty() {
+        *request.get_mut_body() = body;
+    } else {
+        request.get_mut_body().clear();
+    }
+    Ok(())
 }
 
-/// Resolves the authority of a protocol request.
-///
-/// HTTP/2 and HTTP/3 carry the authority in a pseudo header, while HTTP/1.1
-/// carries it in `host`, so both are consulted before falling back to a value
-/// that keeps the request usable rather than empty.
+/// Writes the resolved request authority into a caller-owned buffer.
 ///
 /// # Arguments
 ///
 /// - `&ProtocolHeaders` - The protocol request headers.
-/// - `&http::Uri` - The `uri` argument.
-///
-/// # Returns
-///
-/// - `String` - The resolved request host.
-pub fn resolve_request_host(headers: &ProtocolHeaders, uri: &http::Uri) -> String {
+/// - `&Uri` - The request URI.
+/// - `&mut String` - The destination buffer.
+pub(crate) fn write_request_host(headers: &ProtocolHeaders, uri: &Uri, out: &mut String) {
+    out.clear();
     if let Some(authority) = uri.authority() {
-        return authority.as_str().to_owned();
+        out.push_str(authority.as_str());
+        return;
     }
     for name in [HOST, COLON_AUTHORITY] {
         if let Some(value) = headers.get(name)
             && let Ok(value) = value.to_str()
         {
-            return value.to_owned();
+            out.push_str(value);
+            return;
         }
     }
-    EMPTY_STR.to_owned()
+}
+
+/// Writes the wire request target into a caller-owned buffer.
+///
+/// # Arguments
+///
+/// - `&str` - The request path.
+/// - `Option<&str>` - The request query string, when one is present.
+/// - `&mut String` - The destination buffer.
+pub(crate) fn write_request_target(path: &str, query: Option<&str>, target: &mut String) {
+    target.clear();
+    match query {
+        Some(query) => {
+            target.reserve(path.len() + query.len() + 1);
+            target.push_str(path);
+            target.push(QUESTION_MARK);
+            target.push_str(query);
+        }
+        None => {
+            target.push_str(path);
+        }
+    }
 }
 
 /// Checks that the request authority and the host header name the same host.
@@ -178,9 +193,28 @@ pub fn check_request_authority(
 ///
 /// - `bool` - `true` when both values name the same host.
 pub fn same_authority(authority: &str, host: &str, scheme: Option<&str>) -> bool {
-    let authority: (String, Option<String>) = normalize_authority(authority, scheme);
-    let host: (String, Option<String>) = normalize_authority(host, scheme);
-    authority == host
+    if authority.eq_ignore_ascii_case(host) {
+        return true;
+    }
+    let (auth_host, auth_port): (&str, Option<&str>) = split_authority_port(authority);
+    let (host_host, host_port): (&str, Option<&str>) = split_authority_port(host);
+    if !auth_host.eq_ignore_ascii_case(host_host) {
+        return false;
+    }
+    let default_port: Option<&str> = match scheme {
+        Some(HTTP_SCHEME) => Some(DEFAULT_HTTP_PORT_STR),
+        Some(HTTPS_SCHEME) => Some(DEFAULT_HTTPS_PORT_STR),
+        _ => None,
+    };
+    let effective_auth_port: Option<&str> = match (auth_port, default_port) {
+        (Some(port), Some(default_port)) if port == default_port => None,
+        (port, _) => port,
+    };
+    let effective_host_port: Option<&str> = match (host_port, default_port) {
+        (Some(port), Some(default_port)) if port == default_port => None,
+        (port, _) => port,
+    };
+    effective_auth_port == effective_host_port
 }
 
 /// Normalizes an authority value for comparison.
@@ -197,13 +231,14 @@ pub fn same_authority(authority: &str, host: &str, scheme: Option<&str>) -> bool
 /// # Returns
 ///
 /// - `(String, Option<String>)` - The normalized host, and the normalized port.
+#[cfg(test)]
 pub fn normalize_authority(authority: &str, scheme: Option<&str>) -> (String, Option<String>) {
     let (host, port): (&str, Option<&str>) = split_authority_port(authority);
     let host: String = host.to_ascii_lowercase();
     let port: Option<String> = port.map(|port: &str| port.to_owned());
     let default_port: Option<&str> = match scheme {
-        Some("http") => Some(DEFAULT_HTTP_PORT_STR),
-        Some("https") => Some(DEFAULT_HTTPS_PORT_STR),
+        Some(HTTP_SCHEME) => Some(DEFAULT_HTTP_PORT_STR),
+        Some(HTTPS_SCHEME) => Some(DEFAULT_HTTPS_PORT_STR),
         _ => None,
     };
     match (port, default_port) {
@@ -322,10 +357,34 @@ pub fn fill_request_querys(query: &str, querys: &mut RequestQuerys) {
 ///
 /// - `RequestMethod` - The framework method.
 pub fn protocol_method(method: ProtocolMethod) -> RequestMethod {
-    method
-        .as_str()
-        .parse::<RequestMethod>()
-        .unwrap_or(Method::Unknown(method.as_str().to_owned()))
+    if method == ProtocolMethod::GET {
+        return Method::Get;
+    }
+    if method == ProtocolMethod::POST {
+        return Method::Post;
+    }
+    if method == ProtocolMethod::PUT {
+        return Method::Put;
+    }
+    if method == ProtocolMethod::DELETE {
+        return Method::Delete;
+    }
+    if method == ProtocolMethod::PATCH {
+        return Method::Patch;
+    }
+    if method == ProtocolMethod::HEAD {
+        return Method::Head;
+    }
+    if method == ProtocolMethod::OPTIONS {
+        return Method::Options;
+    }
+    if method == ProtocolMethod::CONNECT {
+        return Method::Connect;
+    }
+    if method == ProtocolMethod::TRACE {
+        return Method::Trace;
+    }
+    Method::Unknown(method.as_str().to_owned())
 }
 
 /// Copies protocol headers into the request, enforcing the head limits.
@@ -344,6 +403,10 @@ pub fn fill_request_headers(
     config: &RequestConfig,
     request: &mut Request,
 ) -> Result<(), RequestError> {
+    let max_header_count: usize = config.get_max_header_count();
+    let max_header_key_size: usize = config.get_max_header_key_size();
+    let max_header_value_size: usize = config.get_max_header_value_size();
+    let target_headers: &mut RequestHeaders = request.get_mut_headers();
     let mut header_count: usize = 0;
     for (name, value) in headers.iter() {
         let key: &str = name.as_str();
@@ -354,28 +417,41 @@ pub fn fill_request_headers(
             continue;
         };
         header_count += 1;
-        if header_count > config.get_max_header_count()
-            && config.get_max_header_count() != DEFAULT_LOW_SECURITY_MAX_HEADER_COUNT
+        if header_count > max_header_count
+            && max_header_count != DEFAULT_LOW_SECURITY_MAX_HEADER_COUNT
         {
             return Err(RequestError::TooManyHeaders(
                 HttpStatus::RequestHeaderFieldsTooLarge,
             ));
         }
-        if key.len() > config.get_max_header_key_size()
-            && config.get_max_header_key_size() != DEFAULT_LOW_SECURITY_MAX_HEADER_KEY_SIZE
+        if key.len() > max_header_key_size
+            && max_header_key_size != DEFAULT_LOW_SECURITY_MAX_HEADER_KEY_SIZE
         {
             return Err(RequestError::HeaderKeyTooLong(HttpStatus::BadRequest));
         }
-        if value.len() > config.get_max_header_value_size()
-            && config.get_max_header_value_size() != DEFAULT_LOW_SECURITY_MAX_HEADER_VALUE_SIZE
+        if value.len() > max_header_value_size
+            && max_header_value_size != DEFAULT_LOW_SECURITY_MAX_HEADER_VALUE_SIZE
         {
             return Err(RequestError::HeaderValueTooLong(HttpStatus::BadRequest));
         }
-        request
-            .get_mut_headers()
-            .entry(key.to_owned())
-            .or_default()
-            .push_back(value.to_owned());
+        if let Some(existing) = target_headers.get_mut(key) {
+            existing.push_back(value.to_owned());
+            continue;
+        }
+        let (mut pooled_key, mut pooled_values): (String, VecDeque<String>) =
+            take_protocol_header_entry().unwrap_or_else(|| (String::new(), VecDeque::new()));
+        pooled_key.clear();
+        pooled_key.push_str(key);
+        while pooled_values.len() > 1 {
+            pooled_values.pop_back();
+        }
+        if let Some(slot) = pooled_values.front_mut() {
+            slot.clear();
+            slot.push_str(value);
+        } else {
+            pooled_values.push_back(value.to_owned());
+        }
+        target_headers.insert(pooled_key, pooled_values);
     }
     Ok(())
 }
@@ -573,6 +649,7 @@ pub fn push_bounded_body(
 /// # Returns
 ///
 /// - `String` - The target including its query string and query separator.
+#[cfg(test)]
 pub fn request_target(path: &str, query: Option<&str>) -> String {
     match query {
         Some(query) => {

@@ -16,7 +16,6 @@ exclude.workspace = true
 http-type = { workspace = true }
 
 h2 = { workspace = true }
-h3 = { workspace = true }
 http = { workspace = true }
 bytes = { workspace = true }
 quinn = { workspace = true }
@@ -25,8 +24,19 @@ serde = { workspace = true }
 tokio = { workspace = true }
 rustls = { workspace = true }
 futures = { workspace = true }
-h3-quinn = { workspace = true }
+socket2 = { workspace = true }
 inventory = { workspace = true }
-tokio-rustls = { workspace = true }
 lombok-macros = { workspace = true }
 rustls-pki-types = { workspace = true }
+
+[dev-dependencies]
+h3 = { workspace = true }
+h3-quinn = { workspace = true }
+tokio-rustls = { workspace = true }
+
+[lib]
+path = "src/lib.rs"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = { workspace = true }
+io-uring = { workspace = true }

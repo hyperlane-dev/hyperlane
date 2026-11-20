@@ -253,7 +253,9 @@ pub(crate) async fn run_http2(run: Run) -> ConnStats {
             }
         };
         if length == case.expect_len {
-            stats.completed += 1;
+            if now >= run.warmup_until {
+                stats.completed += 1;
+            }
         } else {
             stats.errors += 1;
         }
@@ -344,10 +346,16 @@ pub(crate) async fn run_http2_short(run: Run) -> ConnStats {
             sleep(next_open - now).await;
         }
         next_open += interval;
+        let now: Instant = Instant::now();
+        if now >= run.deadline {
+            break;
+        }
         match send_one_http2(&run.address, case, run.protocol, run.ca_path.as_deref()).await {
             Ok(length) => {
                 if length == case.expect_len {
-                    stats.completed += 1;
+                    if now >= run.warmup_until {
+                        stats.completed += 1;
+                    }
                 } else {
                     stats.errors += 1;
                 }
@@ -460,7 +468,9 @@ pub(crate) async fn run_http3(run: Run) -> ConnStats {
             }
         }
         if length == case.expect_len {
-            stats.completed += 1;
+            if now >= run.warmup_until {
+                stats.completed += 1;
+            }
         } else {
             stats.errors += 1;
         }
@@ -584,10 +594,16 @@ pub(crate) async fn run_http3_short(run: Run) -> ConnStats {
             sleep(next_open - now).await;
         }
         next_open += interval;
+        let now: Instant = Instant::now();
+        if now >= run.deadline {
+            break;
+        }
         match send_one_http3(&run.address, case, run.ca_path.clone()).await {
             Ok(length) => {
                 if length == case.expect_len {
-                    stats.completed += 1;
+                    if now >= run.warmup_until {
+                        stats.completed += 1;
+                    }
                 } else {
                     stats.errors += 1;
                 }

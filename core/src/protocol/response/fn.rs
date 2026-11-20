@@ -132,6 +132,145 @@ pub fn find_line_end(bytes: &[u8]) -> Option<usize> {
         .map(|index: usize| index + 1)
 }
 
+/// Parses, validates, and filters a serialized HTTP/1.1 response head into a
+/// protocol response in a single pass.
+///
+/// Hop-by-hop headers and any fields nominated by `Connection` are omitted
+/// directly while constructing the protocol `HeaderMap`, avoiding intermediate
+/// map cloning on the hot path.
+///
+/// # Arguments
+///
+/// - `&[u8]` - The serialized response head bytes up to and including the blank line.
+/// - `bool` - Whether the incoming request method was `HEAD`.
+///
+/// # Returns
+///
+/// - `Result<ParsedProtocolHead, ResponseError>` - The ready protocol head, or
+///   a framing error when the head is malformed or unsupported.
+pub(crate) fn parse_protocol_response_head(
+    head: &[u8],
+    is_head: bool,
+) -> Result<ParsedProtocolHead, ResponseError> {
+    let text: &str =
+        from_utf8(head).map_err(|error: Utf8Error| ResponseError::Send(error.to_string()))?;
+    let mut lines: SplitLines<'_> = text.split(CRLF);
+    let status_line: &str = lines.next().unwrap_or(EMPTY_STR);
+    let mut fields: SplitWhitespace<'_> = status_line.split_whitespace();
+    let version: &str = fields.next().unwrap_or(EMPTY_STR);
+    if !version.starts_with(HTTP_VERSION_PREFIX) {
+        return Err(ResponseError::Send(MISSING_RESPONSE_VERSION.to_owned()));
+    }
+    let status_text: &str = fields.next().unwrap_or(EMPTY_STR);
+    if status_text.is_empty() {
+        return Err(ResponseError::Send(MISSING_RESPONSE_STATUS.to_owned()));
+    }
+    let status_code: usize = status_text
+        .parse::<usize>()
+        .map_err(|error: ParseIntError| ResponseError::Send(error.to_string()))?;
+    validate_status_code(status_code)?;
+    let status: StatusCode = StatusCode::from_u16(status_code as u16)
+        .map_err(|error: InvalidStatusCode| ResponseError::Send(error.to_string()))?;
+    let mut response: ProtocolResponse<()> = ProtocolResponse::new(());
+    *response.status_mut() = status;
+    let headers: &mut ProtocolHeaders = response.headers_mut();
+    let suppress_body: bool = is_bodyless_status(status_code, is_head);
+    let hide_length: bool = hides_entity_length(status_code, is_head);
+    let mut announced_len: Option<usize> = None;
+    let mut nominated: Option<Vec<&str>> = None;
+    for line in lines {
+        let line: &str = line.trim_end_matches(LF_CHAR);
+        if line.is_empty() {
+            continue;
+        }
+        let Some((name, value)) = line.split_once(COLON) else {
+            return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+        };
+        let name: &str = name.trim();
+        if name.is_empty() {
+            return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+        }
+        let trimmed_value: &str = value.trim();
+        if name.eq_ignore_ascii_case(CONNECTION) {
+            if HeaderValue::from_bytes(trimmed_value.as_bytes()).is_err() {
+                return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+            }
+            for token in trimmed_value.split(COMMA_STR) {
+                let token: &str = token.trim();
+                if !token.is_empty()
+                    && !token.eq_ignore_ascii_case(KEEP_ALIVE)
+                    && !token.eq_ignore_ascii_case(CLOSE)
+                {
+                    nominated.get_or_insert_with(Vec::new).push(token);
+                }
+            }
+            continue;
+        }
+        if name.eq_ignore_ascii_case(TRANSFER_ENCODING) {
+            return Err(ResponseError::Send(
+                UNSUPPORTED_TRANSFER_ENCODING.to_owned(),
+            ));
+        }
+        if name.eq_ignore_ascii_case(CONTENT_TYPE) {
+            let header_value: HeaderValue = match trimmed_value {
+                STATIC_CT_HTML_UTF8 => HeaderValue::from_static(STATIC_CT_HTML_UTF8),
+                STATIC_CT_PLAIN => HeaderValue::from_static(STATIC_CT_PLAIN),
+                STATIC_CT_PLAIN_UTF8 => HeaderValue::from_static(STATIC_CT_PLAIN_UTF8),
+                STATIC_CT_JSON => HeaderValue::from_static(STATIC_CT_JSON),
+                _ => match HeaderValue::from_bytes(trimmed_value.as_bytes()) {
+                    Ok(v) => v,
+                    Err(_) => {
+                        return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+                    }
+                },
+            };
+            headers.append(HeaderName::from_static(CONTENT_TYPE), header_value);
+            continue;
+        }
+        if name.eq_ignore_ascii_case(CONTENT_LENGTH) {
+            let length: usize = parse_ascii_length(trimmed_value)
+                .map_err(|error: RequestError| ResponseError::Send(error.to_string()))?;
+            match announced_len {
+                Some(previous) if previous != length => {
+                    return Err(ResponseError::Send(OVERFLOWING_RESPONSE_BODY.to_owned()));
+                }
+                _ => announced_len = Some(length),
+            }
+            if hide_length {
+                continue;
+            }
+            let Ok(header_value) = HeaderValue::from_bytes(trimmed_value.as_bytes()) else {
+                return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+            };
+            headers.append(HeaderName::from_static(CONTENT_LENGTH), header_value);
+            continue;
+        }
+        let Ok(header_name) = HeaderName::from_bytes(name.as_bytes()) else {
+            return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+        };
+        let Ok(header_value) = HeaderValue::from_bytes(trimmed_value.as_bytes()) else {
+            return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+        };
+        let key: &str = header_name.as_str();
+        if key.starts_with(PSEUDO_HEADER_PREFIX) || is_hop_by_hop(key) {
+            continue;
+        }
+        headers.append(header_name, header_value);
+    }
+    if let Some(tokens) = nominated {
+        for token in tokens {
+            if let Ok(name) = HeaderName::from_bytes(token.as_bytes()) {
+                headers.remove(name);
+            }
+        }
+    }
+    Ok(ParsedProtocolHead {
+        response,
+        announced_len,
+        suppress_body,
+    })
+}
+
 /// Parses a serialized response head into a status code and protocol headers.
 ///
 /// The status line contributes the status code and each header line is decoded
@@ -157,6 +296,7 @@ pub fn find_line_end(bytes: &[u8]) -> Option<usize> {
 /// # Returns
 ///
 /// - `Result<(usize, ProtocolHeaders), ResponseError>` - The status code and the
+#[cfg(test)]
 pub fn parse_response_head(head: &[u8]) -> Result<(usize, ProtocolHeaders), ResponseError> {
     let text: &str =
         from_utf8(head).map_err(|error: Utf8Error| ResponseError::Send(error.to_string()))?;
@@ -213,6 +353,7 @@ pub fn parse_response_head(head: &[u8]) -> Result<(usize, ProtocolHeaders), Resp
 /// # Returns
 ///
 /// - `bool` - `true` when the head carries a `transfer-encoding` field.
+#[cfg(test)]
 pub fn has_transfer_encoding(headers: &ProtocolHeaders) -> bool {
     headers.contains_key(TRANSFER_ENCODING)
 }
@@ -233,6 +374,7 @@ pub fn has_transfer_encoding(headers: &ProtocolHeaders) -> bool {
 /// # Returns
 ///
 /// - `Result<Option<usize>, ResponseError>` - The announced length, `None` when
+#[cfg(test)]
 pub fn parse_content_length(headers: &ProtocolHeaders) -> Result<Option<usize>, ResponseError> {
     let mut announced: Option<usize> = None;
     for value in headers.get_all(CONTENT_LENGTH).iter() {
@@ -270,6 +412,7 @@ pub fn parse_content_length(headers: &ProtocolHeaders) -> Result<Option<usize>, 
 /// # Returns
 ///
 /// - `bool` - Whether the `Connection` header nominates the name.
+#[cfg(test)]
 pub fn connection_nominates(headers: &ProtocolHeaders, name: &str) -> bool {
     if name.eq_ignore_ascii_case(CONNECTION) {
         return true;
@@ -285,40 +428,4 @@ pub fn connection_nominates(headers: &ProtocolHeaders, name: &str) -> bool {
         }
     }
     false
-}
-
-/// Waits until the send stream may carry at least one more byte.
-///
-/// The granted capacity can be smaller than the amount requested, so the
-/// returned value is what the caller may send now, not what it asked for. A
-/// stream that closes before granting is a failure, not a grant of everything
-/// the caller asked for: reporting `wanted` there would hand the framer a
-/// window the peer never granted and turn a dead stream into an unbounded loop.
-///
-/// # Arguments
-///
-/// - `&mut h2::SendStream<Bytes>` - The stream half to reserve capacity on.
-/// - `usize` - The number of bytes the caller intends to send.
-///
-/// # Returns
-///
-/// - `Result<usize, ResponseError>` - The granted capacity, or the first
-pub(crate) async fn next_h2_capacity(
-    send_stream: &mut h2::SendStream<Bytes>,
-    wanted: usize,
-) -> Result<usize, ResponseError> {
-    send_stream.reserve_capacity(wanted);
-    loop {
-        let granted: Option<Result<usize, h2::Error>> =
-            poll_fn(|context: &mut task::Context<'_>| send_stream.poll_capacity(context)).await;
-        match granted {
-            Some(Ok(capacity)) => {
-                if capacity > 0 {
-                    return Ok(capacity.min(wanted));
-                }
-            }
-            Some(Err(error)) => return Err(ResponseError::Send(error.to_string())),
-            None => return Err(ResponseError::Send(MISSING_SEND_CAPACITY.to_owned())),
-        }
-    }
 }

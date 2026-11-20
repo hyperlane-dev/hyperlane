@@ -61,6 +61,10 @@ pub(crate) const HOP_BY_HOP_ROUTE_PATH: &str = "/hop-by-hop";
 pub(crate) const HOP_BY_HOP_CLEAN_ROUTE_PATH: &str = "/hop-by-hop-clean";
 pub(crate) const SOCKET_METADATA_ROUTE_PATH: &str = "/socket-metadata";
 pub(crate) const UNFRAMED_BODY_ROUTE_PATH: &str = "/unframed";
+pub(crate) const CANCELLED_WRITE_ROUTE_PATH: &str = "/cancelled-write";
+pub(crate) const CANCELLED_WRITE_RESPONSE_HEAD: &[u8] =
+    b"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n";
+pub(crate) const CANCELLED_WRITE_BYTES: usize = 16 * 1024 * 1024;
 
 pub(crate) const SLOW_DONE_BODY: &str = "slow-done";
 pub(crate) const COOKIE_SENT_BODY: &str = "cookie-sent";

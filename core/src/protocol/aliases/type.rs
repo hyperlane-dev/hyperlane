@@ -1,16 +1,7 @@
 use super::*;
 
-/// A bidirectional in-memory byte pipe joining a handler to a protocol stream.
-pub(crate) type DuplexStream = tokio::io::DuplexStream;
-
 /// The response or request headers in their protocol representation.
 pub(crate) type ProtocolHeaders = http::HeaderMap;
-
-/// The bidirectional stream one HTTP/3 request runs over.
-pub(crate) type RequestH3Stream = h3::server::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes>;
-
-/// The resolver an HTTP/3 connection hands back for one request stream.
-pub(crate) type RequestResolverH3 = h3::server::RequestResolver<h3_quinn::Connection, Bytes>;
 
 /// The HTTP/2 connection half shared by every request stream of one connection.
 pub(crate) type ConnectionH2<T> = h2::server::Connection<T, Bytes>;
@@ -24,14 +15,50 @@ pub(crate) type H2RecvStream = h2::RecvStream;
 /// The stream half carrying the body of one HTTP/2 response.
 pub(crate) type H2SendStream = h2::SendStream<Bytes>;
 
+/// The response head sender for an incoming HTTP/2 request.
+pub(crate) type H2SendResponse = SendResponse<Bytes>;
+
+/// The HTTP/2 server handshake builder.
+pub(crate) type H2ServerBuilder = Builder;
+
+/// Standard library blocking TCP listener converted into a Tokio listener.
+pub(crate) type StdTcpListener = net::TcpListener;
+
+/// Standard library blocking UDP socket wrapped for exclusive multi-shard QUIC dispatch.
+pub(crate) type StdUdpSocket = net::UdpSocket;
+
+/// Established QUIC connection served by the native HTTP/3 engine.
+pub(crate) type QuicConnection = Connection;
+
+/// Incoming QUIC stream half for HTTP/3 requests and unidirectional streams.
+pub(crate) type QuicRecvStream = RecvStream;
+
+/// Outgoing QUIC stream half for HTTP/3 responses and control streams.
+pub(crate) type QuicSendStream = SendStream;
+
+/// Error returned while writing onto a QUIC stream.
+pub(crate) type QuicWriteError = WriteError;
+
+/// Standard library OS thread builder avoiding collision with `h2::server::Builder`.
+pub(crate) type ThreadBuilder = thread::Builder;
+
+/// Standard library OS thread join handle avoiding collision with `tokio::task::JoinHandle`.
+pub(crate) type ThreadJoinHandle<T> = thread::JoinHandle<T>;
+
+/// Tokio runtime builder avoiding collision with `h2::server::Builder`.
+pub(crate) type RuntimeBuilder = runtime::Builder;
+
+/// Standard library read-write lock for the startup inline hook registry.
+pub(crate) type StdRwLock<T> = sync::RwLock<T>;
+
+/// Atomic memory ordering alias avoiding collision with `std::cmp::Ordering`.
+pub(crate) type AtomicOrdering = sync::atomic::Ordering;
+
 /// A request head in its protocol representation.
 pub(crate) type ProtocolRequest<T> = http::Request<T>;
 
 /// A response head in its protocol representation.
 pub(crate) type ProtocolResponse<T> = http::Response<T>;
-
-/// The failure one protocol head builder reports.
-pub(crate) type ProtocolBuildError = http::Error;
 
 /// The request method in its protocol representation.
 pub(crate) type ProtocolMethod = http::Method;
@@ -62,9 +89,6 @@ pub(crate) const MISSING_RESPONSE_VERSION: &str = "response head has no version 
 
 /// The reason returned when a response head carries no status code.
 pub(crate) const MISSING_RESPONSE_STATUS: &str = "response head has no status code";
-
-/// The reason returned when a transport carries no socket identity.
-pub(crate) const NO_ADDRESS: &str = "transport has no socket address";
 
 /// The reason returned when a collected body disagrees with its declared length.
 pub(crate) const CONTENT_LENGTH_MISMATCH: &str =

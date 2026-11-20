@@ -433,3 +433,155 @@ async fn an_infinite_read_timeout_tls_close_still_delivers_close_notify() {
     );
     control.shutdown().await;
 }
+
+#[tokio::test]
+async fn tls_pending_output_is_flushed_before_waiting_for_more_input() {
+    let listener: tokio::net::TcpListener = tokio::net::TcpListener::bind((LOOPBACK_HOST, 0))
+        .await
+        .unwrap();
+    let port: u16 = listener.local_addr().unwrap().port();
+    let config: Arc<TlsServerConfig> =
+        build_stream_tls_config(&trusted_tls_config(), &ServerProtocol::Http1).unwrap();
+    let (ready, waiting): (
+        tokio::sync::oneshot::Sender<usize>,
+        tokio::sync::oneshot::Receiver<usize>,
+    ) = tokio::sync::oneshot::channel();
+    let serving: JoinHandle<()> = spawn(async move {
+        let (tcp, _): (TcpStream, SocketAddr) = listener.accept().await.unwrap();
+        SockRef::from(&tcp).set_send_buffer_size(4096).unwrap();
+        let mut transport: TlsTransport = accept_unbuffered_tls(config, tcp).await.unwrap();
+        let block: Vec<u8> = vec![b'x'; 16 * 1024];
+        let mut accepted: usize = 0;
+        loop {
+            transport.write_all(&block).await.unwrap();
+            accepted += block.len();
+            let blocked: bool = poll_fn(|cx: &mut task::Context<'_>| {
+                Poll::Ready(Pin::new(&mut transport).poll_flush(cx).is_pending())
+            })
+            .await;
+            if blocked {
+                break;
+            }
+            assert!(
+                accepted < 8 * 1024 * 1024,
+                "the constrained socket must exert backpressure"
+            );
+        }
+        ready.send(accepted).unwrap();
+        let mut ack: [u8; 1] = [0];
+        transport.read_exact(&mut ack).await.unwrap();
+        assert_eq!(ack, [b'!']);
+        transport.shutdown().await.unwrap();
+    });
+    let mut client: ClientTlsStream = connect_tls(port, ALPN_HTTP1).await.unwrap();
+    let expected: usize = waiting.await.unwrap();
+    let result: Result<(), Elapsed> = timeout(Duration::from_secs(3), async {
+        let mut received: Vec<u8> = vec![0; expected];
+        client.read_exact(&mut received).await.unwrap();
+        assert!(received.iter().all(|&byte: &u8| byte == b'x'));
+        client.write_all(b"!").await.unwrap();
+        let mut tail: Vec<u8> = Vec::new();
+        client.read_to_end(&mut tail).await.unwrap();
+        assert!(tail.is_empty());
+    })
+    .await;
+    if result.is_err() {
+        serving.abort();
+    } else {
+        serving.await.unwrap();
+    }
+    assert!(
+        result.is_ok(),
+        "accepted TLS bytes must not be stranded when the caller switches to reading"
+    );
+}
+
+#[tokio::test]
+async fn tls_key_updates_and_fragmented_reads_preserve_record_boundaries() {
+    let listener: tokio::net::TcpListener = tokio::net::TcpListener::bind((LOOPBACK_HOST, 0))
+        .await
+        .unwrap();
+    let port: u16 = listener.local_addr().unwrap().port();
+    let config: Arc<TlsServerConfig> =
+        build_stream_tls_config(&trusted_tls_config(), &ServerProtocol::Http1).unwrap();
+    let serving: JoinHandle<()> = spawn(async move {
+        let (tcp, _): (TcpStream, SocketAddr) = listener.accept().await.unwrap();
+        let mut transport: TlsTransport = accept_unbuffered_tls(config, tcp).await.unwrap();
+        for size in [63usize, 16384, 32769, 4097, 65537] {
+            let mut data: Vec<u8> = vec![0; size];
+            transport.read_exact(&mut data).await.unwrap();
+            transport.write_all(&data).await.unwrap();
+            transport.flush().await.unwrap();
+        }
+        transport.shutdown().await.unwrap();
+        assert!(transport.write_all(b"after-close").await.is_err());
+    });
+    let mut client: ClientTlsStream = connect_tls(port, ALPN_HTTP1).await.unwrap();
+    let result: Result<(), Elapsed> = timeout(Duration::from_secs(5), async {
+        for size in [63usize, 16384, 32769, 4097, 65537] {
+            client.get_mut().1.refresh_traffic_keys().unwrap();
+            let data: Vec<u8> = (0..size).map(|index: usize| (index % 251) as u8).collect();
+            client.write_all(&data).await.unwrap();
+            client.flush().await.unwrap();
+            let mut received: Vec<u8> = vec![0; size];
+            for fragment in received.chunks_mut(37) {
+                client.read_exact(fragment).await.unwrap();
+            }
+            assert_eq!(received, data);
+        }
+        let mut tail: Vec<u8> = Vec::new();
+        client.read_to_end(&mut tail).await.unwrap();
+        assert!(tail.is_empty());
+    })
+    .await;
+    if result.is_err() {
+        serving.abort();
+    } else {
+        serving.await.unwrap();
+    }
+    assert!(
+        result.is_ok(),
+        "post-handshake records must not stall buffered traffic"
+    );
+}
+
+#[tokio::test]
+async fn tcp_nodelay_configuration_is_inherited_for_hostname_bind_addresses() {
+    for enabled in [false, true] {
+        let mut listeners: Vec<tokio::net::TcpListener> =
+            bind_tcp_listeners("localhost:0", enabled).await.unwrap();
+        let listener: tokio::net::TcpListener = listeners.pop().unwrap();
+        let address: SocketAddr = listener.local_addr().unwrap();
+        let client: TcpStream = TcpStream::connect(address).await.unwrap();
+        let (accepted, _): (TcpStream, SocketAddr) = listener.accept().await.unwrap();
+        assert_eq!(accepted.nodelay().unwrap(), enabled);
+        drop(client);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_second_server_cannot_join_an_existing_tcp_or_quic_listener() {
+    for protocol in [ServerProtocol::Http1, ServerProtocol::Http3] {
+        let (control, port): (ServerControlHook, u16) =
+            start_protocol_server(protocol, Some(trusted_tls_config()))
+                .await
+                .unwrap();
+        let address: String = format!("{LOOPBACK_HOST}:{port}");
+        let mut second: Server = Server::default();
+        second.server_config(protocol_config(
+            &address,
+            protocol,
+            Some(trusted_tls_config()),
+        ));
+        let result: Result<ServerControlHook, Box<ServerError>> = second.run().await;
+        let unexpectedly_bound: bool = result.is_ok();
+        if let Ok(handle) = result {
+            handle.shutdown().await;
+        }
+        control.shutdown().await;
+        assert!(
+            !unexpectedly_bound,
+            "server startup must retain exclusive port ownership"
+        );
+    }
+}

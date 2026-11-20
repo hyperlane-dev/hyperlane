@@ -31,3 +31,5 @@ pub(crate) struct HopByHopStrippingRoute;
 pub(crate) struct SocketMetadataRoute;
 
 pub(crate) struct UnframedBodyRoute;
+
+pub(crate) struct CancelledWriteRoute;

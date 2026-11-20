@@ -1,17 +1,20 @@
-mod r#aliases;
-mod r#constants;
-mod r#framing;
-mod r#http2;
-mod r#http3;
-mod r#lifecycle;
-mod r#pump;
-mod r#request;
-mod r#response;
-mod r#transport;
+mod aliases;
+mod constants;
+mod http2;
+mod http3;
+mod inline;
+mod pump;
+mod request;
+mod response;
+mod transport;
+#[cfg(target_os = "linux")]
+mod uring;
 
+#[cfg(target_os = "linux")]
+pub(crate) use uring::*;
 pub(crate) use {
-    r#aliases::*, r#constants::*, r#framing::*, r#http2::*, r#http3::*, r#lifecycle::*, r#pump::*,
-    r#request::*, r#response::*, r#transport::*,
+    aliases::*, constants::*, http2::*, http3::*, inline::*, pump::*, request::*, response::*,
+    transport::*,
 };
 
 use super::*;

@@ -1,9 +1,6 @@
 /// Pseudo-header prefix used by HTTP/2 and HTTP/3 header maps.
 pub(crate) const PSEUDO_HEADER_PREFIX: &str = ":";
 
-/// Size of the buffer used to read a protocol request body chunk by chunk.
-pub(crate) const PROTOCOL_BODY_CHUNK: usize = 8 * 1024;
-
 /// The character separating the path from the query in a request target.
 pub(crate) const QUESTION_MARK: char = '?';
 
@@ -13,8 +10,11 @@ pub(crate) const AT_SIGN: char = '@';
 /// The header naming the trailers section of a message.
 pub(crate) const TRAILER_HEADER: &str = "trailer";
 
-/// Buffer size of the duplex pipe joining the pipeline to a protocol stream.
-pub(crate) const PROTOCOL_STREAM_CAPACITY: usize = 32 * 1024;
+/// URI scheme used for cleartext HTTP.
+pub(crate) const HTTP_SCHEME: &str = "http";
+
+/// URI scheme used for TLS-protected HTTP.
+pub(crate) const HTTPS_SCHEME: &str = "https";
 
 /// Maximum size of a serialized response head accepted from the pipeline.
 pub(crate) const RESPONSE_HEAD_MAX: usize = 16 * 1024;
@@ -34,6 +34,18 @@ pub(crate) const MISSING_RESPONSE_HEAD: &str = "response ended before a head was
 /// emitted and the stream can be reset with a real error.
 pub(crate) const UNSUPPORTED_TRANSFER_ENCODING: &str =
     "response transfer-encoding is not supported on this protocol";
+
+/// Static `text/html; charset=utf-8` media type for zero-allocation protocol header reuse.
+pub(crate) const STATIC_CT_HTML_UTF8: &str = "text/html; charset=utf-8";
+
+/// Static `text/plain` media type for zero-allocation protocol header reuse.
+pub(crate) const STATIC_CT_PLAIN: &str = "text/plain";
+
+/// Static `text/plain; charset=utf-8` media type for zero-allocation protocol header reuse.
+pub(crate) const STATIC_CT_PLAIN_UTF8: &str = "text/plain; charset=utf-8";
+
+/// Static `application/json` media type for zero-allocation protocol header reuse.
+pub(crate) const STATIC_CT_JSON: &str = "application/json";
 
 /// The reason returned when a status line carries no code the protocol allows.
 pub(crate) const INVALID_RESPONSE_STATUS: &str = "response head has an unusable status code";

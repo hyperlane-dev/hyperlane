@@ -40,6 +40,32 @@ fn xx_hash3_64_does_not_allocate() {
 }
 
 #[test]
+fn xx_hash3_64_preserves_every_prefix_and_write_partition() {
+    let bytes: Vec<u8> = (0..2048)
+        .map(|offset: usize| (offset % 251) as u8)
+        .collect();
+    for length in [0, 1, 7, 16, 64, 127, 128, 129, 240, 241, 1024, 2048] {
+        for width in [1, 7, 16, 63, 128, 129, 1024] {
+            let mut actual: XxHash3_64 = XxHash3_64::default();
+            let mut expected: twox_hash::xxhash3_64::Hasher =
+                twox_hash::xxhash3_64::Hasher::default();
+            for chunk in bytes[..length].chunks(width) {
+                actual.write(chunk);
+                expected.write(chunk);
+                assert_eq!(actual.finish(), expected.finish());
+                assert_eq!(actual.clone().finish(), expected.finish());
+            }
+            actual.write(&[]);
+            expected.write(&[]);
+            assert_eq!(actual.finish(), expected.finish());
+            actual.write_u8(255);
+            expected.write_u8(255);
+            assert_eq!(actual.finish(), expected.finish());
+        }
+    }
+}
+
+#[test]
 fn xx_hash3_64_hashes_a_map() {
     let mut map: HashMap<String, u32, BuildHasherDefault<XxHash3_64>> = HashMap::default();
     map.insert("connection".to_owned(), 1);

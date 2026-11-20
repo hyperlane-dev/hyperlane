@@ -291,10 +291,19 @@ impl Request {
         self.get_mut_host().clear();
         self.set_version(HttpVersion::default());
         self.get_mut_path().clear();
-        self.get_mut_querys().clear();
+        self.recycle_querys();
         self.recycle_headers();
         self.get_mut_body().clear();
         self
+    }
+
+    /// Hands the query entries to the pool and empties the query map.
+    fn recycle_querys(&mut self) {
+        let querys: &mut RequestQuerys = self.get_mut_querys();
+        if querys.is_empty() {
+            return;
+        }
+        return_header_entries(querys.drain());
     }
 
     /// Hands the header entries to the pool and empties the header map.
@@ -312,9 +321,7 @@ impl Request {
         if headers.is_empty() {
             return;
         }
-        for (key, values) in headers.drain() {
-            return_header_entry((key, values));
-        }
+        return_header_entries(headers.drain());
     }
 
     /// Parses the first line of HTTP request into method, path, and version components.
@@ -334,37 +341,115 @@ impl Request {
     pub(crate) fn get_http_first_line(
         line: &str,
     ) -> Result<(RequestMethod, &str, RequestVersion), RequestError> {
-        let mut parts: SplitWhitespace<'_> = line.split_whitespace();
-        let method_str: &str = parts
-            .next()
-            .ok_or(RequestError::HttpRequestPartsInsufficient(
-                HttpStatus::BadRequest,
-            ))?;
-        let full_path: &str = parts
-            .next()
-            .ok_or(RequestError::HttpRequestPartsInsufficient(
-                HttpStatus::BadRequest,
-            ))?;
-        let version_str: &str = parts
-            .next()
-            .ok_or(RequestError::HttpRequestPartsInsufficient(
-                HttpStatus::BadRequest,
-            ))?;
-        if parts.next().is_some() {
-            return Err(RequestError::HttpRequestPartsInsufficient(
-                HttpStatus::BadRequest,
-            ));
-        }
-        let method: RequestMethod = method_str
-            .parse::<RequestMethod>()
-            .unwrap_or_else(|_: ()| Method::Unknown(method_str.to_owned()));
-        let version: RequestVersion = match version_str.parse::<RequestVersion>() {
-            Ok(RequestVersion::Unknown(_)) | Err(_) => {
+        let (method_str, full_path, version_str): (&str, &str, &str) = if line.is_ascii() {
+            let bytes: &[u8] = line.as_bytes();
+            let mut idx: usize = 0;
+            let len: usize = bytes.len();
+            while idx < len && bytes[idx].is_ascii_whitespace() {
+                idx += 1;
+            }
+            let m_start: usize = idx;
+            while idx < len && !bytes[idx].is_ascii_whitespace() {
+                idx += 1;
+            }
+            if m_start == idx {
                 return Err(RequestError::HttpRequestPartsInsufficient(
                     HttpStatus::BadRequest,
                 ));
             }
-            Ok(version) => version,
+            let m_end: usize = idx;
+            while idx < len && bytes[idx].is_ascii_whitespace() {
+                idx += 1;
+            }
+            let p_start: usize = idx;
+            while idx < len && !bytes[idx].is_ascii_whitespace() {
+                idx += 1;
+            }
+            if p_start == idx {
+                return Err(RequestError::HttpRequestPartsInsufficient(
+                    HttpStatus::BadRequest,
+                ));
+            }
+            let p_end: usize = idx;
+            while idx < len && bytes[idx].is_ascii_whitespace() {
+                idx += 1;
+            }
+            let v_start: usize = idx;
+            while idx < len && !bytes[idx].is_ascii_whitespace() {
+                idx += 1;
+            }
+            if v_start == idx {
+                return Err(RequestError::HttpRequestPartsInsufficient(
+                    HttpStatus::BadRequest,
+                ));
+            }
+            let v_end: usize = idx;
+            while idx < len && bytes[idx].is_ascii_whitespace() {
+                idx += 1;
+            }
+            if idx != len {
+                return Err(RequestError::HttpRequestPartsInsufficient(
+                    HttpStatus::BadRequest,
+                ));
+            }
+            (
+                &line[m_start..m_end],
+                &line[p_start..p_end],
+                &line[v_start..v_end],
+            )
+        } else {
+            let mut parts: SplitWhitespace<'_> = line.split_whitespace();
+            let method_str: &str =
+                parts
+                    .next()
+                    .ok_or(RequestError::HttpRequestPartsInsufficient(
+                        HttpStatus::BadRequest,
+                    ))?;
+            let full_path: &str =
+                parts
+                    .next()
+                    .ok_or(RequestError::HttpRequestPartsInsufficient(
+                        HttpStatus::BadRequest,
+                    ))?;
+            let version_str: &str =
+                parts
+                    .next()
+                    .ok_or(RequestError::HttpRequestPartsInsufficient(
+                        HttpStatus::BadRequest,
+                    ))?;
+            if parts.next().is_some() {
+                return Err(RequestError::HttpRequestPartsInsufficient(
+                    HttpStatus::BadRequest,
+                ));
+            }
+            (method_str, full_path, version_str)
+        };
+        let method: RequestMethod = match method_str.as_bytes() {
+            b"GET" => Method::Get,
+            b"POST" => Method::Post,
+            b"PUT" => Method::Put,
+            b"DELETE" => Method::Delete,
+            b"HEAD" => Method::Head,
+            b"OPTIONS" => Method::Options,
+            b"PATCH" => Method::Patch,
+            b"CONNECT" => Method::Connect,
+            b"TRACE" => Method::Trace,
+            _ => Method::Unknown(method_str.to_owned()),
+        };
+        let version: RequestVersion = match version_str.as_bytes() {
+            b"HTTP/1.1" => HttpVersion::Http1_1,
+            b"HTTP/1.0" => HttpVersion::Http1_0,
+            b"HTTP/0.9" => HttpVersion::Http0_9,
+            b"HTTP/2" => HttpVersion::Http2,
+            b"HTTP/3" => HttpVersion::Http3,
+            _ => match version_str.parse::<RequestVersion>() {
+                Ok(RequestVersion::Unknown(_)) | Err(_) => {
+                    return Err(RequestError::HttpRequestPartsInsufficient(
+                        HttpStatus::BadRequest,
+                    ));
+                }
+                Ok(version) => version,
+            },
         };
         Ok((method, full_path, version))
     }
@@ -459,13 +544,32 @@ impl Request {
         for pair in query.split(AND) {
             if let Some((key, value)) = pair.split_once(EQUAL) {
                 if !key.is_empty() {
-                    querys
-                        .entry(key.to_string())
-                        .or_default()
-                        .push_back(value.to_string());
+                    if let Some(existing) = querys.get_mut(key) {
+                        existing.push_back(value.to_owned());
+                    } else {
+                        let (mut pooled_key, mut pooled_values): (String, VecDeque<String>) =
+                            take_header_entry().unwrap_or_else(|| (String::new(), VecDeque::new()));
+                        pooled_key.clear();
+                        pooled_key.push_str(key);
+                        while pooled_values.len() > 1 {
+                            pooled_values.pop_back();
+                        }
+                        if let Some(slot) = pooled_values.front_mut() {
+                            slot.clear();
+                            slot.push_str(value);
+                        } else {
+                            pooled_values.push_back(value.to_owned());
+                        }
+                        querys.insert(pooled_key, pooled_values);
+                    }
                 }
-            } else if !pair.is_empty() {
-                querys.entry(pair.to_string()).or_default();
+            } else if !pair.is_empty() && !querys.contains_key(pair) {
+                let (mut pooled_key, mut pooled_values): (String, VecDeque<String>) =
+                    take_header_entry().unwrap_or_else(|| (String::new(), VecDeque::new()));
+                pooled_key.clear();
+                pooled_key.push_str(pair);
+                pooled_values.clear();
+                querys.insert(pooled_key, pooled_values);
             }
         }
     }
@@ -564,6 +668,197 @@ impl Request {
             ));
         }
         Ok(length)
+    }
+
+    /// Parses a complete HTTP/1.1 request head (request line and all headers)
+    /// directly from an already-buffered byte slice without per-line copying.
+    ///
+    /// Returns `Ok(None)` when the buffered slice does not yet contain the
+    /// terminating blank line, leaving the caller to fall back to incremental
+    /// line reads without losing any bytes.
+    ///
+    /// # Arguments
+    ///
+    /// - `&[u8]` - The buffered unread bytes from the stream.
+    /// - `&RequestConfig` - Security limits for path, headers and body.
+    /// - `&mut String` - The stream's request-line buffer populated for downstream inspection.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Option<(RequestFraming, usize)>, RequestError>` - The framing and
+    ///   number of bytes consumed when a full head was parsed, `None` when more
+    ///   input is required, or a protocol error.
+    pub(crate) fn parse_http_head_from_slice(
+        &mut self,
+        buffer: &[u8],
+        config: &RequestConfig,
+        line_buffer: &mut String,
+    ) -> Result<Option<(RequestFraming, usize)>, RequestError> {
+        let Some(first_lf) = buffer.iter().position(|byte: &u8| *byte == BR_U8) else {
+            return Ok(None);
+        };
+        let first_line_end: usize = first_lf + 1;
+        let first_line: &str = match from_utf8(&buffer[..first_line_end]) {
+            Ok(text) => text,
+            Err(_) => return Err(RequestError::ReadConnection(HttpStatus::BadRequest)),
+        };
+        line_buffer.clear();
+        line_buffer.push_str(first_line);
+        let (method, full_path, version): (RequestMethod, &str, RequestVersion) =
+            Self::get_http_first_line(first_line)?;
+        Self::check_http_path_size(full_path, config.get_max_path_size())?;
+        let hash_index: Option<usize> = full_path.find(HASH);
+        let query_index: Option<usize> = full_path.find(QUERY);
+        let query: &str = Self::get_http_query(full_path, query_index, hash_index);
+        Self::fill_http_querys(query, self.get_mut_querys());
+        let path_slice: &str = Self::get_http_path(full_path, query_index, hash_index);
+        self.get_mut_path().push_str(path_slice);
+        self.set_version(version);
+        self.set_method(method);
+        let Request {
+            headers,
+            host,
+            version,
+            ..
+        } = self;
+        let max_header_count: usize = config.get_max_header_count();
+        let max_header_key_size: usize = config.get_max_header_key_size();
+        let max_header_value_size: usize = config.get_max_header_value_size();
+        let max_body_size: usize = config.get_max_body_size();
+        let mut content_size: usize = 0;
+        let mut header_count: usize = 0;
+        let mut content_length_seen: bool = false;
+        let mut transfer_encoding_seen: bool = false;
+        let mut host_seen: bool = false;
+        let mut pos: usize = first_line_end;
+        let mut incomplete_head: bool = false;
+        let header_result: Result<(), RequestError> = HEADER_ENTRY_POOL.with(
+            |pool: &RefCell<Vec<(String, VecDeque<String>)>>| -> Result<(), RequestError> {
+                let mut pool: RefMut<'_, Vec<(String, VecDeque<String>)>> = pool.borrow_mut();
+                loop {
+                    let rest: &[u8] = &buffer[pos..];
+                    let Some(rel_lf) = rest.iter().position(|byte: &u8| *byte == BR_U8) else {
+                        incomplete_head = true;
+                        return Ok(());
+                    };
+                    let line_end: usize = pos + rel_lf;
+                    let raw_line: &[u8] = if line_end > pos && buffer[line_end - 1] == b'\r' {
+                        &buffer[pos..line_end - 1]
+                    } else {
+                        &buffer[pos..line_end]
+                    };
+                    pos = line_end + 1;
+                    if raw_line.is_empty() {
+                        break;
+                    }
+                    let first_byte: u8 = raw_line[0];
+                    if first_byte == SPACE_U8 || first_byte == TAB_U8 {
+                        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                    }
+                    header_count += 1;
+                    Self::check_http_header_count(header_count, max_header_count)?;
+                    let Some(colon_pos) = raw_line.iter().position(|byte: &u8| *byte == COLON_U8)
+                    else {
+                        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                    };
+                    let key_bytes: &[u8] = &raw_line[..colon_pos];
+                    if key_bytes.is_empty() {
+                        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                    }
+                    let mut has_upper: bool = false;
+                    for &byte in key_bytes {
+                        if !HTTP_HEADER_TOKEN_TABLE[byte as usize] {
+                            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                        }
+                        if byte.is_ascii_uppercase() {
+                            has_upper = true;
+                        }
+                    }
+                    // SAFETY: Every byte passed `HTTP_HEADER_TOKEN_TABLE`, which only accepts ASCII (< 0x80).
+                    let key: &str = unsafe { from_utf8_unchecked(key_bytes) };
+                    Self::check_http_header_key_size(key, max_header_key_size)?;
+                    let raw_val: &[u8] = &raw_line[colon_pos + 1..];
+                    let mut val_non_ascii: u8 = 0;
+                    for &byte in raw_val {
+                        if !HTTP_HEADER_VALUE_VALID_TABLE[byte as usize] {
+                            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                        }
+                        val_non_ascii |= byte & 0x80;
+                    }
+                    let mut val_start: usize = 0;
+                    let mut val_end: usize = raw_val.len();
+                    while val_start < val_end
+                        && (raw_val[val_start] == SPACE_U8 || raw_val[val_start] == TAB_U8)
+                    {
+                        val_start += 1;
+                    }
+                    while val_end > val_start
+                        && (raw_val[val_end - 1] == SPACE_U8 || raw_val[val_end - 1] == TAB_U8)
+                    {
+                        val_end -= 1;
+                    }
+                    let value: &str = if val_non_ascii == 0 {
+                        // SAFETY: `val_non_ascii == 0` guarantees every byte in `raw_val` is ASCII (< 0x80).
+                        unsafe { from_utf8_unchecked(&raw_val[val_start..val_end]) }
+                    } else {
+                        match from_utf8(&raw_val[val_start..val_end]) {
+                            Ok(text) => text,
+                            Err(_) => {
+                                return Err(RequestError::ReadConnection(HttpStatus::BadRequest));
+                            }
+                        }
+                    };
+                    Self::check_http_header_value_size(value, max_header_value_size)?;
+                    match key.len() {
+                        4 if key.eq_ignore_ascii_case(HOST) => {
+                            if host_seen {
+                                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                            }
+                            host_seen = true;
+                            host.clear();
+                            host.push_str(value);
+                        }
+                        14 if key.eq_ignore_ascii_case(CONTENT_LENGTH) => {
+                            if transfer_encoding_seen {
+                                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                            }
+                            if content_length_seen {
+                                return Err(RequestError::InvalidContentLength(
+                                    HttpStatus::BadRequest,
+                                ));
+                            }
+                            content_length_seen = true;
+                            content_size = Self::check_http_body_size(value, max_body_size)?;
+                        }
+                        17 if key.eq_ignore_ascii_case(HTTP_HEADER_TRANSFER_ENCODING) => {
+                            if *version != HTTP_HOST_REQUIRED_VERSION || content_length_seen {
+                                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                            }
+                            transfer_encoding_seen = true;
+                        }
+                        _ => {}
+                    }
+                    Self::insert_http_header_from_pool(headers, &mut pool, key, has_upper, value);
+                }
+                Ok(())
+            },
+        );
+        header_result?;
+        if incomplete_head {
+            self.reset();
+            line_buffer.clear();
+            return Ok(None);
+        }
+        if *version == HTTP_HOST_REQUIRED_VERSION && !host_seen {
+            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+        }
+        if transfer_encoding_seen {
+            let values: &RequestHeadersValue = headers
+                .get(HTTP_HEADER_TRANSFER_ENCODING)
+                .ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
+            return Ok(Some((r#fn::parse_transfer_encoding(values)?, pos)));
+        }
+        Ok(Some((RequestFraming::Fixed(content_size), pos)))
     }
 
     /// Parses HTTP headers from a buffered reader into this request.
@@ -698,6 +993,112 @@ impl Request {
         Self::insert_http_header(headers, CONTENT_LENGTH, length);
     }
 
+    /// Stores one ASCII header using an already-borrowed worker-local entry pool.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut RequestHeaders` - The header map to store the header in.
+    /// - `&mut Vec<(String, VecDeque<String>)>` - Borrowed worker-local header entry pool.
+    /// - `&str` - The validated ASCII header name, as it arrived.
+    /// - `bool` - Whether `key` contains any ASCII uppercase character.
+    /// - `&str` - The header value.
+    #[inline(always)]
+    fn insert_http_header_from_pool(
+        headers: &mut RequestHeaders,
+        pool: &mut Vec<(String, VecDeque<String>)>,
+        key: &str,
+        has_upper: bool,
+        value: &str,
+    ) {
+        if !has_upper {
+            if let Some(existing) = headers.get_mut(key) {
+                existing.push_back(value.to_owned());
+                return;
+            }
+            let (mut name, mut values): (String, VecDeque<String>) = pool
+                .pop()
+                .unwrap_or_else(|| (String::new(), VecDeque::new()));
+            name.clear();
+            name.push_str(key);
+            while values.len() > 1 {
+                values.pop_back();
+            }
+            if let Some(slot) = values.front_mut() {
+                slot.clear();
+                slot.push_str(value);
+            } else {
+                values.push_back(value.to_owned());
+            }
+            headers.insert(name, values);
+            return;
+        }
+        if key.len() <= STACK_HEADER_KEY_LIMIT {
+            let mut stack_buf: [MaybeUninit<u8>; STACK_HEADER_KEY_LIMIT] =
+                [const { MaybeUninit::uninit() }; STACK_HEADER_KEY_LIMIT];
+            let key_bytes: &[u8] = key.as_bytes();
+            let mut idx: usize = 0;
+            while idx < key_bytes.len() {
+                stack_buf[idx].write(key_bytes[idx].to_ascii_lowercase());
+                idx += 1;
+            }
+            // SAFETY: `key` is validated ASCII (< 0x80), lowercasing preserves ASCII, and
+            // `0..key_bytes.len()` elements of `stack_buf` were initialized above.
+            let lower: &str = unsafe {
+                from_utf8_unchecked(slice::from_raw_parts(
+                    stack_buf.as_ptr().cast::<u8>(),
+                    key_bytes.len(),
+                ))
+            };
+            if let Some(existing) = headers.get_mut(lower) {
+                existing.push_back(value.to_owned());
+                return;
+            }
+            let (mut name, mut values): (String, VecDeque<String>) = pool
+                .pop()
+                .unwrap_or_else(|| (String::new(), VecDeque::new()));
+            name.clear();
+            name.push_str(lower);
+            while values.len() > 1 {
+                values.pop_back();
+            }
+            if let Some(slot) = values.front_mut() {
+                slot.clear();
+                slot.push_str(value);
+            } else {
+                values.push_back(value.to_owned());
+            }
+            headers.insert(name, values);
+            return;
+        }
+        let (mut name, mut values): (String, VecDeque<String>) = pool
+            .pop()
+            .unwrap_or_else(|| (String::new(), VecDeque::new()));
+        name.clear();
+        for ch in key.chars() {
+            name.push(ch.to_ascii_lowercase());
+        }
+        if let Some(existing) = headers.get_mut(&name) {
+            existing.push_back(value.to_owned());
+            if name.capacity() <= MAX_POOLED_HEADER_STRING_CAPACITY
+                && values.capacity() <= MAX_POOLED_HEADER_VALUE_CAPACITY
+                && pool.len() < MAX_POOLED_HEADER_ENTRIES
+            {
+                pool.push((name, values));
+            }
+            return;
+        }
+        while values.len() > 1 {
+            values.pop_back();
+        }
+        if let Some(slot) = values.front_mut() {
+            slot.clear();
+            slot.push_str(value);
+        } else {
+            values.push_back(value.to_owned());
+        }
+        headers.insert(name, values);
+    }
+
     /// Stores one header, reusing a pooled name and value where possible.
     ///
     /// The name is lowercased into the buffer of a recycled entry and the
@@ -773,7 +1174,7 @@ impl Request {
 
     /// Tries to get a query parameter by key.
     ///
-    /// The key type must implement AsRef<str> conversion. A key that repeats in
+    /// The key type must implement `AsRef<str>` conversion. A key that repeats in
     /// the query carries every one of its values.
     ///
     /// # Arguments
@@ -920,6 +1321,36 @@ impl Request {
         self.get_querys().len()
     }
 
+    /// Looks up a header value list case-insensitively without allocating when
+    /// the key is already lowercase or fits in the stack buffer.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - The header name to look up.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<&RequestHeadersValue>` - Reference to the stored values, if present.
+    #[inline(always)]
+    fn get_header_ref(&self, key: &str) -> Option<&RequestHeadersValue> {
+        let bytes: &[u8] = key.as_bytes();
+        if !bytes.iter().any(|byte: &u8| byte.is_ascii_uppercase()) {
+            return self.get_headers().get(key);
+        }
+        if bytes.len() <= STACK_HEADER_KEY_LIMIT {
+            let mut stack_buf: [u8; STACK_HEADER_KEY_LIMIT] = [0; STACK_HEADER_KEY_LIMIT];
+            let mut idx: usize = 0;
+            while idx < bytes.len() {
+                stack_buf[idx] = bytes[idx].to_ascii_lowercase();
+                idx += 1;
+            }
+            if let Ok(lower) = from_utf8(&stack_buf[..bytes.len()]) {
+                return self.get_headers().get(lower);
+            }
+        }
+        self.get_headers().get(&key.to_ascii_lowercase())
+    }
+
     /// Tries to retrieve the value of a request header by its key.
     ///
     /// The key is matched case-insensitively, because the parser stores every
@@ -939,9 +1370,7 @@ impl Request {
     where
         K: AsRef<str>,
     {
-        self.get_headers()
-            .get(&key.as_ref().to_ascii_lowercase())
-            .cloned()
+        self.get_header_ref(key.as_ref()).cloned()
     }
 
     /// Retrieves the value of a request header by its key.
@@ -979,8 +1408,7 @@ impl Request {
     where
         K: AsRef<str>,
     {
-        self.get_headers()
-            .get(&key.as_ref().to_ascii_lowercase())
+        self.get_header_ref(key.as_ref())
             .and_then(|header_values: &VecDeque<String>| header_values.front().cloned())
     }
 
@@ -1019,8 +1447,7 @@ impl Request {
     where
         K: AsRef<str>,
     {
-        self.get_headers()
-            .get(&key.as_ref().to_ascii_lowercase())
+        self.get_header_ref(key.as_ref())
             .and_then(|header_values: &VecDeque<String>| header_values.back().cloned())
     }
 
@@ -1059,8 +1486,7 @@ impl Request {
     where
         K: AsRef<str>,
     {
-        self.get_headers()
-            .get(&key.as_ref().to_ascii_lowercase())
+        self.get_header_ref(key.as_ref())
             .map(|header_values: &VecDeque<String>| header_values.len())
     }
 
@@ -1122,8 +1548,7 @@ impl Request {
     where
         K: AsRef<str>,
     {
-        self.get_headers()
-            .contains_key(&key.as_ref().to_ascii_lowercase())
+        self.get_header_ref(key.as_ref()).is_some()
     }
 
     /// Checks if a header contains a specific value.
@@ -1142,7 +1567,7 @@ impl Request {
         K: AsRef<str>,
         V: AsRef<str>,
     {
-        if let Some(values) = self.get_headers().get(&key.as_ref().to_ascii_lowercase()) {
+        if let Some(values) = self.get_header_ref(key.as_ref()) {
             values.iter().any(|data: &String| data == value.as_ref())
         } else {
             false

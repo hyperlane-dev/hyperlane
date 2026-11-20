@@ -30,14 +30,28 @@ pub fn build_server_tls_config(
     let private_key: PrivateKeyDer<'static> =
         PrivateKeyDer::from_pem_file(tls.get_private_key_path())
             .map_err(|error: pem::Error| ServerError::Tls(tls_error_string(&error)))?;
+    let mut provider: CryptoProvider = default_provider();
+    let preferred_suites: [SupportedCipherSuite; 9] = [
+        TLS13_AES_128_GCM_SHA256,
+        TLS13_AES_256_GCM_SHA384,
+        TLS13_CHACHA20_POLY1305_SHA256,
+        TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+        TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+        TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+        TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+        TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+        TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+    ];
+    provider.cipher_suites = preferred_suites.to_vec();
     let mut server_config: TlsServerConfig =
-        TlsServerConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
+        TlsServerConfig::builder_with_provider(Arc::new(provider))
             .with_protocol_versions(versions)
             .map_err(|error: TlsError| Box::new(ServerError::Tls(error.to_string())))?
             .with_no_client_auth()
             .with_single_cert(certificate_chain, private_key)
             .map_err(|error: TlsError| Box::new(ServerError::Tls(error.to_string())))?;
     server_config.alpn_protocols = vec![alpn.to_vec()];
+    server_config.ignore_client_order = true;
     Ok(Arc::new(server_config))
 }
 
@@ -56,8 +70,7 @@ pub fn build_stream_tls_config(
     tls: &TlsConfig,
     protocol: &ServerProtocol,
 ) -> Result<Arc<TlsServerConfig>, Box<ServerError>> {
-    let versions: &[&'static SupportedProtocolVersion] =
-        &[&rustls::version::TLS13, &rustls::version::TLS12];
+    let versions: &[&'static SupportedProtocolVersion] = &[&TLS13, &TLS12];
     build_server_tls_config(tls, protocol.get_alpn_protocol(), versions)
 }
 
@@ -77,7 +90,7 @@ pub fn build_stream_tls_config(
 /// - `Result<Arc<TlsServerConfig>, Box<ServerError>>` - The TLS configuration, or
 ///   the first failure while reading the PEM material.
 pub fn build_quic_tls_config(tls: &TlsConfig) -> Result<Arc<TlsServerConfig>, Box<ServerError>> {
-    let versions: &[&'static SupportedProtocolVersion] = &[&rustls::version::TLS13];
+    let versions: &[&'static SupportedProtocolVersion] = &[&TLS13];
     build_server_tls_config(tls, ServerProtocol::Http3.get_alpn_protocol(), versions)
 }
 

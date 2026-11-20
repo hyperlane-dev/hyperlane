@@ -21,8 +21,12 @@ use super::*;
 /// hasher.write(b"connection");
 /// let _: u64 = hasher.finish();
 /// ```
-#[derive(Clone)]
 pub struct XxHash3_64 {
-    /// The hasher that holds the secret, the seed and the buffer.
-    pub(super) inner: RawHasher<&'static [u8; DEFAULT_SECRET_LENGTH]>,
+    /// The streaming state, initialized only when an input outgrows the prefix.
+    pub(super) inner: Option<RawHasher<&'static [u8; DEFAULT_SECRET_LENGTH]>>,
+    /// Short hash input retained without initializing the larger streaming state
+    /// or zeroing unused prefix bytes.
+    pub(super) prefix: [MaybeUninit<u8>; HASH_PREFIX_CAPACITY],
+    /// Number of initialized bytes in the short input prefix.
+    pub(super) prefix_len: usize,
 }

@@ -47,3 +47,50 @@ pub(crate) const ENTITY_TAG_OPTIONAL_WHITESPACE: &[u8] = b" \t";
 
 /// The only whitespace allowed around a field value.
 pub(crate) const HTTP_HEADER_OPTIONAL_WHITESPACE: [char; 2] = [' ', '\t'];
+
+/// Maximum header name length lowercased on the stack without heap allocation.
+pub(crate) const STACK_HEADER_KEY_LIMIT: usize = B_64;
+
+/// Compile-time lookup table of valid RFC 9110 HTTP header token bytes.
+pub(crate) const HTTP_HEADER_TOKEN_TABLE: [bool; 256] = {
+    let mut table: [bool; 256] = [false; 256];
+    let mut idx: usize = 0;
+    while idx < 256 {
+        let byte: u8 = idx as u8;
+        let is_alnum: bool = byte.is_ascii_alphanumeric();
+        let is_punct: bool = matches!(
+            byte,
+            b'!' | b'#'
+                | b'$'
+                | b'%'
+                | b'&'
+                | b'\''
+                | b'*'
+                | b'+'
+                | b'-'
+                | b'.'
+                | b'^'
+                | b'_'
+                | b'`'
+                | b'|'
+                | b'~'
+        );
+        table[idx] = is_alnum || is_punct;
+        idx += 1;
+    }
+    table
+};
+
+/// Compile-time lookup table of bytes allowed inside an HTTP header field value.
+pub(crate) const HTTP_HEADER_VALUE_VALID_TABLE: [bool; 256] = {
+    let mut table: [bool; 256] = [false; 256];
+    let mut idx: usize = 0;
+    while idx < 256 {
+        let byte: u8 = idx as u8;
+        let is_invalid: bool = (byte < HTTP_HEADER_CONTROL_LIMIT && byte != HTTP_HEADER_TAB)
+            || byte == HTTP_HEADER_DELETE;
+        table[idx] = !is_invalid;
+        idx += 1;
+    }
+    table
+};

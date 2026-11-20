@@ -113,3 +113,44 @@ fn refuses_an_argument_with_a_bad_number() {
     let args: Vec<String> = vec!["--connections".to_owned(), "many".to_owned()];
     assert!(Config::from_args(&args).is_err());
 }
+
+#[tokio::test]
+async fn excludes_warmup_requests_from_throughput() {
+    let listener: TcpListener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address: String = listener.local_addr().unwrap().to_string();
+    let server: JoinHandle<()> = spawn(async move {
+        let (mut stream, _): (TcpStream, SocketAddr) = listener.accept().await.unwrap();
+        let mut buffer: [u8; 1024] = [0; 1024];
+        while let Ok(read) = stream.read(&mut buffer).await {
+            if read == 0 {
+                break;
+            }
+            sleep(Duration::from_millis(1)).await;
+            if stream
+                .write_all(
+                    b"HTTP/1.1 200 OK\r\nContent-Length: 25\r\n\r\nhello hyperlane benchmark",
+                )
+                .await
+                .is_err()
+            {
+                break;
+            }
+        }
+    });
+    let cases: Vec<Case> = build_cases().into_iter().take(1).collect();
+    let warmup_until: Instant = Instant::now() + Duration::from_millis(150);
+    let stats: ConnStats = run_connection(
+        address,
+        cases,
+        Arc::new(Barrier::new(1)),
+        warmup_until,
+        warmup_until + Duration::from_millis(150),
+        Protocol::Http1,
+        None,
+    )
+    .await;
+    server.abort();
+    assert_eq!(stats.errors, 0);
+    assert!(stats.completed > 0);
+    assert_eq!(stats.completed as usize, stats.latencies_us.len());
+}

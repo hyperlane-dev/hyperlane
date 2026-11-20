@@ -297,8 +297,8 @@ impl Stream {
             leftover: Vec::new(),
             leftover_start: 0,
             leftover_end: 0,
-            line_buffer: String::with_capacity(REQUEST_LINE_BUFFER_CAPACITY),
-            header_line_buffer: String::with_capacity(HEADER_LINE_BUFFER_CAPACITY),
+            line_buffer: String::new(),
+            header_line_buffer: String::new(),
             websocket_state: None,
         }
     }
@@ -401,32 +401,65 @@ impl Stream {
         reader.set_start(start);
         reader.set_end(end);
         line_buffer.clear();
-        AsyncBufReadExt::read_line(&mut reader, line_buffer).await?;
-        let (method, path, version): (RequestMethod, &str, RequestVersion) =
-            Request::get_http_first_line(line_buffer)?;
-        Request::check_http_path_size(path, max_path_size)?;
-        let hash_index: Option<usize> = path.find(HASH);
-        let query_index: Option<usize> = path.find(QUERY);
-        let query: &str = Request::get_http_query(path, query_index, hash_index);
-        Request::fill_http_querys(query, request.get_mut_querys());
-        let path_slice: &str = Request::get_http_path(path, query_index, hash_index);
-        request.get_mut_path().push_str(path_slice);
-        request.set_version(version);
-        let framing: RequestFraming = request
-            .get_http_headers(&mut reader, &config, header_line_buffer)
-            .await?;
-        request.set_method(method);
+        let filled_len: usize = future::poll_fn(|cx: &mut Context<'_>| {
+            Pin::new(&mut reader).poll_fill_buf(cx).map_ok(<[u8]>::len)
+        })
+        .await?;
+        let fast_framing: Option<RequestFraming> = if filled_len > 0 {
+            let slice: &[u8] = &reader.get_buffer()[reader.get_start()..reader.get_end()];
+            match request.parse_http_head_from_slice(slice, &config, line_buffer)? {
+                Some((framing, consumed)) => {
+                    Pin::new(&mut reader).consume(consumed);
+                    Some(framing)
+                }
+                None => None,
+            }
+        } else {
+            None
+        };
+        let framing: RequestFraming = match fast_framing {
+            Some(framing) => framing,
+            None => {
+                line_buffer.clear();
+                AsyncBufReadExt::read_line(&mut reader, line_buffer).await?;
+                let (method, path, version): (RequestMethod, &str, RequestVersion) =
+                    Request::get_http_first_line(line_buffer)?;
+                Request::check_http_path_size(path, max_path_size)?;
+                let hash_index: Option<usize> = path.find(HASH);
+                let query_index: Option<usize> = path.find(QUERY);
+                let query: &str = Request::get_http_query(path, query_index, hash_index);
+                Request::fill_http_querys(query, request.get_mut_querys());
+                let path_slice: &str = Request::get_http_path(path, query_index, hash_index);
+                request.get_mut_path().push_str(path_slice);
+                request.set_version(version);
+                let framing: RequestFraming = request
+                    .get_http_headers(&mut reader, &config, header_line_buffer)
+                    .await?;
+                request.set_method(method);
+                framing
+            }
+        };
         match framing {
             RequestFraming::Fixed(0) => {}
             RequestFraming::Fixed(content_size) => {
-                if content_size > reader.get_end() - reader.get_start()
-                    && expects_http_continue(request)
-                {
-                    let transport: &mut Box<dyn Transport> = reader.get_mut_stream();
-                    transport.write_all(HTTP_CONTINUE_RESPONSE).await?;
-                    transport.flush().await?;
+                let buffered: usize = reader.get_end() - reader.get_start();
+                if content_size <= buffered {
+                    let body: &mut RequestBody = request.get_mut_body();
+                    body.clear();
+                    let body_start: usize = reader.get_start();
+                    body.extend_from_slice(
+                        &reader.get_buffer()[body_start..body_start + content_size],
+                    );
+                    reader.set_start(body_start + content_size);
+                } else {
+                    if expects_http_continue(request) {
+                        let transport: &mut Box<dyn Transport> = reader.get_mut_stream();
+                        transport.write_all(HTTP_CONTINUE_RESPONSE).await?;
+                        transport.flush().await?;
+                    }
+                    Request::fill_http_body(&mut reader, request.get_mut_body(), content_size)
+                        .await?;
                 }
-                Request::fill_http_body(&mut reader, request.get_mut_body(), content_size).await?;
             }
             RequestFraming::Chunked => {
                 Box::pin(fill_chunked_request(&mut reader, request, &config)).await?;

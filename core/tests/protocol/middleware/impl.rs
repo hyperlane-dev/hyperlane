@@ -356,6 +356,26 @@ impl ServerHook for SocketMetadataRoute {
     }
 }
 
+impl ServerHook for CancelledWriteRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, stream: &mut Stream, _: &mut Context) -> Status {
+        stream
+            .try_send(CANCELLED_WRITE_RESPONSE_HEAD)
+            .await
+            .unwrap();
+        let body: Vec<u8> = vec![b'x'; CANCELLED_WRITE_BYTES];
+        let cancelled: bool = timeout(Duration::from_millis(20), stream.try_send(&body))
+            .await
+            .is_err();
+        assert!(cancelled, "the stalled receiver must apply backpressure");
+        stream.try_send(b"!").await.unwrap();
+        Status::Reject
+    }
+}
+
 impl ServerHook for UnframedBodyRoute {
     async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self

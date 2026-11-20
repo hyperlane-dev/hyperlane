@@ -35,3 +35,6 @@ pub(crate) const H2_HANDSHAKE_TIMEOUT: &str = "http2 handshake exceeded the read
 /// milliseconds would be a ~584,000 year deadline, so the sentinel is kept and
 /// read as a real absence of a bound rather than as an enormous one.
 pub(crate) const NO_TIMEOUT_MS: u64 = u64::MAX;
+
+/// Backlog size passed to `listen(2)` for bound TCP listeners.
+pub(crate) const TCP_LISTEN_BACKLOG: i32 = 1024;

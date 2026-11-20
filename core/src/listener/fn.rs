@@ -1,38 +1,85 @@
 use super::*;
 
-/// Accepts TCP connections and serves each one with the configured protocol.
-///
-/// HTTP/1.1 and HTTP/2 share this listener. When TLS is configured the
-/// connection is configured at the socket level first, then wrapped and
-/// handshaken with a bound so a client that opens a connection and never
-/// completes the handshake cannot stall the loop. HTTP/2 additionally requires
-/// its own preface or upgrade, and an HTTP/1.1 selection serves the connection
-/// directly.
-///
-/// Shutdown is not an abort from outside. The loop watches the shutdown signal
-/// itself, and on a signal it drops the listener before it returns, so the port
-/// is already released by the time the loop publishes its stopped state and a
-/// `wait` that follows is observably after the release.
+/// Binds one exclusive UDP socket and constructs one or more CID-steered QUIC endpoints.
 ///
 /// # Arguments
 ///
-/// - `ConnectionEnv` - The server, limits and protocol for the connection.
-/// - `Option<Arc<rustls::ServerConfig>>` - The TLS configuration, when present.
-/// - `AcceptSignal` - The bound listener and the loop's shutdown channels.
+/// - `Arc<QuicServerConfig>` - The QUIC TLS configuration.
+/// - `SocketAddr` - The UDP bind address.
 ///
 /// # Returns
 ///
-/// - `()` - Resolves once the accept loop stops.
-pub(crate) async fn tcp_accept(
+/// - `Result<QuicEndpointSet, Box<ServerError>>` - Exclusive QUIC endpoint set.
+pub(crate) fn bind_quic_endpoints(
+    quic_config: Arc<QuicServerConfig>,
+    bind_addr: SocketAddr,
+) -> Result<QuicEndpointSet, Box<ServerError>> {
+    create_quic_endpoint_set(quic_config, bind_addr)
+}
+
+/// Binds one or more TCP listeners with a deep accept backlog and exclusive port ownership.
+///
+/// # Arguments
+///
+/// - `&str` - The configured bind address string.
+/// - `bool` - Whether to enable `TCP_NODELAY` on the listener socket.
+///
+/// # Returns
+///
+/// - `Result<Vec<TcpListener>, Box<ServerError>>` - Bound Tokio TCP listeners.
+pub(crate) async fn bind_tcp_listeners(
+    bind_address: &str,
+    nodelay: bool,
+) -> Result<Vec<TcpListener>, Box<ServerError>> {
+    let Ok(bind_addr) = bind_address.parse::<SocketAddr>() else {
+        let listener: TcpListener = TcpListener::bind(bind_address)
+            .await
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        SockRef::from(&listener)
+            .set_tcp_nodelay(nodelay)
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        return Ok(vec![listener]);
+    };
+    let shard_count: usize = 1;
+    let mut listeners: Vec<TcpListener> = Vec::with_capacity(shard_count);
+    for _ in 0..shard_count {
+        let socket: Socket = Socket::new(Domain::for_address(bind_addr), Type::STREAM, None)
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        if bind_addr.port() != 0 {
+            socket
+                .set_reuse_address(true)
+                .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        }
+        let _: Result<(), io::Error> = socket.set_tcp_nodelay(nodelay);
+        socket
+            .set_nonblocking(true)
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        socket
+            .bind(&bind_addr.into())
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        socket
+            .listen(TCP_LISTEN_BACKLOG)
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        let std_listener: StdTcpListener = socket.into();
+        let listener: TcpListener = TcpListener::from_std(std_listener)
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        listeners.push(listener);
+    }
+    Ok(listeners)
+}
+
+/// Runs one TCP accept loop on a shared exclusive listener until the shutdown signal fires.
+///
+/// # Arguments
+///
+/// - `ConnectionEnv` - Shared server state and protocol configuration.
+/// - `Arc<TcpListener>` - Exclusively bound TCP listener shared across accept workers.
+/// - `Receiver<()>` - Shutdown signal.
+async fn tcp_accept_loop(
     env: ConnectionEnv,
-    stream_tls: Option<Arc<rustls::ServerConfig>>,
-    signal: AcceptSignal,
+    tcp_listener: Arc<TcpListener>,
+    mut shutdown_receiver: Receiver<()>,
 ) {
-    let AcceptSignal {
-        listener: tcp_listener,
-        mut shutdown_receiver,
-        running_sender,
-    } = signal;
     loop {
         let accepted: Option<(TcpStream, SocketAddr)> = tokio::select! {
             biased;
@@ -43,22 +90,178 @@ pub(crate) async fn tcp_accept(
             break;
         };
         let env: ConnectionEnv = env.clone();
-        let tls: Option<Arc<rustls::ServerConfig>> = stream_tls.clone();
         spawn(async move {
-            serve_tcp_connection(env, tls, stream, remote).await;
+            serve_tcp_connection(env, stream, remote).await;
         });
     }
     drop(tcp_listener);
-    let _: Result<(), tokio::sync::watch::error::SendError<bool>> =
-        running_sender.send(SERVER_STOPPED);
+}
+
+/// Runs one QUIC accept shard until shutdown, then closes and drains its endpoint.
+///
+/// # Arguments
+///
+/// - `ConnectionEnv` - Shared server state and protocol configuration.
+/// - `Endpoint` - Bound QUIC endpoint shard.
+/// - `Receiver<()>` - Shutdown signal.
+///
+/// # Returns
+///
+/// - `Result<(), Box<ServerError>>` - `Ok(())` once drained.
+async fn quic_accept_loop(
+    env: ConnectionEnv,
+    endpoint: Endpoint,
+    mut shutdown_receiver: Receiver<()>,
+) -> Result<(), Box<ServerError>> {
+    let local: SocketAddr = endpoint
+        .local_addr()
+        .map_err(|error: io::Error| ServerError::from(error))?;
+    loop {
+        let connecting: Option<Incoming> = tokio::select! {
+            biased;
+            _ = shutdown_receiver.changed() => None,
+            accepted = endpoint.accept() => accepted,
+        };
+        let Some(connecting) = connecting else {
+            break;
+        };
+        let remote: SocketAddr = connecting.remote_address();
+        let env: ConnectionEnv = env.clone();
+        spawn(async move {
+            let Ok(connection) = connecting.await else {
+                return;
+            };
+            if !negotiated_quic_protocol_matches(&connection) {
+                connection.close(VarInt::from_u32(QUIC_CLOSE_CODE), QUIC_CLOSE_REASON);
+                return;
+            }
+            serve_h3_connection(env, StreamPeers { local, remote }, connection).await;
+        });
+    }
+    let close_code: VarInt = VarInt::from_u32(QUIC_CLOSE_CODE);
+    endpoint.close(close_code, QUIC_CLOSE_REASON);
+    endpoint.wait_idle().await;
+    drop(endpoint);
+    Ok(())
+}
+
+/// Accepts TCP connections across all bound listener shards and publishes stopped state once every shard exits.
+///
+/// # Arguments
+///
+/// - `ConnectionEnv` - Shared server state and protocol configuration.
+/// - `Vec<TcpListener>` - All bound listener shards.
+/// - `Receiver<()>` - Shutdown signal.
+/// - `Sender<bool>` - Running-state publisher.
+pub(crate) async fn tcp_accept_all(
+    env: ConnectionEnv,
+    mut listeners: Vec<TcpListener>,
+    shutdown_receiver: Receiver<()>,
+    running_sender: Sender<bool>,
+) {
+    #[cfg(target_os = "linux")]
+    {
+        match try_serve_uring_tcp(
+            env.clone(),
+            listeners,
+            shutdown_receiver.clone(),
+            running_sender.clone(),
+        )
+        .await
+        {
+            Ok(()) => return,
+            Err(remaining) => listeners = remaining,
+        }
+    }
+    let workers: usize = tokio::runtime::Handle::current().metrics().num_workers();
+    if listeners.len() == 1 && workers <= 1 {
+        let listener: Arc<TcpListener> = Arc::new(listeners.remove(0));
+        tcp_accept_loop(env, listener, shutdown_receiver).await;
+    } else if listeners.len() == 1 {
+        let listener: Arc<TcpListener> = Arc::new(listeners.remove(0));
+        let task_count: usize = workers.clamp(1, 8);
+        let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(task_count);
+        for _ in 0..task_count {
+            let shard_env: ConnectionEnv = env.clone();
+            let shard_listener: Arc<TcpListener> = Arc::clone(&listener);
+            let shard_shutdown: Receiver<()> = shutdown_receiver.clone();
+            handles.push(spawn(async move {
+                tcp_accept_loop(shard_env, shard_listener, shard_shutdown).await;
+            }));
+        }
+        drop(listener);
+        for handle in handles {
+            let _: Result<(), JoinError> = handle.await;
+        }
+    } else {
+        let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(listeners.len());
+        for listener in listeners {
+            let shard_env: ConnectionEnv = env.clone();
+            let shard_listener: Arc<TcpListener> = Arc::new(listener);
+            let shard_shutdown: Receiver<()> = shutdown_receiver.clone();
+            handles.push(spawn(async move {
+                tcp_accept_loop(shard_env, shard_listener, shard_shutdown).await;
+            }));
+        }
+        for handle in handles {
+            let _: Result<(), JoinError> = handle.await;
+        }
+    }
+    let _: Result<(), SendError<bool>> = running_sender.send(SERVER_STOPPED);
+}
+
+/// Accepts QUIC connections across all bound endpoints and stops the UDP dispatcher before publishing stopped state.
+///
+/// # Arguments
+///
+/// - `ConnectionEnv` - Shared server state and protocol configuration.
+/// - `QuicEndpointSet` - All bound QUIC endpoints and optional exclusive-socket dispatcher.
+/// - `Receiver<()>` - Shutdown signal.
+/// - `Sender<bool>` - Running-state publisher.
+pub(crate) async fn quic_accept_all(
+    env: ConnectionEnv,
+    endpoint_set: QuicEndpointSet,
+    shutdown_receiver: Receiver<()>,
+    running_sender: Sender<bool>,
+) {
+    let QuicEndpointSet {
+        mut endpoints,
+        dispatcher,
+        dispatcher_stop,
+    } = endpoint_set;
+    if endpoints.len() == 1 {
+        let endpoint: Endpoint = endpoints.remove(0);
+        let _: Result<(), Box<ServerError>> =
+            quic_accept_loop(env, endpoint, shutdown_receiver).await;
+    } else {
+        let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(endpoints.len());
+        for endpoint in endpoints {
+            let shard_env: ConnectionEnv = env.clone();
+            let shard_shutdown: Receiver<()> = shutdown_receiver.clone();
+            handles.push(spawn(async move {
+                let _: Result<(), Box<ServerError>> =
+                    quic_accept_loop(shard_env, endpoint, shard_shutdown).await;
+            }));
+        }
+        for handle in handles {
+            let _: Result<(), JoinError> = handle.await;
+        }
+    }
+    if let Some(stop_tx) = dispatcher_stop {
+        let _: Result<(), SendError<()>> = stop_tx.send(());
+    }
+    if let Some(handle) = dispatcher {
+        let _: Result<Result<(), Box<dyn Any + Send>>, JoinError> =
+            spawn_blocking(move || handle.join()).await;
+    }
+    let _: Result<(), SendError<bool>> = running_sender.send(SERVER_STOPPED);
 }
 
 /// Serves one accepted TCP connection.
 ///
 /// # Arguments
 ///
-/// - `ConnectionEnv` - The server, limits and protocol for the connection.
-/// - `Option<Arc<rustls::ServerConfig>>` - The TLS configuration, when present.
+/// - `ConnectionEnv` - The shared server, compiled pipeline, TLS acceptor, limits and protocol.
 /// - `TcpStream` - The accepted socket, before its socket options are applied.
 /// - `SocketAddr` - The remote address of the accepted socket.
 ///
@@ -67,32 +270,48 @@ pub(crate) async fn tcp_accept(
 /// - `()` - Resolves once the connection is finished.
 pub(crate) async fn serve_tcp_connection(
     env: ConnectionEnv,
-    stream_tls: Option<Arc<rustls::ServerConfig>>,
     stream: TcpStream,
     remote: SocketAddr,
 ) {
-    let local: Option<SocketAddr> = stream.local_addr().ok();
-    configure_socket(&stream, &env.server);
-    let peers: StreamPeers = StreamPeers {
-        local: local.unwrap_or(remote),
-        remote,
-    };
-    let Some(tls) = stream_tls else {
-        serve_plain_tcp(env, peers, stream).await;
+    let shared: &ConnectionShared = &env.shared;
+    configure_socket(&stream, &shared.server);
+    let Some(tls_config) = shared.tls_config.as_ref() else {
+        if shared.protocol == ServerProtocol::Http2 {
+            let local: SocketAddr = stream.local_addr().unwrap_or(remote);
+            serve_plain_tcp(env, StreamPeers { local, remote }, stream).await;
+        } else {
+            serve_h1_connection(env, stream).await;
+        }
         return;
     };
-    let Ok(handshake) =
-        bounded_handshake(env.request_config, TlsAcceptor::from(tls).accept(stream)).await
+    let local: Option<SocketAddr> = if shared.protocol == ServerProtocol::Http2 {
+        stream.local_addr().ok()
+    } else {
+        None
+    };
+    let Ok(handshake) = bounded_handshake(
+        shared.request_config,
+        accept_unbuffered_tls(Arc::clone(tls_config), stream),
+    )
+    .await
     else {
         return;
     };
-    let Ok(handshake) = handshake else {
+    let Ok(transport) = handshake else {
         return;
     };
-    if !negotiated_protocol_matches(&handshake, &env.protocol) {
+    if !negotiated_protocol_matches(&transport, &shared.protocol) {
         return;
     }
-    serve_tls_stream(env, peers, TlsTransport::new(handshake)).await;
+    if shared.protocol == ServerProtocol::Http2 {
+        let peers: StreamPeers = StreamPeers {
+            local: local.unwrap_or(remote),
+            remote,
+        };
+        serve_tls_stream(env, peers, transport).await;
+    } else {
+        serve_h1_transport(env, transport).await;
+    }
 }
 
 /// Reports whether a negotiated TLS session speaks the protocol being served.
@@ -106,18 +325,20 @@ pub(crate) async fn serve_tcp_connection(
 ///
 /// # Arguments
 ///
-/// - `&tokio_rustls::server::TlsStream<TcpStream>` - The negotiated session.
+/// - `&TlsTransport<T>` - The negotiated TLS transport.
 /// - `&ServerProtocol` - The protocol this connection is being served as.
 ///
 /// # Returns
 ///
 /// - `bool` - `true` when the session may be served under this protocol.
-pub(crate) fn negotiated_protocol_matches(
-    session: &tokio_rustls::server::TlsStream<TcpStream>,
+pub(crate) fn negotiated_protocol_matches<T>(
+    transport: &TlsTransport<T>,
     protocol: &ServerProtocol,
-) -> bool {
-    let (_, connection): (&TcpStream, &rustls::ServerConnection) = session.get_ref();
-    match connection.alpn_protocol() {
+) -> bool
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+{
+    match transport.alpn_protocol() {
         Some(negotiated) => negotiated == protocol.get_alpn_protocol(),
         None => protocol != &ServerProtocol::Http2,
     }
@@ -182,19 +403,35 @@ where
 /// # Arguments
 ///
 /// - `&TcpStream` - The accepted socket to configure.
-/// - `&Arc<Server>` - The server holding the socket options to apply.
+/// - `&Server` - The server holding the socket options to apply.
 ///
 /// # Returns
 ///
 /// - `()` - Resolves once the options are applied.
-pub(crate) fn configure_socket(stream: &TcpStream, server: &Arc<Server>) {
+pub(crate) fn configure_socket(stream: &TcpStream, server: &Server) {
     let server_config: &ServerConfig = server.get_server_config();
-    if let Some(nodelay) = server_config.get_nodelay() {
+    #[cfg(not(unix))]
+    {
+        let nodelay: bool = server_config.get_nodelay().unwrap_or(true);
         let _: Result<(), io::Error> = stream.set_nodelay(nodelay);
     }
     if let Some(ttl) = server_config.get_ttl() {
         let _: Result<(), io::Error> = stream.set_ttl(ttl);
     }
+}
+
+/// Builds the HTTP/2 server handshake builder with tuned flow-control windows.
+///
+/// # Returns
+///
+/// - `H2ServerBuilder` - The configured HTTP/2 server handshake builder.
+fn h2_server_builder() -> H2ServerBuilder {
+    let mut builder: H2ServerBuilder = H2ServerBuilder::new();
+    builder
+        .initial_window_size(1024 * 1024)
+        .initial_connection_window_size(4 * 1024 * 1024)
+        .max_concurrent_streams(1024);
+    builder
 }
 
 /// Serves a plaintext connection, selecting the protocol it speaks.
@@ -209,19 +446,21 @@ pub(crate) fn configure_socket(stream: &TcpStream, server: &Arc<Server>) {
 ///
 /// - `()` - Resolves once the connection is finished.
 pub(crate) async fn serve_plain_tcp(env: ConnectionEnv, peers: StreamPeers, stream: TcpStream) {
-    match env.protocol {
+    match env.shared.protocol {
         ServerProtocol::Http2 => {
-            let handshake: Result<ConnectionH2<TcpStream>, String> =
-                bounded_handshake(env.request_config, h2::server::handshake(stream))
-                    .await
-                    .map_err(|_: tokio::time::error::Elapsed| H2_HANDSHAKE_TIMEOUT.to_owned())
-                    .and_then(|connection: Result<_, H2Error>| {
-                        connection.map_err(|error: H2Error| error.to_string())
-                    });
+            let handshake: Result<ConnectionH2<TcpStream>, String> = bounded_handshake(
+                env.shared.request_config,
+                h2_server_builder().handshake(stream),
+            )
+            .await
+            .map_err(|_: Elapsed| H2_HANDSHAKE_TIMEOUT.to_owned())
+            .and_then(|connection: Result<_, H2Error>| {
+                connection.map_err(|error: H2Error| error.to_string())
+            });
             serve_h2_connection(env, peers, handshake).await;
         }
         _ => {
-            serve_h1_connection(env.server, env.request_config, stream).await;
+            serve_h1_connection(env, stream).await;
         }
     }
 }
@@ -246,117 +485,46 @@ pub(crate) async fn serve_tls_stream(
     peers: StreamPeers,
     transport: TlsTransport,
 ) {
-    match env.protocol {
+    match env.shared.protocol {
         ServerProtocol::Http2 => {
             let session: TlsTransport = transport;
-            let handshake: Result<ConnectionH2<TlsTransport>, String> =
-                bounded_handshake(env.request_config, h2::server::handshake(session))
-                    .await
-                    .map_err(|_: tokio::time::error::Elapsed| H2_HANDSHAKE_TIMEOUT.to_owned())
-                    .and_then(|connection: Result<_, H2Error>| {
-                        connection.map_err(|error: H2Error| error.to_string())
-                    });
+            let handshake: Result<ConnectionH2<TlsTransport>, String> = bounded_handshake(
+                env.shared.request_config,
+                h2_server_builder().handshake(session),
+            )
+            .await
+            .map_err(|_: Elapsed| H2_HANDSHAKE_TIMEOUT.to_owned())
+            .and_then(|connection: Result<_, H2Error>| {
+                connection.map_err(|error: H2Error| error.to_string())
+            });
             serve_h2_connection(env, peers, handshake).await;
         }
         _ => {
-            serve_h1_transport(env.server, env.request_config, transport).await;
+            serve_h1_transport(env, transport).await;
         }
     }
-}
-
-/// Accepts QUIC connections and serves each one with HTTP/3.
-///
-/// Shutdown here is not an abort either, and it cannot be one alone: dropping
-/// the loop would leave the UDP socket bound and every established connection
-/// running. The loop therefore closes the endpoint first, which tells peers the
-/// server is going away and makes the accept future resolve, then waits for the
-/// connections to drain before publishing the stopped state and dropping the
-/// socket.
-///
-/// # Arguments
-///
-/// - `ConnectionEnv` - The server, limits and protocol for the connection.
-/// - `Endpoint` - The bound QUIC endpoint to accept connections from.
-/// - `Receiver<()>` - The shutdown signal the loop selects on.
-/// - `Sender<bool>` - Publishes whether the loop is still serving.
-///
-/// # Returns
-///
-/// - `Result<(), Box<ServerError>>` - `Ok(())` once the endpoint has been closed and
-///   drained, or the failure that stopped the loop early.
-pub(crate) async fn quic_accept(
-    env: ConnectionEnv,
-    endpoint: Endpoint,
-    mut shutdown_receiver: Receiver<()>,
-    running_sender: Sender<bool>,
-) -> Result<(), Box<ServerError>> {
-    let local: SocketAddr = endpoint
-        .local_addr()
-        .map_err(|error: io::Error| ServerError::from(error))?;
-    loop {
-        let connecting: Option<Incoming> = tokio::select! {
-            biased;
-            _ = shutdown_receiver.changed() => None,
-            accepted = endpoint.accept() => accepted,
-        };
-        let Some(connecting) = connecting else {
-            break;
-        };
-        let remote: SocketAddr = connecting.remote_address();
-        let env: ConnectionEnv = env.clone();
-        spawn(async move {
-            let Ok(connection) = connecting.await else {
-                return;
-            };
-            if !negotiated_quic_protocol_matches(&connection) {
-                connection.close(VarInt::from_u32(QUIC_CLOSE_CODE), QUIC_CLOSE_REASON);
-                return;
-            }
-            let Ok(h3_connection) = h3::server::Connection::<h3_quinn::Connection, Bytes>::new(
-                h3_quinn::Connection::new(connection),
-            )
-            .await
-            else {
-                return;
-            };
-            serve_h3_connection(env, StreamPeers { local, remote }, h3_connection).await;
-        });
-    }
-    let close_code: VarInt = VarInt::from_u32(QUIC_CLOSE_CODE);
-    endpoint.close(close_code, QUIC_CLOSE_REASON);
-    endpoint.wait_idle().await;
-    drop(endpoint);
-    let _: Result<(), tokio::sync::watch::error::SendError<bool>> =
-        running_sender.send(SERVER_STOPPED);
-    Ok(())
 }
 
 /// Serves one plaintext HTTP/1.1 connection through the existing pipeline.
 ///
 /// # Arguments
 ///
-/// - `Arc<Server>` - The server whose pipeline serves the connection.
-/// - `RequestConfig` - The parsing limits and read timeouts for the connection.
+/// - `ConnectionEnv` - The shared server, compiled pipeline and parsing limits.
 /// - `TcpStream` - The accepted socket.
 ///
 /// # Returns
 ///
 /// - `()` - Resolves once the connection is finished.
-pub(crate) async fn serve_h1_connection(
-    server: Arc<Server>,
-    request_config: RequestConfig,
-    stream: TcpStream,
-) {
-    let mut stream: Stream = Stream::new(stream, request_config, false);
-    serve_h1_stream(server, &mut stream).await;
+pub(crate) async fn serve_h1_connection(env: ConnectionEnv, stream: TcpStream) {
+    let mut stream: Stream = Stream::new(stream, env.shared.request_config, false);
+    serve_h1_stream(env, &mut stream).await;
 }
 
 /// Serves one HTTP/1.1 connection whose transport is already negotiated.
 ///
 /// # Arguments
 ///
-/// - `Arc<Server>` - The server whose pipeline serves the connection.
-/// - `RequestConfig` - The parsing limits and read timeouts for the connection.
+/// - `ConnectionEnv` - The shared server, compiled pipeline and parsing limits.
 /// - `TlsTransport` - The negotiated session carrying the connection.
 ///
 /// # Returns
@@ -369,13 +537,10 @@ pub(crate) async fn serve_h1_connection(
 /// down explicitly so the close notify alert reaches the peer. A finite read
 /// timeout bounds shutdown so a peer that stops reading cannot hold the
 /// connection open forever; the no-timeout sentinel disables that bound.
-pub(crate) async fn serve_h1_transport(
-    server: Arc<Server>,
-    request_config: RequestConfig,
-    transport: TlsTransport,
-) {
+pub(crate) async fn serve_h1_transport(env: ConnectionEnv, transport: TlsTransport) {
+    let request_config: RequestConfig = env.shared.request_config;
     let mut stream: Stream = Stream::from_transport(transport, request_config, false);
-    serve_h1_stream(server, &mut stream).await;
+    serve_h1_stream(env, &mut stream).await;
     let closed: Result<Result<(), io::Error>, tokio::time::error::Elapsed> =
         bounded_handshake(request_config, stream.get_mut_stream().shutdown()).await;
     match closed {
@@ -389,14 +554,17 @@ pub(crate) async fn serve_h1_transport(
 ///
 /// # Arguments
 ///
-/// - `Arc<Server>` - The server whose pipeline serves the connection.
+/// - `ConnectionEnv` - The shared server and compiled inline pipeline.
 /// - `&mut Stream` - The stream carrying the connection.
 ///
 /// # Returns
 ///
 /// - `()` - Resolves once the connection is finished.
-pub(crate) async fn serve_h1_stream(server: Arc<Server>, stream: &mut Stream) {
-    server.serve_h1_connection_stream(stream).await;
+pub(crate) async fn serve_h1_stream(env: ConnectionEnv, stream: &mut Stream) {
+    env.shared
+        .server
+        .serve_h1_connection_stream(&env.shared.pipeline, stream)
+        .await;
 }
 
 /// Runs one connection future and reports the panic payload if it unwinds.

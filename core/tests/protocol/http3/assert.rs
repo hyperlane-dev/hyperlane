@@ -1,6 +1,209 @@
 use super::*;
 
 #[tokio::test]
+async fn http3_rejects_a_second_control_stream_before_the_first_closes() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .unwrap();
+    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await.unwrap();
+    let mut first: QuicSendStream = connection.open_uni().await.unwrap();
+    first.write_all(&[0, 4, 0]).await.unwrap();
+    let mut second: QuicSendStream = connection.open_uni().await.unwrap();
+    second.write_all(&[0, 4, 0]).await.unwrap();
+    let closed: Result<quinn::ConnectionError, Elapsed> =
+        timeout(Duration::from_secs(2), connection.closed()).await;
+    control.shutdown().await;
+    assert!(
+        closed.is_ok(),
+        "duplicate control streams must close the connection"
+    );
+    match closed.unwrap() {
+        quinn::ConnectionError::ApplicationClosed(error) => {
+            assert_eq!(error.error_code, quinn::VarInt::from_u32(0x103));
+        }
+        other => panic!("expected H3_STREAM_CREATION_ERROR, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn http3_rejects_eof_on_the_peer_control_stream() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .unwrap();
+    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await.unwrap();
+    let mut stream: QuicSendStream = connection.open_uni().await.unwrap();
+    stream.write_all(&[0, 4, 0]).await.unwrap();
+    stream.finish().unwrap();
+    let closed: Result<quinn::ConnectionError, Elapsed> =
+        timeout(Duration::from_secs(2), connection.closed()).await;
+    control.shutdown().await;
+    assert!(
+        closed.is_ok(),
+        "closing a critical stream must close the connection"
+    );
+    match closed.unwrap() {
+        quinn::ConnectionError::ApplicationClosed(error) => {
+            assert_eq!(error.error_code, quinn::VarInt::from_u32(0x104));
+        }
+        other => panic!("expected H3_CLOSED_CRITICAL_STREAM, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn http3_rejects_eof_on_qpack_critical_streams() {
+    for stream_type in [2u8, 3u8] {
+        let (control, port): (ServerControlHook, u16) =
+            start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+                .await
+                .unwrap();
+        let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+            connect_quic(port, ALPN_HTTP3).await.unwrap();
+        let mut stream: QuicSendStream = connection.open_uni().await.unwrap();
+        stream.write_all(&[stream_type]).await.unwrap();
+        stream.finish().unwrap();
+        let closed: Result<quinn::ConnectionError, Elapsed> =
+            timeout(Duration::from_secs(2), connection.closed()).await;
+        control.shutdown().await;
+        assert!(
+            closed.is_ok(),
+            "closing QPACK critical stream must close the connection"
+        );
+        match closed.unwrap() {
+            quinn::ConnectionError::ApplicationClosed(error) => {
+                assert_eq!(error.error_code, quinn::VarInt::from_u32(0x104));
+            }
+            other => panic!("expected H3_CLOSED_CRITICAL_STREAM, got {other:?}"),
+        }
+    }
+}
+
+#[tokio::test]
+async fn http3_rejects_missing_or_duplicate_or_invalid_settings_on_control_stream() {
+    let cases: [(&[u8], u32); 4] = [
+        (&[0, 7, 1, 0], 0x10a),
+        (&[0, 4, 0, 4, 0], 0x105),
+        (&[0, 4, 0, 0, 0], 0x105),
+        (&[0, 4, 2, 2, 0], 0x109),
+    ];
+    for (bytes, expected_code) in cases {
+        let (control, port): (ServerControlHook, u16) =
+            start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+                .await
+                .unwrap();
+        let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+            connect_quic(port, ALPN_HTTP3).await.unwrap();
+        let mut stream: QuicSendStream = connection.open_uni().await.unwrap();
+        stream.write_all(bytes).await.unwrap();
+        let closed: Result<quinn::ConnectionError, Elapsed> =
+            timeout(Duration::from_secs(2), connection.closed()).await;
+        control.shutdown().await;
+        assert!(
+            closed.is_ok(),
+            "invalid control stream must close connection"
+        );
+        match closed.unwrap() {
+            quinn::ConnectionError::ApplicationClosed(error) => {
+                assert_eq!(error.error_code, quinn::VarInt::from_u32(expected_code));
+            }
+            other => panic!("expected error {expected_code:#x}, got {other:?}"),
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn http3_multi_worker_connection_migration_preserves_session() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .unwrap();
+    let (endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await.unwrap();
+    let (mut driver, mut send_request) = h3::client::new(h3_quinn::Connection::new(connection))
+        .await
+        .unwrap();
+    let drive: JoinHandle<()> = spawn(async move {
+        let _: h3::error::ConnectionError =
+            poll_fn(|cx: &mut task::Context<'_>| driver.poll_close(cx)).await;
+    });
+    for migrated in [false, true] {
+        if migrated {
+            let new_socket: StdUdpSocket = StdUdpSocket::bind((LOOPBACK_HOST, 0)).unwrap();
+            endpoint.rebind(new_socket).unwrap();
+        }
+        let req: ProtocolRequest<()> = ProtocolRequest::builder()
+            .method("GET")
+            .uri(format!(
+                "https://{TLS_SERVER_NAME}:{port}{VERSION_ROUTE_PATH}"
+            ))
+            .body(())
+            .unwrap();
+        let mut stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> =
+            send_request.send_request(req).await.unwrap();
+        stream.finish().await.unwrap();
+        let resp: ProtocolResponse<()> = stream.recv_response().await.unwrap();
+        assert_eq!(resp.status(), 200);
+        let mut body: Vec<u8> = Vec::new();
+        while let Some(chunk) = stream.recv_data().await.unwrap() {
+            body.extend_from_slice(chunk.chunk());
+        }
+        assert_eq!(
+            String::from_utf8_lossy(&body),
+            format!("{:?}", HttpVersion::Http3)
+        );
+    }
+    drop(send_request);
+    drive.abort();
+    control.shutdown().await;
+}
+
+#[tokio::test]
+async fn http3_cancelled_backpressured_write_can_be_followed_by_a_smaller_write() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("http3 server must start");
+    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await.unwrap();
+    let (mut driver, mut client) = h3::client::new(h3_quinn::Connection::new(connection.clone()))
+        .await
+        .unwrap();
+    let driving: JoinHandle<()> = spawn(async move {
+        let _: h3::error::ConnectionError = driver.wait_idle().await;
+    });
+    let target: String = format!("https://{TLS_SERVER_NAME}:{port}{CANCELLED_WRITE_ROUTE_PATH}");
+    let request: http::Request<()> = http::Request::builder().uri(target).body(()).unwrap();
+    let mut stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> =
+        client.send_request(request).await.unwrap();
+    stream.finish().await.unwrap();
+    let response: http::Response<()> = stream.recv_response().await.unwrap();
+    assert_eq!(response.status().as_u16(), 200);
+    sleep(Duration::from_millis(150)).await;
+    let mut body: Vec<u8> = Vec::new();
+    loop {
+        let chunk: Option<_> = timeout(
+            Duration::from_secs(REQUEST_TIMEOUT_SECS),
+            stream.recv_data(),
+        )
+        .await
+        .expect("the writer must resume when receive capacity is released")
+        .expect("cancelling a write must not reset the stream");
+        let Some(chunk) = chunk else { break };
+        body.extend_from_slice(chunk.chunk());
+    }
+    assert!(!body.is_empty());
+    assert!(body.len() < CANCELLED_WRITE_BYTES);
+    assert_eq!(body.last(), Some(&b'!'));
+    assert!(body[..body.len() - 1].iter().all(|byte: &u8| *byte == b'x'));
+    driving.abort();
+    connection.close(quinn::VarInt::from_u32(0), b"done");
+    control.shutdown().await;
+}
+
+#[tokio::test]
 async fn http3_over_quic_reports_the_real_local_and_peer_addresses_of_the_connection() {
     let (control, port): (ServerControlHook, u16) =
         start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))

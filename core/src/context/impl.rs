@@ -237,7 +237,12 @@ impl Context {
     /// - `&mut Self` - A mutable reference to self for chaining.
     #[inline(always)]
     pub(crate) fn clear_route_params(&mut self) -> &mut Self {
-        self.get_mut_route_params().clear();
+        let params: &mut RouteParams = self.get_mut_route_params();
+        if !params.is_empty() {
+            for pair in params.drain() {
+                return_route_param_entry(pair);
+            }
+        }
         self
     }
 
@@ -295,6 +300,16 @@ impl Context {
     /// - `Option<&String>` - The unchanged path and query, or none for a manually constructed context.
     pub(crate) fn get_request_target_ref(&self) -> Option<&String> {
         self.original_target.as_ref()
+    }
+
+    /// Takes the original target string out of the context for pooling.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<String>` - The previously stored target string, if any.
+    #[inline(always)]
+    pub(crate) fn take_original_target(&mut self) -> Option<String> {
+        self.get_mut_original_target().take()
     }
 
     /// Stores the original target for the current request before user middleware runs.

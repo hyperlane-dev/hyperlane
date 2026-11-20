@@ -1,5 +1,30 @@
 use super::*;
 
+#[test]
+fn header_entry_pool_discards_oversized_retained_allocations() {
+    while take_header_entry().is_some() {}
+    let oversized: usize = MAX_POOLED_HEADER_STRING_CAPACITY + 1;
+    return_header_entry((String::with_capacity(oversized), VecDeque::new()));
+    assert!(take_header_entry().is_none());
+    return_header_entry((
+        String::new(),
+        VecDeque::from([String::with_capacity(oversized)]),
+    ));
+    assert!(take_header_entry().is_none());
+    return_header_entry((
+        String::new(),
+        VecDeque::with_capacity(MAX_POOLED_HEADER_VALUE_CAPACITY + 1),
+    ));
+    assert!(take_header_entry().is_none());
+    return_header_entry((
+        String::from("small"),
+        VecDeque::from([String::from("value")]),
+    ));
+    let (name, values): (String, VecDeque<String>) = take_header_entry().unwrap();
+    assert_eq!(name, "small");
+    assert_eq!(values, VecDeque::from([String::from("value")]));
+}
+
 #[tokio::test]
 async fn http1_chunked_decodes_binary_and_preserves_the_next_request() {
     let raw: &[u8] = b"POST /upload HTTP/1.1\r\nHost: localhost\r\n\

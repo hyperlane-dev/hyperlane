@@ -82,9 +82,6 @@ fn contains_continue_member(value: &str) -> bool {
         .eq_ignore_ascii_case(CONTINUE_EXPECT)
 }
 
-/// The number of header entries the pool keeps for reuse.
-pub(crate) const MAX_POOLED_HEADER_ENTRIES: usize = B_128;
-
 /// Takes a recycled header entry from the pool.
 ///
 /// # Returns
@@ -102,9 +99,53 @@ pub(crate) fn take_header_entry() -> Option<(String, VecDeque<String>)> {
 ///
 /// - `(String, VecDeque<String>)` - The entry to recycle.
 pub(crate) fn return_header_entry(entry: (String, VecDeque<String>)) {
+    if entry.0.capacity() > MAX_POOLED_HEADER_STRING_CAPACITY
+        || entry.1.capacity() > MAX_POOLED_HEADER_VALUE_CAPACITY
+    {
+        return;
+    }
+    if entry
+        .1
+        .iter()
+        .any(|value: &String| value.capacity() > MAX_POOLED_HEADER_STRING_CAPACITY)
+    {
+        return;
+    }
     HEADER_ENTRY_POOL.with(|pool: &RefCell<Vec<(String, VecDeque<String>)>>| {
         let mut pool: RefMut<'_, Vec<(String, VecDeque<String>)>> = pool.borrow_mut();
         if pool.len() < MAX_POOLED_HEADER_ENTRIES {
+            pool.push(entry);
+        }
+    });
+}
+
+/// Returns multiple header or query entries to the worker-local pool in a single lookup.
+///
+/// # Arguments
+///
+/// - `I` - An iterator yielding header or query entries to recycle.
+pub(crate) fn return_header_entries<I>(entries: I)
+where
+    I: IntoIterator<Item = (String, VecDeque<String>)>,
+{
+    HEADER_ENTRY_POOL.with(|pool: &RefCell<Vec<(String, VecDeque<String>)>>| {
+        let mut pool: RefMut<'_, Vec<(String, VecDeque<String>)>> = pool.borrow_mut();
+        for entry in entries {
+            if pool.len() >= MAX_POOLED_HEADER_ENTRIES {
+                break;
+            }
+            if entry.0.capacity() > MAX_POOLED_HEADER_STRING_CAPACITY
+                || entry.1.capacity() > MAX_POOLED_HEADER_VALUE_CAPACITY
+            {
+                continue;
+            }
+            if entry
+                .1
+                .iter()
+                .any(|value: &String| value.capacity() > MAX_POOLED_HEADER_STRING_CAPACITY)
+            {
+                continue;
+            }
             pool.push(entry);
         }
     });

@@ -24,6 +24,7 @@ use rustls::{
     ClientConfig, RootCertStore,
     pki_types::{CertificateDer, ServerName, pem::PemObject},
 };
+use socket2::SockRef;
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     net::TcpStream,
