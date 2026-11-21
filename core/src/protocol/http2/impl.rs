@@ -5,10 +5,10 @@ impl H2DirectState {
     /// Resets the underlying HTTP/2 stream after a framing error or truncation.
     pub(super) fn reset(&mut self) {
         if let Some(mut send_response) = self.get_mut_send_response().take() {
-            send_response.send_reset(h2::Reason::INTERNAL_ERROR);
+            send_response.send_reset(Reason::INTERNAL_ERROR);
         }
         if let Some(mut send_stream) = self.get_mut_send_stream().take() {
-            send_stream.send_reset(h2::Reason::INTERNAL_ERROR);
+            send_stream.send_reset(Reason::INTERNAL_ERROR);
         }
         self.set_finished(true);
     }
@@ -122,7 +122,7 @@ impl H2DirectState {
             return Ok(body_bytes.len());
         }
         if check_body_budget(self.try_get_announced_len(), 0, body_bytes.len()) {
-            send_response.send_reset(h2::Reason::INTERNAL_ERROR);
+            send_response.send_reset(Reason::INTERNAL_ERROR);
             return Err(self.fail(OVERFLOWING_RESPONSE_BODY));
         }
         let mut send_stream: H2SendStream =

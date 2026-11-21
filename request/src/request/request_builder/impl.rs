@@ -1,5 +1,6 @@
 use super::*;
 
+/// Inherent implementation of [`RequestBuilder`].
 impl RequestBuilder {
     /// Create an empty builder (defaults: GET, no headers, default config).
     pub fn new() -> Self {
@@ -163,8 +164,8 @@ impl RequestBuilder {
     /// # Returns
     ///
     /// - `&mut Self` - A mutable reference to this builder for chaining.
-    pub fn body_json<V: serde::Serialize>(&mut self, value: &V) -> &mut Self {
-        if let Ok(bytes) = serde_json::to_vec(value) {
+    pub fn body_json<V: Serialize>(&mut self, value: &V) -> &mut Self {
+        if let Ok(bytes) = to_vec(value) {
             self.get_mut_request().set_body(Body::from_bytes(bytes));
         }
         self

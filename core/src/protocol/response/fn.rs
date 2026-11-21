@@ -314,7 +314,7 @@ pub fn parse_response_head(head: &[u8]) -> Result<(usize, ProtocolHeaders), Resp
     let status_code: usize = status_text
         .parse::<usize>()
         .map_err(|error: ParseIntError| ResponseError::Send(error.to_string()))?;
-    let mut headers: ProtocolHeaders = http::HeaderMap::new();
+    let mut headers: ProtocolHeaders = HeaderMap::new();
     for line in lines {
         let line: &str = line.trim_end_matches(LF_CHAR);
         if line.is_empty() {
@@ -327,10 +327,10 @@ pub fn parse_response_head(head: &[u8]) -> Result<(usize, ProtocolHeaders), Resp
         if name.is_empty() {
             return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
         }
-        let Ok(header_name) = http::HeaderName::from_bytes(name.as_bytes()) else {
+        let Ok(header_name) = HeaderName::from_bytes(name.as_bytes()) else {
             return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
         };
-        let Ok(header_value) = http::HeaderValue::from_bytes(value.trim().as_bytes()) else {
+        let Ok(header_value) = HeaderValue::from_bytes(value.trim().as_bytes()) else {
             return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
         };
         headers.append(header_name, header_value);

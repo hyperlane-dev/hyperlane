@@ -28,7 +28,7 @@ pub(crate) fn try_send_macro(
     inject(
         position,
         item,
-        |context: &syn::Ident, stream: &syn::Ident| match data_expr {
+        |context: &Ident, stream: &Ident| match data_expr {
             Some(expr) => {
                 quote! {
                     let _: ::std::result::Result<(), ::hyperlane::ResponseError> = #stream.try_send(#expr).await;
@@ -67,7 +67,7 @@ pub(crate) fn send_macro(attr: TokenStream, item: TokenStream, position: Positio
     inject(
         position,
         item,
-        |context: &syn::Ident, stream: &syn::Ident| match data_expr {
+        |context: &Ident, stream: &Ident| match data_expr {
             Some(expr) => {
                 quote! {
                     #stream.send(#expr).await;

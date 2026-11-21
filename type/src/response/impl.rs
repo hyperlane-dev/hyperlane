@@ -373,7 +373,7 @@ impl Response {
     where
         T: DeserializeOwned,
     {
-        serde_json::from_slice(self.get_body())
+        from_slice(self.get_body())
     }
 
     /// Deserializes the body content of the response as_ref a specified type `T`.

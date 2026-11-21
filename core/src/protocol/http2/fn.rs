@@ -94,7 +94,7 @@ pub(crate) async fn h2_request_task(
     let H2RequestEnv { shared, peers } = env;
     let server: &Server = &shared.server;
     let request_config: RequestConfig = shared.request_config;
-    let (parts, mut recv_stream): (http::request::Parts, H2RecvStream) = request.into_parts();
+    let (parts, mut recv_stream): (Parts, H2RecvStream) = request.into_parts();
     let mut ctx: Context = take_pooled_context();
     let mut body: Vec<u8> = mem::take(ctx.get_mut_request().get_mut_body());
     body.clear();

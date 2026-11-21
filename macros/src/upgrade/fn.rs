@@ -4,18 +4,17 @@ use super::*;
 ///
 /// # Arguments
 ///
-/// - `&proc_macro2::Ident` - The protocol upgrade type identifier as an ident.
+/// - `&Ident` - The protocol upgrade type identifier as an ident.
 ///
 /// # Returns
 ///
 /// Returns a closure that generates the protocol check code.
 pub(crate) fn create_protocol_check(
-    upgrade_type: &proc_macro2::Ident,
+    upgrade_type: &Ident,
 ) -> impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream {
     let upgrade_type_str: String = upgrade_type.to_string();
     move |context: &Ident, _: &Ident| {
-        let check_fn: proc_macro2::Ident =
-            Ident::new(&format!("is_{upgrade_type_str}"), context.span());
+        let check_fn: Ident = Ident::new(&format!("is_{upgrade_type_str}"), context.span());
         quote! {
             if !#context.get_request().get_upgrade_type().#check_fn() {
                 return ::hyperlane::Status::Continue;

@@ -1,7 +1,7 @@
 use super::*;
 
 /// The response or request headers in their protocol representation.
-pub(crate) type ProtocolHeaders = http::HeaderMap;
+pub(crate) type ProtocolHeaders = HeaderMap;
 
 /// The HTTP/2 connection half shared by every request stream of one connection.
 pub(crate) type ConnectionH2<T> = h2::server::Connection<T, Bytes>;

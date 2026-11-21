@@ -4,13 +4,13 @@ use super::*;
 ///
 /// # Arguments
 ///
-/// - `&proc_macro2::Ident` - The HTTP version identifier as an ident.
+/// - `&Ident` - The HTTP version identifier as an ident.
 ///
 /// # Returns
 ///
 /// Returns a closure that generates the version check code.
 pub(crate) fn create_version_check(
-    version: &proc_macro2::Ident,
+    version: &Ident,
 ) -> impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream {
     let version_str: String = version.to_string();
     move |context: &Ident, _: &Ident| {

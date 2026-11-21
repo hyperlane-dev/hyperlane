@@ -211,7 +211,7 @@ impl RequestConfig {
     where
         C: AsRef<str>,
     {
-        serde_json::from_str(json.as_ref())
+        from_str(json.as_ref())
     }
 
     /// Creates a new `RequestConfig` with low-security settings.
@@ -1778,7 +1778,7 @@ impl Request {
     where
         T: DeserializeOwned,
     {
-        serde_json::from_slice(self.get_body())
+        from_slice(self.get_body())
     }
 
     /// Deserializes the body content of the request as_ref a specified type `T`.

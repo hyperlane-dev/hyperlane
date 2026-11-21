@@ -607,7 +607,7 @@ pub(crate) async fn try_serve_uring_tcp(
         Err(_) => return Ok(()),
     };
     let listener_fd: RawFd = std_listener.as_raw_fd();
-    let tokio_handle: Handle = tokio::runtime::Handle::current();
+    let tokio_handle: Handle = Handle::current();
     let worker_count: usize = tokio_handle.metrics().num_workers().clamp(1, 64);
     let accept_slot_count: usize = if worker_count > 1 {
         URING_MULTI_WORKER_ACCEPT_SLOTS

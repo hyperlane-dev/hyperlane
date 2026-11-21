@@ -11,7 +11,7 @@ use super::*;
 ///
 /// # Returns
 ///
-/// - `syn::Result<MultiHostData>` - Parsed MultiHostData or error.
+/// - `Result<MultiHostData>` - Parsed MultiHostData or error.
 impl Parse for MultiHostData {
     /// Parses the input token stream into a MultiHostData structure.
     ///
@@ -21,8 +21,8 @@ impl Parse for MultiHostData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed MultiHostData, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed MultiHostData, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut host_values: Vec<Expr> = Vec::new();
         loop {
             let host_value: Expr = input.parse()?;

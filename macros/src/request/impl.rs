@@ -10,7 +10,7 @@ use super::*;
 ///
 /// # Returns
 ///
-/// - `syn::Result<RequestMethods>` - Parsed RequestMethods or error.
+/// - `Result<RequestMethods>` - Parsed RequestMethods or error.
 impl Parse for RequestMethods {
     /// Parses the input token stream into a RequestMethods structure.
     ///
@@ -20,8 +20,8 @@ impl Parse for RequestMethods {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed RequestMethods, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed RequestMethods, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         Ok(RequestMethods {
             methods: Punctuated::parse_separated_nonempty(input)?,
         })
@@ -39,7 +39,7 @@ impl Parse for RequestMethods {
 ///
 /// # Returns
 ///
-/// - `syn::Result<MultiRequestBodyData>` - Parsed MultiRequestBodyData or error.
+/// - `Result<MultiRequestBodyData>` - Parsed MultiRequestBodyData or error.
 impl Parse for MultiRequestBodyData {
     /// Parses the input token stream into a MultiRequestBodyData structure.
     ///
@@ -49,8 +49,8 @@ impl Parse for MultiRequestBodyData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed MultiRequestBodyData, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed MultiRequestBodyData, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -78,7 +78,7 @@ impl Parse for MultiRequestBodyData {
 ///
 /// # Returns
 ///
-/// - `syn::Result<MultiRequestBodyJsonData>` - Parsed MultiRequestBodyJsonData or error.
+/// - `Result<MultiRequestBodyJsonData>` - Parsed MultiRequestBodyJsonData or error.
 impl Parse for MultiRequestBodyJsonData {
     /// Parses the input token stream into a MultiRequestBodyJsonData structure.
     ///
@@ -88,8 +88,8 @@ impl Parse for MultiRequestBodyJsonData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed MultiRequestBodyJsonData, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed MultiRequestBodyJsonData, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut params: Vec<(Ident, Type)> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -119,7 +119,7 @@ impl Parse for MultiRequestBodyJsonData {
 ///
 /// # Returns
 ///
-/// - `syn::Result<MultiAttributeData>` - Parsed MultiAttributeData or error.
+/// - `Result<MultiAttributeData>` - Parsed MultiAttributeData or error.
 impl Parse for MultiAttributeData {
     /// Parses the input token stream into a MultiAttributeData structure.
     ///
@@ -129,8 +129,8 @@ impl Parse for MultiAttributeData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed MultiAttributeData, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed MultiAttributeData, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut params: Vec<(Expr, Ident, Type)> = Vec::new();
         loop {
             let key_name: Expr = input.parse()?;
@@ -162,7 +162,7 @@ impl Parse for MultiAttributeData {
 ///
 /// # Returns
 ///
-/// - `syn::Result<MultiAttributesData>` - Parsed MultiAttributesData or error.
+/// - `Result<MultiAttributesData>` - Parsed MultiAttributesData or error.
 impl Parse for MultiAttributesData {
     /// Parses the input token stream into a MultiAttributesData structure.
     ///
@@ -172,8 +172,8 @@ impl Parse for MultiAttributesData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed MultiAttributesData, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed MultiAttributesData, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -201,7 +201,7 @@ impl Parse for MultiAttributesData {
 ///
 /// # Returns
 ///
-/// - `syn::Result<MultiRouteParamData>` - Parsed MultiRouteParamData or error.
+/// - `Result<MultiRouteParamData>` - Parsed MultiRouteParamData or error.
 impl Parse for MultiRouteParamData {
     /// Parses the input token stream into a MultiRouteParamData structure.
     ///
@@ -211,8 +211,8 @@ impl Parse for MultiRouteParamData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed MultiRouteParamData, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed MultiRouteParamData, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut params: Vec<(Expr, Ident)> = Vec::new();
         loop {
             let key_name: Expr = input.parse()?;
@@ -242,7 +242,7 @@ impl Parse for MultiRouteParamData {
 ///
 /// # Returns
 ///
-/// - `syn::Result<MultiRouteParamsData>` - Parsed MultiRouteParamsData or error.
+/// - `Result<MultiRouteParamsData>` - Parsed MultiRouteParamsData or error.
 impl Parse for MultiRouteParamsData {
     /// Parses the input token stream into a MultiRouteParamsData structure.
     ///
@@ -252,8 +252,8 @@ impl Parse for MultiRouteParamsData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed MultiRouteParamsData, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed MultiRouteParamsData, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -281,7 +281,7 @@ impl Parse for MultiRouteParamsData {
 ///
 /// # Returns
 ///
-/// - `syn::Result<MultiQueryData>` - Parsed MultiQueryData or error.
+/// - `Result<MultiQueryData>` - Parsed MultiQueryData or error.
 impl Parse for MultiQueryData {
     /// Parses the input token stream into a MultiQueryData structure.
     ///
@@ -291,8 +291,8 @@ impl Parse for MultiQueryData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed MultiQueryData, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed MultiQueryData, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut params: Vec<(Expr, Ident)> = Vec::new();
         loop {
             let key_name: Expr = input.parse()?;
@@ -322,7 +322,7 @@ impl Parse for MultiQueryData {
 ///
 /// # Returns
 ///
-/// - `syn::Result<MultiQuerysData>` - Parsed MultiQuerysData or error.
+/// - `Result<MultiQuerysData>` - Parsed MultiQuerysData or error.
 impl Parse for MultiQuerysData {
     /// Parses the input token stream into a MultiQuerysData structure.
     ///
@@ -332,8 +332,8 @@ impl Parse for MultiQuerysData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed MultiQuerysData, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed MultiQuerysData, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -361,7 +361,7 @@ impl Parse for MultiQuerysData {
 ///
 /// # Returns
 ///
-/// - `syn::Result<MultiHeaderData>` - Parsed MultiHeaderData or error.
+/// - `Result<MultiHeaderData>` - Parsed MultiHeaderData or error.
 impl Parse for MultiHeaderData {
     /// Parses the input token stream into a MultiHeaderData structure.
     ///
@@ -371,8 +371,8 @@ impl Parse for MultiHeaderData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed MultiHeaderData, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed MultiHeaderData, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut params: Vec<(Expr, Ident)> = Vec::new();
         loop {
             let key_name: Expr = input.parse()?;
@@ -402,7 +402,7 @@ impl Parse for MultiHeaderData {
 ///
 /// # Returns
 ///
-/// - `syn::Result<MultiHeadersData>` - Parsed MultiHeadersData or error.
+/// - `Result<MultiHeadersData>` - Parsed MultiHeadersData or error.
 impl Parse for MultiHeadersData {
     /// Parses the input token stream into a MultiHeadersData structure.
     ///
@@ -412,8 +412,8 @@ impl Parse for MultiHeadersData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed MultiHeadersData, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed MultiHeadersData, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -441,7 +441,7 @@ impl Parse for MultiHeadersData {
 ///
 /// # Returns
 ///
-/// - `syn::Result<MultiCookieData>` - Parsed MultiCookieData or error.
+/// - `Result<MultiCookieData>` - Parsed MultiCookieData or error.
 impl Parse for MultiCookieData {
     /// Parses the input token stream into a MultiCookieData structure.
     ///
@@ -451,8 +451,8 @@ impl Parse for MultiCookieData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed MultiCookieData, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed MultiCookieData, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut params: Vec<(Expr, Ident)> = Vec::new();
         loop {
             let key_name: Expr = input.parse()?;
@@ -482,7 +482,7 @@ impl Parse for MultiCookieData {
 ///
 /// # Returns
 ///
-/// - `syn::Result<MultiCookiesData>` - Parsed MultiCookiesData or error.
+/// - `Result<MultiCookiesData>` - Parsed MultiCookiesData or error.
 impl Parse for MultiCookiesData {
     /// Parses the input token stream into a MultiCookiesData structure.
     ///
@@ -492,8 +492,8 @@ impl Parse for MultiCookiesData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed MultiCookiesData, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed MultiCookiesData, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -521,7 +521,7 @@ impl Parse for MultiCookiesData {
 ///
 /// # Returns
 ///
-/// - `syn::Result<MultiRequestVersionData>` - Parsed MultiRequestVersionData or error.
+/// - `Result<MultiRequestVersionData>` - Parsed MultiRequestVersionData or error.
 impl Parse for MultiRequestVersionData {
     /// Parses the input token stream into a MultiRequestVersionData structure.
     ///
@@ -531,8 +531,8 @@ impl Parse for MultiRequestVersionData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed MultiRequestVersionData, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed MultiRequestVersionData, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -560,7 +560,7 @@ impl Parse for MultiRequestVersionData {
 ///
 /// # Returns
 ///
-/// - `syn::Result<MultiRequestPathData>` - Parsed MultiRequestPathData or error.
+/// - `Result<MultiRequestPathData>` - Parsed MultiRequestPathData or error.
 impl Parse for MultiRequestPathData {
     /// Parses the input token stream into a MultiRequestPathData structure.
     ///
@@ -570,8 +570,8 @@ impl Parse for MultiRequestPathData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed MultiRequestPathData, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed MultiRequestPathData, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -599,7 +599,7 @@ impl Parse for MultiRequestPathData {
 ///
 /// # Returns
 ///
-/// - `syn::Result<MultiPanicData>` - Parsed MultiPanicData or error.
+/// - `Result<MultiPanicData>` - Parsed MultiPanicData or error.
 impl Parse for MultiPanicData {
     /// Parses the input token stream into a MultiPanicData structure.
     ///
@@ -609,8 +609,8 @@ impl Parse for MultiPanicData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed MultiPanicData, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed MultiPanicData, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -638,7 +638,7 @@ impl Parse for MultiPanicData {
 ///
 /// # Returns
 ///
-/// - `syn::Result<MultiRequestErrorData>` - Parsed MultiRequestErrorData or error.
+/// - `Result<MultiRequestErrorData>` - Parsed MultiRequestErrorData or error.
 impl Parse for MultiRequestErrorData {
     /// Parses the input token stream into a MultiRequestErrorData structure.
     ///
@@ -648,8 +648,8 @@ impl Parse for MultiRequestErrorData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed MultiRequestErrorData, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed MultiRequestErrorData, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;

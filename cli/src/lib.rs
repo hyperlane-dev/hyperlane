@@ -25,14 +25,18 @@ pub(crate) use std::{
 };
 
 pub(crate) use {
-    log::SetLoggerError,
+    log::{
+        Level, LevelFilter, Metadata, Record, SetLoggerError, max_level, set_logger, set_max_level,
+    },
     lombok_macros::*,
-    notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher, recommended_watcher},
+    notify::{
+        Error, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher, recommended_watcher,
+    },
     std::ffi::OsStr,
     tokio::{
         fs::{create_dir_all, write},
         process::Command,
-        sync::watch::{Receiver, Sender, channel},
+        sync::watch::{Receiver, Sender, channel, error::SendError},
         time::{Duration, Interval, interval, sleep},
     },
 };

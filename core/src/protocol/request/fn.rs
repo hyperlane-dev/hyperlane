@@ -25,7 +25,7 @@ pub(crate) fn fill_protocol_request(
         parts,
         body,
     } = head;
-    let uri: &http::Uri = &parts.uri;
+    let uri: &Uri = &parts.uri;
     write_request_target(uri.path(), uri.query(), target);
     let max_path_size: usize = config.get_max_path_size();
     if target.len() > max_path_size && max_path_size != DEFAULT_LOW_SECURITY_MAX_PATH_SIZE {
@@ -121,23 +121,20 @@ pub(crate) fn write_request_target(path: &str, query: Option<&str>, target: &mut
 /// # Arguments
 ///
 /// - `&ProtocolHeaders` - The protocol request headers.
-/// - `&http::Uri` - The request target, carrying the authority.
+/// - `&Uri` - The request target, carrying the authority.
 ///
 /// # Returns
 ///
 /// - `Result<(), RequestError>` - `Ok(())` when the authority is unambiguous, or
 ///   `RequestError::InvalidUrlHost` when it is not.
-pub fn check_request_authority(
-    headers: &ProtocolHeaders,
-    uri: &http::Uri,
-) -> Result<(), RequestError> {
+pub fn check_request_authority(headers: &ProtocolHeaders, uri: &Uri) -> Result<(), RequestError> {
     let host_count: usize = headers.get_all(HOST).iter().count();
     if host_count > 1 {
         return Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest));
     }
     let authority: Option<&str> = uri
         .authority()
-        .map(|authority: &http::uri::Authority| authority.as_str());
+        .map(|authority: &Authority| authority.as_str());
     let host: Option<&str> = match headers.get(HOST) {
         Some(value) => match value.to_str() {
             Ok(value) => Some(value),

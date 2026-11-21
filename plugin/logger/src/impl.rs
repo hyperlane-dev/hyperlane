@@ -1,5 +1,6 @@
 use super::*;
 
+/// Default construction for [`LoggerConfig`].
 impl Default for LoggerConfig {
     /// Builds the configuration the logger uses when none is given.
     ///
@@ -14,17 +15,18 @@ impl Default for LoggerConfig {
     }
 }
 
+/// Implements `impl log::Log for LoggerPlugin`.
 impl log::Log for LoggerPlugin {
     /// Reports whether the level is written.
     ///
     /// # Arguments
     ///
-    /// - `&log::Metadata<'_>` - The metadata of the record.
+    /// - `&Metadata<'_>` - The metadata of the record.
     ///
     /// # Returns
     ///
     /// - `bool` - Whether the record is written.
-    fn enabled(&self, _: &log::Metadata<'_>) -> bool {
+    fn enabled(&self, _: &Metadata<'_>) -> bool {
         true
     }
 
@@ -32,8 +34,8 @@ impl log::Log for LoggerPlugin {
     ///
     /// # Arguments
     ///
-    /// - `&log::Record<'_>` - The record to write.
-    fn log(&self, record: &log::Record<'_>) {
+    /// - `&Record<'_>` - The record to write.
+    fn log(&self, record: &Record<'_>) {
         let line: String = format!("{} {}", record.level(), record.args());
         if let Some(file) = FILE.get()
             && let Ok(mut file) = file.lock()
@@ -55,6 +57,7 @@ impl log::Log for LoggerPlugin {
     }
 }
 
+/// Inherent implementation of [`LoggerPlugin`].
 impl LoggerPlugin {
     /// Installs the logger.
     ///
@@ -78,9 +81,9 @@ impl LoggerPlugin {
             .map_err(|_: LoggerConfig| "the logger configuration was already set".to_owned())?;
         FILE.set(Mutex::new(file))
             .map_err(|_: Mutex<Option<File>>| "the log file was already set".to_owned())?;
-        log::set_logger(&LoggerPlugin)
-            .map_err(|_: log::SetLoggerError| "a logger was already installed".to_owned())?;
-        log::set_max_level(
+        set_logger(&LoggerPlugin)
+            .map_err(|_: SetLoggerError| "a logger was already installed".to_owned())?;
+        set_max_level(
             CONFIG
                 .get()
                 .map(|config: &LoggerConfig| config.level)
@@ -159,6 +162,7 @@ impl LoggerPlugin {
     }
 }
 
+/// Implements [`ServerHook`] for [`RequestLogger`].
 impl ServerHook for RequestLogger {
     /// Builds the middleware.
     ///
@@ -194,6 +198,7 @@ impl ServerHook for RequestLogger {
     }
 }
 
+/// Implements [`ServerHook`] for [`ResponseLogger`].
 impl ServerHook for ResponseLogger {
     /// Builds the middleware.
     ///

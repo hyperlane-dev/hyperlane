@@ -18,7 +18,7 @@ pub(crate) fn host_macro(attr: TokenStream, item: TokenStream, position: Positio
         let statements: Vec<proc_macro2::TokenStream> = multi_host
             .host_values
             .iter()
-            .map(|host_value: &syn::Expr| {
+            .map(|host_value: &Expr| {
                 quote! {
                     if #context.get_request().get_host() != #host_value {
                         return ::hyperlane::Status::Continue;
@@ -54,7 +54,7 @@ pub(crate) fn reject_host_macro(
         let statements: Vec<proc_macro2::TokenStream> = multi_host
             .host_values
             .iter()
-            .map(|host_value: &syn::Expr| {
+            .map(|host_value: &Expr| {
                 quote! {
                     if #context.get_request().get_host() == #host_value {
                         return ::hyperlane::Status::Continue;

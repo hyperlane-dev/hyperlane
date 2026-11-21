@@ -74,8 +74,10 @@ use std::{
 
 use {
     core::hash::BuildHasherDefault,
+    hex::encode,
     lombok_macros::*,
     serde::{Deserialize, Serialize, de::DeserializeOwned},
+    serde_json::{from_slice, from_str},
     tokio::{
         io::{
             AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt,

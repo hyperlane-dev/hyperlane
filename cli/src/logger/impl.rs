@@ -6,26 +6,26 @@ impl log::Log for Logger {
     ///
     /// # Arguments
     ///
-    /// - `&log::Metadata` - The metadata of the log record.
+    /// - `&Metadata` - The metadata of the log record.
     ///
     /// # Returns
     ///
     /// - `bool` - Whether the record's level is within the maximum log level.
-    fn enabled(&self, metadata: &log::Metadata) -> bool {
-        metadata.level() <= log::max_level()
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        metadata.level() <= max_level()
     }
 
     /// Logs a record with colored console output.
     ///
     /// # Arguments
     ///
-    /// - `&log::Record` - The log record to output.
-    fn log(&self, record: &log::Record) {
+    /// - `&Record` - The log record to output.
+    fn log(&self, record: &Record) {
         if !self.enabled(record.metadata()) {
             return;
         }
-        let now_time: String = color_output::time();
-        let level: log::Level = record.level();
+        let now_time: String = time();
+        let level: Level = record.level();
         let args: &Arguments<'_> = record.args();
         let file: Option<&str> = record.file();
         let module_path: Option<&str> = record.module_path();
@@ -37,11 +37,11 @@ impl log::Log for Logger {
         let args_text: String = format!("{args}{LOG_SPACE}");
         let location_text: String = format!("{LOG_SPACE}{location}{LOG_COLON}{line}{LOG_SPACE}");
         let color: ColorType = match record.level() {
-            log::Level::Trace => ColorType::Use(Color::Magenta),
-            log::Level::Debug => ColorType::Use(Color::Cyan),
-            log::Level::Info => ColorType::Use(Color::Green),
-            log::Level::Warn => ColorType::Use(Color::Yellow),
-            log::Level::Error => ColorType::Use(Color::Red),
+            Level::Trace => ColorType::Use(Color::Magenta),
+            Level::Debug => ColorType::Use(Color::Cyan),
+            Level::Info => ColorType::Use(Color::Green),
+            Level::Warn => ColorType::Use(Color::Yellow),
+            Level::Error => ColorType::Use(Color::Red),
         };
         let mut time_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
         let mut level_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
@@ -88,9 +88,9 @@ impl Logger {
     ///
     /// # Arguments
     ///
-    /// - `log::LevelFilter` - The maximum log level to enable.
-    pub fn init(level_filter: log::LevelFilter) {
-        let _: Result<(), SetLoggerError> = log::set_logger(&LOGGER);
-        log::set_max_level(level_filter);
+    /// - `LevelFilter` - The maximum log level to enable.
+    pub fn init(level_filter: LevelFilter) {
+        let _: Result<(), SetLoggerError> = set_logger(&LOGGER);
+        set_max_level(level_filter);
     }
 }

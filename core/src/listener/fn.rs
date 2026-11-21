@@ -173,7 +173,7 @@ pub(crate) async fn tcp_accept_all(
             Err(remaining) => listeners = remaining,
         }
     }
-    let workers: usize = tokio::runtime::Handle::current().metrics().num_workers();
+    let workers: usize = Handle::current().metrics().num_workers();
     if listeners.len() == 1 && workers <= 1 {
         let listener: Arc<TcpListener> = Arc::new(listeners.remove(0));
         tcp_accept_loop(env, listener, shutdown_receiver).await;
@@ -363,7 +363,7 @@ pub(crate) fn negotiated_quic_protocol_matches(connection: &quinn::Connection) -
     let Some(handshake) = connection.handshake_data() else {
         return false;
     };
-    match handshake.downcast::<quinn::crypto::rustls::HandshakeData>() {
+    match handshake.downcast::<HandshakeData>() {
         Ok(data) => data.protocol.as_deref() == Some(ServerProtocol::Http3.get_alpn_protocol()),
         Err(_) => false,
     }
@@ -382,12 +382,12 @@ pub(crate) fn negotiated_quic_protocol_matches(connection: &quinn::Connection) -
 ///
 /// # Returns
 ///
-/// - `Result<T, tokio::time::error::Elapsed>` - The handshake result, or
+/// - `Result<T, Elapsed>` - The handshake result, or
 ///   the elapsed that stopped it.
 pub(crate) async fn bounded_handshake<F, T>(
     request_config: RequestConfig,
     handshake: F,
-) -> Result<T, tokio::time::error::Elapsed>
+) -> Result<T, Elapsed>
 where
     F: Future<Output = T>,
 {
@@ -541,7 +541,7 @@ pub(crate) async fn serve_h1_transport(env: ConnectionEnv, transport: TlsTranspo
     let request_config: RequestConfig = env.shared.request_config;
     let mut stream: Stream = Stream::from_transport(transport, request_config, false);
     serve_h1_stream(env, &mut stream).await;
-    let closed: Result<Result<(), io::Error>, tokio::time::error::Elapsed> =
+    let closed: Result<Result<(), io::Error>, Elapsed> =
         bounded_handshake(request_config, stream.get_mut_stream().shutdown()).await;
     match closed {
         Ok(Ok(())) => {}

@@ -73,7 +73,7 @@ where
                 };
                 let normalized_leading: Vec<proc_macro2::TokenStream> = leading_stmts
                     .iter()
-                    .map(|stmt: &syn::Stmt| match stmt {
+                    .map(|stmt: &Stmt| match stmt {
                         Stmt::Expr(expr, None) => quote! { #expr; },
                         _ => quote! { #stmt },
                     })
@@ -141,7 +141,7 @@ fn is_context_type(ty: &Type) -> bool {
     {
         let path: &Path = &type_path.path;
         if path.segments.len() >= 2 {
-            let segments: Vec<&syn::PathSegment> = path.segments.iter().collect();
+            let segments: Vec<&PathSegment> = path.segments.iter().collect();
             if segments.len() >= 2 {
                 let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
                 if last_two[0].ident == HYPERLANE_CRATE_NAME
@@ -175,7 +175,7 @@ fn is_stream_type(ty: &Type) -> bool {
     {
         let path: &Path = &type_path.path;
         if path.segments.len() >= 2 {
-            let segments: Vec<&syn::PathSegment> = path.segments.iter().collect();
+            let segments: Vec<&PathSegment> = path.segments.iter().collect();
             if segments.len() >= 2 {
                 let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
                 if last_two[0].ident == HYPERLANE_CRATE_NAME
@@ -207,8 +207,8 @@ fn is_stream_type(ty: &Type) -> bool {
 ///
 /// # Returns
 ///
-/// - `syn::Result<Ident>` - Returns the context identifier or an error.
-pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<Ident> {
+/// - `Result<Ident>` - Returns the context identifier or an error.
+pub(crate) fn parse_context_from_signature(sig: &Signature) -> Result<Ident> {
     for arg in sig.inputs.iter() {
         if let FnArg::Typed(pat_type) = arg
             && is_context_type(&pat_type.ty)
@@ -217,7 +217,7 @@ pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<Ident
                 Pat::Ident(pat_ident) => pat_ident.ident.clone(),
                 Pat::Wild(_) => Ident::new("_", Span::call_site()),
                 _ => {
-                    return Err(syn::Error::new_spanned(
+                    return Err(Error::new_spanned(
                         &pat_type.pat,
                         EXPECTED_IDENTIFIER_FOR_CONTEXT_PARAMETER,
                     ));
@@ -226,10 +226,7 @@ pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<Ident
             return Ok(ident);
         }
     }
-    Err(syn::Error::new_spanned(
-        &sig.inputs,
-        EXPECTED_CONTEXT_PARAMETER,
-    ))
+    Err(Error::new_spanned(&sig.inputs, EXPECTED_CONTEXT_PARAMETER))
 }
 
 /// Parses stream identifier from function signature by searching all parameters.
@@ -247,8 +244,8 @@ pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<Ident
 ///
 /// # Returns
 ///
-/// - `syn::Result<Ident>` - Returns the stream identifier or an error.
-pub(crate) fn parse_stream_from_signature(sig: &Signature) -> syn::Result<Ident> {
+/// - `Result<Ident>` - Returns the stream identifier or an error.
+pub(crate) fn parse_stream_from_signature(sig: &Signature) -> Result<Ident> {
     for arg in sig.inputs.iter() {
         if let FnArg::Typed(pat_type) = arg
             && is_stream_type(&pat_type.ty)
@@ -257,7 +254,7 @@ pub(crate) fn parse_stream_from_signature(sig: &Signature) -> syn::Result<Ident>
                 Pat::Ident(pat_ident) => pat_ident.ident.clone(),
                 Pat::Wild(_) => Ident::new("_", Span::call_site()),
                 _ => {
-                    return Err(syn::Error::new_spanned(
+                    return Err(Error::new_spanned(
                         &pat_type.pat,
                         EXPECTED_IDENTIFIER_FOR_STREAM_PARAMETER,
                     ));
@@ -266,10 +263,7 @@ pub(crate) fn parse_stream_from_signature(sig: &Signature) -> syn::Result<Ident>
             return Ok(ident);
         }
     }
-    Err(syn::Error::new_spanned(
-        &sig.inputs,
-        EXPECTED_STREAM_PARAMETER,
-    ))
+    Err(Error::new_spanned(&sig.inputs, EXPECTED_STREAM_PARAMETER))
 }
 
 /// Convert an optional expression into an `Option<isize>` token stream.

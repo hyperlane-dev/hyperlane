@@ -544,7 +544,7 @@ impl RoutePattern {
                         }
                     };
                     {
-                        let mat: regex::Match<'_> = regex.find(&segment_value)?;
+                        let mat: Match<'_> = regex.find(&segment_value)?;
                         if mat.start() != 0 || mat.end() != segment_value.len() {
                             return None;
                         }

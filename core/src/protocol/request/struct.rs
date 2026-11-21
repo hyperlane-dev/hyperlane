@@ -20,7 +20,7 @@ pub(crate) struct ProtocolRequestHead {
     /// The request method decoded by the protocol library.
     pub(crate) method: ProtocolMethod,
     /// The decoded request head, carrying the URI and the headers.
-    pub(crate) parts: http::request::Parts,
+    pub(crate) parts: Parts,
     /// The already collected request body.
     pub(crate) body: Vec<u8>,
 }

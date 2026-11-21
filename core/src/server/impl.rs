@@ -707,12 +707,9 @@ impl Server {
                 let Some(config) = tls_config.clone() else {
                     return Err(Box::new(ServerError::MissingTlsForHttp3));
                 };
-                let quic_config: Arc<quinn::crypto::rustls::QuicServerConfig> = Arc::new(
-                    quinn::crypto::rustls::QuicServerConfig::try_from(build_quic_tls_config(
-                        &config,
-                    )?)
-                    .map_err(
-                        |error: quinn::crypto::rustls::NoInitialCipherSuite| {
+                let quic_config: Arc<QuicServerConfig> = Arc::new(
+                    QuicServerConfig::try_from(build_quic_tls_config(&config)?).map_err(
+                        |error: NoInitialCipherSuite| {
                             Box::new(ServerError::Tls(format!(
                                 "no compatible cipher suite for quic: {}",
                                 error
@@ -765,16 +762,14 @@ impl Server {
             let mut running_receiver_clone: Receiver<bool> = running_receiver.clone();
             Box::pin(async move {
                 while !*running_receiver_clone.borrow_and_update() {
-                    let _: Result<(), tokio::sync::watch::error::RecvError> =
-                        running_receiver_clone.changed().await;
+                    let _: Result<(), RecvError> = running_receiver_clone.changed().await;
                 }
             })
         });
         let shutdown_hook: ServerControlHookHandler<()> = Arc::new(move || {
             let shutdown_sender_clone: Sender<()> = shutdown_sender.clone();
             Box::pin(async move {
-                let _: Result<(), tokio::sync::watch::error::SendError<()>> =
-                    shutdown_sender_clone.send(());
+                let _: Result<(), SendError<()>> = shutdown_sender_clone.send(());
             })
         });
         let mut server_control_hook: ServerControlHook = ServerControlHook::default();

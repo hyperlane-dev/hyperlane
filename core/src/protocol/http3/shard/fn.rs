@@ -196,7 +196,7 @@ pub(crate) fn create_quic_endpoint_set(
     quic_config: Arc<QuicServerConfig>,
     bind_addr: SocketAddr,
 ) -> Result<QuicEndpointSet, Box<ServerError>> {
-    let workers: usize = tokio::runtime::Handle::current().metrics().num_workers();
+    let workers: usize = Handle::current().metrics().num_workers();
     if workers <= 1 {
         let domain: Domain = if bind_addr.is_ipv6() {
             Domain::IPV6

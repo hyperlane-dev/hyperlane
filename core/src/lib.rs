@@ -58,9 +58,13 @@ use std::{
 use {
     bytes::Bytes,
     futures::{FutureExt, StreamExt, stream::FuturesUnordered},
-    h2::server::{Builder, SendResponse},
+    h2::{
+        Reason,
+        server::{Builder, SendResponse},
+    },
     http::{
-        HeaderName, HeaderValue, StatusCode, Uri,
+        HeaderMap, HeaderName, HeaderValue, StatusCode, Uri,
+        request::Parts,
         status::InvalidStatusCode,
         uri::{Authority, Scheme},
     },
@@ -70,10 +74,10 @@ use {
         self, AsyncUdpSocket, Connection, ConnectionId, ConnectionIdGenerator, Endpoint,
         EndpointConfig, Incoming, RecvStream, Runtime, SendStream, TokioRuntime, UdpPoller, VarInt,
         WriteError,
-        crypto::rustls::QuicServerConfig,
+        crypto::rustls::{HandshakeData, NoInitialCipherSuite, QuicServerConfig},
         udp::{BATCH_SIZE, RecvMeta, Transmit},
     },
-    regex::Regex,
+    regex::{Match, Regex},
     rustls::{
         SupportedCipherSuite,
         crypto::{
@@ -104,11 +108,14 @@ use {
         io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf},
         net::{TcpListener, TcpStream},
         runtime, spawn,
-        sync::watch::{Receiver, Sender, channel, error::SendError},
+        sync::watch::{Receiver, Sender, channel, error::RecvError, error::SendError},
         task::{JoinError, JoinHandle, spawn_blocking},
         time::{error::Elapsed, timeout},
     },
 };
+
+#[cfg(not(target_os = "linux"))]
+use tokio::runtime::Handle;
 
 #[cfg(target_os = "linux")]
 use {

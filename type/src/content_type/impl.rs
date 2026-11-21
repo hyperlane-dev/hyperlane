@@ -102,7 +102,7 @@ impl ContentType {
     where
         T: Serialize + Debug + Clone + Default + Display,
     {
-        hex::encode(data.to_string())
+        encode(data.to_string())
     }
 
     /// Gets formatted body string for content type.
