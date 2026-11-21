@@ -228,9 +228,7 @@ where
         stream.write_all(data),
     )
     .await
-    .map_err(|_: tokio::time::error::Elapsed| {
-        io::Error::new(io::ErrorKind::TimedOut, "socket write timed out")
-    })?
+    .map_err(|_: Elapsed| io::Error::new(io::ErrorKind::TimedOut, "socket write timed out"))?
 }
 
 pub(crate) async fn exchange_on(stream: &mut TcpStream, request: &[u8]) -> Vec<u8> {

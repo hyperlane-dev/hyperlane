@@ -42,7 +42,7 @@ pub(crate) fn route_gate(slot: GateSlot) -> &'static RouteGate {
     }
 }
 
-pub(crate) type GateLease = tokio::sync::MutexGuard<'static, ()>;
+pub(crate) type GateLease = MutexGuard<'static, ()>;
 
 pub(crate) async fn gate_lease(slot: GateSlot) -> GateLease {
     slot_mutex(slot).lock().await

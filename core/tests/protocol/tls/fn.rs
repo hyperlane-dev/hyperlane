@@ -442,10 +442,7 @@ async fn tls_pending_output_is_flushed_before_waiting_for_more_input() {
     let port: u16 = listener.local_addr().unwrap().port();
     let config: Arc<TlsServerConfig> =
         build_stream_tls_config(&trusted_tls_config(), &ServerProtocol::Http1).unwrap();
-    let (ready, waiting): (
-        tokio::sync::oneshot::Sender<usize>,
-        tokio::sync::oneshot::Receiver<usize>,
-    ) = tokio::sync::oneshot::channel();
+    let (ready, waiting): (Sender<usize>, Receiver<usize>) = tokio::sync::oneshot::channel();
     let serving: JoinHandle<()> = spawn(async move {
         let (tcp, _): (TcpStream, SocketAddr) = listener.accept().await.unwrap();
         SockRef::from(&tcp).set_send_buffer_size(4096).unwrap();

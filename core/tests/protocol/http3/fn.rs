@@ -16,11 +16,11 @@ fn quic_client_config(alpn: &[u8]) -> quinn::ClientConfig {
 pub(crate) async fn connect_quic(
     port: u16,
     alpn: &[u8],
-) -> Result<(quinn::Endpoint, quinn::Connection), String> {
+) -> Result<(Endpoint, quinn::Connection), String> {
     let bind: SocketAddr = format!("{LOOPBACK_HOST}:0")
         .parse()
         .map_err(|error: AddrParseError| format!("loopback bind address is invalid: {error}"))?;
-    let mut endpoint: quinn::Endpoint = quinn::Endpoint::client(bind)
+    let mut endpoint: Endpoint = quinn::Endpoint::client(bind)
         .map_err(|error: io::Error| format!("quic endpoint bind failed: {error}"))?;
     endpoint.set_default_client_config(quic_client_config(alpn));
     let address: SocketAddr = format!("{LOOPBACK_HOST}:{port}")
@@ -28,11 +28,11 @@ pub(crate) async fn connect_quic(
         .map_err(|error: AddrParseError| format!("loopback address is invalid: {error}"))?;
     let connecting: Connecting = endpoint
         .connect(address, TLS_SERVER_NAME)
-        .map_err(|error: quinn::ConnectError| format!("quic connect failed: {error}"))?;
+        .map_err(|error: ConnectError| format!("quic connect failed: {error}"))?;
     let connection: quinn::Connection =
         timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS), connecting)
             .await
-            .map_err(|_: tokio::time::error::Elapsed| "quic connect timed out".to_string())?
+            .map_err(|_: Elapsed| "quic connect timed out".to_string())?
             .map_err(|error: quinn::ConnectionError| format!("quic connect failed: {error}"))?;
     Ok((endpoint, connection))
 }
@@ -40,7 +40,7 @@ pub(crate) async fn connect_quic(
 fn negotiated_quic_alpn(connection: &quinn::Connection) -> Option<Vec<u8>> {
     let data: Option<Box<dyn Any>> = connection.handshake_data();
     match data {
-        Some(data) => match data.downcast::<quinn::crypto::rustls::HandshakeData>() {
+        Some(data) => match data.downcast::<HandshakeData>() {
             Ok(handshake) => handshake.protocol,
             Err(_) => None,
         },
@@ -54,7 +54,7 @@ pub(crate) async fn h3_request_with_headers(
     target: &str,
     body: &[u8],
 ) -> Result<H3HeadReply, String> {
-    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+    let (_endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await?;
     let alpn: Option<Vec<u8>> = negotiated_quic_alpn(&connection);
     h3_exchange_on(H3Exchange {
@@ -106,10 +106,10 @@ pub(crate) async fn h3_exchange_on(exchange: H3Exchange<'_>) -> Result<H3HeadRep
         stream.recv_response(),
     )
     .await
-    .map_err(|_: tokio::time::error::Elapsed| "h3 response timed out".to_string())?
+    .map_err(|_: Elapsed| "h3 response timed out".to_string())?
     .map_err(|error: h3::error::StreamError| format!("recv_response failed: {error}"))?;
     let status: u16 = response.status().as_u16();
-    let headers: http::HeaderMap = response.headers().clone();
+    let headers: HeaderMap = response.headers().clone();
     let mut collected: Vec<u8> = Vec::new();
     let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
     loop {
@@ -131,10 +131,9 @@ pub(crate) async fn h3_exchange_on(exchange: H3Exchange<'_>) -> Result<H3HeadRep
 }
 
 pub(crate) async fn h3_stream_until(port: u16, target: &str, needle: &str) -> (Vec<u8>, bool) {
-    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
-        connect_quic(port, ALPN_HTTP3)
-            .await
-            .expect("quic connect must succeed");
+    let (_endpoint, connection): (Endpoint, quinn::Connection) = connect_quic(port, ALPN_HTTP3)
+        .await
+        .expect("quic connect must succeed");
     let (mut driver, mut client) = new(h3_quinn::Connection::new(connection.clone()))
         .await
         .expect("h3 handshake must succeed");
@@ -192,7 +191,7 @@ pub(crate) async fn h3_request(
     target: &str,
     body: &[u8],
 ) -> Result<H3Reply, String> {
-    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+    let (_endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await?;
     let alpn: Option<Vec<u8>> = negotiated_quic_alpn(&connection);
     let (mut driver, mut client) = new(h3_quinn::Connection::new(connection.clone()))
@@ -226,7 +225,7 @@ pub(crate) async fn h3_request(
         stream.recv_response(),
     )
     .await
-    .map_err(|_: tokio::time::error::Elapsed| "h3 response timed out".to_string())?
+    .map_err(|_: Elapsed| "h3 response timed out".to_string())?
     .map_err(|error: h3::error::StreamError| format!("recv_response failed: {error}"))?;
     let status: u16 = response.status().as_u16();
     let version: Version = response.version();

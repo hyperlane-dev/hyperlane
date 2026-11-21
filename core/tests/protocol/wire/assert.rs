@@ -97,7 +97,7 @@ async fn http2_strips_every_hop_by_hop_header_but_keeps_end_to_end_ones() {
     let driving: JoinHandle<()> = spawn(async move {
         let _result: Result<(), Error> = connection.await;
     });
-    let (status, headers, body): (u16, http::HeaderMap, Vec<u8>) = h2_request_with_headers(
+    let (status, headers, body): (u16, HeaderMap, Vec<u8>) = h2_request_with_headers(
         &mut sender,
         "GET",
         &format!("http://{TLS_SERVER_NAME}:{port}{HOP_BY_HOP_CLEAN_ROUTE_PATH}"),

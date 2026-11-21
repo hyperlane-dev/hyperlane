@@ -50,14 +50,14 @@ pub(crate) async fn h2_request(
             .send_data(Bytes::copy_from_slice(body), true)
             .map_err(|error: h2::Error| format!("h2 send_data failed: {error}"))?;
     }
-    let response: http::Response<h2::RecvStream> =
+    let response: http::Response<RecvStream> =
         timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response)
             .await
             .map_err(|_| "h2 response timed out".to_string())?
             .map_err(|error: h2::Error| format!("h2 response failed: {error}"))?;
     let status: u16 = response.status().as_u16();
     let version: Version = response.version();
-    let mut received: h2::RecvStream = response.into_body();
+    let mut received: RecvStream = response.into_body();
     let mut collected: Vec<u8> = Vec::new();
     let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
     loop {
@@ -99,14 +99,14 @@ pub(crate) async fn h2_request_with_headers(
             .send_data(Bytes::copy_from_slice(body), true)
             .map_err(|error: h2::Error| format!("h2 send_data failed: {error}"))?;
     }
-    let response: http::Response<h2::RecvStream> =
+    let response: http::Response<RecvStream> =
         timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response)
             .await
             .map_err(|_| "h2 response timed out".to_string())?
             .map_err(|error: h2::Error| format!("h2 response failed: {error}"))?;
     let status: u16 = response.status().as_u16();
-    let headers: http::HeaderMap = response.headers().clone();
-    let mut received: h2::RecvStream = response.into_body();
+    let headers: HeaderMap = response.headers().clone();
+    let mut received: RecvStream = response.into_body();
     let mut collected: Vec<u8> = Vec::new();
     let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
     loop {
@@ -143,12 +143,12 @@ pub(crate) async fn h2_stream_until(port: u16, target: &str, needle: &str) -> (V
     let (response, _send_stream) = sender
         .send_request(request, true)
         .expect("h2 request must be accepted");
-    let response: http::Response<h2::RecvStream> =
+    let response: http::Response<RecvStream> =
         timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response)
             .await
             .expect("h2 response head must arrive")
             .expect("h2 response must not fail");
-    let mut body: h2::RecvStream = response.into_body();
+    let mut body: RecvStream = response.into_body();
     let mut collected: Vec<u8> = Vec::new();
     let mut matched: bool = false;
     let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
@@ -192,14 +192,14 @@ pub(crate) async fn h2_request_with_host_header(
     let (response, _send_stream) = sender
         .send_request(request, true)
         .map_err(|error: h2::Error| format!("h2 send_request failed: {error}"))?;
-    let response: http::Response<h2::RecvStream> =
+    let response: http::Response<RecvStream> =
         match timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response).await {
             Ok(Ok(response)) => response,
             Ok(Err(_error)) => return Ok(None),
             Err(_) => return Err("h2 response timed out".to_string()),
         };
     let status: u16 = response.status().as_u16();
-    let mut received: h2::RecvStream = response.into_body();
+    let mut received: RecvStream = response.into_body();
     let mut collected: Vec<u8> = Vec::new();
     let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
     loop {

@@ -39,7 +39,7 @@ pub(crate) async fn h3_targets_on_one_connection(
     port: u16,
     targets: [&str; 2],
 ) -> Result<Vec<(u16, Version, Vec<u8>)>, String> {
-    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+    let (_endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await?;
     let (mut driver, mut client) = new(h3_quinn::Connection::new(connection.clone()))
         .await
@@ -69,7 +69,7 @@ pub(crate) async fn h3_targets_on_one_connection(
             stream.recv_response(),
         )
         .await
-        .map_err(|_: tokio::time::error::Elapsed| "h3 response timed out".to_string())?
+        .map_err(|_: Elapsed| "h3 response timed out".to_string())?
         .map_err(|error: h3::error::StreamError| format!("recv_response failed: {error}"))?;
         let status: u16 = response.status().as_u16();
         let version: Version = response.version();

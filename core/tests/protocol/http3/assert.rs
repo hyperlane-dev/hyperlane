@@ -6,7 +6,7 @@ async fn http3_rejects_a_second_control_stream_before_the_first_closes() {
         start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
             .await
             .unwrap();
-    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+    let (_endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await.unwrap();
     let mut first: QuicSendStream = connection.open_uni().await.unwrap();
     first.write_all(&[0, 4, 0]).await.unwrap();
@@ -33,7 +33,7 @@ async fn http3_rejects_eof_on_the_peer_control_stream() {
         start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
             .await
             .unwrap();
-    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+    let (_endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await.unwrap();
     let mut stream: QuicSendStream = connection.open_uni().await.unwrap();
     stream.write_all(&[0, 4, 0]).await.unwrap();
@@ -60,7 +60,7 @@ async fn http3_rejects_eof_on_qpack_critical_streams() {
             start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
                 .await
                 .unwrap();
-        let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+        let (_endpoint, connection): (Endpoint, quinn::Connection) =
             connect_quic(port, ALPN_HTTP3).await.unwrap();
         let mut stream: QuicSendStream = connection.open_uni().await.unwrap();
         stream.write_all(&[stream_type]).await.unwrap();
@@ -94,7 +94,7 @@ async fn http3_rejects_missing_or_duplicate_or_invalid_settings_on_control_strea
             start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
                 .await
                 .unwrap();
-        let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+        let (_endpoint, connection): (Endpoint, quinn::Connection) =
             connect_quic(port, ALPN_HTTP3).await.unwrap();
         let mut stream: QuicSendStream = connection.open_uni().await.unwrap();
         stream.write_all(bytes).await.unwrap();
@@ -120,7 +120,7 @@ async fn http3_multi_worker_connection_migration_preserves_session() {
         start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
             .await
             .unwrap();
-    let (endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+    let (endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await.unwrap();
     let (mut driver, mut send_request) = new(h3_quinn::Connection::new(connection)).await.unwrap();
     let drive: JoinHandle<()> = spawn(async move {
@@ -164,7 +164,7 @@ async fn http3_cancelled_backpressured_write_can_be_followed_by_a_smaller_write(
         start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
             .await
             .expect("http3 server must start");
-    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+    let (_endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await.unwrap();
     let (mut driver, mut client) = new(h3_quinn::Connection::new(connection.clone()))
         .await
@@ -207,10 +207,9 @@ async fn http3_over_quic_reports_the_real_local_and_peer_addresses_of_the_connec
         start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
             .await
             .expect("http3 quic server must start");
-    let (endpoint, connection): (quinn::Endpoint, quinn::Connection) =
-        connect_quic(port, ALPN_HTTP3)
-            .await
-            .expect("a quic client must connect");
+    let (endpoint, connection): (Endpoint, quinn::Connection) = connect_quic(port, ALPN_HTTP3)
+        .await
+        .expect("a quic client must connect");
     let client_local: SocketAddr = endpoint
         .local_addr()
         .expect("the client endpoint must report its own udp address");
@@ -393,7 +392,7 @@ async fn http3_over_quic_rejects_a_client_offering_only_h2() {
         start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
             .await
             .expect("http3 quic server must start");
-    let outcome: Result<(quinn::Endpoint, quinn::Connection), String> =
+    let outcome: Result<(Endpoint, quinn::Connection), String> =
         connect_quic(port, ALPN_HTTP2).await;
     assert!(
         outcome.is_err(),
@@ -497,7 +496,7 @@ async fn http3_rejects_data_frame_before_headers_on_request_stream() {
         start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
             .await
             .expect("the HTTP/3 server must start");
-    let (endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+    let (endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await.unwrap();
     let (mut send, _recv): (QuicSendStream, QuicRecvStream) = connection.open_bi().await.unwrap();
     send.write_all(&[0x00, 0x02, b'h', b'i']).await.unwrap();
@@ -522,7 +521,7 @@ async fn http3_rejects_reserved_http2_frame_on_control_stream() {
         start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
             .await
             .expect("the HTTP/3 server must start");
-    let (endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+    let (endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await.unwrap();
     let mut ctrl: QuicSendStream = connection.open_uni().await.unwrap();
     ctrl.write_all(&[0x00, 0x04, 0x00, 0x02, 0x00])
@@ -548,7 +547,7 @@ async fn http3_rejects_data_frame_after_trailing_headers() {
         start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
             .await
             .expect("the HTTP/3 server must start");
-    let (endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+    let (endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await.unwrap();
     let (mut send, _recv): (QuicSendStream, QuicRecvStream) = connection.open_bi().await.unwrap();
     let mut qpack_get: Vec<u8> = vec![0x00, 0x00, 0xd1, 0xd7, 0xc1, 0x50, 9];
@@ -581,7 +580,7 @@ async fn http3_rejects_dynamic_qpack_encoder_instruction_when_capacity_is_zero()
         start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
             .await
             .expect("the HTTP/3 server must start");
-    let (endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+    let (endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await.unwrap();
     let mut encoder: QuicSendStream = connection.open_uni().await.unwrap();
     encoder.write_all(&[0x02, 0x21]).await.unwrap();
@@ -605,7 +604,7 @@ async fn http3_ignores_an_unknown_non_grease_frame_before_request_headers() {
         start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
             .await
             .unwrap();
-    let (endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+    let (endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await.unwrap();
     let (mut send, mut recv): (QuicSendStream, QuicRecvStream) =
         connection.open_bi().await.unwrap();
@@ -640,7 +639,7 @@ async fn http3_rejects_qpack_decoder_insert_count_increment_when_capacity_is_zer
         start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
             .await
             .expect("the HTTP/3 server must start");
-    let (endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+    let (endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await.unwrap();
     let mut decoder: QuicSendStream = connection.open_uni().await.unwrap();
     decoder.write_all(&[0x03, 0x01]).await.unwrap();

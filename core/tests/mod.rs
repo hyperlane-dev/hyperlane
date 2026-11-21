@@ -27,15 +27,18 @@ use std::{
 };
 
 use bytes::{Buf, Bytes};
-use h2::{Error, client::ResponseFuture, client::handshake};
+use h2::{Error, RecvStream, SendStream, client::ResponseFuture, client::handshake};
 use h3::{
     client::RequestStream,
     client::new,
     error::{Code, StreamError},
 };
 use h3_quinn::{BidiStream, OpenStreams};
-use http::Version;
-use quinn::{Connecting, crypto::rustls::QuicClientConfig};
+use http::{HeaderMap, HeaderValue, Uri, Version, request::Builder};
+use quinn::{
+    ConnectError, Connecting, Endpoint, crypto::rustls::HandshakeData,
+    crypto::rustls::QuicClientConfig,
+};
 use rustls::{
     ClientConfig, RootCertStore,
     pki_types::{CertificateDer, InvalidDnsNameError, ServerName, pem::PemObject},
@@ -45,8 +48,12 @@ use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     net::TcpStream,
     spawn,
+    sync::MutexGuard,
     sync::Notify,
+    sync::oneshot::Receiver,
+    sync::oneshot::Sender,
     task::JoinHandle,
+    time::error::Elapsed,
     time::{sleep, timeout},
 };
 use tokio_rustls::{Connect, TlsConnector, client::TlsStream};

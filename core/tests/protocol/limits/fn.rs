@@ -76,7 +76,7 @@ pub(super) fn http1_body_request(payload: &[u8]) -> Vec<u8> {
 
 pub(super) async fn h2_oversized_body_then_get(
     port: u16,
-) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+) -> Result<(u16, HeaderMap, Vec<u8>), String> {
     let (mut sender, connection): (
         h2::client::SendRequest<Bytes>,
         h2::client::Connection<TcpStream, Bytes>,
@@ -103,8 +103,8 @@ pub(super) async fn h2_oversized_body_then_get(
 
 pub(super) async fn h3_oversized_body_then_get(
     port: u16,
-) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
-    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+) -> Result<(u16, HeaderMap, Vec<u8>), String> {
+    let (_endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await?;
     let (mut driver, mut client): (
         h3::client::Connection<h3_quinn::Connection, Bytes>,
@@ -134,14 +134,14 @@ pub(super) async fn expect_exchange(
     content_length: usize,
     upload: Option<&[u8]>,
 ) -> (u16, Vec<u8>) {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         protocol,
         limits_request_config(MAX_BODY_SIZE, DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS),
     )
     .await
     .expect("Expect test server must start");
-    let result: Result<Result<(u16, Vec<u8>), String>, tokio::time::error::Elapsed> =
+    let result: Result<Result<(u16, Vec<u8>), String>, Elapsed> =
         timeout(Duration::from_secs(EXPECT_EXCHANGE_TIMEOUT_SECS), async {
             match protocol {
                 ServerProtocol::Http2 => h2_expect_exchange(port, content_length, upload).await,
@@ -225,7 +225,7 @@ async fn h3_expect_exchange(
     content_length: usize,
     upload: Option<&[u8]>,
 ) -> Result<(u16, Vec<u8>), String> {
-    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+    let (_endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await?;
     let (mut driver, mut client): (
         h3::client::Connection<h3_quinn::Connection, Bytes>,
@@ -263,7 +263,7 @@ pub(crate) fn h2_build_request(
     target: &str,
     content_length: Option<usize>,
 ) -> Result<http::Request<()>, String> {
-    let mut builder: http::request::Builder = http::Request::builder()
+    let mut builder: Builder = http::Request::builder()
         .method(method)
         .uri(target)
         .header(PROBE_HEADER_KEY, PROBE_HEADER_VALUE);
@@ -279,14 +279,14 @@ pub(crate) fn h2_open_stream(
     sender: &mut h2::client::SendRequest<Bytes>,
     request: http::Request<()>,
     end_of_stream: bool,
-) -> Result<(ResponseFuture, h2::SendStream<Bytes>), String> {
+) -> Result<(ResponseFuture, SendStream<Bytes>), String> {
     sender
         .send_request(request, end_of_stream)
         .map_err(|error: h2::Error| format!("h2 send_request failed: {error}"))
 }
 
 pub(crate) fn h2_push_body(
-    send_stream: &mut h2::SendStream<Bytes>,
+    send_stream: &mut SendStream<Bytes>,
     body: &[u8],
     end_of_stream: bool,
 ) -> Result<(), String> {
@@ -296,7 +296,7 @@ pub(crate) fn h2_push_body(
 }
 
 pub(crate) fn h2_push_body_typed(
-    send_stream: &mut h2::SendStream<Bytes>,
+    send_stream: &mut SendStream<Bytes>,
     body: &[u8],
     end_of_stream: bool,
 ) -> Result<(), Error> {
@@ -305,7 +305,7 @@ pub(crate) fn h2_push_body_typed(
 
 pub(crate) async fn h2_await_response(
     response: ResponseFuture,
-) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+) -> Result<(u16, HeaderMap, Vec<u8>), String> {
     match h2_await_outcome(response).await {
         LimitsOutcome::Replied(status, headers, body) => Ok((status, headers, body)),
         LimitsOutcome::H2Reset(error) => Err(format!("h2 stream reset: {error:?}")),
@@ -316,23 +316,23 @@ pub(crate) async fn h2_await_response(
 }
 
 pub(crate) async fn h2_await_outcome(response: ResponseFuture) -> LimitsOutcome {
-    let received: Result<http::Response<h2::RecvStream>, Error> =
+    let received: Result<http::Response<RecvStream>, Error> =
         match timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response).await {
             Ok(received) => received,
             Err(_) => return LimitsOutcome::TimedOut,
         };
-    let received: http::Response<h2::RecvStream> = match received {
+    let received: http::Response<RecvStream> = match received {
         Ok(received) => received,
         Err(error) => return LimitsOutcome::H2Reset(error),
     };
     let status: u16 = received.status().as_u16();
-    let headers: http::HeaderMap = received.headers().clone();
-    let mut body_stream: h2::RecvStream = received.into_body();
+    let headers: HeaderMap = received.headers().clone();
+    let mut body_stream: RecvStream = received.into_body();
     let mut collected: Vec<u8> = Vec::new();
     let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
     loop {
         let remaining: Duration = deadline.saturating_duration_since(Instant::now());
-        let chunk: Result<Option<Result<Bytes, Error>>, tokio::time::error::Elapsed> =
+        let chunk: Result<Option<Result<Bytes, Error>>, Elapsed> =
             timeout(remaining, body_stream.data()).await;
         match chunk {
             Err(_) => return LimitsOutcome::TimedOut,
@@ -350,10 +350,8 @@ pub(crate) async fn h2_await_outcome(response: ResponseFuture) -> LimitsOutcome 
 }
 
 pub(crate) async fn h2_still_pending(response: ResponseFuture, budget_ms: u64) -> bool {
-    let outcome: Result<
-        Result<http::Response<h2::RecvStream>, Error>,
-        tokio::time::error::Elapsed,
-    > = timeout(Duration::from_millis(budget_ms), response).await;
+    let outcome: Result<Result<http::Response<RecvStream>, Error>, Elapsed> =
+        timeout(Duration::from_millis(budget_ms), response).await;
     outcome.is_err()
 }
 
@@ -361,7 +359,7 @@ pub(crate) async fn h2_get(
     sender: &mut h2::client::SendRequest<Bytes>,
     port: u16,
     path: &str,
-) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+) -> Result<(u16, HeaderMap, Vec<u8>), String> {
     let request: http::Request<()> =
         h2_build_request("GET", &h2_target(port, path), None).map_err(|error: String| error)?;
     let (response, _send_stream) =
@@ -385,10 +383,10 @@ pub(crate) fn h3_reset_is_internal(error: &StreamError) -> bool {
     }
 }
 
-pub(crate) fn header_value(headers: &http::HeaderMap, key: &str) -> Option<String> {
+pub(crate) fn header_value(headers: &HeaderMap, key: &str) -> Option<String> {
     headers
         .get(key)
-        .map(|value: &http::HeaderValue| value.to_str().unwrap_or_default().to_owned())
+        .map(|value: &HeaderValue| value.to_str().unwrap_or_default().to_owned())
 }
 
 pub(crate) fn oversized_payload() -> Vec<u8> {
@@ -410,7 +408,7 @@ pub(crate) fn declared_short_payload() -> Vec<u8> {
 
 pub(crate) async fn h3_collect(
     stream: &mut RequestStream<BidiStream<Bytes>, Bytes>,
-) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+) -> Result<(u16, HeaderMap, Vec<u8>), String> {
     match h3_collect_outcome(stream).await {
         LimitsOutcome::Replied(status, headers, body) => Ok((status, headers, body)),
         LimitsOutcome::H3Reset(error) => Err(format!("h3 stream reset: {error:?}")),
@@ -435,7 +433,7 @@ async fn h3_collect_outcome(stream: &mut RequestStream<BidiStream<Bytes>, Bytes>
         Err(error) => return LimitsOutcome::H3Reset(error),
     };
     let status: u16 = received.status().as_u16();
-    let headers: http::HeaderMap = received.headers().clone();
+    let headers: HeaderMap = received.headers().clone();
     let mut collected: Vec<u8> = Vec::new();
     let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
     loop {
@@ -457,11 +455,11 @@ pub(crate) async fn h3_exchange(
     method: &str,
     target: &str,
     body: &[u8],
-) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+) -> Result<(u16, HeaderMap, Vec<u8>), String> {
     h3_outcome_to_reply(h3_exchange_outcome(port, method, target, body).await)
 }
 
-fn h3_outcome_to_reply(outcome: LimitsOutcome) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+fn h3_outcome_to_reply(outcome: LimitsOutcome) -> Result<(u16, HeaderMap, Vec<u8>), String> {
     match outcome {
         LimitsOutcome::Replied(status, headers, body) => Ok((status, headers, body)),
         LimitsOutcome::H3Reset(error) => Err(format!("h3 stream reset: {error:?}")),
@@ -477,7 +475,7 @@ pub(crate) async fn h3_exchange_outcome(
     target: &str,
     body: &[u8],
 ) -> LimitsOutcome {
-    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+    let (_endpoint, connection): (Endpoint, quinn::Connection) =
         match connect_quic(port, ALPN_HTTP3).await {
             Ok(pair) => pair,
             Err(_) => return LimitsOutcome::SetupFailed,
