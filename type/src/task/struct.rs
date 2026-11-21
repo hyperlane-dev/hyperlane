@@ -8,11 +8,11 @@ use super::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub struct Task {
     /// Pool of unbounded senders for distributing tasks to worker threads.
-    pub pool: Vec<UnboundedSender<AsyncTask>>,
+    pub(crate) pool: Vec<UnboundedSender<AsyncTask>>,
     /// Atomic counter for round-robin task distribution across workers.
-    pub counter: Arc<AtomicUsize>,
+    pub(crate) counter: Arc<AtomicUsize>,
     /// Flag indicating whether the task pool should shut down.
-    pub shutdown: Arc<AtomicBool>,
+    pub(crate) shutdown: Arc<AtomicBool>,
     /// Notification handles for precise wake-up of specific workers.
-    pub notifies: Vec<Arc<Notify>>,
+    pub(crate) notifies: Vec<Arc<Notify>>,
 }

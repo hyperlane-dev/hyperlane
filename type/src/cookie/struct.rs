@@ -8,34 +8,34 @@ use super::*;
 pub struct CookieBuilder {
     /// Cookie name identifier.
     #[set(type(AsRef<str>))]
-    pub name: CookieKey,
+    pub(crate) name: CookieKey,
     /// Cookie value content.
     #[set(type(AsRef<str>))]
-    pub value: CookieValue,
+    pub(crate) value: CookieValue,
     /// Optional expiration date/time string.
     #[set(skip)]
-    pub expires: Option<String>,
+    pub(crate) expires: Option<String>,
     /// Optional maximum age in seconds.
     #[get(type(copy))]
     #[set(skip)]
-    pub max_age: Option<i64>,
+    pub(crate) max_age: Option<i64>,
     /// Optional domain scope for the cookie.
     #[set(skip)]
-    pub domain: Option<String>,
+    pub(crate) domain: Option<String>,
     /// Optional path scope for the cookie.
     #[set(skip)]
-    pub path: Option<String>,
+    pub(crate) path: Option<String>,
     /// Optional flag indicating secure (HTTPS-only) transmission.
     #[get(type(copy))]
     #[set(skip)]
-    pub secure: Option<bool>,
+    pub(crate) secure: Option<bool>,
     /// Optional flag preventing JavaScript access.
     #[get(type(copy))]
     #[set(skip)]
-    pub http_only: Option<bool>,
+    pub(crate) http_only: Option<bool>,
     /// Optional SameSite policy setting.
     #[set(skip)]
-    pub same_site: Option<String>,
+    pub(crate) same_site: Option<String>,
 }
 
 /// Parser for HTTP Cookie headers.

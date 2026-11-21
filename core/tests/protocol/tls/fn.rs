@@ -400,9 +400,10 @@ async fn an_infinite_read_timeout_tls_close_still_delivers_close_notify() {
             ServerProtocol::Http1,
             Some(trusted_tls_config()),
         ))
-        .request_config(RequestConfig {
-            read_timeout_ms: u64::MAX,
-            ..RequestConfig::default()
+        .request_config({
+            let mut config: RequestConfig = RequestConfig::default();
+            config.set_read_timeout_ms(u64::MAX);
+            config
         });
     register_probe_hooks(&mut server);
     let (control, port): (ServerControlHook, u16) = run_on_reserved_port(&mut server)

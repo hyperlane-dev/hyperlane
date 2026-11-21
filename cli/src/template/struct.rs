@@ -10,5 +10,5 @@ pub struct TemplateConfig {
     /// Model subtype (only used when template_type is Model)
     pub model_sub_type: Option<ModelSubType>,
     /// Base directory for generation (default: ./application)
-    pub base_directory: String,
+    pub(crate) base_directory: String,
 }

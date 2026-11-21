@@ -25,15 +25,15 @@ pub struct RouteMatcher {
     /// These are route without any variable path segments.
     #[set(skip)]
     #[debug(skip)]
-    pub static_route: ServerHookMap,
+    pub(crate) static_route: ServerHookMap,
     /// A layered map of dynamic routes grouped by segment count.
     /// Routes are organized by path segment count for efficient filtering during matching.
     #[set(skip)]
     #[debug(skip)]
-    pub dynamic_route: ServerHookPatternRoute,
+    pub(crate) dynamic_route: ServerHookPatternRoute,
     /// A layered map of regex routes grouped by segment count.
     /// Routes with tail regex patterns can match paths with more segments.
     #[set(skip)]
     #[debug(skip)]
-    pub regex_route: ServerHookPatternRoute,
+    pub(crate) regex_route: ServerHookPatternRoute,
 }

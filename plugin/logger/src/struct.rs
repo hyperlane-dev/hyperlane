@@ -4,9 +4,9 @@ use super::*;
 #[derive(Clone, Debug)]
 pub struct LoggerConfig {
     /// The highest level that is written.
-    pub level: LevelFilter,
+    pub(crate) level: LevelFilter,
     /// The file the log is appended to, when there is one.
-    pub file: Option<String>,
+    pub(crate) file: Option<String>,
 }
 
 /// The plugin that writes the log of the server.

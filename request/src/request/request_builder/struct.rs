@@ -34,5 +34,5 @@ use super::*;
 /// ```
 #[derive(Clone, Data, Debug, Default)]
 pub struct RequestBuilder {
-    pub request: HttpRequest,
+    pub(crate) request: HttpRequest,
 }

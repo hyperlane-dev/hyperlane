@@ -11,10 +11,10 @@ use super::*;
 pub struct PanicData {
     /// The message associated with the panic.
     /// This is `None` if the panic payload is not a string.
-    pub message: Option<String>,
+    pub(crate) message: Option<String>,
     /// The source code location where the panic occurred.
-    pub location: Option<String>,
+    pub(crate) location: Option<String>,
     /// The payload of the panic, often a string literal.
     /// The hook attempts to downcast it to a `&str` or `String`.
-    pub payload: Option<String>,
+    pub(crate) payload: Option<String>,
 }

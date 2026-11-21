@@ -9,7 +9,7 @@ pub struct WebSocket {
     /// The internal broadcast map.
     ///
     /// This map is used for managing WebSocket message distribution.
-    pub broadcast_map: BroadcastMap<Vec<u8>>,
+    pub(crate) broadcast_map: BroadcastMap<Vec<u8>>,
 }
 
 /// Configuration for a WebSocket connection.
@@ -25,42 +25,42 @@ pub struct WebSocket {
 pub struct WebSocketConfig<'a, B: BroadcastTypeTrait> {
     /// The underlying stream for this WebSocket connection.
     #[set(skip)]
-    pub stream: &'a mut Stream,
+    pub(crate) stream: &'a mut Stream,
     /// The Hyperlane context.
     ///
     /// This context is associated with this WebSocket connection.
     #[set(skip)]
-    pub context: &'a mut Context,
+    pub(crate) context: &'a mut Context,
     /// The capacity.
     ///
     /// This is the capacity of the broadcast sender channel.
     #[get(type(copy))]
     #[set(skip)]
-    pub capacity: Capacity,
+    pub(crate) capacity: Capacity,
     /// The broadcast type.
     ///
     /// This defines the type of broadcast this WebSocket connection will participate in
     /// (point-to-point or point-to-group).
     #[set(skip)]
-    pub broadcast_type: BroadcastType<B>,
+    pub(crate) broadcast_type: BroadcastType<B>,
     /// The connected hook handler.
     ///
     /// This hook is executed when the WebSocket connection is established.
     #[set(skip)]
-    pub connected_hook: ServerHookHandler,
+    pub(crate) connected_hook: ServerHookHandler,
     /// The request hook handler.
     ///
     /// This hook is executed when a new request is received on the WebSocket.
     #[set(skip)]
-    pub request_hook: ServerHookHandler,
+    pub(crate) request_hook: ServerHookHandler,
     /// The sended hook handler.
     ///
     /// This hook is executed after a message has been successfully sent over the WebSocket.
     #[set(skip)]
-    pub sended_hook: ServerHookHandler,
+    pub(crate) sended_hook: ServerHookHandler,
     /// The closed hook handler.
     ///
     /// This hook is executed when the WebSocket connection is closed.
     #[set(skip)]
-    pub closed_hook: ServerHookHandler,
+    pub(crate) closed_hook: ServerHookHandler,
 }

@@ -4,32 +4,32 @@ use super::*;
 fn test_url_components_parse_full_url() {
     let components: HttpUrlComponents =
         HttpUrlComponents::parse("https://host.test:8443/a/b?x=1&y=2#frag").unwrap_or_default();
-    assert_eq!(components.protocol, "https");
-    assert_eq!(components.host, Some("host.test".to_string()));
-    assert_eq!(components.port, Some(8443u16));
-    assert_eq!(components.path, Some("/a/b".to_string()));
-    assert_eq!(components.query, Some("x=1&y=2".to_string()));
-    assert_eq!(components.fragment, Some("frag".to_string()));
+    assert_eq!(components.get_protocol(), "https");
+    assert_eq!(components.get_host(), Some("host.test".to_string()));
+    assert_eq!(components.get_port(), Some(8443u16));
+    assert_eq!(components.get_path(), Some("/a/b".to_string()));
+    assert_eq!(components.get_query(), Some("x=1&y=2".to_string()));
+    assert_eq!(components.get_fragment(), Some("frag".to_string()));
 }
 
 #[test]
 fn test_url_components_parse_bare_host_uses_root_path() {
     let components: HttpUrlComponents =
         HttpUrlComponents::parse("http://host.test").unwrap_or_default();
-    assert_eq!(components.protocol, "http");
-    assert_eq!(components.host, Some("host.test".to_string()));
-    assert_eq!(components.port, None);
-    assert_eq!(components.path, Some("/".to_string()));
-    assert_eq!(components.query, None);
-    assert_eq!(components.fragment, None);
+    assert_eq!(components.get_protocol(), "http");
+    assert_eq!(components.get_host(), Some("host.test".to_string()));
+    assert_eq!(components.get_port(), None);
+    assert_eq!(components.get_path(), Some("/".to_string()));
+    assert_eq!(components.get_query(), None);
+    assert_eq!(components.get_fragment(), None);
 }
 
 #[test]
 fn test_url_components_parse_keeps_empty_query() {
     let components: HttpUrlComponents =
         HttpUrlComponents::parse("http://host.test/p?").unwrap_or_default();
-    assert_eq!(components.query, Some(String::new()));
-    assert_eq!(components.path, Some("/p".to_string()));
+    assert_eq!(components.get_query(), Some(String::new()));
+    assert_eq!(components.get_path(), Some("/p".to_string()));
 }
 
 #[test]
@@ -41,12 +41,12 @@ fn test_url_components_parse_rejects_relative_url() {
 #[test]
 fn test_url_components_default_is_all_empty() {
     let components: HttpUrlComponents = HttpUrlComponents::default();
-    assert_eq!(components.protocol, "");
-    assert_eq!(components.host, None);
-    assert_eq!(components.port, None);
-    assert_eq!(components.path, None);
-    assert_eq!(components.query, None);
-    assert_eq!(components.fragment, None);
+    assert_eq!(components.get_protocol(), "");
+    assert_eq!(components.get_host(), None);
+    assert_eq!(components.get_port(), None);
+    assert_eq!(components.get_path(), None);
+    assert_eq!(components.get_query(), None);
+    assert_eq!(components.get_fragment(), None);
 }
 
 #[test]

@@ -13,28 +13,28 @@ use super::*;
 /// use http_request::{Proxy, ProxyType};
 ///
 /// let https = Proxy::https("proxy.example.com", 7890);
-/// assert_eq!(https.proxy_type, ProxyType::Https);
-/// assert_eq!(https.port, 7890);
+/// assert_eq!(https.get_proxy_type(), &ProxyType::Https);
+/// assert_eq!(https.get_port(), 7890);
 ///
 /// let socks = Proxy::socks5("127.0.0.1", 1080).auth("example-user", "example-password");
-/// assert_eq!(socks.proxy_type, ProxyType::Socks5);
-/// assert_eq!(socks.username.as_deref(), Some("example-user"));
+/// assert_eq!(socks.get_proxy_type(), &ProxyType::Socks5);
+/// assert_eq!(socks.get_username(), Some("example-user".to_string()));
 /// ```
 #[derive(Clone, Data, Debug, Eq, PartialEq)]
 pub struct Proxy {
     /// Proxy protocol family.
-    pub proxy_type: ProxyType,
+    pub(crate) proxy_type: ProxyType,
     /// Proxy server hostname or IP.
-    pub host: String,
+    pub(crate) host: String,
     /// Proxy server port.
     #[get(type(copy))]
-    pub port: u16,
+    pub(crate) port: u16,
     /// Optional username for proxy auth.
     #[get(type(clone))]
-    pub username: Option<String>,
+    pub(crate) username: Option<String>,
     /// Optional password for proxy auth.
     #[get(type(clone))]
-    pub password: Option<String>,
+    pub(crate) password: Option<String>,
 }
 
 /// Async tunnel stream wrapping another async stream, with a buffer of

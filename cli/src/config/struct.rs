@@ -4,7 +4,7 @@ use super::*;
 ///
 /// `hyperlane-cli` ships both a library and a `hyperlane` binary; the binary
 /// is a separate crate that consumes this one, so the read path must stay
-/// `pub` (§17.14 does not recall published API).
+/// `pub` (§17.18 exempts a struct the package's own binary target reads).
 #[derive(Clone, Data, Debug)]
 pub struct Args {
     /// The command to execute

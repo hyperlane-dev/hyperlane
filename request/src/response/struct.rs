@@ -13,16 +13,16 @@ use super::*;
 #[derive(Clone, Debug, Getter, Setter)]
 pub struct HttpResponse {
     /// HTTP version (`HTTP/1.1`, `HTTP/2`, ...).
-    pub version: HttpVersion,
+    pub(crate) version: HttpVersion,
     /// 3-digit numeric status code (`200`, `404`, ...).
     #[get(type(copy))]
-    pub status_code: ResponseStatusCode,
+    pub(crate) status_code: ResponseStatusCode,
     /// Reason phrase (`"OK"`, `"Not Found"`, ...).
     #[set(type(AsRef<str>))]
-    pub reason_phrase: String,
+    pub(crate) reason_phrase: String,
     /// Response headers (single-value, lowercase keys).
-    pub headers: HttpResponseHeaders,
+    pub(crate) headers: HttpResponseHeaders,
     /// Raw response body bytes.
     #[set(type(AsRef<[u8]>))]
-    pub body: ResponseBody,
+    pub(crate) body: ResponseBody,
 }

@@ -8,53 +8,53 @@ use super::*;
 /// Since all fields implement `Copy`, this struct is lightweight
 /// and can be easily cloned and shared.
 ///
-/// The fields stay `pub`: `type/tests/request` reads them directly, so this is
-/// published API and §17.14 does not recall it (semver).
+/// The fields are crate-internal (§17.18): a consumer reaches them through
+/// the generated `get_*` and `set_*` accessors.
 #[derive(Clone, Copy, Data, Debug, Deserialize, DisplayDebug, Eq, New, PartialEq, Serialize)]
 pub struct RequestConfig {
     /// Buffer size for reading operations.
     #[get(type(copy))]
-    pub buffer_size: usize,
+    pub(crate) buffer_size: usize,
     /// Maximum size for URL path in bytes.
     #[get(type(copy))]
-    pub max_path_size: usize,
+    pub(crate) max_path_size: usize,
     /// Maximum number of headers allowed in a request.
     #[get(type(copy))]
-    pub max_header_count: usize,
+    pub(crate) max_header_count: usize,
     /// Maximum size for a header key in bytes.
     #[get(type(copy))]
-    pub max_header_key_size: usize,
+    pub(crate) max_header_key_size: usize,
     /// Maximum size for a header value in bytes.
     #[get(type(copy))]
-    pub max_header_value_size: usize,
+    pub(crate) max_header_value_size: usize,
     /// Maximum size for request body in bytes.
     #[get(type(copy))]
-    pub max_body_size: usize,
+    pub(crate) max_body_size: usize,
     /// Timeout for reading data in milliseconds.
     #[get(type(copy))]
-    pub read_timeout_ms: u64,
+    pub(crate) read_timeout_ms: u64,
 }
 
 /// HTTP request representation.
 ///
 /// Contains all components of an HTTP request.
 ///
-/// The fields stay `pub`: `type/tests/request` builds fixtures through them, so
-/// this is published API and §17.14 does not recall it (semver).
+/// The fields are crate-internal (§17.18): a consumer reaches them through
+/// the generated `get_*` and `set_*` accessors.
 #[derive(Clone, Data, Debug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
 pub struct Request {
     /// HTTP request method.
-    pub method: RequestMethod,
+    pub(crate) method: RequestMethod,
     /// Request host.
-    pub host: RequestHost,
+    pub(crate) host: RequestHost,
     /// HTTP protocol version.
-    pub version: RequestVersion,
+    pub(crate) version: RequestVersion,
     /// Request path.
-    pub path: RequestPath,
+    pub(crate) path: RequestPath,
     /// URL query parameters.
-    pub querys: RequestQuerys,
+    pub(crate) querys: RequestQuerys,
     /// HTTP headers collection.
-    pub headers: RequestHeaders,
+    pub(crate) headers: RequestHeaders,
     /// Request body content.
-    pub body: RequestBody,
+    pub(crate) body: RequestBody,
 }

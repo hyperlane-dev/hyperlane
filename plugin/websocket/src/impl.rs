@@ -339,6 +339,26 @@ where
             closed_hook: Hook::default_handler(),
         }
     }
+
+    /// Hands out the stream and the context together.
+    ///
+    /// The two borrows live in the same configuration, so they have to be
+    /// taken together: a caller that wants to run a hook needs both, and the
+    /// borrow checker will not let it take them one at a time.
+    ///
+    /// # Returns
+    ///
+    /// - `(&'a mut Stream, &'a mut Context)` - The stream and the context.
+    #[inline(always)]
+    pub fn take_parts(self) -> (&'a mut Stream, &'a mut Context) {
+        // The destructuring pattern is the §17.13 escape hatch: it is not
+        // `self.field` access, and it hands out the two borrows together
+        // with the lifetime the struct holds them under.
+        let Self {
+            stream, context, ..
+        } = self;
+        (stream, context)
+    }
 }
 
 impl<'a, B> WebSocketConfig<'a, B>
@@ -458,13 +478,15 @@ where
     /// # let mut stream: Stream = Stream::from_transport(MemoryTransport(transport), RequestConfig::default(), false);
     /// # let mut ctx: Context = Context::default();
     /// // Register the hook with the stream and context for this connection.
-    /// let config: WebSocketConfig<'_, String> = WebSocketConfig::new(&mut stream, &mut ctx)
+    /// let mut config: WebSocketConfig<'_, String> = WebSocketConfig::new(&mut stream, &mut ctx)
     ///     .set_connected_hook::<MyConnectedHook>();
     /// # let runtime: tokio::runtime::Runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
     /// # runtime.block_on(async {
-    /// #     let status: Status = (config.connected_hook)(config.stream, config.context).await;
+    /// #     let hook = config.get_connected_hook().clone();
+    /// #     let (stream, context) = config.take_parts();
+    /// #     let status: Status = hook(stream, context).await;
     /// #     assert!(matches!(status, Status::Continue));
-    /// #     assert!(config.context.get_attribute::<bool, _>("connected"));
+    /// #     assert!(context.get_attribute::<bool, _>("connected"));
     /// # });
     /// ```
     #[inline(always)]
@@ -544,13 +566,15 @@ where
     /// # let mut stream: Stream = Stream::from_transport(MemoryTransport(transport), RequestConfig::default(), false);
     /// # let mut ctx: Context = Context::default();
     /// // Register the hook with the stream and context for this connection.
-    /// let config: WebSocketConfig<'_, String> = WebSocketConfig::new(&mut stream, &mut ctx)
+    /// let mut config: WebSocketConfig<'_, String> = WebSocketConfig::new(&mut stream, &mut ctx)
     ///     .set_request_hook::<MyRequestHook>();
     /// # let runtime: tokio::runtime::Runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
     /// # runtime.block_on(async {
-    /// #     let status: Status = (config.request_hook)(config.stream, config.context).await;
+    /// #     let hook = config.get_request_hook().clone();
+    /// #     let (stream, context) = config.take_parts();
+    /// #     let status: Status = hook(stream, context).await;
     /// #     assert!(matches!(status, Status::Continue));
-    /// #     assert!(config.context.get_attribute::<bool, _>("request_received"));
+    /// #     assert!(context.get_attribute::<bool, _>("request_received"));
     /// # });
     /// ```
     #[inline(always)]
@@ -630,13 +654,15 @@ where
     /// # let mut stream: Stream = Stream::from_transport(MemoryTransport(transport), RequestConfig::default(), false);
     /// # let mut ctx: Context = Context::default();
     /// // Register the hook with the stream and context for this connection.
-    /// let config: WebSocketConfig<'_, String> = WebSocketConfig::new(&mut stream, &mut ctx)
+    /// let mut config: WebSocketConfig<'_, String> = WebSocketConfig::new(&mut stream, &mut ctx)
     ///     .set_sended_hook::<MySendedHook>();
     /// # let runtime: tokio::runtime::Runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
     /// # runtime.block_on(async {
-    /// #     let status: Status = (config.sended_hook)(config.stream, config.context).await;
+    /// #     let hook = config.get_sended_hook().clone();
+    /// #     let (stream, context) = config.take_parts();
+    /// #     let status: Status = hook(stream, context).await;
     /// #     assert!(matches!(status, Status::Continue));
-    /// #     assert!(config.context.get_attribute::<bool, _>("message_sent"));
+    /// #     assert!(context.get_attribute::<bool, _>("message_sent"));
     /// # });
     /// ```
     #[inline(always)]
@@ -716,13 +742,15 @@ where
     /// # let mut stream: Stream = Stream::from_transport(MemoryTransport(transport), RequestConfig::default(), false);
     /// # let mut ctx: Context = Context::default();
     /// // Register the hook with the stream and context for this connection.
-    /// let config: WebSocketConfig<'_, String> = WebSocketConfig::new(&mut stream, &mut ctx)
+    /// let mut config: WebSocketConfig<'_, String> = WebSocketConfig::new(&mut stream, &mut ctx)
     ///     .set_closed_hook::<MyClosedHook>();
     /// # let runtime: tokio::runtime::Runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
     /// # runtime.block_on(async {
-    /// #     let status: Status = (config.closed_hook)(config.stream, config.context).await;
+    /// #     let hook = config.get_closed_hook().clone();
+    /// #     let (stream, context) = config.take_parts();
+    /// #     let status: Status = hook(stream, context).await;
     /// #     assert!(matches!(status, Status::Continue));
-    /// #     assert!(config.context.get_attribute::<bool, _>("closed"));
+    /// #     assert!(context.get_attribute::<bool, _>("closed"));
     /// # });
     /// ```
     #[inline(always)]

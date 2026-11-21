@@ -7,11 +7,11 @@ use super::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub struct Context {
     /// The incoming HTTP request.
-    pub request: Request,
+    pub(crate) request: Request,
     /// The outgoing HTTP response.
-    pub response: Response,
+    pub(crate) response: Response,
     /// Parameters extracted from the route path.
-    pub route_params: RouteParams,
+    pub(crate) route_params: RouteParams,
     /// The original wire request target, before routing or query-map conversion.
     ///
     /// The target is read on every request and written on every request, so it
@@ -27,5 +27,5 @@ pub struct Context {
     #[set(pub(crate))]
     pub(crate) original_head: Option<bool>,
     /// A collection of custom attributes for sharing data within the request lifecycle.
-    pub attributes: ThreadSafeAttributeStore,
+    pub(crate) attributes: ThreadSafeAttributeStore,
 }

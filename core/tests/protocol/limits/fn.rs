@@ -1,11 +1,10 @@
 use super::*;
 
 pub(crate) fn limits_request_config(max_body_size: usize, read_timeout_ms: u64) -> RequestConfig {
-    RequestConfig {
-        max_body_size,
-        read_timeout_ms,
-        ..RequestConfig::default()
-    }
+    let mut config: RequestConfig = RequestConfig::low_security();
+    config.set_max_body_size(max_body_size);
+    config.set_read_timeout_ms(read_timeout_ms);
+    config
 }
 
 fn register_limits_hooks(server: &mut Server) -> &mut Server {

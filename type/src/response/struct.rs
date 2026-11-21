@@ -2,21 +2,21 @@ use super::*;
 
 /// Represents a parsed HTTP response.
 ///
-/// The fields stay `pub`: `type/tests/response` reads them directly, so this is
-/// published API and §17.14 does not recall it (semver).
+/// The fields are crate-internal (§17.18): a consumer reaches them through
+/// the generated `get_*` and `set_*` accessors.
 #[derive(Clone, Data, Debug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
 pub struct Response {
     /// The HTTP version used in the response.
-    pub version: ResponseVersion,
+    pub(crate) version: ResponseVersion,
     /// The HTTP status code.
     #[get(type(copy))]
-    pub status_code: ResponseStatusCode,
+    pub(crate) status_code: ResponseStatusCode,
     /// The reason phrase associated with the status code.
     #[set(skip)]
-    pub reason_phrase: ResponseReasonPhrase,
+    pub(crate) reason_phrase: ResponseReasonPhrase,
     /// The response headers as key-value pairs.
-    pub headers: ResponseHeaders,
+    pub(crate) headers: ResponseHeaders,
     /// The binary body content of the response.
     #[set(skip)]
-    pub body: ResponseBody,
+    pub(crate) body: ResponseBody,
 }

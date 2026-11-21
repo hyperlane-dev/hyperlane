@@ -15,18 +15,18 @@ pub struct HttpRequest {
     /// HTTP method (`Method::Get` / `Method::Post` / ...).
     #[get(type(clone))]
     #[get_mut(skip)]
-    pub method: Method,
+    pub(crate) method: Method,
     /// Target URL (string form, parsed on send).
     #[get_mut(skip)]
-    pub url: String,
+    pub(crate) url: String,
     /// Request headers (single-value).
-    pub headers: HashMap<String, String>,
+    pub(crate) headers: HashMap<String, String>,
     /// Request body.
     #[get_mut(skip)]
-    pub body: Body,
+    pub(crate) body: Body,
     /// Per-request config: timeout, redirects, proxy, decode, etc.
-    pub config: RequestConfig,
+    pub(crate) config: RequestConfig,
     /// Internal scratch: redirect-loop tracking + TLS root store.
     /// Private; only `HttpRequest` methods touch it.
-    pub tmp: Tmp,
+    pub(crate) tmp: Tmp,
 }

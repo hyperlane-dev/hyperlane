@@ -11,9 +11,9 @@ use super::*;
 #[derive(Clone, CustomDebug, Data, Deserialize, DisplayDebug, Eq, New, PartialEq, Serialize)]
 pub struct TlsConfig {
     /// Path to the PEM encoded certificate chain presented to clients.
-    pub certificate_path: String,
+    pub(crate) certificate_path: String,
     /// Path to the PEM encoded private key matching the leaf certificate.
-    pub private_key_path: String,
+    pub(crate) private_key_path: String,
 }
 
 /// Represents the server configuration.
@@ -24,13 +24,13 @@ pub struct TlsConfig {
 pub struct ServerConfig {
     /// The address the server will bind to.
     #[set(type(AsRef<str>))]
-    pub address: String,
+    pub(crate) address: String,
     /// The `TCP_NODELAY` option for sockets.
     #[get(type(copy))]
-    pub nodelay: Option<bool>,
+    pub(crate) nodelay: Option<bool>,
     /// The `IP_TTL` option for sockets.
     #[get(type(copy))]
-    pub ttl: Option<u32>,
+    pub(crate) ttl: Option<u32>,
     /// The wire protocol the listener speaks, defaulting to HTTP/1.
     ///
     /// Skipped by `new` so the three argument constructor keeps its signature;
@@ -38,7 +38,7 @@ pub struct ServerConfig {
     #[get(type(copy))]
     #[new(skip)]
     #[serde(default)]
-    pub protocol: ServerProtocol,
+    pub(crate) protocol: ServerProtocol,
     /// TLS material used to terminate connections, or `None` for plaintext.
     ///
     /// Skipped by `new` for the same reason as `protocol`; the setters take an
@@ -46,5 +46,5 @@ pub struct ServerConfig {
     #[get(type(clone))]
     #[new(skip)]
     #[serde(default)]
-    pub tls: Option<TlsConfig>,
+    pub(crate) tls: Option<TlsConfig>,
 }

@@ -8,7 +8,7 @@ pub struct Stream {
     /// TLS session and a per-request duplex stream are interchangeable here.
     /// Address metadata comes from the transport itself, so a transport without
     /// a socket identity reports an error instead of a fabricated address.
-    pub stream: Box<dyn Transport>,
+    pub(crate) stream: Box<dyn Transport>,
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) request_config: RequestConfig,
