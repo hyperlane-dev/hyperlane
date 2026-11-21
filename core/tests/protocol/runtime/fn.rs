@@ -101,3 +101,42 @@ async fn unreadable_tls_material_is_rejected_before_binding() {
     let rebound: io::Result<TcpListener> = TcpListener::bind(&address);
     assert!(rebound.is_ok(), "the rejected run must leave the port free");
 }
+
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn uring_shutdown_drops_user_futures_outside_reactor_borrows() {
+    if !uring_is_available() {
+        eprintln!(
+            "io_uring unavailable; shutdown reentrancy requires the permitted-kernel test run"
+        );
+        return;
+    }
+    let state: Arc<UringDropState> =
+        Arc::clone(URING_DROP_STATE.get_or_init(|| Arc::new(UringDropState::default())));
+    let mut server: Server = Server::default();
+    server.server_config(protocol_config(
+        PLACEHOLDER_ADDRESS,
+        ServerProtocol::Http1,
+        None,
+    ));
+    server.route::<UringPendingDropRoute>(VERSION_ROUTE_PATH);
+    let (control, port): (ServerControlHook, u16) =
+        run_on_reserved_port(&mut server).await.unwrap();
+    let mut client: TcpStream = connect_tcp(port).await.unwrap();
+    client
+        .write_all(&http1_close_request("GET", VERSION_ROUTE_PATH))
+        .await
+        .unwrap();
+    timeout(Duration::from_secs(3), state.started.notified())
+        .await
+        .unwrap();
+    assert!(state.entered_uring.load(AtomicOrdering::Acquire));
+    timeout(Duration::from_secs(3), control.shutdown())
+        .await
+        .unwrap();
+    timeout(Duration::from_secs(3), control.wait())
+        .await
+        .unwrap();
+    assert!(state.dropped.load(AtomicOrdering::Acquire));
+    assert!(state.borrow_available.load(AtomicOrdering::Acquire));
+}

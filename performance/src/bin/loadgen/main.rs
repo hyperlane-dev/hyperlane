@@ -56,6 +56,9 @@ use tokio::{
 };
 use tokio_rustls::{TlsConnector, client::TlsStream};
 
+#[cfg(test)]
+use tokio::net::TcpListener;
+
 /// The HTTP/2 error used by the protocol module.
 pub(crate) type H2Error = h2::Error;
 /// The QUIC client configuration, distinct from the TLS configuration.
@@ -730,6 +733,10 @@ async fn run_short(run: Run, cases: Vec<Case>) -> ConnStats {
             sleep(next_open - now).await;
         }
         next_open += interval;
+        let now: Instant = Instant::now();
+        if now >= run.deadline {
+            break;
+        }
         let transport: Box<dyn Transport> =
             match open_transport(&run.address, run.protocol, run.ca_path.as_deref()).await {
                 Ok(transport) => transport,
@@ -754,7 +761,9 @@ async fn run_short(run: Run, cases: Vec<Case>) -> ConnStats {
         match connection.read_response(&mut body).await {
             Ok(length) => {
                 if length == case.expect_len {
-                    stats.completed += 1;
+                    if now >= run.warmup_until {
+                        stats.completed += 1;
+                    }
                 } else {
                     stats.errors += 1;
                 }
@@ -1047,7 +1056,9 @@ async fn run_connection(
         match connection.read_response(&mut body).await {
             Ok(length) => {
                 if length == case.expect_len {
-                    stats.completed += 1;
+                    if now >= warmup_until {
+                        stats.completed += 1;
+                    }
                 } else {
                     stats.errors += 1;
                 }

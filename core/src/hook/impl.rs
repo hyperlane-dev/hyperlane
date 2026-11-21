@@ -121,8 +121,13 @@ impl Hook {
     where
         R: ServerHook,
     {
-        Arc::new(
+        let key_slot: Arc<AtomicUsize> = Arc::new(AtomicUsize::new(0));
+        let guard: InlineHookGuard = InlineHookGuard {
+            key: Arc::clone(&key_slot),
+        };
+        let handler: ServerHookHandler = Arc::new(
             move |stream: &mut Stream, ctx: &mut Context| -> FutureBox<Status> {
+                let _guard: &InlineHookGuard = &guard;
                 let ctx_address: usize = ctx.into();
                 let stream_address: usize = stream.into();
                 Box::pin(async move {
@@ -131,7 +136,11 @@ impl Hook {
                     R::new(stream, ctx).await.handle(stream, ctx).await
                 })
             },
-        )
+        );
+        let key: usize = Arc::as_ptr(&handler) as *const () as usize;
+        key_slot.store(key, AtomicOrdering::Relaxed);
+        register_inline_hook(key, inline_init_hook::<R>);
+        handler
     }
 }
 

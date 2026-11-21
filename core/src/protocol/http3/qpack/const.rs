@@ -1,0 +1,222 @@
+use super::*;
+
+/// Wire bytes for the GET request method.
+pub(crate) const WIRE_METHOD_GET: &[u8] = GET.as_bytes();
+
+/// Wire bytes for the POST request method.
+pub(crate) const WIRE_METHOD_POST: &[u8] = POST.as_bytes();
+
+/// Wire bytes for the PUT request method.
+pub(crate) const WIRE_METHOD_PUT: &[u8] = PUT.as_bytes();
+
+/// Wire bytes for the DELETE request method.
+pub(crate) const WIRE_METHOD_DELETE: &[u8] = DELETE.as_bytes();
+
+/// Wire bytes for the HEAD request method.
+pub(crate) const WIRE_METHOD_HEAD: &[u8] = HEAD.as_bytes();
+
+/// Wire bytes for the OPTIONS request method.
+pub(crate) const WIRE_METHOD_OPTIONS: &[u8] = OPTIONS.as_bytes();
+
+/// Wire bytes for the PATCH request method.
+pub(crate) const WIRE_METHOD_PATCH: &[u8] = PATCH.as_bytes();
+
+/// Wire bytes for the CONNECT request method.
+pub(crate) const WIRE_METHOD_CONNECT: &[u8] = CONNECT.as_bytes();
+
+/// Wire bytes for the TRACE request method.
+pub(crate) const WIRE_METHOD_TRACE: &[u8] = TRACE.as_bytes();
+
+/// Additional punctuation allowed in a URI scheme.
+pub(crate) const H3_SCHEME_PUNCTUATION: &[u8] = b"+-.";
+
+/// QPACK match key for the content type field.
+pub(crate) const QPACK_CONTENT_TYPE_NAME: &[u8] = CONTENT_TYPE.as_bytes();
+
+/// QPACK match key for the UTF-8 HTML media type.
+pub(crate) const QPACK_CONTENT_TYPE_HTML: &[u8] = STATIC_CT_HTML_UTF8.as_bytes();
+
+/// QPACK match key for the plain text media type.
+pub(crate) const QPACK_CONTENT_TYPE_PLAIN: &[u8] = TEXT_PLAIN.as_bytes();
+
+/// Compact UTF-8 plain text spelling in the QPACK static table.
+pub(crate) const QPACK_CONTENT_TYPE_PLAIN_UTF8: &[u8] = b"text/plain;charset=utf-8";
+
+/// QPACK match key for the JSON media type.
+pub(crate) const QPACK_CONTENT_TYPE_JSON: &[u8] = APPLICATION_JSON.as_bytes();
+
+/// QPACK match key for a cookie-setting field.
+pub(crate) const QPACK_SET_COOKIE_NAME: &[u8] = SET_COOKIE.as_bytes();
+
+/// QPACK match key for a redirect destination field.
+pub(crate) const QPACK_LOCATION_NAME: &[u8] = LOCATION.as_bytes();
+
+/// QPACK match key for the server identification field.
+pub(crate) const QPACK_SERVER_NAME: &[u8] = SERVER.as_bytes();
+
+/// QPACK match key for the response date field.
+pub(crate) const QPACK_DATE_NAME: &[u8] = DATE.as_bytes();
+
+/// RFC 9204 Appendix A static table entries `(name, value)`.
+pub(crate) const QPACK_STATIC_TABLE: [(&str, &str); 99] = [
+    (":authority", ""),
+    (":path", "/"),
+    ("age", "0"),
+    ("content-disposition", ""),
+    ("content-length", "0"),
+    ("cookie", ""),
+    ("date", ""),
+    ("etag", ""),
+    ("if-modified-since", ""),
+    ("if-none-match", ""),
+    ("last-modified", ""),
+    ("link", ""),
+    ("location", ""),
+    ("referer", ""),
+    ("set-cookie", ""),
+    (":method", "CONNECT"),
+    (":method", "DELETE"),
+    (":method", "GET"),
+    (":method", "HEAD"),
+    (":method", "OPTIONS"),
+    (":method", "POST"),
+    (":method", "PUT"),
+    (":scheme", "http"),
+    (":scheme", "https"),
+    (":status", "103"),
+    (":status", "200"),
+    (":status", "304"),
+    (":status", "404"),
+    (":status", "503"),
+    ("accept", "*/*"),
+    ("accept", "application/dns-message"),
+    ("accept-encoding", "gzip, deflate, br"),
+    ("accept-ranges", "bytes"),
+    ("access-control-allow-headers", "cache-control"),
+    ("access-control-allow-headers", "content-type"),
+    ("access-control-allow-origin", "*"),
+    ("cache-control", "max-age=0"),
+    ("cache-control", "max-age=2592000"),
+    ("cache-control", "max-age=604800"),
+    ("cache-control", "no-cache"),
+    ("cache-control", "no-store"),
+    ("cache-control", "public, max-age=31536000"),
+    ("content-encoding", "br"),
+    ("content-encoding", "gzip"),
+    ("content-type", "application/dns-message"),
+    ("content-type", "application/javascript"),
+    ("content-type", "application/json"),
+    ("content-type", "application/x-www-form-urlencoded"),
+    ("content-type", "image/gif"),
+    ("content-type", "image/jpeg"),
+    ("content-type", "image/png"),
+    ("content-type", "text/css"),
+    ("content-type", "text/html; charset=utf-8"),
+    ("content-type", "text/plain"),
+    ("content-type", "text/plain;charset=utf-8"),
+    ("range", "bytes=0-"),
+    ("strict-transport-security", "max-age=31536000"),
+    (
+        "strict-transport-security",
+        "max-age=31536000; includesubdomains",
+    ),
+    (
+        "strict-transport-security",
+        "max-age=31536000; includesubdomains; preload",
+    ),
+    ("vary", "accept-encoding"),
+    ("vary", "origin"),
+    ("x-content-type-options", "nosniff"),
+    ("x-xss-protection", "1; mode=block"),
+    (":status", "100"),
+    (":status", "204"),
+    (":status", "206"),
+    (":status", "302"),
+    (":status", "400"),
+    (":status", "403"),
+    (":status", "421"),
+    (":status", "425"),
+    (":status", "500"),
+    ("accept-language", ""),
+    ("access-control-allow-credentials", "FALSE"),
+    ("access-control-allow-credentials", "TRUE"),
+    ("access-control-allow-headers", "*"),
+    ("access-control-allow-methods", "get"),
+    ("access-control-allow-methods", "get, post, options"),
+    ("access-control-allow-methods", "options"),
+    ("access-control-expose-headers", "content-length"),
+    ("access-control-request-headers", "content-type"),
+    ("access-control-request-method", "get"),
+    ("access-control-request-method", "post"),
+    ("alt-svc", "clear"),
+    ("authorization", ""),
+    (
+        "content-security-policy",
+        "script-src 'none'; object-src 'none'; base-uri 'none'",
+    ),
+    ("early-data", "1"),
+    ("expect-ct", ""),
+    ("forwarded", ""),
+    ("if-range", ""),
+    ("origin", ""),
+    ("purpose", "prefetch"),
+    ("server", ""),
+    ("timing-allow-origin", "*"),
+    ("upgrade-insecure-requests", "1"),
+    ("user-agent", ""),
+    ("x-forwarded-for", ""),
+    ("x-frame-options", "deny"),
+    ("x-frame-options", "sameorigin"),
+];
+
+/// RFC 7541 Appendix B Huffman codes for bytes 0..=255.
+pub(crate) const HUFFMAN_CODES: [u32; 256] = [
+    0x1ff8, 0x7fffd8, 0xfffffe2, 0xfffffe3, 0xfffffe4, 0xfffffe5, 0xfffffe6, 0xfffffe7, 0xfffffe8,
+    0xffffea, 0x3ffffffc, 0xfffffe9, 0xfffffea, 0x3ffffffd, 0xfffffeb, 0xfffffec, 0xfffffed,
+    0xfffffee, 0xfffffef, 0xffffff0, 0xffffff1, 0xffffff2, 0x3ffffffe, 0xffffff3, 0xffffff4,
+    0xffffff5, 0xffffff6, 0xffffff7, 0xffffff8, 0xffffff9, 0xffffffa, 0xffffffb, 0x14, 0x3f8,
+    0x3f9, 0xffa, 0x1ff9, 0x15, 0xf8, 0x7fa, 0x3fa, 0x3fb, 0xf9, 0x7fb, 0xfa, 0x16, 0x17, 0x18,
+    0x0, 0x1, 0x2, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x5c, 0xfb, 0x7ffc, 0x20, 0xffb,
+    0x3fc, 0x1ffa, 0x21, 0x5d, 0x5e, 0x5f, 0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68,
+    0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f, 0x70, 0x71, 0x72, 0xfc, 0x73, 0xfd, 0x1ffb, 0x7fff0,
+    0x1ffc, 0x3ffc, 0x22, 0x7ffd, 0x3, 0x23, 0x4, 0x24, 0x5, 0x25, 0x26, 0x27, 0x6, 0x74, 0x75,
+    0x28, 0x29, 0x2a, 0x7, 0x2b, 0x76, 0x2c, 0x8, 0x9, 0x2d, 0x77, 0x78, 0x79, 0x7a, 0x7b, 0x7ffe,
+    0x7fc, 0x3ffd, 0x1ffd, 0xffffffc, 0xfffe6, 0x3fffd2, 0xfffe7, 0xfffe8, 0x3fffd3, 0x3fffd4,
+    0x3fffd5, 0x7fffd9, 0x3fffd6, 0x7fffda, 0x7fffdb, 0x7fffdc, 0x7fffdd, 0x7fffde, 0xffffeb,
+    0x7fffdf, 0xffffec, 0xffffed, 0x3fffd7, 0x7fffe0, 0xffffee, 0x7fffe1, 0x7fffe2, 0x7fffe3,
+    0x7fffe4, 0x1fffdc, 0x3fffd8, 0x7fffe5, 0x3fffd9, 0x7fffe6, 0x7fffe7, 0xffffef, 0x3fffda,
+    0x1fffdd, 0xfffe9, 0x3fffdb, 0x3fffdc, 0x7fffe8, 0x7fffe9, 0x1fffde, 0x7fffea, 0x3fffdd,
+    0x3fffde, 0xfffff0, 0x1fffdf, 0x3fffdf, 0x7fffeb, 0x7fffec, 0x1fffe0, 0x1fffe1, 0x3fffe0,
+    0x1fffe2, 0x7fffed, 0x3fffe1, 0x7fffee, 0x7fffef, 0xfffea, 0x3fffe2, 0x3fffe3, 0x3fffe4,
+    0x7ffff0, 0x3fffe5, 0x3fffe6, 0x7ffff1, 0x3ffffe0, 0x3ffffe1, 0xfffeb, 0x7fff1, 0x3fffe7,
+    0x7ffff2, 0x3fffe8, 0x1ffffec, 0x3ffffe2, 0x3ffffe3, 0x3ffffe4, 0x7ffffde, 0x7ffffdf,
+    0x3ffffe5, 0xfffff1, 0x1ffffed, 0x7fff2, 0x1fffe3, 0x3ffffe6, 0x7ffffe0, 0x7ffffe1, 0x3ffffe7,
+    0x7ffffe2, 0xfffff2, 0x1fffe4, 0x1fffe5, 0x3ffffe8, 0x3ffffe9, 0xffffffd, 0x7ffffe3, 0x7ffffe4,
+    0x7ffffe5, 0xfffec, 0xfffff3, 0xfffed, 0x1fffe6, 0x3fffe9, 0x1fffe7, 0x1fffe8, 0x7ffff3,
+    0x3fffea, 0x3fffeb, 0x1ffffee, 0x1ffffef, 0xfffff4, 0xfffff5, 0x3ffffea, 0x7ffff4, 0x3ffffeb,
+    0x7ffffe6, 0x3ffffec, 0x3ffffed, 0x7ffffe7, 0x7ffffe8, 0x7ffffe9, 0x7ffffea, 0x7ffffeb,
+    0xffffffe, 0x7ffffec, 0x7ffffed, 0x7ffffee, 0x7ffffef, 0x7fffff0, 0x3ffffee,
+];
+
+/// RFC 7541 Appendix B Huffman code bit lengths for bytes 0..=255.
+pub(crate) const HUFFMAN_LENGTHS: [u8; 256] = [
+    13, 23, 28, 28, 28, 28, 28, 28, 28, 24, 30, 28, 28, 30, 28, 28, 28, 28, 28, 28, 28, 28, 30, 28,
+    28, 28, 28, 28, 28, 28, 28, 28, 6, 10, 10, 12, 13, 6, 8, 11, 10, 10, 8, 11, 8, 6, 6, 6, 5, 5,
+    5, 6, 6, 6, 6, 6, 6, 6, 7, 8, 15, 6, 12, 10, 13, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 8, 7, 8, 13, 19, 13, 14, 6, 15, 5, 6, 5, 6, 5, 6, 6, 6, 5, 7, 7, 6, 6,
+    6, 5, 6, 7, 6, 5, 5, 6, 7, 7, 7, 7, 7, 15, 11, 14, 13, 28, 20, 22, 20, 20, 22, 22, 22, 23, 22,
+    23, 23, 23, 23, 23, 24, 23, 24, 24, 22, 23, 24, 23, 23, 23, 23, 21, 22, 23, 22, 23, 23, 24, 22,
+    21, 20, 22, 22, 23, 23, 21, 23, 22, 22, 24, 21, 22, 23, 23, 21, 21, 22, 21, 23, 22, 23, 23, 20,
+    22, 22, 22, 23, 22, 22, 23, 26, 26, 20, 19, 22, 23, 22, 25, 26, 26, 26, 27, 27, 26, 24, 25, 19,
+    21, 26, 27, 27, 26, 27, 24, 21, 21, 26, 26, 28, 27, 27, 27, 20, 24, 20, 21, 22, 21, 21, 23, 22,
+    22, 25, 25, 24, 24, 26, 23, 26, 27, 26, 26, 27, 27, 27, 27, 27, 28, 27, 27, 27, 27, 27, 26,
+];
+
+/// Sentinel DFA entry marking an invalid symbol or unexpected EOS code.
+pub(crate) const HUFFMAN_INVALID: u16 = 0xFFFF;
+
+/// Bit flag on a 16-bit Huffman DFA entry indicating a branch to a child 256-entry table.
+pub(crate) const HUFFMAN_BRANCH_FLAG: u16 = 0x8000;
+
+/// Lookup table of valid lowercase RFC 9114 HTTP/3 header token bytes.
+pub(crate) const H3_LOWER_TOKEN_BYTES: &[u8] = b"!#$%&'*+-.^_`|~";

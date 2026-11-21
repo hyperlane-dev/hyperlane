@@ -537,77 +537,6 @@ impl Server {
         Self::flush_stderr();
     }
 
-    /// Executes trait-based request middleware in sequence.
-    ///
-    /// # Arguments
-    ///
-    /// - `&mut Stream` - The `Stream` for the current request.
-    /// - `&mut Context` - The `Context` for the current request.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    pub(super) async fn handle_request_middleware(
-        &self,
-        stream: &mut Stream,
-        ctx: &mut Context,
-    ) -> bool {
-        for hook in self.get_request_middleware().iter() {
-            if hook(stream, ctx).await.is_reject() {
-                return true;
-            }
-        }
-        false
-    }
-
-    /// Executes a trait-based route hook if one matches.
-    ///
-    /// # Arguments
-    ///
-    /// - `&mut Stream` - The `Stream` for the current request.
-    /// - `&mut Context` - The `Context` for the current request.
-    /// - `&str` - The request path to match.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    pub(super) async fn handle_route_matcher(
-        &self,
-        stream: &mut Stream,
-        ctx: &mut Context,
-        path: &str,
-    ) -> bool {
-        if let Some(hook) = self.get_route_matcher().try_resolve_route(ctx, path)
-            && hook(stream, ctx).await.is_reject()
-        {
-            return true;
-        }
-        false
-    }
-
-    /// Executes trait-based response middleware in sequence.
-    ///
-    /// # Arguments
-    ///
-    /// - `&mut Stream` - The `Stream` for the current request.
-    /// - `&mut Context` - The `Context` for the current request.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    pub(super) async fn handle_response_middleware(
-        &self,
-        stream: &mut Stream,
-        ctx: &mut Context,
-    ) -> bool {
-        for hook in self.get_response_middleware().iter() {
-            if hook(stream, ctx).await.is_reject() {
-                return true;
-            }
-        }
-        false
-    }
-
     /// Handles errors that occur while processing HTTP requests.
     ///
     /// # Arguments
@@ -630,123 +559,38 @@ impl Server {
         }
     }
 
-    /// The core request handling pipeline.
-    ///
-    /// This function orchestrates the execution of request middleware, the route hook,
-    /// and response middleware. It supports both function-based and trait-based handlers.
+    /// Handles a single client connection, looping across keep-alive requests
+    /// while reusing `ctx.request` in place without moving or reallocating it.
     ///
     /// # Arguments
     ///
-    /// - `&mut Stream` - The `Stream` for the current request.
-    /// - `&mut Context` - The `Context` for the current request.
-    /// - `Request` - The incoming request to be processed.
-    /// - `Option<String>` - The original target supplied by a multiplexed protocol.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - A boolean indicating whether the connection should be kept alive.
-    pub(crate) async fn request_hook(
+    /// - `&CompiledPipeline` - The pre-compiled inline hook dispatch table.
+    /// - `&mut Stream` - The `Stream` for the current connection.
+    /// - `&mut Context` - The recycled `Context` for the connection.
+    async fn handle_connection(
         &self,
+        pipeline: &CompiledPipeline,
         stream: &mut Stream,
         ctx: &mut Context,
-        request: Request,
-        target: Option<String>,
-    ) -> bool {
-        let keep_alive: bool = request.is_enable_keep_alive();
-        let version: RequestVersion = request.get_version().clone();
-        ctx.set_original_head(Some(request.get_method().is_head()));
-        ctx.set_request(request);
-        ctx.get_mut_response().reset().set_version(version);
-        ctx.clear_route_params();
-        ctx.reset_request_attributes();
-        match target {
-            Some(target) => {
-                ctx.set_request_target(target);
-            }
-            None => {
-                if let Some(target) = stream.get_line_buffer().split_ascii_whitespace().nth(1) {
-                    ctx.set_request_target(target);
-                } else {
-                    ctx.clear_attribute();
-                }
-            }
-        }
-        stream.set_closed(false);
-        if self.handle_request_middleware(stream, ctx).await {
-            return stream.is_keep_alive(keep_alive);
-        }
-        // A static route is the common case and needs nothing but the path,
-        // so the path is borrowed from the request instead of being copied
-        // out of it. Only a pattern route, which is the rarer case, pays for
-        // the copy.
-        let static_hook: Option<&ServerHookHandler> = {
-            let path: &str = ctx.get_request().get_path().as_str();
-            self.get_route_matcher().try_resolve_static_route(path)
-        };
-        if let Some(hook) = static_hook {
-            if hook(stream, ctx).await.is_reject() {
-                return stream.is_keep_alive(keep_alive);
-            }
-        } else {
-            let route: RequestPath = ctx.get_request().get_path().clone();
-            if self.handle_route_matcher(stream, ctx, &route).await {
-                return stream.is_keep_alive(keep_alive);
-            }
-        }
-        if self.handle_response_middleware(stream, ctx).await {
-            return stream.is_keep_alive(keep_alive);
-        }
-        stream.is_keep_alive(keep_alive)
-    }
-
-    /// Handles subsequent HTTP requests on a persistent (keep-alive) connection.
-    ///
-    /// # Arguments
-    ///
-    /// - `&mut Stream` - The `Stream` for the current request.
-    /// - `&mut Context` - The `Context` for the current request.
-    /// - `Request` - The initial request that established the keep-alive connection.
-    async fn handle_http_requests(&self, stream: &mut Stream, ctx: &mut Context, request: Request) {
-        if !self.request_hook(stream, ctx, request, None).await {
-            return;
-        }
+    ) {
         loop {
-            let mut reused_request: Request = mem::take(ctx.get_mut_request());
-            match stream.try_fill_http_request(&mut reused_request).await {
+            match stream.try_fill_http_request(ctx.get_mut_request()).await {
                 Ok(()) => {
-                    if !self.request_hook(stream, ctx, reused_request, None).await {
+                    if !pipeline.run_request(stream, ctx, None).await {
                         return;
                     }
                 }
+                Err(RequestError::ClientClosedConnection(_))
+                    if self.get_request_error().is_empty() =>
+                {
+                    return;
+                }
                 Err(error) => {
-                    ctx.set_original_head(None).set_request(reused_request);
+                    ctx.set_original_head(None);
                     let version: Option<HttpVersion> = h1_error_response_version(stream, &error);
                     Box::pin(reply_to_request_error(self, stream, ctx, &error, version)).await;
                     return;
                 }
-            }
-        }
-    }
-
-    /// Handles a single client connection, determining whether it's an HTTP or WebSocket request.
-    ///
-    /// It reads the initial request from the stream and dispatches it to the appropriate hook.
-    /// Both arguments are borrowed: the stream and the context belong to the
-    /// caller, so this leaves them alive for whatever runs next — the panic
-    /// hooks after an unwind, or the next request on a keep alive connection.
-    ///
-    /// # Arguments
-    ///
-    /// - `&mut Stream` - The `Stream` for the current request.
-    /// - `&mut Context` - The `Context` for the current request.
-    async fn handle_connection(&self, stream: &mut Stream, ctx: &mut Context) {
-        match stream.try_get_http_request().await {
-            Ok(request) => {
-                self.handle_http_requests(stream, ctx, request).await;
-            }
-            Err(error) => {
-                let version: Option<HttpVersion> = h1_error_response_version(stream, &error);
-                Box::pin(reply_to_request_error(self, stream, ctx, &error, version)).await;
             }
         }
     }
@@ -762,55 +606,51 @@ impl Server {
     ///
     /// # Arguments
     ///
+    /// - `&CompiledPipeline` - The pre-compiled inline hook dispatch table.
     /// - `&mut Stream` - The stream carrying the connection.
     ///
     /// # Returns
     ///
     /// - `()` - Resolves once the connection is finished.
-    pub(crate) async fn serve_h1_connection_stream(&self, stream: &mut Stream) {
-        let mut ctx: Context = Context::default();
+    pub(crate) async fn serve_h1_connection_stream(
+        &self,
+        pipeline: &CompiledPipeline,
+        stream: &mut Stream,
+    ) {
+        let mut ctx: Context = take_pooled_context();
         let panicked: Option<PanicData> =
-            catch_connection_panic(self.handle_connection(stream, &mut ctx)).await;
-        let Some(panic) = panicked else {
-            return;
-        };
-        ctx.set_task_panic(panic)
-            .get_mut_response()
-            .set_status_code(HttpStatus::InternalServerError.code());
-        stream.set_closed(false);
-        for hook in self.get_task_panic().iter() {
-            if hook(stream, &mut ctx).await.is_reject() {
-                break;
+            catch_connection_panic(self.handle_connection(pipeline, stream, &mut ctx)).await;
+        if let Some(panic) = panicked {
+            ctx.set_task_panic(panic)
+                .get_mut_response()
+                .set_status_code(HttpStatus::InternalServerError.code());
+            stream.set_closed(false);
+            for hook in self.get_task_panic().iter() {
+                if hook(stream, &mut ctx).await.is_reject() {
+                    break;
+                }
             }
         }
+        return_pooled_context(ctx);
     }
 
-    /// Serves one request that arrived on a multiplexed protocol stream.
-    ///
-    /// The lifecycle is the one an HTTP/1.1 request runs: the request
-    /// middleware, the matched route and the response middleware, in that
-    /// order, against the same context and the same error hook. A panic inside
-    /// it is caught the same way a connection panic is.
+    /// Serves one request already populated in `ctx` over a multiplexed protocol stream.
     ///
     /// # Arguments
     ///
+    /// - `&CompiledPipeline` - The pre-compiled inline hook dispatch table.
     /// - `&mut Stream` - The stream the pipeline writes its response onto.
-    /// - `&mut Context` - The context for the current request.
-    /// - `Request` - The request converted from the protocol head and body.
+    /// - `&mut Context` - The context whose request has already been filled.
     /// - `String` - The complete original target before query-map conversion.
-    ///
-    /// # Returns
-    ///
-    /// - `()` - Resolves once the pipeline has finished writing.
-    pub(crate) async fn run_protocol_lifecycle(
+    pub(crate) async fn run_protocol_lifecycle_in_place(
         &self,
+        pipeline: &CompiledPipeline,
         stream: &mut Stream,
         ctx: &mut Context,
-        request: Request,
         target: String,
     ) {
         let panicked: Option<PanicData> = catch_connection_panic(async {
-            let _keep_alive: bool = self.request_hook(stream, ctx, request, Some(target)).await;
+            let _keep_alive: bool = pipeline.run_request(stream, ctx, Some(target)).await;
         })
         .await;
         let Some(panic) = panicked else {
@@ -857,7 +697,8 @@ impl Server {
             None => None,
         };
         let bind_address: &String = server_config.get_address();
-        let server: Arc<Server> = Arc::new(Self::clone(self));
+        let server: Server = Self::clone(self);
+        let pipeline: CompiledPipeline = CompiledPipeline::from_server(&server);
         let request_config: RequestConfig = *self.get_request_config();
         let (shutdown_sender, shutdown_receiver) = channel(());
         let (running_sender, running_receiver) = channel(SERVER_RUNNING);
@@ -866,12 +707,9 @@ impl Server {
                 let Some(config) = tls_config.clone() else {
                     return Err(Box::new(ServerError::MissingTlsForHttp3));
                 };
-                let quic_config: Arc<quinn::crypto::rustls::QuicServerConfig> = Arc::new(
-                    quinn::crypto::rustls::QuicServerConfig::try_from(build_quic_tls_config(
-                        &config,
-                    )?)
-                    .map_err(
-                        |error: quinn::crypto::rustls::NoInitialCipherSuite| {
+                let quic_config: Arc<QuicServerConfig> = Arc::new(
+                    QuicServerConfig::try_from(build_quic_tls_config(&config)?).map_err(
+                        |error: NoInitialCipherSuite| {
                             Box::new(ServerError::Tls(format!(
                                 "no compatible cipher suite for quic: {}",
                                 error
@@ -888,39 +726,35 @@ impl Server {
                                 bind_address, error
                             )))
                         })?;
-                let endpoint: Endpoint =
-                    Endpoint::server(quinn::ServerConfig::with_crypto(quic_config), bind_addr)
-                        .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+                let endpoints: QuicEndpointSet = bind_quic_endpoints(quic_config, bind_addr)?;
                 let env: ConnectionEnv = ConnectionEnv {
-                    server,
-                    request_config,
-                    protocol,
+                    shared: Arc::new(ConnectionShared {
+                        server,
+                        pipeline,
+                        request_config,
+                        protocol,
+                        tls_config: None,
+                    }),
                 };
                 spawn(async move {
-                    let _: Result<(), Box<ServerError>> =
-                        quic_accept(env, endpoint, shutdown_receiver, running_sender).await;
+                    quic_accept_all(env, endpoints, shutdown_receiver, running_sender).await;
                 })
             }
             _ => {
-                let tcp_listener: TcpListener = TcpListener::bind(&bind_address)
-                    .await
-                    .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+                let nodelay: bool = server_config.get_nodelay().unwrap_or(true);
+                let tcp_listeners: Vec<TcpListener> =
+                    bind_tcp_listeners(bind_address, nodelay).await?;
                 let env: ConnectionEnv = ConnectionEnv {
-                    server,
-                    request_config,
-                    protocol,
+                    shared: Arc::new(ConnectionShared {
+                        server,
+                        pipeline,
+                        request_config,
+                        protocol,
+                        tls_config: stream_tls,
+                    }),
                 };
                 spawn(async move {
-                    tcp_accept(
-                        env,
-                        stream_tls,
-                        AcceptSignal {
-                            listener: tcp_listener,
-                            shutdown_receiver,
-                            running_sender,
-                        },
-                    )
-                    .await;
+                    tcp_accept_all(env, tcp_listeners, shutdown_receiver, running_sender).await;
                 })
             }
         };
@@ -928,16 +762,14 @@ impl Server {
             let mut running_receiver_clone: Receiver<bool> = running_receiver.clone();
             Box::pin(async move {
                 while !*running_receiver_clone.borrow_and_update() {
-                    let _: Result<(), tokio::sync::watch::error::RecvError> =
-                        running_receiver_clone.changed().await;
+                    let _: Result<(), RecvError> = running_receiver_clone.changed().await;
                 }
             })
         });
         let shutdown_hook: ServerControlHookHandler<()> = Arc::new(move || {
             let shutdown_sender_clone: Sender<()> = shutdown_sender.clone();
             Box::pin(async move {
-                let _: Result<(), tokio::sync::watch::error::SendError<()>> =
-                    shutdown_sender_clone.send(());
+                let _: Result<(), SendError<()>> = shutdown_sender_clone.send(());
             })
         });
         let mut server_control_hook: ServerControlHook = ServerControlHook::default();

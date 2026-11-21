@@ -106,7 +106,7 @@ fn test_builder_body_text_stores_utf8_bytes() {
 
 #[test]
 fn test_builder_body_json_serialises_value() {
-    let body: serde_json::Value = json!({ "code": 1 });
+    let body: Value = json!({ "code": 1 });
     let mut builder: RequestBuilder = RequestBuilder::new();
     let request: HttpRequest = builder.post("http://a.test/").body_json(&body).build();
     assert_eq!(request.get_body().as_str(), Some("{\"code\":1}"));
@@ -114,8 +114,8 @@ fn test_builder_body_json_serialises_value() {
 
 #[test]
 fn test_builder_body_json_replaces_previous_body() {
-    let first: serde_json::Value = json!({ "a": 1 });
-    let second: serde_json::Value = json!({ "b": 2 });
+    let first: Value = json!({ "a": 1 });
+    let second: Value = json!({ "b": 2 });
     let mut builder: RequestBuilder = RequestBuilder::new();
     let request: HttpRequest = builder
         .post("http://a.test/")

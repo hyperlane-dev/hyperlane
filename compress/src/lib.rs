@@ -21,6 +21,8 @@ use std::{
     collections::HashMap,
     fmt,
     io::{self, BufReader, BufWriter, Read, prelude::*},
+    mem::MaybeUninit,
+    ptr, slice,
     str::FromStr,
 };
 
@@ -32,5 +34,5 @@ use {
         read::{DeflateDecoder, GzDecoder},
         write::{DeflateEncoder, GzEncoder},
     },
-    twox_hash::xxhash3_64::{DEFAULT_SECRET_LENGTH, RawHasher, SecretBuffer},
+    twox_hash::xxhash3_64::{self, DEFAULT_SECRET_LENGTH, RawHasher, SecretBuffer},
 };

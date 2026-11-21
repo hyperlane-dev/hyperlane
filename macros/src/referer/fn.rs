@@ -19,7 +19,7 @@ pub(crate) fn referer_macro(
 ) -> TokenStream {
     let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_referer.referer_values.iter().map(|referer_value: &syn::Expr| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_referer.referer_values.iter().map(|referer_value: &Expr| {
             quote! {
                 if #context.get_request().try_get_header_back(::hyperlane::REFERER).map_or(true, |referer_header: ::hyperlane::RequestHeadersValueItem| referer_header != #referer_value) {
                     return ::hyperlane::Status::Continue;
@@ -51,7 +51,7 @@ pub(crate) fn reject_referer_macro(
 ) -> TokenStream {
     let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_referer.referer_values.iter().map(|referer_value: &syn::Expr| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_referer.referer_values.iter().map(|referer_value: &Expr| {
             quote! {
                 if #context.get_request().try_get_header_back(::hyperlane::REFERER).map_or(false, |referer_header: ::hyperlane::RequestHeadersValueItem| referer_header == #referer_value) {
                     return ::hyperlane::Status::Continue;

@@ -79,23 +79,19 @@ pub(crate) fn prologue_hooks_macro(
 ) -> TokenStream {
     let functions: Punctuated<Expr, Token![,]> =
         parse_macro_input!(attr with Punctuated::parse_terminated);
-    inject(
-        position,
-        item,
-        |context: &syn::Ident, stream: &syn::Ident| {
-            let hook_calls: Vec<proc_macro2::TokenStream> = functions
-                .iter()
-                .map(|function_expr: &syn::Expr| {
-                    quote! {
-                        let _ = #function_expr(#stream, #context).await;
-                    }
-                })
-                .collect();
-            quote! {
-                #(#hook_calls)*
-            }
-        },
-    )
+    inject(position, item, |context: &Ident, stream: &Ident| {
+        let hook_calls: Vec<proc_macro2::TokenStream> = functions
+            .iter()
+            .map(|function_expr: &Expr| {
+                quote! {
+                    let _ = #function_expr(#stream, #context).await;
+                }
+            })
+            .collect();
+        quote! {
+            #(#hook_calls)*
+        }
+    })
 }
 
 /// Expands macro to add multiple post-hook function calls.
@@ -116,21 +112,17 @@ pub(crate) fn epilogue_hooks_macro(
 ) -> TokenStream {
     let functions: Punctuated<Expr, Token![,]> =
         parse_macro_input!(attr with Punctuated::parse_terminated);
-    inject(
-        position,
-        item,
-        |context: &syn::Ident, stream: &syn::Ident| {
-            let hook_calls: Vec<proc_macro2::TokenStream> = functions
-                .iter()
-                .map(|function_expr: &syn::Expr| {
-                    quote! {
-                        let _ = #function_expr(#stream, #context).await;
-                    }
-                })
-                .collect();
-            quote! {
-                #(#hook_calls)*
-            }
-        },
-    )
+    inject(position, item, |context: &Ident, stream: &Ident| {
+        let hook_calls: Vec<proc_macro2::TokenStream> = functions
+            .iter()
+            .map(|function_expr: &Expr| {
+                quote! {
+                    let _ = #function_expr(#stream, #context).await;
+                }
+            })
+            .collect();
+        quote! {
+            #(#hook_calls)*
+        }
+    })
 }

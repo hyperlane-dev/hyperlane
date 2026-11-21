@@ -32,44 +32,105 @@ use std::{
     any::Any,
     cell::{RefCell, RefMut},
     cmp::Ordering,
-    collections::HashSet,
+    collections::{HashMap, HashSet, VecDeque},
+    fmt,
     future::{Future, poll_fn},
     hash::{Hash, Hasher},
-    io::{self, Write, stderr, stdout},
-    mem,
-    net::{AddrParseError, SocketAddr},
+    io::{self, IoSlice, IoSliceMut, Write, stderr, stdout},
+    marker::PhantomPinned,
+    mem::{self, MaybeUninit},
+    net::{self, AddrParseError, SocketAddr},
     num::ParseIntError,
     panic::AssertUnwindSafe,
-    pin::Pin,
-    ptr,
+    pin::{Pin, pin},
+    process::abort,
+    ptr, slice,
     str::{Split, SplitWhitespace, Utf8Error, from_utf8},
-    sync::Arc,
-    task::{self, Poll},
+    sync::{
+        self, Arc, Mutex, MutexGuard, OnceLock,
+        atomic::{AtomicBool, AtomicUsize},
+    },
+    task::{self, Poll, Waker},
+    thread,
     time::Duration,
 };
 
 use {
     bytes::Bytes,
-    futures::FutureExt,
-    h3::error::{Code, StreamError},
-    http::{HeaderValue, StatusCode},
+    futures::{FutureExt, StreamExt, stream::FuturesUnordered},
+    h2::{
+        Reason,
+        server::{Builder, SendResponse},
+    },
+    http::{
+        HeaderMap, HeaderName, HeaderValue, StatusCode, Uri,
+        request::Parts,
+        status::InvalidStatusCode,
+        uri::{Authority, Scheme},
+    },
     inventory::collect,
     lombok_macros::*,
-    quinn::{self, Endpoint, Incoming, VarInt},
-    regex::Regex,
-    rustls::pki_types::{
-        CertificateDer, PrivateKeyDer,
-        pem::{self, PemObject},
+    quinn::{
+        self, AsyncUdpSocket, Connection, ConnectionId, ConnectionIdGenerator, Endpoint,
+        EndpointConfig, Incoming, RecvStream, Runtime, SendStream, TokioRuntime, UdpPoller, VarInt,
+        WriteError,
+        crypto::rustls::{HandshakeData, NoInitialCipherSuite, QuicServerConfig},
+        udp::{BATCH_SIZE, RecvMeta, Transmit},
+    },
+    regex::{Match, Regex},
+    rustls::{
+        SupportedCipherSuite,
+        crypto::{
+            CryptoProvider, SecureRandom,
+            ring::{
+                cipher_suite::{
+                    TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+                    TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+                    TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+                    TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+                    TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS13_AES_128_GCM_SHA256,
+                    TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256,
+                },
+                default_provider,
+            },
+        },
+        pki_types::{
+            CertificateDer, PrivateKeyDer,
+            pem::{self, PemObject},
+        },
+        server::UnbufferedServerConnection,
+        unbuffered::{ConnectionState, EncodeError, EncryptError, UnbufferedStatus},
+        version::{TLS12, TLS13},
     },
     serde::{Deserialize, Serialize},
+    socket2::{Domain, SockRef, Socket, Type},
     tokio::{
-        io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf},
-        join,
+        io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf},
         net::{TcpListener, TcpStream},
-        spawn,
-        sync::watch::{Receiver, Sender, channel},
-        task::JoinHandle,
-        time::timeout,
+        runtime, spawn,
+        sync::watch::{Receiver, Sender, channel, error::RecvError, error::SendError},
+        task::{JoinError, JoinHandle, spawn_blocking},
+        time::{error::Elapsed, timeout},
     },
-    tokio_rustls::TlsAcceptor,
+};
+
+#[cfg(not(target_os = "linux"))]
+use tokio::runtime::Handle;
+
+#[cfg(target_os = "linux")]
+use {
+    io_uring::{IoUring, opcode, squeue, types},
+    libc::{
+        AF_INET, AF_INET6, EAGAIN, EBUSY, ECANCELED, EFD_CLOEXEC, EFD_NONBLOCK, EINTR, EPIPE,
+        IP_TTL, IPPROTO_IP, IPPROTO_IPV6, IPV6_UNICAST_HOPS, MSG_MORE, MSG_WAITALL, POLLIN,
+        SHUT_WR, SOCK_CLOEXEC, SOCK_NONBLOCK, c_int, c_void, close, eventfd, read, setsockopt,
+        shutdown, sockaddr, sockaddr_in, sockaddr_in6, sockaddr_storage, socklen_t, write,
+    },
+    std::{
+        net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6},
+        os::fd::{AsRawFd, RawFd},
+        sync::mpsc::{SyncSender, sync_channel},
+        task::Wake,
+    },
+    tokio::runtime::{EnterGuard, Handle},
 };

@@ -4,13 +4,13 @@ use super::*;
 ///
 /// # Arguments
 ///
-/// - `&proc_macro2::Ident` - The HTTP method name as an ident.
+/// - `&Ident` - The HTTP method name as an ident.
 ///
 /// # Returns
 ///
 /// Returns a closure that generates the method check code.
 pub(crate) fn create_method_check(
-    method: &proc_macro2::Ident,
+    method: &Ident,
 ) -> impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream {
     let method_str: String = method.to_string();
     move |context: &Ident, _: &Ident| {
@@ -50,10 +50,9 @@ pub(crate) fn methods_macro(
             let method_checks: Vec<proc_macro2::TokenStream> = methods
                 .methods
                 .iter()
-                .map(|method: &syn::Ident| {
+                .map(|method: &Ident| {
                     let method_str: String = method.to_string();
-                    let check_fn: proc_macro2::Ident =
-                        Ident::new(&format!("is_{method_str}"), method.span());
+                    let check_fn: Ident = Ident::new(&format!("is_{method_str}"), method.span());
                     quote! {
                         #context.get_request().get_method().#check_fn()
                     }

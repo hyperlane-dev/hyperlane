@@ -10,4 +10,4 @@ mod url;
 use super::*;
 
 use http_type::{CHUNKED, CONTENT_ENCODING, TRANSFER_ENCODING};
-use serde_json::json;
+use serde_json::{Value, json, to_string};

@@ -11,7 +11,7 @@ use super::*;
 ///
 /// # Returns
 ///
-/// - `syn::Result<MultiRefererData>` - Parsed MultiRefererData or error.
+/// - `Result<MultiRefererData>` - Parsed MultiRefererData or error.
 impl Parse for MultiRefererData {
     /// Parses the input token stream into a MultiRefererData structure.
     ///
@@ -21,8 +21,8 @@ impl Parse for MultiRefererData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed MultiRefererData, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed MultiRefererData, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut referer_values: Vec<Expr> = Vec::new();
         loop {
             let referer_value: Expr = input.parse()?;

@@ -12,8 +12,8 @@ impl Parse for ResponseHeaderData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed ResponseHeaderData, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed ResponseHeaderData, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         let key: Expr = input.parse()?;
         let operation: HeaderOperation = if input.peek(Token![=>]) {
             input.parse::<Token![=>]>()?;
@@ -22,7 +22,7 @@ impl Parse for ResponseHeaderData {
             input.parse::<Token![,]>()?;
             HeaderOperation::Add
         } else {
-            return Err(syn::Error::new(input.span(), EXPECTED_ADD_OR_SET_OPERATION));
+            return Err(Error::new(input.span(), EXPECTED_ADD_OR_SET_OPERATION));
         };
         let value: Expr = input.parse()?;
         Ok(ResponseHeaderData {
@@ -45,8 +45,8 @@ impl Parse for ResponseBodyData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - The parsed ResponseBodyData, or an error for invalid input.
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    /// - `Result<Self>` - The parsed ResponseBodyData, or an error for invalid input.
+    fn parse(input: ParseStream) -> Result<Self> {
         let body: Expr = input.parse()?;
         Ok(ResponseBodyData { body })
     }

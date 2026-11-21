@@ -61,11 +61,10 @@ impl Default for Response {
     /// Builds the default `Response` with all fields set to their defaults.
     #[inline(always)]
     fn default() -> Self {
-        let http_status: HttpStatus = HttpStatus::default();
         Self {
             version: HttpVersion::Http1_1,
-            status_code: http_status.code(),
-            reason_phrase: http_status.to_string(),
+            status_code: HttpStatus::Ok.code(),
+            reason_phrase: OK.to_owned(),
             headers: hash_map_xx_hash3_64(),
             body: Vec::new(),
         }
@@ -74,6 +73,40 @@ impl Default for Response {
 
 /// Inherent implementation of [`Response`].
 impl Response {
+    /// Sets the response reason phrase while reusing the existing string capacity.
+    ///
+    /// # Arguments
+    ///
+    /// - `impl AsRef<str>` - The reason phrase text.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Self` - A mutable reference to self for chaining.
+    #[inline(always)]
+    pub fn set_reason_phrase(&mut self, val: impl AsRef<str>) -> &mut Self {
+        let text: &str = val.as_ref();
+        self.reason_phrase.clear();
+        self.reason_phrase.push_str(text);
+        self
+    }
+
+    /// Sets the response body while reusing the existing byte vector capacity.
+    ///
+    /// # Arguments
+    ///
+    /// - `impl AsRef<[u8]>` - The response body bytes.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Self` - A mutable reference to self for chaining.
+    #[inline(always)]
+    pub fn set_body(&mut self, val: impl AsRef<[u8]>) -> &mut Self {
+        let bytes: &[u8] = val.as_ref();
+        self.body.clear();
+        self.body.extend_from_slice(bytes);
+        self
+    }
+
     /// Pushes a header with a key and value as_ref the response bytes.
     ///
     /// # Arguments
@@ -340,7 +373,7 @@ impl Response {
     where
         T: DeserializeOwned,
     {
-        serde_json::from_slice(self.get_body())
+        from_slice(self.get_body())
     }
 
     /// Deserializes the body content of the response as_ref a specified type `T`.
@@ -586,9 +619,7 @@ impl Response {
         if headers.is_empty() {
             return;
         }
-        for (key, values) in headers.drain() {
-            return_header_entry((key, values));
-        }
+        return_header_entries(headers.drain());
     }
 
     /// Tries to parse cookies from the `Set-Cookie` header.
@@ -722,9 +753,61 @@ impl Response {
             // replaced, so a response that announces the same status over and
             // over stops allocating for it.
             let phrase: &'static str = HttpStatus::phrase_ref(status_code);
-            let stored: &mut ResponseReasonPhrase = self.get_mut_reason_phrase();
-            stored.clear();
-            stored.push_str(phrase);
+            if self.get_reason_phrase().as_str() != phrase {
+                let stored: &mut ResponseReasonPhrase = self.get_mut_reason_phrase();
+                stored.clear();
+                stored.push_str(phrase);
+            }
+        }
+        if INCLUDE_BODY
+            && self.get_headers().is_empty()
+            && status_code >= HttpStatus::Ok.code()
+            && status_code != HttpStatus::NoContent.code()
+            && status_code != HttpStatus::ResetContent.code()
+            && status_code != HttpStatus::NotModified.code()
+        {
+            let content_type: &str = default_content_type();
+            let body_len: usize = self.get_body().len();
+            let mut digits: [u8; B_20] = [0; B_20];
+            let rendered_len: &str = render_length(body_len, &mut digits);
+            let mut code_digits: [u8; B_20] = [0; B_20];
+            let rendered_code: &str = render_length(status_code, &mut code_digits);
+            let version_str: &str = self.get_version().as_str();
+            let phrase_str: &str = self.get_reason_phrase().as_str();
+            let total_size: usize = version_str.len()
+                + 1
+                + rendered_code.len()
+                + 1
+                + phrase_str.len()
+                + HTTP_BR.len()
+                + CONNECTION.len()
+                + COLON.len()
+                + KEEP_ALIVE.len()
+                + HTTP_BR.len()
+                + CONTENT_TYPE.len()
+                + COLON.len()
+                + content_type.len()
+                + HTTP_BR.len()
+                + CONTENT_LENGTH.len()
+                + COLON.len()
+                + rendered_len.len()
+                + HTTP_BR.len()
+                + HTTP_BR.len()
+                + body_len;
+            let mut response_bytes: Vec<u8> = Vec::with_capacity(total_size);
+            response_bytes.extend_from_slice(version_str.as_bytes());
+            response_bytes.push(b' ');
+            response_bytes.extend_from_slice(rendered_code.as_bytes());
+            response_bytes.push(b' ');
+            response_bytes.extend_from_slice(phrase_str.as_bytes());
+            response_bytes.extend_from_slice(HTTP_BR.as_bytes());
+            Self::push_header(&mut response_bytes, CONTENT_LENGTH, rendered_len);
+            Self::push_header(&mut response_bytes, CONNECTION, KEEP_ALIVE);
+            Self::push_header(&mut response_bytes, CONTENT_TYPE, content_type);
+            response_bytes.extend_from_slice(HTTP_BR.as_bytes());
+            response_bytes.extend_from_slice(self.get_body().as_slice());
+            self.populate_default_headers_batch(content_type, rendered_len);
+            return response_bytes;
         }
         if self
             .get_headers()
@@ -823,6 +906,41 @@ impl Response {
         response_bytes.extend_from_slice(HTTP_BR.as_bytes());
         response_bytes.extend_from_slice(body);
         response_bytes
+    }
+
+    /// Populates the three default wire headers using one thread-local pool lookup.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - The default content type value.
+    /// - `&str` - The decimal body length string.
+    fn populate_default_headers_batch(&mut self, content_type: &str, rendered_len: &str) {
+        let headers: &mut ResponseHeaders = self.get_mut_headers();
+        let pairs: [(&str, &str); 3] = [
+            (CONNECTION, KEEP_ALIVE),
+            (CONTENT_TYPE, content_type),
+            (CONTENT_LENGTH, rendered_len),
+        ];
+        HEADER_ENTRY_POOL.with(|pool: &RefCell<Vec<(String, VecDeque<String>)>>| {
+            let mut pool: RefMut<'_, Vec<(String, VecDeque<String>)>> = pool.borrow_mut();
+            for (key, value) in pairs {
+                let (mut name, mut values): (String, VecDeque<String>) = pool
+                    .pop()
+                    .unwrap_or_else(|| (String::new(), VecDeque::new()));
+                name.clear();
+                name.push_str(key);
+                while values.len() > 1 {
+                    values.pop_back();
+                }
+                if let Some(slot) = values.front_mut() {
+                    slot.clear();
+                    slot.push_str(value);
+                } else {
+                    values.push_back(value.to_owned());
+                }
+                headers.insert(name, values);
+            }
+        });
     }
 
     /// Sets the generated content length using a stack buffer.

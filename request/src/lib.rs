@@ -38,11 +38,12 @@ pub use std::{
 pub use {
     http_type::tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf},
     rustls::{
-        ClientConfig, ClientConnection, RootCertStore, StreamOwned,
+        ClientConfig, ClientConnection, Error, RootCertStore, StreamOwned,
         pki_types::{InvalidDnsNameError, ServerName},
     },
     serde::Serialize,
-    tokio_rustls::TlsConnector,
+    serde_json::to_vec,
+    tokio_rustls::{TlsConnector, client::TlsStream},
     webpki_roots::TLS_SERVER_ROOTS,
 };
 

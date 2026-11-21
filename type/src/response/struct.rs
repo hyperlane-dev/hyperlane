@@ -12,11 +12,11 @@ pub struct Response {
     #[get(type(copy))]
     pub status_code: ResponseStatusCode,
     /// The reason phrase associated with the status code.
-    #[set(type(AsRef<str>))]
+    #[set(skip)]
     pub reason_phrase: ResponseReasonPhrase,
     /// The response headers as key-value pairs.
     pub headers: ResponseHeaders,
     /// The binary body content of the response.
-    #[set(type(AsRef<[u8]>))]
+    #[set(skip)]
     pub body: ResponseBody,
 }

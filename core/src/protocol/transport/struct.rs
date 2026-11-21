@@ -1,82 +1,54 @@
 use super::*;
 
-/// A transport that carries an HTTP/2 or HTTP/3 request stream to the pipeline.
-///
-/// HTTP/2 and HTTP/3 deliver a request as a bidirectional stream, and the
-/// framework pipeline writes HTTP/1.1 shaped bytes onto it: a status line, a
-/// header block, then body bytes. A duplex pipe joins the two halves: the
-/// lifecycle writes into one end exactly as it would write to a socket, and a
-/// concurrent pump reads the other end, frames the head once it is complete and
-/// forwards every following chunk as a data frame. A handler that flushes
-/// progressively therefore reaches the client before it returns, which a sink
-/// that collected everything and framed it afterwards could not do.
-///
-/// The transport itself performs no framing. It only exposes the pipe to the
-/// framework and reports the addresses of the connection carrying it.
-#[derive(Data, Debug)]
-pub(crate) struct DuplexTransport {
-    /// The half the framework pipeline writes onto.
-    #[get(skip)]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
-    pub(super) pipe: DuplexStream,
-    /// The local address of the connection carrying this stream.
-    #[get(type(copy), pub(crate))]
-    #[get_mut(skip)]
-    #[set(pub(crate))]
-    pub(super) local: Option<SocketAddr>,
-    /// The remote address of the connection carrying this stream.
-    #[get(type(copy), pub(crate))]
-    #[get_mut(skip)]
-    #[set(pub(crate))]
-    pub(super) remote: Option<SocketAddr>,
+/// Wraps a negotiated TLS session driven through [`UnbufferedServerConnection`]
+/// with worker-local pooled record buffers and zero-allocation in-place writes.
+pub(crate) struct TlsTransport<T = TcpStream> {
+    /// Underlying accepted stream transport (Tokio `TcpStream` or Linux `io_uring` transport).
+    pub(super) tcp: T,
+    /// Unbuffered rustls server state machine.
+    pub(super) conn: UnbufferedServerConnection,
+    /// Incoming encrypted TLS record buffer (`0..in_len` valid).
+    pub(super) in_buf: Vec<u8>,
+    /// Number of unread ciphertext bytes stored in `in_buf`.
+    pub(super) in_len: usize,
+    /// Decrypted plaintext bytes awaiting consumption by `poll_read`.
+    pub(super) plain_buf: Vec<u8>,
+    /// Cursor of the first unread byte in `plain_buf`.
+    pub(super) plain_pos: usize,
+    /// Outgoing encrypted TLS bytes awaiting transmission (`out_pos..out_len`).
+    pub(super) out_buf: Vec<u8>,
+    /// Cursor of the first untransmitted byte in `out_buf`.
+    pub(super) out_pos: usize,
+    /// Total valid encrypted bytes in `out_buf`.
+    pub(super) out_len: usize,
+    /// Whether the peer has sent `close_notify`.
+    pub(super) peer_closed: bool,
+    /// Whether this side has already queued `close_notify`.
+    pub(super) write_closed: bool,
 }
 
-/// Wraps a TLS session so it satisfies the framework transport contract.
-///
-/// An HTTP/1.1 request over TLS must present the same `Stream` surface as a
-/// plaintext one, so the negotiated session is carried with the address
-/// information the framework reads from it. The session is the real socket,
-/// so keep alive, upgrades and raw writes behave exactly as they do in
-/// plaintext.
-#[derive(Data, Debug)]
-pub(crate) struct TlsTransport {
-    /// The negotiated TLS session over the accepted socket.
-    #[get(skip)]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
-    pub(super) session: tokio_rustls::server::TlsStream<TcpStream>,
-}
-
-/// The environment one accepted connection is served in.
-///
-/// Every protocol path needs the same three things: the server whose pipeline
-/// runs each request, the parsing limits and read timeouts those requests are
-/// bounded by, and the protocol this connection is served as. Carried as one
-/// value they stop being the same three parameters repeated in the same order at
-/// every layer.
-///
-/// The server handle is held in an `Arc` exactly as before: one clone per spawned
-/// connection, and one per request task, which is the count the previous
-/// signature already forced. `Clone` copies the handle and adds one to the number
-/// of existing clones of that `Arc`. The other two fields are `Copy`, so they are
-/// carried by value.
-#[derive(Clone, Debug)]
-pub(crate) struct ConnectionEnv {
+/// Shared immutable server state owned once per listener and cloned via a single `Arc`.
+pub(crate) struct ConnectionShared {
     /// The server whose pipeline serves each request.
-    pub(crate) server: Arc<Server>,
+    pub(crate) server: Server,
+    /// Pre-compiled inline hook dispatch table built once at server startup.
+    pub(crate) pipeline: CompiledPipeline,
     /// The parsing limits and read timeouts for the connection.
     pub(crate) request_config: RequestConfig,
     /// The protocol served on this connection.
     pub(crate) protocol: ServerProtocol,
+    /// Optional validated rustls server configuration for stream listeners.
+    pub(crate) tls_config: Option<Arc<TlsServerConfig>>,
 }
 
-/// The addresses of the connection carrying one request stream.
-///
-/// The duplex transport reports these to the framework, so a handler that reads
-/// them sees the real connection rather than a fabricated one. They are the same
-/// two values on every protocol path and the duplex transport is always built
-/// from both, so they travel together.
+/// The server, compiled pipeline, limits, and protocol owned by an accepted connection.
+#[derive(Clone)]
+pub(crate) struct ConnectionEnv {
+    /// Shared immutable listener state.
+    pub(crate) shared: Arc<ConnectionShared>,
+}
+
+/// The real socket addresses of the connection carrying a request stream.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct StreamPeers {
     /// The local address of the carrying connection.

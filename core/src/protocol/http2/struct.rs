@@ -1,27 +1,84 @@
 use super::*;
 
-/// Frames a response onto an HTTP/2 request stream as the pump produces it.
-///
-/// The framing code moves a stream half out of the field with `take` before it
-/// can write on it, so both stream fields are reached through their mutable
-/// accessor rather than a shared one.
-#[derive(Data)]
-pub(crate) struct H2Framer {
-    /// The response half, used only for the head.
+/// Internal state of a direct HTTP/2 response transport.
+#[derive(Data, Debug)]
+pub(crate) struct H2DirectState {
+    /// The response half, used once to emit the HEADERS frame.
     #[get(skip)]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
-    pub(super) send_response: Option<h2::server::SendResponse<Bytes>>,
-    /// The stream half, used for every data frame.
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) send_response: Option<H2SendResponse>,
+    /// The data stream half, used to emit DATA frames and EOS.
     #[get(skip)]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
-    pub(super) send_stream: Option<h2::SendStream<Bytes>>,
-    /// Whether the end of stream has already been sent.
-    #[get(type(copy), pub(crate))]
-    #[get_mut(skip)]
-    #[set(pub(crate))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) send_stream: Option<H2SendStream>,
+    /// Buffered bytes accumulated only when a response head spans multiple writes.
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) pending_head: Vec<u8>,
+    /// Buffered trailing body bytes extracted after a split head completes.
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) pending_body: Vec<u8>,
+    /// Read cursor inside `pending_body`.
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) pending_body_offset: usize,
+    /// Whether the response head has already been emitted.
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) head_sent: bool,
+    /// Whether body bytes must be suppressed (e.g. HEAD, 204, 304, 1xx).
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) suppress_body: bool,
+    /// Whether the incoming request method was `HEAD`.
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) is_head: bool,
+    /// The validated content length announced in the head, if any.
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) announced_len: Option<usize>,
+    /// Total body bytes forwarded so far.
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) body_len: usize,
+    /// Whether the end-of-stream flag has already been emitted.
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
     pub(super) finished: bool,
+    /// Whether framing encountered an unrecoverable protocol error.
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) failed: bool,
+}
+
+/// Direct `Transport` implementation that frames written HTTP/1.1 bytes straight
+/// onto an HTTP/2 stream without a duplex pipe or background pump task.
+#[derive(Data, Debug)]
+pub(crate) struct H2DirectTransport {
+    /// Exclusively owned framing state wrapped in a mutex to satisfy `Transport: Sync`.
+    #[get(skip)]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) state: Mutex<H2DirectState>,
+    /// The local and remote addresses of the carrying TCP connection.
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) peers: StreamPeers,
 }
 
 /// The environment one HTTP/2 request stream is served in.
@@ -34,12 +91,10 @@ pub(crate) struct H2Framer {
 /// Every field but the server handle is `Copy`. The handle is an `Arc` the
 /// connection loop already cloned, so passing the environment by value moves that
 /// handle instead of cloning it again.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(crate) struct H2RequestEnv {
-    /// The server whose pipeline serves the request.
-    pub(crate) server: Arc<Server>,
-    /// The parsing limits and read timeout for the connection.
-    pub(crate) request_config: RequestConfig,
+    /// Shared listener state containing the server and compiled inline pipeline.
+    pub(crate) shared: Arc<ConnectionShared>,
     /// The addresses of the connection carrying the request.
     pub(crate) peers: StreamPeers,
 }

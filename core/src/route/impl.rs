@@ -399,6 +399,85 @@ impl RoutePattern {
         }
     }
 
+    /// Matches this route pattern against a request path and populates `params`
+    /// in place without allocating an intermediate segment vector.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - The request path to match against.
+    /// - `&mut RouteParams` - The recycled parameter map to populate on match.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if the pattern matched and `params` was populated.
+    pub(crate) fn try_match_path_into(&self, path: &str, params: &mut RouteParams) -> bool {
+        let trimmed: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
+        let route_segments: &[RouteSegment] = self.get_0().as_slice();
+        let route_segments_len: usize = route_segments.len();
+        if trimmed.is_empty() {
+            return route_segments_len == 0;
+        }
+        if self.is_static() {
+            return self.try_match_static_path(trimmed).is_some();
+        }
+        let is_tail_regex: bool = matches!(route_segments.last(), Some(RouteSegment::Regex(_, _)));
+        if !is_tail_regex {
+            let mut seg_idx: usize = 0;
+            for part in trimmed.split(DEFAULT_HTTP_PATH) {
+                if part.is_empty() {
+                    continue;
+                }
+                let Some(expected) = route_segments.get(seg_idx) else {
+                    return false;
+                };
+                match expected {
+                    RouteSegment::Static(literal) => {
+                        if part != literal.as_str() {
+                            return false;
+                        }
+                    }
+                    RouteSegment::Dynamic(_) => {}
+                    RouteSegment::Regex(_, regex) => {
+                        let Some(mat) = regex.find(part) else {
+                            return false;
+                        };
+                        if mat.start() != 0 || mat.end() != part.len() {
+                            return false;
+                        }
+                    }
+                }
+                seg_idx += 1;
+            }
+            if seg_idx != route_segments_len {
+                return false;
+            }
+            let mut write_idx: usize = 0;
+            for part in trimmed.split(DEFAULT_HTTP_PATH) {
+                if part.is_empty() {
+                    continue;
+                }
+                match &route_segments[write_idx] {
+                    RouteSegment::Static(_) => {}
+                    RouteSegment::Dynamic(param_name) | RouteSegment::Regex(param_name, _) => {
+                        let (mut key, mut val): (String, String) = take_route_param_entry();
+                        key.push_str(param_name);
+                        val.push_str(part);
+                        params.insert(key, val);
+                    }
+                }
+                write_idx += 1;
+            }
+            return true;
+        }
+        match self.try_match_path(path) {
+            Some(matched) => {
+                *params = matched;
+                true
+            }
+            None => false,
+        }
+    }
+
     /// Matches this route pattern against a request path.
     ///
     /// If the pattern matches, extracts any dynamic or regex parameters.
@@ -465,7 +544,7 @@ impl RoutePattern {
                         }
                     };
                     {
-                        let mat: regex::Match<'_> = regex.find(&segment_value)?;
+                        let mat: Match<'_> = regex.find(&segment_value)?;
                         if mat.start() != 0 || mat.end() != segment_value.len() {
                             return None;
                         }
@@ -602,29 +681,6 @@ impl RouteMatcher {
             Err(pos) => routes_for_count.insert(pos, (route_pattern, hook)),
         }
         Ok(())
-    }
-
-    /// Resolves a static route hook by reference (no Arc::clone) for hot-path use.
-    ///
-    /// A static route is the common case, and it needs neither a route
-    /// parameter nor a mutable context, so the caller can look it up with
-    /// nothing but the path. That keeps the path from being copied out of the
-    /// request for every request that a static route answers.
-    ///
-    /// # Arguments
-    ///
-    /// - `&'a self` - The route table to search.
-    /// - `&str` - The request path to resolve.
-    ///
-    /// # Returns
-    ///
-    /// - `Option<&'a ServerHookHandler>`: The matched handler, or `None` when
-    ///   no static route matched.
-    pub(crate) fn try_resolve_static_route<'a>(
-        &'a self,
-        path: &str,
-    ) -> Option<&'a ServerHookHandler> {
-        self.get_static_route().get(path)
     }
 
     /// Resolves a route hook by reference (no Arc::clone) for hot-path use.

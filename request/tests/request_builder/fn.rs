@@ -38,7 +38,7 @@ async fn test_async_https_get_request() {
 
 #[test]
 fn test_sync_post_json_request() {
-    let body = serde_json::json!({
+    let body = json!({
         "code": "fn main() {\r\n    println!(\"hello world\");\r\n}",
         "language": "rust",
     });

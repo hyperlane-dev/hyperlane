@@ -137,7 +137,7 @@ pub(crate) async fn read_more(stream: &mut TcpStream, sink: &mut Vec<u8>) {
 
 pub(crate) async fn http1_head_until<T>(stream: &mut T, delimiter: &str) -> String
 where
-    T: tokio::io::AsyncRead + Unpin,
+    T: AsyncRead + Unpin,
 {
     let mut collected: Vec<u8> = Vec::new();
     let mut chunk: [u8; 8192] = [0; 8192];
@@ -196,15 +196,13 @@ pub(crate) async fn tls_exchange(
 }
 
 pub(crate) async fn connect_tls(port: u16, alpn: &[u8]) -> io::Result<ClientTlsStream> {
-    let name: ServerName<'static> = ServerName::try_from(TLS_SERVER_NAME).map_err(
-        |error: rustls::pki_types::InvalidDnsNameError| {
+    let name: ServerName<'static> =
+        ServerName::try_from(TLS_SERVER_NAME).map_err(|error: InvalidDnsNameError| {
             io::Error::new(io::ErrorKind::InvalidInput, error.to_string())
-        },
-    )?;
-    let connector: tokio_rustls::TlsConnector =
-        tokio_rustls::TlsConnector::from(alpn_client_config(alpn));
+        })?;
+    let connector: TlsConnector = TlsConnector::from(alpn_client_config(alpn));
     let socket: TcpStream = connect_tcp(port).await?;
-    let handshake: tokio_rustls::Connect<TcpStream> = connector.connect(name, socket);
+    let handshake: Connect<TcpStream> = connector.connect(name, socket);
     let bound: Duration = Duration::from_secs(CONNECT_TIMEOUT_SECS);
     match timeout(bound, handshake).await {
         Ok(outcome) => outcome,
@@ -217,9 +215,8 @@ pub(crate) async fn connect_tls(port: u16, alpn: &[u8]) -> io::Result<ClientTlsS
 
 pub(crate) async fn connect_tls_untrusted(port: u16) -> Result<(), String> {
     let name: ServerName<'static> = ServerName::try_from(TLS_SERVER_NAME)
-        .map_err(|error: rustls::pki_types::InvalidDnsNameError| error.to_string())?;
-    let connector: tokio_rustls::TlsConnector =
-        tokio_rustls::TlsConnector::from(untrusted_client_config(ALPN_HTTP2));
+        .map_err(|error: InvalidDnsNameError| error.to_string())?;
+    let connector: TlsConnector = TlsConnector::from(untrusted_client_config(ALPN_HTTP2));
     let socket: TcpStream = connect_tcp(port)
         .await
         .map_err(|error: io::Error| error.to_string())?;
@@ -243,15 +240,13 @@ fn untrusted_client_config(alpn: &[u8]) -> Arc<ClientConfig> {
 }
 
 pub(crate) async fn connect_tls_without_alpn(port: u16) -> io::Result<ClientTlsStream> {
-    let name: ServerName<'static> = ServerName::try_from(TLS_SERVER_NAME).map_err(
-        |error: rustls::pki_types::InvalidDnsNameError| {
+    let name: ServerName<'static> =
+        ServerName::try_from(TLS_SERVER_NAME).map_err(|error: InvalidDnsNameError| {
             io::Error::new(io::ErrorKind::InvalidInput, error.to_string())
-        },
-    )?;
-    let connector: tokio_rustls::TlsConnector =
-        tokio_rustls::TlsConnector::from(no_alpn_client_config());
+        })?;
+    let connector: TlsConnector = TlsConnector::from(no_alpn_client_config());
     let socket: TcpStream = connect_tcp(port).await?;
-    let handshake: tokio_rustls::Connect<TcpStream> = connector.connect(name, socket);
+    let handshake: Connect<TcpStream> = connector.connect(name, socket);
     let bound: Duration = Duration::from_secs(CONNECT_TIMEOUT_SECS);
     match timeout(bound, handshake).await {
         Ok(outcome) => outcome,

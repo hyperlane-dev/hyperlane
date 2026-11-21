@@ -1,7 +1,7 @@
-mod r#fn;
-mod r#impl;
-mod r#struct;
+mod qpack;
+mod shard;
+mod stream;
 
-pub(crate) use {r#fn::*, r#struct::*};
+pub(crate) use {qpack::*, shard::*, stream::*};
 
 use super::*;

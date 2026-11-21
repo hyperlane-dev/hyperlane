@@ -9,7 +9,7 @@ use super::*;
 /// - `input` - The parse stream containing the token stream to be parsed
 ///
 /// # Returns
-/// Returns a `syn::Result<Self>` containing the parsed FromStreamData on success,
+/// Returns a `Result<Self>` containing the parsed FromStreamData on success,
 /// or a syn::Error with appropriate error message on failure
 ///
 /// # Errors
@@ -29,23 +29,20 @@ impl Parse for FromStreamData {
     ///
     /// # Returns
     ///
-    /// - `syn::Result<Self>` - `Ok(FromStreamData)` contains the successfully parsed data
+    /// - `Result<Self>` - `Ok(FromStreamData)` contains the successfully parsed data
     ///   with variable name, `Err(syn::Error)` contains an appropriate error message
     ///   for invalid input.
     ///
     /// # Errors
     /// The function returns errors in the following cases:
     /// - More than one parameter is provided
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let variable_name: Option<Expr> = if input.is_empty() {
             None
         } else {
             let expr: Expr = input.parse()?;
             if !input.is_empty() {
-                return Err(syn::Error::new(
-                    input.span(),
-                    EXPECTED_AT_MOST_ONE_PARAMETER,
-                ));
+                return Err(Error::new(input.span(), EXPECTED_AT_MOST_ONE_PARAMETER));
             }
             Some(expr)
         };

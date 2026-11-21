@@ -38,16 +38,16 @@ pub(crate) async fn http1_target_reply(stream: &mut TcpStream, target: &str) -> 
 pub(crate) async fn h3_targets_on_one_connection(
     port: u16,
     targets: [&str; 2],
-) -> Result<Vec<(u16, http::Version, Vec<u8>)>, String> {
-    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+) -> Result<Vec<(u16, Version, Vec<u8>)>, String> {
+    let (_endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await?;
-    let (mut driver, mut client) = h3::client::new(h3_quinn::Connection::new(connection.clone()))
+    let (mut driver, mut client) = new(h3_quinn::Connection::new(connection.clone()))
         .await
         .map_err(|error: h3::error::ConnectionError| format!("h3 handshake failed: {error}"))?;
     let driving: JoinHandle<()> = spawn(async move {
         let _final: h3::error::ConnectionError = driver.wait_idle().await;
     });
-    let mut replies: Vec<(u16, http::Version, Vec<u8>)> = Vec::new();
+    let mut replies: Vec<(u16, Version, Vec<u8>)> = Vec::new();
     for target in targets {
         let uri: String = format!("https://{TLS_SERVER_NAME}:{port}{target}");
         let request: http::Request<()> = http::Request::builder()
@@ -56,23 +56,23 @@ pub(crate) async fn h3_targets_on_one_connection(
             .header(PROBE_HEADER_KEY, PROBE_HEADER_VALUE)
             .body(())
             .map_err(|error: http::Error| format!("request build failed: {error}"))?;
-        let mut stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = client
+        let mut stream: RequestStream<BidiStream<Bytes>, Bytes> = client
             .send_request(request)
             .await
-            .map_err(|error: h3::error::StreamError| format!("send_request failed: {error}"))?;
+            .map_err(|error: StreamError| format!("send_request failed: {error}"))?;
         stream
             .finish()
             .await
-            .map_err(|error: h3::error::StreamError| format!("finish failed: {error}"))?;
+            .map_err(|error: StreamError| format!("finish failed: {error}"))?;
         let response: http::Response<()> = timeout(
             Duration::from_secs(REQUEST_TIMEOUT_SECS),
             stream.recv_response(),
         )
         .await
-        .map_err(|_: tokio::time::error::Elapsed| "h3 response timed out".to_string())?
-        .map_err(|error: h3::error::StreamError| format!("recv_response failed: {error}"))?;
+        .map_err(|_: Elapsed| "h3 response timed out".to_string())?
+        .map_err(|error: StreamError| format!("recv_response failed: {error}"))?;
         let status: u16 = response.status().as_u16();
-        let version: http::Version = response.version();
+        let version: Version = response.version();
         let mut collected: Vec<u8> = Vec::new();
         let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
         loop {

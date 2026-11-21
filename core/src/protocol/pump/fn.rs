@@ -1,196 +1,178 @@
 use super::*;
 
-/// Takes a recycled body buffer from the pool.
+/// Takes a recycled context from the worker-local pool, or builds a fresh one.
 ///
 /// # Returns
 ///
-/// - `Option<Vec<u8>>` - The recycled buffer, or `None` when the pool is
-///   empty.
-fn take_recycled_buffer() -> Option<Vec<u8>> {
-    BODY_BUFFER_POOL.with(|pool: &RefCell<Vec<Vec<u8>>>| pool.borrow_mut().pop())
+/// - `Context` - A clean context ready for one request or connection.
+pub(crate) fn take_pooled_context() -> Context {
+    CONTEXT_POOL.with(|pool: &RefCell<Vec<Context>>| pool.borrow_mut().pop().unwrap_or_default())
 }
 
-/// Returns a body buffer to the pool for reuse.
+/// Resets and returns a context to the worker-local pool for reuse.
 ///
-/// The buffer keeps its capacity, so the next response that takes it does not
-/// allocate one. A buffer that grew past the size the pool keeps is dropped
-/// instead, because a pool of very large buffers would hold the memory of
-/// every worker at once.
+/// Oversized buffers are released before pooling so a single large request or
+/// response never pins excessive memory on a worker thread.
 ///
 /// # Arguments
 ///
-/// - `Vec<u8>` - The buffer to recycle.
-fn return_recycled_buffer(buffer: Vec<u8>) {
-    if buffer.capacity() > MAX_POOLED_BUFFER_CAPACITY {
+/// - `Context` - The context to recycle.
+pub(crate) fn return_pooled_context(mut ctx: Context) {
+    {
+        let headers: &mut RequestHeaders = ctx.get_mut_request().get_mut_headers();
+        if !headers.is_empty() {
+            PROTOCOL_HEADER_POOL.with(|pool: &RefCell<Vec<(String, VecDeque<String>)>>| {
+                let mut pool: RefMut<'_, Vec<(String, VecDeque<String>)>> = pool.borrow_mut();
+                for (key, values) in headers.drain() {
+                    if pool.len() < MAX_POOLED_PROTOCOL_HEADERS
+                        && key.capacity() <= MAX_POOLED_STRING_CAPACITY
+                        && values.capacity() <= B_4
+                        && values
+                            .iter()
+                            .all(|value: &String| value.capacity() <= MAX_POOLED_STRING_CAPACITY)
+                    {
+                        pool.push((key, values));
+                    }
+                }
+            });
+        }
+    }
+    ctx.get_mut_request().reset();
+    if ctx.get_request().get_headers().capacity() > MAX_POOLED_PROTOCOL_HEADERS {
+        *ctx.get_mut_request().get_mut_headers() = RequestHeaders::default();
+    }
+    if ctx.get_request().get_querys().capacity() > MAX_POOLED_PROTOCOL_HEADERS {
+        *ctx.get_mut_request().get_mut_querys() = RequestQuerys::default();
+    }
+    if ctx.get_request().get_body().capacity() > MAX_POOLED_BUFFER_CAPACITY {
+        *ctx.get_mut_request().get_mut_body() = Vec::new();
+    }
+    if ctx.get_request().get_path().capacity() > MAX_POOLED_STRING_CAPACITY {
+        *ctx.get_mut_request().get_mut_path() = String::new();
+    }
+    if ctx.get_request().get_host().capacity() > MAX_POOLED_STRING_CAPACITY {
+        *ctx.get_mut_request().get_mut_host() = String::new();
+    }
+    ctx.get_mut_response().reset();
+    if ctx.get_response().get_headers().capacity() > MAX_POOLED_PROTOCOL_HEADERS {
+        *ctx.get_mut_response().get_mut_headers() = ResponseHeaders::default();
+    }
+    if ctx.get_response().get_reason_phrase().capacity() > MAX_POOLED_STRING_CAPACITY {
+        *ctx.get_mut_response().get_mut_reason_phrase() = String::new();
+    }
+    if ctx.get_response().get_body().capacity() > MAX_POOLED_BUFFER_CAPACITY {
+        *ctx.get_mut_response().get_mut_body() = Vec::new();
+    }
+    ctx.clear_route_params();
+    ctx.reset_request_attributes();
+    ctx.set_original_head(None);
+    if let Some(target) = ctx.take_original_target() {
+        return_target_buffer(target);
+    }
+    CONTEXT_POOL.with(|pool: &RefCell<Vec<Context>>| {
+        let mut pool: RefMut<'_, Vec<Context>> = pool.borrow_mut();
+        if pool.len() < MAX_POOLED_CONTEXTS {
+            pool.push(ctx);
+        }
+    });
+}
+
+/// Takes a recycled protocol header entry from the worker-local pool.
+///
+/// # Returns
+///
+/// - `Option<(String, VecDeque<String>)>` - A recycled header name and value list.
+pub(crate) fn take_protocol_header_entry() -> Option<(String, VecDeque<String>)> {
+    PROTOCOL_HEADER_POOL
+        .with(|pool: &RefCell<Vec<(String, VecDeque<String>)>>| pool.borrow_mut().pop())
+}
+
+/// Takes a recycled target string buffer from the worker-local pool.
+///
+/// # Returns
+///
+/// - `String` - An empty string with retained capacity when available.
+pub(crate) fn take_target_buffer() -> String {
+    TARGET_BUFFER_POOL.with(|pool: &RefCell<Vec<String>>| {
+        let mut buffer: String = pool.borrow_mut().pop().unwrap_or_default();
+        buffer.clear();
+        buffer
+    })
+}
+
+/// Returns a target string buffer to the worker-local pool.
+///
+/// # Arguments
+///
+/// - `String` - The target buffer to recycle.
+pub(crate) fn return_target_buffer(mut buffer: String) {
+    if buffer.capacity() == 0 || buffer.capacity() > MAX_POOLED_STRING_CAPACITY {
         return;
     }
-    BODY_BUFFER_POOL.with(|pool: &RefCell<Vec<Vec<u8>>>| {
-        let mut pool: RefMut<'_, Vec<Vec<u8>>> = pool.borrow_mut();
-        if pool.len() < MAX_POOLED_BUFFERS {
+    buffer.clear();
+    TARGET_BUFFER_POOL.with(|pool: &RefCell<Vec<String>>| {
+        let mut pool: RefMut<'_, Vec<String>> = pool.borrow_mut();
+        if pool.len() < MAX_POOLED_CONTEXTS {
             pool.push(buffer);
         }
     });
 }
 
-/// Increments a response head and forwards every body chunk that follows it.
-///
-/// The pump owns the write side of a protocol stream. It reads the HTTP/1.1
-/// shaped bytes the request lifecycle wrote, frames the head exactly once as
-/// soon as the blank line ends the header block, and forwards each chunk after
-/// it as its own data frame. Running it alongside the lifecycle, rather than
-/// after it, is what lets a raw send, a split send or a server sent event
-/// stream reach the client before the handler returns.
-///
-/// The framing is decided as early as the bytes allow. A head that cannot be
-/// represented on this protocol at all — one announcing a transfer coding the
-/// framing does not carry, one with a status code or a header line the protocol
-/// cannot encode — is refused before any frame is emitted, so nothing has been
-/// committed to the wire.
-///
-/// A body that does not match the length it announced is a different case and
-/// cannot be caught that early: a short body is only short once the pipe ends.
-/// The head and the body bytes read before that point have already been framed,
-/// so a truncated or overlong response surfaces as a failed pump with the
-/// stream left for the caller to reset, never as a clean `finish()`. The client
-/// sees a stream that ends without the bytes the head promised, which is the
-/// honest signal; it is not told the response completed.
-///
-/// # Arguments
-///
-/// - `&mut F` - The `value` argument.
-/// - `DuplexStream` - The read end of the pipe the lifecycle writes onto.
-/// - `usize` - The maximum number of head bytes buffered while the head is pending.
-/// - `bool` - Whether the request method forbids a response body.
+/// Takes a recycled route parameter key/value pair from the worker-local pool.
 ///
 /// # Returns
 ///
-/// - `Result<(), ResponseError>` - `Ok(())` once the lifecycle dropped its end
-pub(crate) async fn pump_response<F>(
-    framer: &mut F,
-    reader: DuplexStream,
-    max_head_size: usize,
-    is_head: bool,
-) -> Result<(), ResponseError>
-where
-    F: ResponseFramer,
-{
-    let mut chunk: Vec<u8> = match take_recycled_buffer() {
-        Some(mut buffer) => {
-            buffer.clear();
-            buffer.resize(PROTOCOL_BODY_CHUNK, 0);
-            buffer
-        }
-        None => vec![0; PROTOCOL_BODY_CHUNK],
-    };
-    let outcome: Result<(), ResponseError> =
-        pump_response_inner(framer, reader, max_head_size, is_head, &mut chunk).await;
-    return_recycled_buffer(chunk);
-    outcome
+/// - `(String, String)` - A pair of cleared strings retaining previous capacity.
+pub(crate) fn take_route_param_entry() -> (String, String) {
+    ROUTE_PARAM_POOL.with(|pool: &RefCell<Vec<(String, String)>>| {
+        let mut pair: (String, String) = pool.borrow_mut().pop().unwrap_or_default();
+        pair.0.clear();
+        pair.1.clear();
+        pair
+    })
 }
 
-/// Pumps the response head and body onto the framer.
+/// Returns a route parameter key/value pair to the worker-local pool.
 ///
 /// # Arguments
 ///
-/// - `&mut F` - The framer that receives the frames.
-/// - `DuplexStream` - The half of the pipe the response arrives on.
-/// - `usize` - The largest head the pump accepts.
-/// - `bool` - Whether the request method was `HEAD`.
-/// - `&mut [u8]` - The buffer the reads land in.
+/// - `(String, String)` - The key/value strings to recycle.
+pub(crate) fn return_route_param_entry(mut pair: (String, String)) {
+    if pair.0.capacity() > MAX_POOLED_STRING_CAPACITY
+        || pair.1.capacity() > MAX_POOLED_STRING_CAPACITY
+    {
+        return;
+    }
+    pair.0.clear();
+    pair.1.clear();
+    ROUTE_PARAM_POOL.with(|pool: &RefCell<Vec<(String, String)>>| {
+        let mut pool: RefMut<'_, Vec<(String, String)>> = pool.borrow_mut();
+        if pool.len() < MAX_POOLED_PROTOCOL_HEADERS {
+            pool.push(pair);
+        }
+    });
+}
+
+/// Polls a future once before arming a timeout on the hot path.
+///
+/// # Arguments
+///
+/// - `Pin<&mut F>` - The future to poll.
 ///
 /// # Returns
 ///
-/// - `Result<(), ResponseError>` - Nothing, or the reason the response could not
-///   be pumped.
-async fn pump_response_inner<F>(
-    framer: &mut F,
-    mut reader: DuplexStream,
-    max_head_size: usize,
-    is_head: bool,
-    read_chunk: &mut [u8],
-) -> Result<(), ResponseError>
+/// - `Option<F::Output>` - `Some` when the future completed immediately, `None` when still pending.
+pub(crate) async fn poll_once_protocol<F>(mut future: Pin<&mut F>) -> Option<F::Output>
 where
-    F: ResponseFramer,
+    F: Future,
 {
-    let mut pending: Vec<u8> = Vec::new();
-    let mut head: Option<FramedHead> = None;
-    let mut body_len: usize = 0;
-    let mut suppress_body: bool = is_head;
-    let mut announced_len: Option<usize> = None;
-    loop {
-        let read: usize = tokio::io::AsyncReadExt::read(&mut reader, read_chunk).await?;
-        if read == 0 {
-            break;
-        }
-        if head.is_none() {
-            pending.extend_from_slice(&read_chunk[..read]);
-            let Some(body_start) = find_head_end(&pending) else {
-                if pending.len() > max_head_size {
-                    return Err(ResponseError::Send(RESPONSE_HEAD_TOO_LONG.to_owned()));
-                }
-                continue;
-            };
-            if body_start > max_head_size {
-                return Err(ResponseError::Send(RESPONSE_HEAD_TOO_LONG.to_owned()));
-            }
-            let (status_code, mut headers): (usize, ProtocolHeaders) =
-                parse_response_head(&pending[..body_start])?;
-            validate_status_code(status_code)?;
-            if has_transfer_encoding(&headers) {
-                return Err(ResponseError::Send(
-                    UNSUPPORTED_TRANSFER_ENCODING.to_owned(),
-                ));
-            }
-            announced_len = parse_content_length(&headers)?;
-            suppress_body = is_bodyless_status(status_code, is_head);
-            if hides_entity_length(status_code, is_head) {
-                headers.remove(CONTENT_LENGTH);
-            }
-            let head_body: &[u8] = if suppress_body {
-                &[]
-            } else {
-                &pending[body_start..]
-            };
-            let parsed: FramedHead = FramedHead {
-                status_code,
-                headers,
-            };
-            framer.send_head(&parsed, suppress_body).await?;
-            if !head_body.is_empty() {
-                let overflowed: bool = check_body_budget(announced_len, body_len, head_body.len());
-                body_len += head_body.len();
-                if overflowed {
-                    return Err(ResponseError::Send(OVERFLOWING_RESPONSE_BODY.to_owned()));
-                }
-                framer.send_data(head_body).await?;
-            }
-            head = Some(parsed);
-            pending.clear();
-            continue;
-        }
-        if suppress_body {
-            continue;
-        }
-        let overflowed: bool = check_body_budget(announced_len, body_len, read);
-        body_len += read;
-        if overflowed {
-            return Err(ResponseError::Send(OVERFLOWING_RESPONSE_BODY.to_owned()));
-        }
-        framer.send_data(&read_chunk[..read]).await?;
-    }
-    let Some(head) = head else {
-        return Err(ResponseError::Send(MISSING_RESPONSE_HEAD.to_owned()));
-    };
-    if !suppress_body
-        && let Some(announced) = announced_len
-        && body_len != announced
-    {
-        return Err(ResponseError::Send(TRUNCATED_RESPONSE_BODY.to_owned()));
-    }
-    framer.finish().await?;
-    let _framed: FramedHead = head;
-    let _forwarded: usize = body_len;
-    Ok(())
+    poll_fn(
+        |context: &mut task::Context<'_>| match future.as_mut().poll(context) {
+            Poll::Ready(value) => Poll::Ready(Some(value)),
+            Poll::Pending => Poll::Ready(None),
+        },
+    )
+    .await
 }
 
 /// Reports whether a response may not announce an entity length.

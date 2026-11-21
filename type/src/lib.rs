@@ -55,13 +55,14 @@ use std::{
     future::{self, Future},
     hash::Hash,
     io::{self, ErrorKind},
-    mem,
+    mem::{self, MaybeUninit},
     net::{IpAddr, SocketAddr},
     num::ParseIntError,
     pin::{Pin, pin},
     rc::Rc,
     result::Result,
-    str::{FromStr, SplitWhitespace, from_utf8},
+    slice,
+    str::{FromStr, SplitWhitespace, from_utf8, from_utf8_unchecked},
     sync::{
         Arc, OnceLock,
         atomic::{self, AtomicBool, AtomicUsize},
@@ -73,8 +74,10 @@ use std::{
 
 use {
     core::hash::BuildHasherDefault,
+    hex::encode,
     lombok_macros::*,
     serde::{Deserialize, Serialize, de::DeserializeOwned},
+    serde_json::{from_slice, from_str},
     tokio::{
         io::{
             AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt,

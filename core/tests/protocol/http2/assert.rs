@@ -10,15 +10,13 @@ async fn http2_plaintext_reports_the_real_local_and_peer_addresses_of_the_connec
     let client_local: SocketAddr = socket
         .local_addr()
         .expect("a connected socket must report its local address");
-    let (mut sender, connection) = timeout(
-        Duration::from_secs(CONNECT_TIMEOUT_SECS),
-        h2::client::handshake(socket),
-    )
-    .await
-    .expect("h2 prior-knowledge handshake must not time out")
-    .expect("h2 prior-knowledge handshake must succeed");
+    let (mut sender, connection) =
+        timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS), handshake(socket))
+            .await
+            .expect("h2 prior-knowledge handshake must not time out")
+            .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let (status, _version, body): H2Reply = h2_request(
         &mut sender,
@@ -63,7 +61,7 @@ async fn http2_streams_a_body_that_never_announced_a_content_length() {
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let (status, headers, body): H2HeadReply = h2_request_with_headers(
         &mut sender,
@@ -98,7 +96,7 @@ async fn http2_plaintext_prior_knowledge_serves_http2_over_tcp() {
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let (status, version, body): H2Reply = h2_request(
         &mut sender,
@@ -133,7 +131,7 @@ async fn http2_plaintext_prior_knowledge_reads_path_query_and_header() {
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let target: String = format!(
         "http://{TLS_SERVER_NAME}:{port}{PROBE_PATH}?{}",
@@ -163,7 +161,7 @@ async fn http2_tls_negotiates_h2_alpn_against_validated_chain() {
         "the server must select the h2 ALPN identifier"
     );
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let (status, version, body): H2Reply = h2_request(
         &mut sender,
@@ -213,7 +211,7 @@ async fn http2_plaintext_binary_post_round_trips_hostile_bytes() {
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let payload: Vec<u8> = hostile_binary_payload();
     let (status, version, body): H2Reply = h2_request(
@@ -245,7 +243,7 @@ async fn http2_plaintext_delivers_a_response_above_the_flow_control_window() {
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let expected: Vec<u8> = large_binary_payload();
     let (status, _version, body): H2Reply = h2_request(
@@ -281,7 +279,7 @@ async fn http2_one_connection_answers_a_fast_stream_while_a_slow_stream_is_block
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let _lease: GateLease = gate_lease(GateSlot::SlowHttp2).await;
     let order: Arc<Mutex<Vec<&'static str>>> = Arc::new(Mutex::new(Vec::new()));
@@ -390,7 +388,7 @@ async fn http2_rejects_a_host_header_that_disagrees_with_the_authority() {
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let target: String = format!("http://{TLS_SERVER_NAME}:{port}{VERSION_ROUTE_PATH}");
     let outcome: Option<(u16, Vec<u8>)> =
@@ -420,7 +418,7 @@ async fn http2_accepts_a_host_header_that_agrees_with_the_authority() {
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let target: String = format!("http://{TLS_SERVER_NAME}:{port}{VERSION_ROUTE_PATH}");
     let outcome: Option<(u16, Vec<u8>)> = h2_request_with_host_header(

@@ -67,6 +67,6 @@ fn test_body_clone_is_equal_and_independent() {
 #[test]
 fn test_body_serializes_bytes_field() {
     let body: Body = Body::from_bytes("hi");
-    let encoded: String = serde_json::to_string(&body).unwrap_or_default();
+    let encoded: String = to_string(&body).unwrap_or_default();
     assert_eq!(encoded, "{\"bytes\":[104,105]}");
 }

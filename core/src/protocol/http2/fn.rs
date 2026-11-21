@@ -5,8 +5,8 @@ use super::*;
 /// The connection half stays polled for the whole lifetime of the connection:
 /// it owns flow control and the settings exchange for every stream, so parking
 /// it while a handler runs would stall the other requests multiplexed onto the
-/// same connection. Each request is therefore spawned onto its own task while
-/// this loop keeps polling.
+/// same connection. Independent request futures are polled alongside the
+/// connection driver without allocating a separate Tokio task for each stream.
 ///
 /// # Arguments
 ///
@@ -27,53 +27,79 @@ pub(crate) async fn serve_h2_connection<T>(
         Ok(connection) => connection,
         Err(_) => return,
     };
-    loop {
-        match connection.accept().await {
-            Some(Ok((request, send_response))) => {
-                spawn(h2_request_task(
-                    H2RequestEnv {
-                        server: env.server.clone(),
-                        request_config: env.request_config,
-                        peers,
-                    },
-                    request,
-                    send_response,
-                ));
+    let mut requests: FuturesUnordered<_> = FuturesUnordered::new();
+    poll_fn(|cx: &mut task::Context<'_>| -> Poll<()> {
+        loop {
+            let mut progressed: bool = false;
+            let mut accepted_batch: usize = 0;
+            while accepted_batch < 64 {
+                match connection.poll_accept(cx) {
+                    Poll::Ready(Some(Ok((request, send_response)))) => {
+                        requests.push(
+                            AssertUnwindSafe(h2_request_task(
+                                H2RequestEnv {
+                                    shared: Arc::clone(&env.shared),
+                                    peers,
+                                },
+                                request,
+                                send_response,
+                            ))
+                            .catch_unwind(),
+                        );
+                        accepted_batch += 1;
+                        progressed = true;
+                    }
+                    Poll::Ready(Some(Err(_))) | Poll::Ready(None) => return Poll::Ready(()),
+                    Poll::Pending => break,
+                }
             }
-            Some(Err(_)) => return,
-            None => return,
+            let mut completed_batch: usize = 0;
+            while !requests.is_empty() && completed_batch < 64 {
+                match requests.poll_next_unpin(cx) {
+                    Poll::Ready(Some(_)) => {
+                        completed_batch += 1;
+                        progressed = true;
+                    }
+                    Poll::Ready(None) | Poll::Pending => break,
+                }
+            }
+            if !progressed {
+                return Poll::Pending;
+            }
+            if accepted_batch == 64 || completed_batch == 64 {
+                cx.waker().wake_by_ref();
+                return Poll::Pending;
+            }
         }
-    }
+    })
+    .await;
 }
 
 /// Runs the framework lifecycle over one HTTP/2 request stream.
 ///
-/// The lifecycle and the framing pump run concurrently: the lifecycle writes
-/// HTTP/1.1 shaped bytes into a duplex pipe and the pump frames them onto the
-/// stream as they arrive. Awaiting both keeps the head and every body chunk on
-/// the wire before the handler's completion is observed.
+/// Writes from the handler and middleware are framed directly onto the HTTP/2
+/// stream through [`H2DirectTransport`], avoiding duplex pipe allocation,
+/// cross-task scheduling, and intermediate response head cloning.
 ///
 /// # Arguments
 ///
 /// - `H2RequestEnv` - The server, limits and connection addresses.
 /// - `ProtocolRequest<H2RecvStream>` - The decoded protocol request.
-/// - `h2::server::SendResponse<Bytes>` - The response half of the stream.
-///
+/// - `H2SendResponse` - The response half of the stream.
 pub(crate) async fn h2_request_task(
     env: H2RequestEnv,
     request: ProtocolRequest<H2RecvStream>,
-    send_response: h2::server::SendResponse<Bytes>,
+    mut send_response: H2SendResponse,
 ) {
-    let H2RequestEnv {
-        server,
-        request_config,
-        peers,
-    } = env;
-    let (parts, mut recv_stream): (http::request::Parts, H2RecvStream) = request.into_parts();
-    let mut framer: H2Framer = H2Framer::new(send_response);
-    let mut body: Vec<u8> = Vec::new();
+    let H2RequestEnv { shared, peers } = env;
+    let server: &Server = &shared.server;
+    let request_config: RequestConfig = shared.request_config;
+    let (parts, mut recv_stream): (Parts, H2RecvStream) = request.into_parts();
+    let mut ctx: Context = take_pooled_context();
+    let mut body: Vec<u8> = mem::take(ctx.get_mut_request().get_mut_body());
+    body.clear();
     if let Err(error) = collect_h2_body(
-        &mut framer,
+        &mut send_response,
         &mut recv_stream,
         &request_config,
         &parts.headers,
@@ -81,118 +107,100 @@ pub(crate) async fn h2_request_task(
     )
     .await
     {
+        *ctx.get_mut_request().get_mut_body() = body;
         h2_fail_request(
-            &H2RequestEnv {
-                server,
-                request_config,
-                peers,
-            },
-            &mut framer,
+            server,
+            request_config,
+            peers,
+            send_response,
+            &mut ctx,
             HttpVersion::Http2,
             error,
         )
         .await;
+        return_pooled_context(ctx);
         return;
     }
-    let target: String = request_target(parts.uri.path(), parts.uri.query());
-    let built: Result<Request, RequestError> = build_protocol_request(
+    let mut target: String = take_target_buffer();
+    let method: ProtocolMethod = parts.method.clone();
+    let built: Result<(), RequestError> = fill_protocol_request(
         &request_config,
         ProtocolRequestHead {
             version: HttpVersion::Http2,
-            method: parts.method.clone(),
+            method,
             parts,
             body,
         },
+        ctx.get_mut_request(),
+        &mut target,
     );
-    let request: Request = match built {
-        Ok(request) => request,
-        Err(error) => {
-            h2_fail_request(
-                &H2RequestEnv {
-                    server,
-                    request_config,
-                    peers,
-                },
-                &mut framer,
-                HttpVersion::Http2,
-                error,
-            )
-            .await;
-            return;
-        }
-    };
-    let is_head: bool = request.get_method().is_head();
-    let (stream, peer): (Stream, DuplexStream) = build_duplex_transport(request_config, peers);
-    let lifecycle: ServerLifecycle = ServerLifecycle::new(server, request, target);
-    let joined: Result<((), ()), ResponseError> = futures::try_join!(
-        async {
-            lifecycle.run(stream).await;
-            Ok::<(), ResponseError>(())
-        },
-        pump_response(&mut framer, peer, RESPONSE_HEAD_MAX, is_head)
-    );
-    let pump_result: Result<(), ResponseError> = joined.map(|(_, pumped): ((), ())| pumped);
-    if pump_result.is_err() {
-        framer.reset();
+    if let Err(error) = built {
+        return_target_buffer(target);
+        h2_fail_request(
+            server,
+            request_config,
+            peers,
+            send_response,
+            &mut ctx,
+            HttpVersion::Http2,
+            error,
+        )
+        .await;
+        return_pooled_context(ctx);
+        return;
     }
+    let is_head: bool = ctx.get_request().get_method().is_head();
+    let mut stream: Stream = Stream::from_transport(
+        H2DirectTransport::new(send_response, peers, is_head),
+        request_config,
+        false,
+    );
+    server
+        .run_protocol_lifecycle_in_place(&shared.pipeline, &mut stream, &mut ctx, target)
+        .await;
+    let _: Result<(), io::Error> = stream.get_mut_stream().shutdown().await;
+    return_pooled_context(ctx);
 }
 
 /// Answers a request that failed before a handler could run.
 ///
-/// The error reaches the existing request error hooks over the same duplex pipe
-/// and the same framing pump a real response takes, so the error handler writes
-/// an HTTP/1.1 shaped head that is framed as HTTP/2 on the wire instead of the
-/// stream ending silently.
-///
-/// Borrows the request environment while framing the error response.
-///
 /// # Arguments
 ///
-/// - `&H2RequestEnv` - The server, limits and connection addresses.
-/// - `&mut H2Framer` - The framer owning the stream's frames.
+/// - `&Server` - The server owning the request error hooks.
+/// - `RequestConfig` - The parsing limits and read timeout.
+/// - `StreamPeers` - The connection's socket addresses.
+/// - `H2SendResponse` - The response half of the stream.
+/// - `&mut Context` - The context passed to error hooks.
 /// - `HttpVersion` - The real protocol version to stamp on the error context.
 /// - `RequestError` - The failure that stopped the request.
-///
+#[cold]
 pub(crate) async fn h2_fail_request(
-    env: &H2RequestEnv,
-    framer: &mut H2Framer,
+    server: &Server,
+    request_config: RequestConfig,
+    peers: StreamPeers,
+    send_response: H2SendResponse,
+    ctx: &mut Context,
     version: HttpVersion,
     error: RequestError,
 ) {
-    let mut ctx: Context = Context::default();
-    let mut request: Request = Request::default();
-    request.set_version(version.clone());
-    ctx.set_request(request);
+    ctx.get_mut_request().reset().set_version(version.clone());
     ctx.get_mut_response().reset().set_version(version.clone());
-    let (mut stream, peer): (Stream, DuplexStream) =
-        build_duplex_transport(env.request_config, env.peers);
-    let is_head: bool = false;
-    let server: Arc<Server> = env.server.clone();
-    let (_, pump_result): ((), Result<(), ResponseError>) = join!(
-        async move {
-            reply_to_request_error(&server, &mut stream, &mut ctx, &error, Some(version)).await;
-            drop(stream);
-        },
-        pump_response(framer, peer, RESPONSE_HEAD_MAX, is_head)
+    ctx.clear_route_params();
+    ctx.reset_request_attributes();
+    let mut stream: Stream = Stream::from_transport(
+        H2DirectTransport::new(send_response, peers, false),
+        request_config,
+        false,
     );
-    if pump_result.is_err() {
-        framer.reset();
-    }
+    reply_to_request_error(server, &mut stream, ctx, &error, Some(version)).await;
+    let _: Result<(), io::Error> = stream.get_mut_stream().shutdown().await;
 }
 
 /// Collects an HTTP/2 request body into a bounded buffer.
 ///
-/// `Ok(None)` from the protocol is end of body and completes collection; only
-/// a read that never returns is a timeout. The bound is one deadline for the
-/// whole request read rather than a fresh one per chunk, so a client that
-/// dribbles one byte at a time cannot hold a stream open forever. A config that
-/// asks for the permissive low security timeout applies no deadline at all,
-/// matching the HTTP/1.1 reader. Receive capacity is released as each chunk is
-/// drained, so a handler that reads slowly cannot stall the window.
-///
 /// # Arguments
 ///
-/// - `&mut H2Framer` - The framer for an optional interim response.
+/// - `&mut H2SendResponse` - The response sender for an optional interim response.
 /// - `&mut H2RecvStream` - The receive half of the request stream.
 /// - `&RequestConfig` - The parsing limits to enforce.
 /// - `&ProtocolHeaders` - The protocol request headers carrying the declared length.
@@ -200,9 +208,9 @@ pub(crate) async fn h2_fail_request(
 ///
 /// # Returns
 ///
-/// - `Result<(), RequestError>` - `Ok(())` once the body is complete, or the
+/// - `Result<(), RequestError>` - `Ok(())` once the body is complete, or the failure.
 async fn collect_h2_body(
-    framer: &mut H2Framer,
+    send_response: &mut H2SendResponse,
     recv_stream: &mut H2RecvStream,
     request_config: &RequestConfig,
     headers: &ProtocolHeaders,
@@ -210,13 +218,19 @@ async fn collect_h2_body(
 ) -> Result<(), RequestError> {
     let max_body_size: usize = request_config.get_max_body_size();
     let declared: Option<usize> = declared_content_length(headers, max_body_size)?;
-    if declared != Some(0)
-        && headers.contains_key(EXPECT)
-        && !recv_stream.is_end_stream()
-        && has_continue_expectation(headers)
-        && let Some(sender) = framer.get_mut_send_response().as_mut()
+    if recv_stream.is_end_stream() {
+        return match declared {
+            None | Some(0) => Ok(()),
+            Some(_) => Err(RequestError::Request(CONTENT_LENGTH_MISMATCH.to_owned())),
+        };
+    }
+    if let Some(expected) = declared
+        && expected > 0
     {
-        sender
+        body.reserve(expected.min(MAX_POOLED_BUFFER_CAPACITY));
+    }
+    if declared != Some(0) && headers.contains_key(EXPECT) && has_continue_expectation(headers) {
+        send_response
             .send_informational(continue_response())
             .map_err(|error: H2Error| RequestError::Request(error.to_string()))?;
     }
@@ -224,15 +238,16 @@ async fn collect_h2_body(
     if read_timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
         collect_h2_body_until_end(recv_stream, max_body_size, body).await?;
     } else {
-        let bound: Duration = Duration::from_millis(read_timeout_ms);
-        match timeout(
-            bound,
-            collect_h2_body_until_end(recv_stream, max_body_size, body),
-        )
-        .await
-        {
-            Ok(collected) => collected?,
-            Err(_) => return Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
+        let mut reading: Pin<&mut _> =
+            pin!(collect_h2_body_until_end(recv_stream, max_body_size, body));
+        if let Some(collected) = poll_once_protocol(reading.as_mut()).await {
+            collected?;
+        } else {
+            let bound: Duration = Duration::from_millis(read_timeout_ms);
+            match timeout(bound, reading).await {
+                Ok(collected) => collected?,
+                Err(_) => return Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
+            }
         }
     }
     match declared {
@@ -254,7 +269,7 @@ async fn collect_h2_body(
 ///
 /// # Returns
 ///
-/// - `Result<(), RequestError>` - `Ok(())` once the body is complete, or the
+/// - `Result<(), RequestError>` - `Ok(())` once the body is complete, or the failure.
 async fn collect_h2_body_until_end(
     recv_stream: &mut H2RecvStream,
     max_body_size: usize,

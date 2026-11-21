@@ -296,7 +296,7 @@ impl HttpRequest {
             let dns: ServerName<'static> = ServerName::try_from(host.clone())
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
             let session: ClientConnection = ClientConnection::new(Arc::new(tls_cfg), dns)
-                .map_err(|e: rustls::Error| RequestError::Request(e.to_string()))?;
+                .map_err(|e: Error| RequestError::Request(e.to_string()))?;
             Ok(Box::new(StreamOwned::new(session, tcp)))
         } else {
             Ok(Box::new(tcp))
@@ -489,7 +489,7 @@ impl HttpRequest {
             let connector: TlsConnector = TlsConnector::from(Arc::new(tls_cfg));
             let dns: ServerName<'static> = ServerName::try_from(host.clone())
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
-            let tls: tokio_rustls::client::TlsStream<http_type::tokio::net::TcpStream> = connector
+            let tls: TlsStream<http_type::tokio::net::TcpStream> = connector
                 .connect(dns, tcp)
                 .await
                 .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
@@ -721,7 +721,7 @@ impl HttpRequest {
             let dns: ServerName<'static> = ServerName::try_from(proxy.get_host().clone())
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
             let session: ClientConnection = ClientConnection::new(Arc::new(tls_cfg), dns)
-                .map_err(|e: rustls::Error| RequestError::Request(e.to_string()))?;
+                .map_err(|e: Error| RequestError::Request(e.to_string()))?;
             Box::new(StreamOwned::new(session, tcp))
         } else {
             Box::new(tcp)
@@ -772,7 +772,7 @@ impl HttpRequest {
             let dns: ServerName<'static> = ServerName::try_from(target_host.clone())
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
             let session: ClientConnection = ClientConnection::new(Arc::new(tls_cfg), dns)
-                .map_err(|e: rustls::Error| RequestError::Request(e.to_string()))?;
+                .map_err(|e: Error| RequestError::Request(e.to_string()))?;
             let tunnel: SyncProxyTunnelStream = SyncProxyTunnelStream::new(proxy_stream, pre_read);
             return Ok(Box::new(StreamOwned::new(session, tunnel)));
         }
@@ -889,7 +889,7 @@ impl HttpRequest {
             let dns: ServerName<'static> = ServerName::try_from(target_host)
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
             let session: ClientConnection = ClientConnection::new(Arc::new(tls_cfg), dns)
-                .map_err(|e: rustls::Error| RequestError::Request(e.to_string()))?;
+                .map_err(|e: Error| RequestError::Request(e.to_string()))?;
             let proxy_box: BoxReadWrite = Box::new(tcp);
             let tunnel: SyncProxyTunnelStream = SyncProxyTunnelStream::new(proxy_box, Vec::new());
             return Ok(Box::new(StreamOwned::new(session, tunnel)));
@@ -957,7 +957,7 @@ impl HttpRequest {
             let connector: TlsConnector = TlsConnector::from(Arc::new(tls_cfg));
             let dns: ServerName<'static> = ServerName::try_from(proxy.get_host().clone())
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
-            let tls: tokio_rustls::client::TlsStream<http_type::tokio::net::TcpStream> = connector
+            let tls: TlsStream<http_type::tokio::net::TcpStream> = connector
                 .connect(dns, tcp)
                 .await
                 .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
@@ -1015,7 +1015,7 @@ impl HttpRequest {
             let dns: ServerName<'static> = ServerName::try_from(target_host.clone())
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
             let tunnel: ProxyTunnelStream = ProxyTunnelStream::new(proxy_stream, pre_read);
-            let tls: tokio_rustls::client::TlsStream<ProxyTunnelStream> = connector
+            let tls: TlsStream<ProxyTunnelStream> = connector
                 .connect(dns, tunnel)
                 .await
                 .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
@@ -1144,7 +1144,7 @@ impl HttpRequest {
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
             let proxy_box: BoxAsyncReadWrite = Box::new(tcp);
             let tunnel: ProxyTunnelStream = ProxyTunnelStream::new(proxy_box, Vec::new());
-            let tls: tokio_rustls::client::TlsStream<ProxyTunnelStream> = connector
+            let tls: TlsStream<ProxyTunnelStream> = connector
                 .connect(dns, tunnel)
                 .await
                 .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;

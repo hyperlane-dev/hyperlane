@@ -31,7 +31,7 @@ async fn http1_default_request_error_sends_nothing_on_clean_eof() {
         start_default_request_error_server(ServerProtocol::Http1, HTTP1_BODY_LIMIT)
             .await
             .expect("http1 server without a request error hook must start");
-    let result: Result<io::Result<()>, tokio::time::error::Elapsed> =
+    let result: Result<io::Result<()>, Elapsed> =
         timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), async {
             for after_request in [false, true] {
                 let mut stream: TcpStream = connect_tcp(port).await?;
@@ -75,7 +75,7 @@ async fn assert_multiplexed_default_request_error(protocol: ServerProtocol) {
         start_default_request_error_server(protocol, MAX_BODY_SIZE)
             .await
             .expect("server without a request error hook must start");
-    let reply: Result<DefaultErrorReply, tokio::time::error::Elapsed> =
+    let reply: Result<DefaultErrorReply, Elapsed> =
         timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), async {
             match protocol {
                 ServerProtocol::Http2 => h2_oversized_body_then_get(port).await,
@@ -85,7 +85,7 @@ async fn assert_multiplexed_default_request_error(protocol: ServerProtocol) {
         })
         .await;
     control.shutdown().await;
-    let (status, headers, body): (u16, http::HeaderMap, Vec<u8>) = reply
+    let (status, headers, body): (u16, HeaderMap, Vec<u8>) = reply
         .expect("oversized POST and the subsequent GET must not time out")
         .expect("both requests must receive complete HTTP responses on the same connection");
     assert_eq!(status, TOO_LARGE_STATUS as u16);
@@ -96,7 +96,7 @@ async fn assert_multiplexed_default_request_error(protocol: ServerProtocol) {
 
 #[tokio::test]
 async fn default_request_error_does_not_override_the_existing_http1_hook() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http1,
@@ -132,14 +132,14 @@ fn http1_reply_header<'a>(head: &'a str, name: &str) -> Option<&'a str> {
 async fn http1_expect_continue_releases_the_waiting_request_body() {
     const CONTINUE_RESPONSE: &[u8] = b"HTTP/1.1 100 Continue\r\n\r\n";
     const BODY: &[u8] = b"continue-payload";
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http1,
         limits_request_config(MAX_BODY_SIZE, READ_TIMEOUT_MS),
     )
     .await
     .expect("http1 limits server must start");
-    let result: Result<io::Result<Vec<u8>>, tokio::time::error::Elapsed> =
+    let result: Result<io::Result<Vec<u8>>, Elapsed> =
         timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), async {
             let mut stream: TcpStream = connect_tcp(port).await?;
             let head: String = format!(
@@ -177,7 +177,7 @@ async fn http1_expect_continue_releases_the_waiting_request_body() {
 
 #[tokio::test]
 async fn http1_no_content_and_not_modified_end_at_the_next_response() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http1,
         limits_request_config(MAX_BODY_SIZE, READ_TIMEOUT_MS),
@@ -241,7 +241,7 @@ async fn http3_expect_oversized_body_is_rejected_without_continue() {
 
 #[tokio::test]
 async fn http2_head_response_carries_headers_without_a_body() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http2,
@@ -253,14 +253,14 @@ async fn http2_head_response_carries_headers_without_a_body() {
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let request: http::Request<()> =
         h2_build_request("HEAD", &h2_target(port, HEAD_ROUTE_PATH), None)
             .expect("h2 head request must build");
     let (response, _send_stream) =
         h2_open_stream(&mut sender, request, true).expect("h2 head stream must open");
-    let (status, _headers, body): (u16, http::HeaderMap, Vec<u8>) = h2_await_response(response)
+    let (status, _headers, body): (u16, HeaderMap, Vec<u8>) = h2_await_response(response)
         .await
         .unwrap_or_else(|error: String| panic!("h2 HEAD response failed: {error}"));
     assert_eq!(status, WIRE_OK_STATUS);
@@ -269,7 +269,7 @@ async fn http2_head_response_carries_headers_without_a_body() {
         "a HEAD response must carry no body bytes, got {} bytes",
         body.len()
     );
-    let after: (u16, http::HeaderMap, Vec<u8>) = h2_get(&mut sender, port, BODY_ECHO_ROUTE_PATH)
+    let after: (u16, HeaderMap, Vec<u8>) = h2_get(&mut sender, port, BODY_ECHO_ROUTE_PATH)
         .await
         .expect("the same connection must serve a later valid request");
     assert_eq!(after.0, WIRE_OK_STATUS);
@@ -280,7 +280,7 @@ async fn http2_head_response_carries_headers_without_a_body() {
 
 #[tokio::test]
 async fn http2_no_content_and_not_modified_strip_the_body_bytes() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http2,
@@ -292,7 +292,7 @@ async fn http2_no_content_and_not_modified_strip_the_body_bytes() {
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     for (path, expected) in [
         (NO_CONTENT_ROUTE_PATH, WIRE_NO_CONTENT_STATUS),
@@ -302,7 +302,7 @@ async fn http2_no_content_and_not_modified_strip_the_body_bytes() {
             h2_build_request("GET", &h2_target(port, path), None).expect("h2 request must build");
         let (response, _send_stream) =
             h2_open_stream(&mut sender, request, true).expect("h2 stream must open");
-        let (status, headers, body): (u16, http::HeaderMap, Vec<u8>) = h2_await_response(response)
+        let (status, headers, body): (u16, HeaderMap, Vec<u8>) = h2_await_response(response)
             .await
             .unwrap_or_else(|error: String| panic!("h2 {expected} response failed: {error}"));
         assert_eq!(status, expected);
@@ -325,7 +325,7 @@ async fn http2_no_content_and_not_modified_strip_the_body_bytes() {
 
 #[tokio::test]
 async fn http3_head_and_no_body_statuses_carry_no_body() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http3,
@@ -338,7 +338,7 @@ async fn http3_head_and_no_body_statuses_carry_no_body() {
         ("GET", NO_CONTENT_ROUTE_PATH, WIRE_NO_CONTENT_STATUS),
         ("GET", NOT_MODIFIED_ROUTE_PATH, WIRE_NOT_MODIFIED_STATUS),
     ] {
-        let (status, headers, body): (u16, http::HeaderMap, Vec<u8>) =
+        let (status, headers, body): (u16, HeaderMap, Vec<u8>) =
             h3_exchange(port, method, &h3_target(port, path), &[])
                 .await
                 .unwrap_or_else(|error: String| panic!("h3 {method} {path} failed: {error}"));
@@ -360,7 +360,7 @@ async fn http3_head_and_no_body_statuses_carry_no_body() {
 
 #[tokio::test]
 async fn http2_raw_chunked_framing_decodes_or_is_rejected_explicitly() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http2,
@@ -372,7 +372,7 @@ async fn http2_raw_chunked_framing_decodes_or_is_rejected_explicitly() {
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let request: http::Request<()> =
         h2_build_request("GET", &h2_target(port, RAW_CHUNKED_ROUTE_PATH), None)
@@ -411,7 +411,7 @@ async fn http2_raw_chunked_framing_decodes_or_is_rejected_explicitly() {
             panic!("the raw chunked request must reach the server, never fail in the fixture");
         }
     }
-    let after: (u16, http::HeaderMap, Vec<u8>) = h2_get(&mut sender, port, BODY_ECHO_ROUTE_PATH)
+    let after: (u16, HeaderMap, Vec<u8>) = h2_get(&mut sender, port, BODY_ECHO_ROUTE_PATH)
         .await
         .expect("the same connection must serve a later valid request");
     assert_eq!(after.0, WIRE_OK_STATUS);
@@ -422,7 +422,7 @@ async fn http2_raw_chunked_framing_decodes_or_is_rejected_explicitly() {
 
 #[tokio::test]
 async fn http3_raw_chunked_framing_decodes_or_is_rejected_explicitly() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http3,
@@ -462,7 +462,7 @@ async fn http3_raw_chunked_framing_decodes_or_is_rejected_explicitly() {
             panic!("the raw chunked request must reach the server, never fail in the fixture");
         }
     }
-    let after: (u16, http::HeaderMap, Vec<u8>) =
+    let after: (u16, HeaderMap, Vec<u8>) =
         h3_exchange(port, "GET", &h3_target(port, BODY_ECHO_ROUTE_PATH), &[])
             .await
             .unwrap_or_else(|error: String| panic!("the later valid request failed: {error}"));
@@ -472,7 +472,7 @@ async fn http3_raw_chunked_framing_decodes_or_is_rejected_explicitly() {
 
 #[tokio::test]
 async fn http2_oversized_body_hits_max_body_size_and_the_request_error_hook() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http2,
@@ -484,9 +484,9 @@ async fn http2_oversized_body_hits_max_body_size_and_the_request_error_hook() {
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
-    let before: (u16, http::HeaderMap, Vec<u8>) = h2_get(&mut sender, port, BODY_ECHO_ROUTE_PATH)
+    let before: (u16, HeaderMap, Vec<u8>) = h2_get(&mut sender, port, BODY_ECHO_ROUTE_PATH)
         .await
         .expect("a valid request before the oversized one must succeed");
     assert_eq!(before.0, WIRE_OK_STATUS);
@@ -531,7 +531,7 @@ async fn http2_oversized_body_hits_max_body_size_and_the_request_error_hook() {
 
 #[tokio::test]
 async fn http3_oversized_body_hits_max_body_size_and_the_request_error_hook() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http3,
@@ -539,13 +539,13 @@ async fn http3_oversized_body_hits_max_body_size_and_the_request_error_hook() {
     )
     .await
     .expect("http3 limits server must start");
-    let before: (u16, http::HeaderMap, Vec<u8>) =
+    let before: (u16, HeaderMap, Vec<u8>) =
         h3_exchange(port, "GET", &h3_target(port, BODY_ECHO_ROUTE_PATH), &[])
             .await
             .unwrap_or_else(|error: String| panic!("the baseline h3 request failed: {error}"));
     assert_eq!(before.0, WIRE_OK_STATUS);
     let payload: Vec<u8> = oversized_payload();
-    let outcome: Result<(u16, http::HeaderMap, Vec<u8>), String> = h3_exchange(
+    let outcome: Result<(u16, HeaderMap, Vec<u8>), String> = h3_exchange(
         port,
         "POST",
         &h3_target(port, BODY_ECHO_ROUTE_PATH),
@@ -573,7 +573,7 @@ async fn http3_oversized_body_hits_max_body_size_and_the_request_error_hook() {
 
 #[tokio::test]
 async fn http2_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_request() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http2,
@@ -585,7 +585,7 @@ async fn http2_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_re
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let payload: Vec<u8> = declared_short_payload();
     let stalled: http::Request<()> = h2_build_request(
@@ -606,14 +606,12 @@ async fn http2_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_re
             .expect("h2 valid request must build");
     let (valid_response, _valid_send) =
         h2_open_stream(&mut sender, valid, true).expect("valid stream must open");
-    let (status, headers, body): (u16, http::HeaderMap, Vec<u8>) = timeout(
+    let (status, headers, body): (u16, HeaderMap, Vec<u8>) = timeout(
         Duration::from_millis(CONCURRENT_BUDGET_MS),
         h2_await_response(valid_response),
     )
     .await
-    .unwrap_or_else(|_: tokio::time::error::Elapsed| {
-        panic!("the valid request was blocked by the stalled one")
-    })
+    .unwrap_or_else(|_: Elapsed| panic!("the valid request was blocked by the stalled one"))
     .expect("the valid request must complete");
     assert_eq!(status, WIRE_OK_STATUS);
     assert!(body.is_empty());
@@ -630,7 +628,7 @@ async fn http2_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_re
 
 #[tokio::test]
 async fn http3_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_request() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http3,
@@ -638,11 +636,10 @@ async fn http3_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_re
     )
     .await
     .expect("http3 limits server must start");
-    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
-        connect_quic(port, ALPN_HTTP3)
-            .await
-            .expect("quic connect must succeed");
-    let (mut driver, mut client) = h3::client::new(h3_quinn::Connection::new(connection.clone()))
+    let (_endpoint, connection): (Endpoint, quinn::Connection) = connect_quic(port, ALPN_HTTP3)
+        .await
+        .expect("quic connect must succeed");
+    let (mut driver, mut client) = new(h3_quinn::Connection::new(connection.clone()))
         .await
         .expect("h3 handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
@@ -655,7 +652,7 @@ async fn http3_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_re
         .header(CONTENT_LENGTH, WRONG_CONTENT_LENGTH.to_string())
         .body(())
         .expect("h3 incomplete request must build");
-    let mut stalled_stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = client
+    let mut stalled_stream: RequestStream<BidiStream<Bytes>, Bytes> = client
         .send_request(stalled)
         .await
         .expect("stalled stream must open");
@@ -678,7 +675,7 @@ async fn http3_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_re
         .uri(h3_target(port, BODY_ECHO_ROUTE_PATH))
         .body(())
         .expect("h3 valid request must build");
-    let mut valid_stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = client
+    let mut valid_stream: RequestStream<BidiStream<Bytes>, Bytes> = client
         .send_request(valid)
         .await
         .expect("valid stream must open");
@@ -686,14 +683,12 @@ async fn http3_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_re
         .finish()
         .await
         .expect("the valid request must finish");
-    let (status, headers, body): (u16, http::HeaderMap, Vec<u8>) = timeout(
+    let (status, headers, body): (u16, HeaderMap, Vec<u8>) = timeout(
         Duration::from_millis(CONCURRENT_BUDGET_MS),
         h3_collect(&mut valid_stream),
     )
     .await
-    .unwrap_or_else(|_: tokio::time::error::Elapsed| {
-        panic!("the valid request was blocked by the stalled one")
-    })
+    .unwrap_or_else(|_: Elapsed| panic!("the valid request was blocked by the stalled one"))
     .expect("the valid request must complete");
     assert_eq!(status, WIRE_OK_STATUS);
     assert!(body.is_empty());
@@ -709,7 +704,7 @@ async fn http3_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_re
 
 #[tokio::test]
 async fn http2_wrong_declared_content_length_never_yields_a_truncated_success() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http2,
@@ -721,7 +716,7 @@ async fn http2_wrong_declared_content_length_never_yields_a_truncated_success() 
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let payload: Vec<u8> = declared_short_payload();
     let request: http::Request<()> = h2_build_request(
@@ -757,7 +752,7 @@ async fn http2_wrong_declared_content_length_never_yields_a_truncated_success() 
 
 #[tokio::test]
 async fn http2_panicking_route_reaches_the_task_panic_hook() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http2,
@@ -769,7 +764,7 @@ async fn http2_panicking_route_reaches_the_task_panic_hook() {
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let request: http::Request<()> =
         h2_build_request("GET", &h2_target(port, PANIC_ROUTE_PATH), None)
@@ -798,7 +793,7 @@ async fn http2_panicking_route_reaches_the_task_panic_hook() {
 
 #[tokio::test]
 async fn http3_panicking_route_reaches_the_task_panic_hook() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http3,

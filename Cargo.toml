@@ -12,7 +12,7 @@ categories = ["network-programming", "web-programming"]
 exclude.workspace = true
 
 [workspace.package]
-version = "22.6.0"
+version = "22.6.9"
 readme = "README.md"
 edition = "2024"
 authors = ["root@devhub.vip"]
@@ -64,10 +64,12 @@ log = "0.4.34"
 futures = "0.3"
 brotli = "9.0.0"
 bytes = "1.12.1"
+libc = "0.2.191"
 quote = "1.0.47"
 regex = "1.13.1"
 flate2 = "1.1.10"
 h3-quinn = "0.0.10"
+io-uring = "0.7.16"
 twox-hash = "2.1.4"
 inventory = "0.3.24"
 thiserror = "2.0.21"
@@ -81,6 +83,7 @@ lombok-macros = "10.3.1"
 serde_urlencoded = "0.7.1"
 tokio-broadcast = "10.3.1"
 syn = { version = "3.0.6", features = ["full"] }
+socket2 = { version = "0.6.5", features = ["all"] }
 tokio = { version = "1.53.1", features = ["full"] }
 serde = { version = "1.0.229", features = ["derive"] }
 rustls-pki-types = { version = "1.15.1", features = ["std"] }
