@@ -198,9 +198,29 @@ pub(crate) fn create_quic_endpoint_set(
 ) -> Result<QuicEndpointSet, Box<ServerError>> {
     let workers: usize = tokio::runtime::Handle::current().metrics().num_workers();
     if workers <= 1 {
-        let endpoint: Endpoint =
-            Endpoint::server(quinn::ServerConfig::with_crypto(quic_config), bind_addr)
-                .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        let domain: Domain = if bind_addr.is_ipv6() {
+            Domain::IPV6
+        } else {
+            Domain::IPV4
+        };
+        let socket: Socket = Socket::new(domain, Type::DGRAM, None)
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        let _: io::Result<()> = socket.set_recv_buffer_size(QUIC_SHARD_SOCKET_BUF_SIZE);
+        let _: io::Result<()> = socket.set_send_buffer_size(QUIC_SHARD_SOCKET_BUF_SIZE);
+        socket
+            .bind(&bind_addr.into())
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        socket
+            .set_nonblocking(true)
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        let std_udp: StdUdpSocket = StdUdpSocket::from(socket);
+        let endpoint: Endpoint = Endpoint::new(
+            EndpointConfig::default(),
+            Some(quinn::ServerConfig::with_crypto(quic_config)),
+            std_udp,
+            Arc::new(TokioRuntime),
+        )
+        .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
         return Ok(QuicEndpointSet {
             endpoints: vec![endpoint],
             dispatcher: None,
