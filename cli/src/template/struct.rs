@@ -4,11 +4,11 @@ use super::*;
 #[derive(Clone, Data, Debug)]
 pub struct TemplateConfig {
     /// Type of template component to generate
-    pub template_type: TemplateType,
+    pub(crate) template_type: TemplateType,
     /// Name of the component
-    pub component_name: String,
+    pub(crate) component_name: String,
     /// Model subtype (only used when template_type is Model)
-    pub model_sub_type: Option<ModelSubType>,
+    pub(crate) model_sub_type: Option<ModelSubType>,
     /// Base directory for generation (default: ./application)
     pub(crate) base_directory: String,
 }
