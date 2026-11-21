@@ -90,24 +90,24 @@ pub(crate) async fn h3_exchange_on(exchange: H3Exchange<'_>) -> Result<H3HeadRep
     let mut stream: RequestStream<BidiStream<Bytes>, Bytes> = client
         .send_request(request)
         .await
-        .map_err(|error: h3::error::StreamError| format!("send_request failed: {error}"))?;
+        .map_err(|error: StreamError| format!("send_request failed: {error}"))?;
     if !body.is_empty() {
         stream
             .send_data(Bytes::copy_from_slice(body))
             .await
-            .map_err(|error: h3::error::StreamError| format!("send_data failed: {error}"))?;
+            .map_err(|error: StreamError| format!("send_data failed: {error}"))?;
     }
     stream
         .finish()
         .await
-        .map_err(|error: h3::error::StreamError| format!("finish failed: {error}"))?;
+        .map_err(|error: StreamError| format!("finish failed: {error}"))?;
     let response: http::Response<()> = timeout(
         Duration::from_secs(REQUEST_TIMEOUT_SECS),
         stream.recv_response(),
     )
     .await
     .map_err(|_: Elapsed| "h3 response timed out".to_string())?
-    .map_err(|error: h3::error::StreamError| format!("recv_response failed: {error}"))?;
+    .map_err(|error: StreamError| format!("recv_response failed: {error}"))?;
     let status: u16 = response.status().as_u16();
     let headers: HeaderMap = response.headers().clone();
     let mut collected: Vec<u8> = Vec::new();
@@ -209,24 +209,24 @@ pub(crate) async fn h3_request(
     let mut stream: RequestStream<BidiStream<Bytes>, Bytes> = client
         .send_request(request)
         .await
-        .map_err(|error: h3::error::StreamError| format!("send_request failed: {error}"))?;
+        .map_err(|error: StreamError| format!("send_request failed: {error}"))?;
     if !body.is_empty() {
         stream
             .send_data(Bytes::copy_from_slice(body))
             .await
-            .map_err(|error: h3::error::StreamError| format!("send_data failed: {error}"))?;
+            .map_err(|error: StreamError| format!("send_data failed: {error}"))?;
     }
     stream
         .finish()
         .await
-        .map_err(|error: h3::error::StreamError| format!("finish failed: {error}"))?;
+        .map_err(|error: StreamError| format!("finish failed: {error}"))?;
     let response: http::Response<()> = timeout(
         Duration::from_secs(REQUEST_TIMEOUT_SECS),
         stream.recv_response(),
     )
     .await
     .map_err(|_: Elapsed| "h3 response timed out".to_string())?
-    .map_err(|error: h3::error::StreamError| format!("recv_response failed: {error}"))?;
+    .map_err(|error: StreamError| format!("recv_response failed: {error}"))?;
     let status: u16 = response.status().as_u16();
     let version: Version = response.version();
     let mut collected: Vec<u8> = Vec::new();

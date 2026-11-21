@@ -15,7 +15,7 @@ pub(crate) async fn h2_plaintext_session(
     timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS), handshake(socket))
         .await
         .map_err(|_| "h2 plaintext handshake timed out".to_string())?
-        .map_err(|error: h2::Error| format!("h2 plaintext handshake failed: {error}"))
+        .map_err(|error: Error| format!("h2 plaintext handshake failed: {error}"))
 }
 
 pub(crate) async fn h2_tls_alpn(port: u16) -> Result<(Option<Vec<u8>>, H2TlsSession), String> {
@@ -26,7 +26,7 @@ pub(crate) async fn h2_tls_alpn(port: u16) -> Result<(Option<Vec<u8>>, H2TlsSess
     let (send, connection) = timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS), handshake(stream))
         .await
         .map_err(|_| "h2 tls handshake timed out".to_string())?
-        .map_err(|error: h2::Error| format!("h2 tls handshake failed: {error}"))?;
+        .map_err(|error: Error| format!("h2 tls handshake failed: {error}"))?;
     Ok((alpn, (send, connection)))
 }
 
@@ -44,17 +44,17 @@ pub(crate) async fn h2_request(
         .map_err(|error: http::Error| format!("h2 request build failed: {error}"))?;
     let (response, mut send_stream) = sender
         .send_request(request, body.is_empty())
-        .map_err(|error: h2::Error| format!("h2 send_request failed: {error}"))?;
+        .map_err(|error: Error| format!("h2 send_request failed: {error}"))?;
     if !body.is_empty() {
         send_stream
             .send_data(Bytes::copy_from_slice(body), true)
-            .map_err(|error: h2::Error| format!("h2 send_data failed: {error}"))?;
+            .map_err(|error: Error| format!("h2 send_data failed: {error}"))?;
     }
     let response: http::Response<RecvStream> =
         timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response)
             .await
             .map_err(|_| "h2 response timed out".to_string())?
-            .map_err(|error: h2::Error| format!("h2 response failed: {error}"))?;
+            .map_err(|error: Error| format!("h2 response failed: {error}"))?;
     let status: u16 = response.status().as_u16();
     let version: Version = response.version();
     let mut received: RecvStream = response.into_body();
@@ -93,17 +93,17 @@ pub(crate) async fn h2_request_with_headers(
         .map_err(|error: http::Error| format!("h2 request build failed: {error}"))?;
     let (response, mut send_stream) = sender
         .send_request(request, body.is_empty())
-        .map_err(|error: h2::Error| format!("h2 send_request failed: {error}"))?;
+        .map_err(|error: Error| format!("h2 send_request failed: {error}"))?;
     if !body.is_empty() {
         send_stream
             .send_data(Bytes::copy_from_slice(body), true)
-            .map_err(|error: h2::Error| format!("h2 send_data failed: {error}"))?;
+            .map_err(|error: Error| format!("h2 send_data failed: {error}"))?;
     }
     let response: http::Response<RecvStream> =
         timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response)
             .await
             .map_err(|_| "h2 response timed out".to_string())?
-            .map_err(|error: h2::Error| format!("h2 response failed: {error}"))?;
+            .map_err(|error: Error| format!("h2 response failed: {error}"))?;
     let status: u16 = response.status().as_u16();
     let headers: HeaderMap = response.headers().clone();
     let mut received: RecvStream = response.into_body();
@@ -191,7 +191,7 @@ pub(crate) async fn h2_request_with_host_header(
         .map_err(|error: http::Error| format!("h2 request build failed: {error}"))?;
     let (response, _send_stream) = sender
         .send_request(request, true)
-        .map_err(|error: h2::Error| format!("h2 send_request failed: {error}"))?;
+        .map_err(|error: Error| format!("h2 send_request failed: {error}"))?;
     let response: http::Response<RecvStream> =
         match timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response).await {
             Ok(Ok(response)) => response,

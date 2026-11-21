@@ -217,7 +217,7 @@ async fn h2_next_informational(
     poll_fn(|context: &mut task::Context<'_>| response.poll_informational(context))
         .await
         .transpose()
-        .map_err(|error: h2::Error| format!("h2 informational response failed: {error}"))
+        .map_err(|error: Error| format!("h2 informational response failed: {error}"))
 }
 
 async fn h3_expect_exchange(
@@ -282,7 +282,7 @@ pub(crate) fn h2_open_stream(
 ) -> Result<(ResponseFuture, SendStream<Bytes>), String> {
     sender
         .send_request(request, end_of_stream)
-        .map_err(|error: h2::Error| format!("h2 send_request failed: {error}"))
+        .map_err(|error: Error| format!("h2 send_request failed: {error}"))
 }
 
 pub(crate) fn h2_push_body(
@@ -292,7 +292,7 @@ pub(crate) fn h2_push_body(
 ) -> Result<(), String> {
     send_stream
         .send_data(Bytes::copy_from_slice(body), end_of_stream)
-        .map_err(|error: h2::Error| format!("h2 send_data failed: {error}"))
+        .map_err(|error: Error| format!("h2 send_data failed: {error}"))
 }
 
 pub(crate) fn h2_push_body_typed(
