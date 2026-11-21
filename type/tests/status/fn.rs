@@ -45,16 +45,16 @@ fn test_status_copy() {
 #[test]
 fn test_status_serialize_deserialize() {
     let status: Status = Status::Continue;
-    let json: String = serde_json::to_string(&status).unwrap();
-    let deserialized: Status = serde_json::from_str(&json).unwrap();
+    let json: String = to_string(&status).unwrap();
+    let deserialized: Status = from_str(&json).unwrap();
     assert_eq!(status, deserialized);
 }
 
 #[test]
 fn test_status_serialize_deserialize_reject() {
     let status: Status = Status::Reject;
-    let json: String = serde_json::to_string(&status).unwrap();
-    let deserialized: Status = serde_json::from_str(&json).unwrap();
+    let json: String = to_string(&status).unwrap();
+    let deserialized: Status = from_str(&json).unwrap();
     assert_eq!(status, deserialized);
 }
 

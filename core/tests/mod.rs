@@ -27,10 +27,18 @@ use std::{
 };
 
 use bytes::{Buf, Bytes};
-use h3::error::Code;
+use h2::{Error, client::ResponseFuture, client::handshake};
+use h3::{
+    client::RequestStream,
+    client::new,
+    error::{Code, StreamError},
+};
+use h3_quinn::{BidiStream, OpenStreams};
+use http::Version;
+use quinn::{Connecting, crypto::rustls::QuicClientConfig};
 use rustls::{
     ClientConfig, RootCertStore,
-    pki_types::{CertificateDer, ServerName, pem::PemObject},
+    pki_types::{CertificateDer, InvalidDnsNameError, ServerName, pem::PemObject},
 };
 use socket2::SockRef;
 use tokio::{
@@ -41,5 +49,6 @@ use tokio::{
     task::JoinHandle,
     time::{sleep, timeout},
 };
+use tokio_rustls::{Connect, TlsConnector, client::TlsStream};
 
-pub(crate) type ClientTlsStream = tokio_rustls::client::TlsStream<TcpStream>;
+pub(crate) type ClientTlsStream = TlsStream<TcpStream>;

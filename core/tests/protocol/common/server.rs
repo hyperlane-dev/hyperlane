@@ -95,7 +95,7 @@ pub(crate) async fn assert_wait_pending_then_complete(control: &ServerControlHoo
     let pending: JoinHandle<()> = spawn(async move {
         probe.wait().await;
     });
-    tokio::time::sleep(Duration::from_millis(SHUTDOWN_PROBE_MILLIS)).await;
+    sleep(Duration::from_millis(SHUTDOWN_PROBE_MILLIS)).await;
     assert!(
         !pending.is_finished(),
         "wait must still be pending before shutdown is requested"
@@ -190,7 +190,7 @@ pub(crate) async fn read_http1_head<T>(
     expected_body: usize,
 ) -> io::Result<(String, Vec<u8>)>
 where
-    T: tokio::io::AsyncRead + Unpin,
+    T: AsyncRead + Unpin,
 {
     let mut collected: Vec<u8> = Vec::new();
     let mut chunk: [u8; 16 * 1024] = [0; 16 * 1024];
@@ -221,7 +221,7 @@ where
 
 pub(crate) async fn write_bounded<T>(stream: &mut T, data: &[u8]) -> io::Result<()>
 where
-    T: tokio::io::AsyncWrite + Unpin,
+    T: AsyncWrite + Unpin,
 {
     timeout(
         Duration::from_secs(REQUEST_TIMEOUT_SECS),

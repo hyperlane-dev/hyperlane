@@ -20,8 +20,8 @@ pub(crate) struct TaskPanicRecorder;
 
 pub(crate) enum LimitsOutcome {
     Replied(u16, http::HeaderMap, Vec<u8>),
-    H2Reset(h2::Error),
-    H3Reset(h3::error::StreamError),
+    H2Reset(Error),
+    H3Reset(StreamError),
     TimedOut,
     SetupFailed,
 }

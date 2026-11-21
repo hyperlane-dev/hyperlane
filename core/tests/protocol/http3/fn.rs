@@ -8,7 +8,7 @@ fn quic_client_config(alpn: &[u8]) -> quinn::ClientConfig {
         .with_no_client_auth();
     config.alpn_protocols = vec![alpn.to_vec()];
     quinn::ClientConfig::new(Arc::new(
-        quinn::crypto::rustls::QuicClientConfig::try_from(config)
+        QuicClientConfig::try_from(config)
             .expect("the ring provider supports the QUIC initial cipher suite"),
     ))
 }
@@ -26,7 +26,7 @@ pub(crate) async fn connect_quic(
     let address: SocketAddr = format!("{LOOPBACK_HOST}:{port}")
         .parse()
         .map_err(|error: AddrParseError| format!("loopback address is invalid: {error}"))?;
-    let connecting: quinn::Connecting = endpoint
+    let connecting: Connecting = endpoint
         .connect(address, TLS_SERVER_NAME)
         .map_err(|error: quinn::ConnectError| format!("quic connect failed: {error}"))?;
     let connection: quinn::Connection =
@@ -75,7 +75,7 @@ pub(crate) async fn h3_exchange_on(exchange: H3Exchange<'_>) -> Result<H3HeadRep
         target,
         body,
     } = exchange;
-    let (mut driver, mut client) = h3::client::new(h3_quinn::Connection::new(connection.clone()))
+    let (mut driver, mut client) = new(h3_quinn::Connection::new(connection.clone()))
         .await
         .map_err(|error: h3::error::ConnectionError| format!("h3 handshake failed: {error}"))?;
     let driving: JoinHandle<()> = spawn(async move {
@@ -87,7 +87,7 @@ pub(crate) async fn h3_exchange_on(exchange: H3Exchange<'_>) -> Result<H3HeadRep
         .header(PROBE_HEADER_KEY, PROBE_HEADER_VALUE)
         .body(())
         .map_err(|error: http::Error| format!("request build failed: {error}"))?;
-    let mut stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = client
+    let mut stream: RequestStream<BidiStream<Bytes>, Bytes> = client
         .send_request(request)
         .await
         .map_err(|error: h3::error::StreamError| format!("send_request failed: {error}"))?;
@@ -135,7 +135,7 @@ pub(crate) async fn h3_stream_until(port: u16, target: &str, needle: &str) -> (V
         connect_quic(port, ALPN_HTTP3)
             .await
             .expect("quic connect must succeed");
-    let (mut driver, mut client) = h3::client::new(h3_quinn::Connection::new(connection.clone()))
+    let (mut driver, mut client) = new(h3_quinn::Connection::new(connection.clone()))
         .await
         .expect("h3 handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
@@ -146,7 +146,7 @@ pub(crate) async fn h3_stream_until(port: u16, target: &str, needle: &str) -> (V
         .uri(target)
         .body(())
         .expect("request must build");
-    let mut stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = client
+    let mut stream: RequestStream<BidiStream<Bytes>, Bytes> = client
         .send_request(request)
         .await
         .expect("h3 request must be accepted");
@@ -158,7 +158,7 @@ pub(crate) async fn h3_stream_until(port: u16, target: &str, needle: &str) -> (V
     .await
     .expect("the h3 response head must arrive inside its timeout")
     .expect("the h3 response head must not fail");
-    let mut body: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = stream;
+    let mut body: RequestStream<BidiStream<Bytes>, Bytes> = stream;
     let mut collected: Vec<u8> = Vec::new();
     let mut matched: bool = false;
     let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
@@ -195,7 +195,7 @@ pub(crate) async fn h3_request(
     let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await?;
     let alpn: Option<Vec<u8>> = negotiated_quic_alpn(&connection);
-    let (mut driver, mut client) = h3::client::new(h3_quinn::Connection::new(connection.clone()))
+    let (mut driver, mut client) = new(h3_quinn::Connection::new(connection.clone()))
         .await
         .map_err(|error: h3::error::ConnectionError| format!("h3 handshake failed: {error}"))?;
     let driving: JoinHandle<()> = spawn(async move {
@@ -207,7 +207,7 @@ pub(crate) async fn h3_request(
         .header(PROBE_HEADER_KEY, PROBE_HEADER_VALUE)
         .body(())
         .map_err(|error: http::Error| format!("request build failed: {error}"))?;
-    let mut stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = client
+    let mut stream: RequestStream<BidiStream<Bytes>, Bytes> = client
         .send_request(request)
         .await
         .map_err(|error: h3::error::StreamError| format!("send_request failed: {error}"))?;
@@ -229,7 +229,7 @@ pub(crate) async fn h3_request(
     .map_err(|_: tokio::time::error::Elapsed| "h3 response timed out".to_string())?
     .map_err(|error: h3::error::StreamError| format!("recv_response failed: {error}"))?;
     let status: u16 = response.status().as_u16();
-    let version: http::Version = response.version();
+    let version: Version = response.version();
     let mut collected: Vec<u8> = Vec::new();
     let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
     loop {

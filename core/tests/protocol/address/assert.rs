@@ -90,7 +90,7 @@ async fn http2_prior_knowledge_keeps_the_exact_request_target_bytes() {
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     for (name, target) in TARGET_CASES {
         let uri: String = format!("http://{TLS_SERVER_NAME}:{port}{target}");
@@ -124,7 +124,7 @@ async fn http2_prior_knowledge_preserves_a_trailing_question_mark() {
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let uri: String = format!("http://{TLS_SERVER_NAME}:{port}{TRAILING_QUESTION_TARGET}");
     let (status, headers, body): H2HeadReply =
@@ -166,7 +166,7 @@ async fn http2_next_stream_replaces_the_previous_target() {
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let first_uri: String = format!("http://{TLS_SERVER_NAME}:{port}{}", TARGET_CASES[0].1);
     let second_uri: String = format!("http://{TLS_SERVER_NAME}:{port}{}", TARGET_CASES[5].1);
@@ -266,7 +266,7 @@ async fn http3_next_stream_on_one_connection_replaces_the_previous_target() {
         start_target_server(ServerProtocol::Http3, Some(trusted_tls_config()))
             .await
             .expect("the http3 target server must start");
-    let replies: Vec<(u16, http::Version, Vec<u8>)> =
+    let replies: Vec<(u16, Version, Vec<u8>)> =
         h3_targets_on_one_connection(port, [TARGET_CASES[0].1, TARGET_CASES[5].1])
             .await
             .expect("the h3 target requests must complete on one connection");

@@ -268,8 +268,8 @@ fn request_error_from_io_error() {
 
 #[tokio::test]
 async fn request_error_from_elapsed() {
-    let elapsed: Elapsed = tokio::time::timeout(Duration::from_millis(0), async {
-        tokio::time::sleep(Duration::from_secs(10)).await;
+    let elapsed: Elapsed = timeout(Duration::from_millis(0), async {
+        sleep(Duration::from_secs(10)).await;
     })
     .await
     .unwrap_err();

@@ -3,14 +3,14 @@ use super::*;
 #[tokio::test]
 async fn test_arc_mutex_creation() {
     let mutex: ArcMutex<i32> = arc_mutex(42);
-    let guard: tokio::sync::MutexGuard<'_, i32> = mutex.lock().await;
+    let guard: MutexGuard<'_, i32> = mutex.lock().await;
     assert_eq!(*guard, 42);
 }
 
 #[tokio::test]
 async fn test_arc_mutex_with_string() {
     let mutex: ArcMutex<String> = arc_mutex("hello".to_string());
-    let guard: tokio::sync::MutexGuard<'_, String> = mutex.lock().await;
+    let guard: MutexGuard<'_, String> = mutex.lock().await;
     assert_eq!(*guard, "hello");
 }
 
@@ -18,10 +18,10 @@ async fn test_arc_mutex_with_string() {
 async fn test_arc_mutex_mutation() {
     let mutex: ArcMutex<i32> = arc_mutex(0);
     {
-        let mut guard: tokio::sync::MutexGuard<'_, i32> = mutex.lock().await;
+        let mut guard: MutexGuard<'_, i32> = mutex.lock().await;
         *guard = 100;
     }
-    let guard: tokio::sync::MutexGuard<'_, i32> = mutex.lock().await;
+    let guard: MutexGuard<'_, i32> = mutex.lock().await;
     assert_eq!(*guard, 100);
 }
 
@@ -30,10 +30,10 @@ async fn test_arc_mutex_clone_shares_data() {
     let mutex1: ArcMutex<i32> = arc_mutex(42);
     let mutex2: ArcMutex<i32> = Arc::clone(&mutex1);
     {
-        let mut guard: tokio::sync::MutexGuard<'_, i32> = mutex2.lock().await;
+        let mut guard: MutexGuard<'_, i32> = mutex2.lock().await;
         *guard = 99;
     }
-    let guard: tokio::sync::MutexGuard<'_, i32> = mutex1.lock().await;
+    let guard: MutexGuard<'_, i32> = mutex1.lock().await;
     assert_eq!(*guard, 99);
 }
 
@@ -41,10 +41,10 @@ async fn test_arc_mutex_clone_shares_data() {
 async fn test_arc_mutex_with_vec() {
     let mutex: ArcMutex<Vec<i32>> = arc_mutex(vec![1, 2, 3]);
     {
-        let mut guard: tokio::sync::MutexGuard<'_, Vec<i32>> = mutex.lock().await;
+        let mut guard: MutexGuard<'_, Vec<i32>> = mutex.lock().await;
         guard.push(4);
     }
-    let guard: tokio::sync::MutexGuard<'_, Vec<i32>> = mutex.lock().await;
+    let guard: MutexGuard<'_, Vec<i32>> = mutex.lock().await;
     assert_eq!(*guard, vec![1, 2, 3, 4]);
 }
 

@@ -253,7 +253,7 @@ async fn http2_head_response_carries_headers_without_a_body() {
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let request: http::Request<()> =
         h2_build_request("HEAD", &h2_target(port, HEAD_ROUTE_PATH), None)
@@ -292,7 +292,7 @@ async fn http2_no_content_and_not_modified_strip_the_body_bytes() {
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     for (path, expected) in [
         (NO_CONTENT_ROUTE_PATH, WIRE_NO_CONTENT_STATUS),
@@ -372,7 +372,7 @@ async fn http2_raw_chunked_framing_decodes_or_is_rejected_explicitly() {
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let request: http::Request<()> =
         h2_build_request("GET", &h2_target(port, RAW_CHUNKED_ROUTE_PATH), None)
@@ -484,7 +484,7 @@ async fn http2_oversized_body_hits_max_body_size_and_the_request_error_hook() {
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let before: (u16, http::HeaderMap, Vec<u8>) = h2_get(&mut sender, port, BODY_ECHO_ROUTE_PATH)
         .await
@@ -585,7 +585,7 @@ async fn http2_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_re
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let payload: Vec<u8> = declared_short_payload();
     let stalled: http::Request<()> = h2_build_request(
@@ -642,7 +642,7 @@ async fn http3_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_re
         connect_quic(port, ALPN_HTTP3)
             .await
             .expect("quic connect must succeed");
-    let (mut driver, mut client) = h3::client::new(h3_quinn::Connection::new(connection.clone()))
+    let (mut driver, mut client) = new(h3_quinn::Connection::new(connection.clone()))
         .await
         .expect("h3 handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
@@ -655,7 +655,7 @@ async fn http3_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_re
         .header(CONTENT_LENGTH, WRONG_CONTENT_LENGTH.to_string())
         .body(())
         .expect("h3 incomplete request must build");
-    let mut stalled_stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = client
+    let mut stalled_stream: RequestStream<BidiStream<Bytes>, Bytes> = client
         .send_request(stalled)
         .await
         .expect("stalled stream must open");
@@ -678,7 +678,7 @@ async fn http3_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_re
         .uri(h3_target(port, BODY_ECHO_ROUTE_PATH))
         .body(())
         .expect("h3 valid request must build");
-    let mut valid_stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = client
+    let mut valid_stream: RequestStream<BidiStream<Bytes>, Bytes> = client
         .send_request(valid)
         .await
         .expect("valid stream must open");
@@ -721,7 +721,7 @@ async fn http2_wrong_declared_content_length_never_yields_a_truncated_success() 
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let payload: Vec<u8> = declared_short_payload();
     let request: http::Request<()> = h2_build_request(
@@ -769,7 +769,7 @@ async fn http2_panicking_route_reaches_the_task_panic_hook() {
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let request: http::Request<()> =
         h2_build_request("GET", &h2_target(port, PANIC_ROUTE_PATH), None)

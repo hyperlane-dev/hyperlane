@@ -12,13 +12,10 @@ pub(crate) async fn h2_plaintext_session(
     let socket: TcpStream = connect_tcp(port)
         .await
         .map_err(|error: io::Error| format!("h2 plaintext connect failed: {error}"))?;
-    timeout(
-        Duration::from_secs(CONNECT_TIMEOUT_SECS),
-        h2::client::handshake(socket),
-    )
-    .await
-    .map_err(|_| "h2 plaintext handshake timed out".to_string())?
-    .map_err(|error: h2::Error| format!("h2 plaintext handshake failed: {error}"))
+    timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS), handshake(socket))
+        .await
+        .map_err(|_| "h2 plaintext handshake timed out".to_string())?
+        .map_err(|error: h2::Error| format!("h2 plaintext handshake failed: {error}"))
 }
 
 pub(crate) async fn h2_tls_alpn(port: u16) -> Result<(Option<Vec<u8>>, H2TlsSession), String> {
@@ -26,13 +23,10 @@ pub(crate) async fn h2_tls_alpn(port: u16) -> Result<(Option<Vec<u8>>, H2TlsSess
         .await
         .map_err(|error: io::Error| format!("h2 tls connect failed: {error}"))?;
     let alpn: Option<Vec<u8>> = negotiated_alpn(&stream);
-    let (send, connection) = timeout(
-        Duration::from_secs(CONNECT_TIMEOUT_SECS),
-        h2::client::handshake(stream),
-    )
-    .await
-    .map_err(|_| "h2 tls handshake timed out".to_string())?
-    .map_err(|error: h2::Error| format!("h2 tls handshake failed: {error}"))?;
+    let (send, connection) = timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS), handshake(stream))
+        .await
+        .map_err(|_| "h2 tls handshake timed out".to_string())?
+        .map_err(|error: h2::Error| format!("h2 tls handshake failed: {error}"))?;
     Ok((alpn, (send, connection)))
 }
 
@@ -62,7 +56,7 @@ pub(crate) async fn h2_request(
             .map_err(|_| "h2 response timed out".to_string())?
             .map_err(|error: h2::Error| format!("h2 response failed: {error}"))?;
     let status: u16 = response.status().as_u16();
-    let version: http::Version = response.version();
+    let version: Version = response.version();
     let mut received: h2::RecvStream = response.into_body();
     let mut collected: Vec<u8> = Vec::new();
     let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
@@ -73,7 +67,7 @@ pub(crate) async fn h2_request(
         }
         match timeout(remaining, received.data()).await {
             Ok(Some(Ok(chunk))) => {
-                let _released: Result<(), h2::Error> =
+                let _released: Result<(), Error> =
                     received.flow_control().release_capacity(chunk.len());
                 collected.extend_from_slice(&chunk);
             }
@@ -122,7 +116,7 @@ pub(crate) async fn h2_request_with_headers(
         }
         match timeout(remaining, received.data()).await {
             Ok(Some(Ok(chunk))) => {
-                let _released: Result<(), h2::Error> =
+                let _released: Result<(), Error> =
                     received.flow_control().release_capacity(chunk.len());
                 collected.extend_from_slice(&chunk);
             }
@@ -139,7 +133,7 @@ pub(crate) async fn h2_stream_until(port: u16, target: &str, needle: &str) -> (V
         .await
         .expect("h2 handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let request: http::Request<()> = http::Request::builder()
         .method("GET")
@@ -169,7 +163,7 @@ pub(crate) async fn h2_stream_until(port: u16, target: &str, needle: &str) -> (V
         }
         match timeout(remaining, body.data()).await {
             Ok(Some(Ok(chunk))) => {
-                let _released: Result<(), h2::Error> =
+                let _released: Result<(), Error> =
                     body.flow_control().release_capacity(chunk.len());
                 collected.extend_from_slice(&chunk);
             }
@@ -215,7 +209,7 @@ pub(crate) async fn h2_request_with_host_header(
         }
         match timeout(remaining, received.data()).await {
             Ok(Some(Ok(chunk))) => {
-                let _released: Result<(), h2::Error> =
+                let _released: Result<(), Error> =
                     received.flow_control().release_capacity(chunk.len());
                 collected.extend_from_slice(&chunk);
             }

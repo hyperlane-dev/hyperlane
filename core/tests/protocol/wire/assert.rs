@@ -33,7 +33,7 @@ async fn an_http1_listener_refuses_a_prior_knowledge_http2_client() {
         .await
         .expect("the client handshake future resolves before the wire is settled");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let target: String = format!("http://{TLS_SERVER_NAME}:{port}{VERSION_ROUTE_PATH}");
     let outcome: Result<H2Reply, String> = h2_request(&mut sender, "GET", &target, &[]).await;
@@ -95,7 +95,7 @@ async fn http2_strips_every_hop_by_hop_header_but_keeps_end_to_end_ones() {
         .await
         .expect("h2 handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let (status, headers, body): (u16, http::HeaderMap, Vec<u8>) = h2_request_with_headers(
         &mut sender,
@@ -126,7 +126,7 @@ async fn http2_strips_every_hop_by_hop_header_but_keeps_end_to_end_ones() {
         "an end-to-end header must survive the stripping, got: {headers:?}"
     );
     assert_eq!(String::from_utf8_lossy(&body), HOP_BY_HOP_SENT_BODY);
-    let (status, _version, body): (u16, http::Version, Vec<u8>) = h2_request(
+    let (status, _version, body): (u16, Version, Vec<u8>) = h2_request(
         &mut sender,
         "GET",
         &format!("http://{TLS_SERVER_NAME}:{port}{HOP_BY_HOP_CLEAN_ROUTE_PATH}"),
@@ -151,7 +151,7 @@ async fn http2_refuses_a_response_announcing_a_chunked_transfer_encoding() {
         .await
         .expect("h2 handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let outcome: Result<H2Reply, String> = h2_request(
         &mut sender,

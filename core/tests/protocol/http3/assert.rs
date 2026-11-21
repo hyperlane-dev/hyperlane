@@ -122,9 +122,7 @@ async fn http3_multi_worker_connection_migration_preserves_session() {
             .unwrap();
     let (endpoint, connection): (quinn::Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await.unwrap();
-    let (mut driver, mut send_request) = h3::client::new(h3_quinn::Connection::new(connection))
-        .await
-        .unwrap();
+    let (mut driver, mut send_request) = new(h3_quinn::Connection::new(connection)).await.unwrap();
     let drive: JoinHandle<()> = spawn(async move {
         let _: h3::error::ConnectionError =
             poll_fn(|cx: &mut task::Context<'_>| driver.poll_close(cx)).await;
@@ -141,7 +139,7 @@ async fn http3_multi_worker_connection_migration_preserves_session() {
             ))
             .body(())
             .unwrap();
-        let mut stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> =
+        let mut stream: RequestStream<BidiStream<Bytes>, Bytes> =
             send_request.send_request(req).await.unwrap();
         stream.finish().await.unwrap();
         let resp: ProtocolResponse<()> = stream.recv_response().await.unwrap();
@@ -168,7 +166,7 @@ async fn http3_cancelled_backpressured_write_can_be_followed_by_a_smaller_write(
             .expect("http3 server must start");
     let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await.unwrap();
-    let (mut driver, mut client) = h3::client::new(h3_quinn::Connection::new(connection.clone()))
+    let (mut driver, mut client) = new(h3_quinn::Connection::new(connection.clone()))
         .await
         .unwrap();
     let driving: JoinHandle<()> = spawn(async move {
@@ -176,7 +174,7 @@ async fn http3_cancelled_backpressured_write_can_be_followed_by_a_smaller_write(
     });
     let target: String = format!("https://{TLS_SERVER_NAME}:{port}{CANCELLED_WRITE_ROUTE_PATH}");
     let request: http::Request<()> = http::Request::builder().uri(target).body(()).unwrap();
-    let mut stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> =
+    let mut stream: RequestStream<BidiStream<Bytes>, Bytes> =
         client.send_request(request).await.unwrap();
     stream.finish().await.unwrap();
     let response: http::Response<()> = stream.recv_response().await.unwrap();

@@ -17,8 +17,7 @@ fn xx_hash3_64_matches_the_allocating_hasher() {
         stack_hasher.write(sample.as_bytes());
         let stack_hash: u64 = stack_hasher.finish();
 
-        let mut allocating_hasher: twox_hash::xxhash3_64::Hasher =
-            twox_hash::xxhash3_64::Hasher::default();
+        let mut allocating_hasher: xxhash3_64::Hasher = xxhash3_64::Hasher::default();
         allocating_hasher.write(sample.as_bytes());
         let allocating_hash: u64 = allocating_hasher.finish();
 
@@ -47,8 +46,7 @@ fn xx_hash3_64_preserves_every_prefix_and_write_partition() {
     for length in [0, 1, 7, 16, 64, 127, 128, 129, 240, 241, 1024, 2048] {
         for width in [1, 7, 16, 63, 128, 129, 1024] {
             let mut actual: XxHash3_64 = XxHash3_64::default();
-            let mut expected: twox_hash::xxhash3_64::Hasher =
-                twox_hash::xxhash3_64::Hasher::default();
+            let mut expected: xxhash3_64::Hasher = xxhash3_64::Hasher::default();
             for chunk in bytes[..length].chunks(width) {
                 actual.write(chunk);
                 expected.write(chunk);
