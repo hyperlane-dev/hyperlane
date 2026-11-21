@@ -212,7 +212,7 @@ async fn run_uring_h1_tls(env: ConnectionEnv, transport: UringTcpTransport) {
         .server
         .serve_h1_connection_stream(&env.shared.pipeline, &mut stream)
         .await;
-    let _: Result<(), io::Error> = stream.stream.shutdown().await;
+    let _: Result<(), io::Error> = stream.shutdown().await;
 }
 
 /// Polls every connection slot currently queued in `reactor.local_ready`.

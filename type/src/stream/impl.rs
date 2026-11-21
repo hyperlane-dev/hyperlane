@@ -348,6 +348,20 @@ impl Stream {
         self.get_stream().local_addr()
     }
 
+    /// Shuts the transport down.
+    ///
+    /// The transport itself is crate-internal, so a caller that needs to
+    /// close the connection reaches it through this method rather than
+    /// through the field.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<(), io::Error>` - Whether the transport shut down.
+    #[inline(always)]
+    pub async fn shutdown(&mut self) -> Result<(), io::Error> {
+        self.get_mut_stream().shutdown().await
+    }
+
     /// Checks if the connection should be kept alive.
     ///
     /// This method evaluates whether the connection should remain open based on
