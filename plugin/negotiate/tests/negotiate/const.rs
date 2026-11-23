@@ -1,0 +1,25 @@
+use super::*;
+
+pub(super) const LARGE_PATH: &str = "/large";
+pub(super) const SMALL_PATH: &str = "/small";
+pub(super) const CODED_PATH: &str = "/coded";
+pub(super) const STREAM_PATH: &str = "/stream";
+pub(super) const NO_CONTENT_PATH: &str = "/no-content";
+pub(super) const VARY_PATH: &str = "/vary";
+pub(super) const VALIDATED_PATH: &str = "/validated";
+pub(super) const APP_VALIDATOR: &str = "\"application-validator\"";
+pub(super) const SMALL_BODY: &str = "tiny";
+pub(super) const BODY_UNIT: &str = "hyperlane negotiates the content coding of a response ";
+pub(super) const BODY_REPEATS: usize = 8;
+pub(super) const GZIP_TOKEN: &str = "gzip";
+pub(super) const BROTLI_TOKEN: &str = "br";
+pub(super) const DEFLATE_TOKEN: &str = "deflate";
+pub(super) const UNSUPPORTED_TOKEN: &str = "zstd";
+pub(super) const REFUSED_TOKEN: &str = "br;q=0";
+pub(super) const PREFER_BROTLI: &str = "gzip;q=0.5, br";
+pub(super) const PREFER_GZIP: &str = "br;q=0.5, gzip";
+pub(super) const EXISTING_VARY: &str = "origin";
+pub(super) const GZIP_MAGIC: [u8; 2] = [0x1f, 0x8b];
+pub(super) const HTTP_ONE: &str = "HTTP/1.1";
+pub(super) const BIND_ATTEMPTS: usize = 3;
+pub(super) const WIRE_TIMEOUT: Duration = Duration::from_secs(5);

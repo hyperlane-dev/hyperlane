@@ -185,3 +185,134 @@ fn variants_are_ordered_and_hashable() {
     set.insert(Compress::Br);
     assert_eq!(set.len(), 2);
 }
+
+#[test]
+fn as_str_renders_field_token() {
+    assert_eq!(Compress::Gzip.as_str(), "gzip");
+    assert_eq!(Compress::Deflate.as_str(), "deflate");
+    assert_eq!(Compress::Br.as_str(), "br");
+    assert_eq!(Compress::Unknown.as_str(), "");
+}
+
+#[test]
+fn from_accept_encoding_picks_single_coding() {
+    assert_eq!(Compress::from_accept_encoding("gzip"), Some(Compress::Gzip));
+    assert_eq!(
+        Compress::from_accept_encoding("deflate"),
+        Some(Compress::Deflate)
+    );
+    assert_eq!(Compress::from_accept_encoding("br"), Some(Compress::Br));
+}
+
+#[test]
+fn from_accept_encoding_is_case_insensitive() {
+    assert_eq!(Compress::from_accept_encoding("GZIP"), Some(Compress::Gzip));
+    assert_eq!(Compress::from_accept_encoding("Br"), Some(Compress::Br));
+    assert_eq!(
+        Compress::from_accept_encoding("BR;Q=1.0"),
+        Some(Compress::Br)
+    );
+}
+
+#[test]
+fn from_accept_encoding_prefers_brotli_on_a_tie() {
+    assert_eq!(
+        Compress::from_accept_encoding("gzip, br"),
+        Some(Compress::Br)
+    );
+    assert_eq!(
+        Compress::from_accept_encoding("deflate, gzip"),
+        Some(Compress::Gzip)
+    );
+    assert_eq!(
+        Compress::from_accept_encoding("gzip;q=0.8, br;q=0.8"),
+        Some(Compress::Br)
+    );
+}
+
+#[test]
+fn from_accept_encoding_respects_quality_order() {
+    assert_eq!(
+        Compress::from_accept_encoding("gzip;q=0.5, br"),
+        Some(Compress::Br)
+    );
+    assert_eq!(
+        Compress::from_accept_encoding("br;q=0.5, gzip"),
+        Some(Compress::Gzip)
+    );
+    assert_eq!(
+        Compress::from_accept_encoding("br;q=0.2, deflate;q=0.9, gzip;q=0.4"),
+        Some(Compress::Deflate)
+    );
+}
+
+#[test]
+fn from_accept_encoding_refuses_zero_quality() {
+    assert_eq!(Compress::from_accept_encoding("br;q=0"), None);
+    assert_eq!(Compress::from_accept_encoding("br;q=0.0"), None);
+    assert_eq!(
+        Compress::from_accept_encoding("br;q=0, gzip"),
+        Some(Compress::Gzip)
+    );
+}
+
+#[test]
+fn from_accept_encoding_ignores_unknown_codings() {
+    assert_eq!(Compress::from_accept_encoding("zstd"), None);
+    assert_eq!(
+        Compress::from_accept_encoding("lzma, gzip"),
+        Some(Compress::Gzip)
+    );
+    assert_eq!(Compress::from_accept_encoding("identity"), None);
+}
+
+#[test]
+fn from_accept_encoding_applies_wildcard() {
+    assert_eq!(Compress::from_accept_encoding("*"), Some(Compress::Br));
+    assert_eq!(
+        Compress::from_accept_encoding("gzip, *;q=0"),
+        Some(Compress::Gzip)
+    );
+    assert_eq!(
+        Compress::from_accept_encoding("br;q=0.3, *;q=0.9"),
+        Some(Compress::Gzip)
+    );
+    assert_eq!(Compress::from_accept_encoding("*;q=0"), None);
+}
+
+#[test]
+fn from_accept_encoding_returns_none_for_absent_or_empty_field() {
+    assert_eq!(Compress::from_accept_encoding(""), None);
+    assert_eq!(Compress::from_accept_encoding("   "), None);
+    assert_eq!(Compress::from_accept_encoding(","), None);
+    assert_eq!(Compress::from_accept_encoding(";;"), None);
+}
+
+#[test]
+fn from_accept_encoding_refuses_quality_outside_the_unit_interval() {
+    assert_eq!(Compress::from_accept_encoding("gzip;q=1.5"), None);
+    assert_eq!(Compress::from_accept_encoding("gzip;q=-1"), None);
+    assert_eq!(Compress::from_accept_encoding("gzip;q=abc"), None);
+    assert_eq!(Compress::from_accept_encoding("gzip;q=nan"), None);
+    assert_eq!(Compress::from_accept_encoding("gzip;q=inf"), None);
+    assert_eq!(
+        Compress::from_accept_encoding("gzip;q=2, br;q=0.5"),
+        Some(Compress::Br)
+    );
+}
+
+#[test]
+fn from_accept_encoding_ignores_unknown_parameters() {
+    assert_eq!(
+        Compress::from_accept_encoding("gzip;version=2"),
+        Some(Compress::Gzip)
+    );
+    assert_eq!(
+        Compress::from_accept_encoding("br;charset=utf-8;q=0.5, gzip;q=1"),
+        Some(Compress::Gzip)
+    );
+    assert_eq!(
+        Compress::from_accept_encoding("  gzip ; q = 0.9  "),
+        Some(Compress::Gzip)
+    );
+}

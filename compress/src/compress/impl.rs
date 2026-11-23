@@ -53,13 +53,7 @@ impl fmt::Display for Compress {
     /// - `fmt::Result` - The result of the formatting operation.
     #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let display_str: &str = match *self {
-            Compress::Gzip => CONTENT_ENCODING_GZIP,
-            Compress::Deflate => CONTENT_ENCODING_DEFLATE,
-            Compress::Br => CONTENT_ENCODING_BROTLI,
-            Compress::Unknown => EMPTY_STR,
-        };
-        write!(f, "{display_str}")
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -76,6 +70,125 @@ impl Compress {
     #[inline(always)]
     pub fn is_unknown(&self) -> bool {
         *self == Self::Unknown
+    }
+
+    /// Renders the coding as its `Content-Encoding` field token.
+    ///
+    /// # Returns
+    ///
+    /// - `&'static str` - The token, empty for [`Compress::Unknown`].
+    #[inline(always)]
+    pub fn as_str(&self) -> &'static str {
+        match *self {
+            Self::Gzip => CONTENT_ENCODING_GZIP,
+            Self::Deflate => CONTENT_ENCODING_DEFLATE,
+            Self::Br => CONTENT_ENCODING_BROTLI,
+            Self::Unknown => EMPTY_STR,
+        }
+    }
+
+    /// Picks the coding this crate supports best out of an `Accept-Encoding` field value.
+    ///
+    /// The field is a comma separated list of codings, and every coding may carry a
+    /// `q` parameter that scales how much the client wants it, so `gzip;q=0.5, br`
+    /// asks for Brotli before Gzip. A coding the client refuses with `q=0` is never
+    /// picked, a coding this crate does not implement is ignored, and the `*` coding
+    /// stands for every supported coding the field does not name. Two codings the
+    /// client wants equally are resolved in favour of the smaller output, so the
+    /// answer is `br`, then `gzip`, then `deflate`, whatever order the field lists
+    /// them in.
+    ///
+    /// The field is parsed without allocating, so a server may negotiate the coding
+    /// of every response without a heap cost of its own.
+    ///
+    /// # Arguments
+    ///
+    /// - `H` - The field value, which requires the `AsRef<str>` bound.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<Self>` - The coding to answer with, or `None` when the client
+    ///   accepts none of the codings this crate implements.
+    #[inline]
+    pub fn from_accept_encoding<H>(header: H) -> Option<Self>
+    where
+        H: AsRef<str>,
+    {
+        let mut brotli: Option<f32> = None;
+        let mut gzip: Option<f32> = None;
+        let mut deflate: Option<f32> = None;
+        let mut wildcard: Option<f32> = None;
+        for item in header.as_ref().split(ACCEPT_ENCODING_SEPARATOR) {
+            let Some((coding, quality)) = Self::split_accept_item(item) else {
+                continue;
+            };
+            if coding == ACCEPT_ENCODING_WILDCARD {
+                wildcard = Some(quality);
+            } else if coding.eq_ignore_ascii_case(CONTENT_ENCODING_BROTLI) {
+                brotli = Some(quality);
+            } else if coding.eq_ignore_ascii_case(CONTENT_ENCODING_GZIP) {
+                gzip = Some(quality);
+            } else if coding.eq_ignore_ascii_case(CONTENT_ENCODING_DEFLATE) {
+                deflate = Some(quality);
+            }
+        }
+        let candidates: [(Self, Option<f32>); 3] = [
+            (Self::Br, brotli),
+            (Self::Gzip, gzip),
+            (Self::Deflate, deflate),
+        ];
+        let mut best: Option<Self> = None;
+        let mut best_quality: f32 = 0.0;
+        for (coding, quality) in candidates {
+            let quality: f32 = quality.or(wildcard).unwrap_or(0.0);
+            if quality <= best_quality {
+                continue;
+            }
+            best = Some(coding);
+            best_quality = quality;
+        }
+        best
+    }
+
+    /// Splits one entry of an `Accept-Encoding` field value into its coding and quality.
+    ///
+    /// A quality that is absent counts as `1`, and a quality that is present but
+    /// does not parse as a number inside the unit interval refuses the entry,
+    /// because a client that cannot say how much it wants a coding cannot be
+    /// answered with it.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - The entry, with or without its parameters.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<(&str, f32)>` - The coding and its quality, or `None` when the
+    ///   entry names no coding or carries a quality the interval does not hold.
+    #[inline]
+    fn split_accept_item(item: &str) -> Option<(&str, f32)> {
+        let (coding, parameters): (&str, &str) = match item.split_once(PARAMETER_SEPARATOR) {
+            Some((coding, parameters)) => (coding, parameters),
+            None => (item, EMPTY_STR),
+        };
+        let coding: &str = coding.trim();
+        if coding.is_empty() {
+            return None;
+        }
+        for parameter in parameters.split(PARAMETER_SEPARATOR) {
+            let Some((name, value)) = parameter.split_once(PARAMETER_ASSIGN) else {
+                continue;
+            };
+            if !name.trim().eq_ignore_ascii_case(ACCEPT_ENCODING_QUALITY) {
+                continue;
+            }
+            let quality: f32 = value.trim().parse().ok()?;
+            if !(0.0..=1.0).contains(&quality) {
+                return None;
+            }
+            return Some((coding, quality));
+        }
+        Some((coding, DEFAULT_QUALITY))
     }
 
     /// Extracts the compression type from an HTTP header.
