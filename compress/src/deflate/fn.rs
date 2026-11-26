@@ -19,16 +19,13 @@ use super::*;
 ///   compressed data is returned as an owned `Vec<u8>`. If an error occurs, an empty owned `Vec<u8>`
 ///   is returned.
 pub fn encode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
-    let encoder: DeflateEncoder<Vec<u8>> = DeflateEncoder::new(Vec::new(), Compression::default());
-    let mut buffered_writer: BufWriter<DeflateEncoder<Vec<u8>>> =
-        BufWriter::with_capacity(buffer_size, encoder);
-    if buffered_writer.write_all(data).is_err() {
+    let initial_capacity: usize = data.len().min(buffer_size);
+    let mut encoder: DeflateEncoder<Vec<u8>> =
+        DeflateEncoder::new(Vec::with_capacity(initial_capacity), Compression::default());
+    if encoder.write_all(data).is_err() {
         return Cow::Owned(Vec::new());
     }
-    match buffered_writer.into_inner() {
-        Ok(encoder) => Cow::Owned(encoder.finish().unwrap_or_else(|_: io::Error| Vec::new())),
-        Err(_) => Cow::Owned(Vec::new()),
-    }
+    Cow::Owned(encoder.finish().unwrap_or_else(|_: io::Error| Vec::new()))
 }
 
 /// Decompresses Deflate compressed data.
@@ -36,18 +33,19 @@ pub fn encode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
 /// # Arguments
 ///
 /// - `&'_ [u8]` - A reference to a byte slice containing the compressed data to decode.
-/// - `usize` - The buffer size for decompression.
+/// - `usize` - The capacity hint for decompression.
 ///
 /// # Returns
 ///
 /// - `Cow<'_, [u8]>` - The decompressed data.
 pub fn decode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
     let decoder: DeflateDecoder<&[u8]> = DeflateDecoder::new(data);
-    let mut buffered_reader: BufReader<DeflateDecoder<&[u8]>> =
-        BufReader::with_capacity(buffer_size, decoder);
-    let mut decompressed_data: Vec<u8> = Vec::new();
-    match buffered_reader.read_to_end(&mut decompressed_data) {
-        Ok(_) => Cow::Owned(decompressed_data),
+    let mut limited: io::Take<DeflateDecoder<&[u8]>> =
+        decoder.take((MAX_DECOMPRESSED_BYTES + 1) as u64);
+    let initial_capacity: usize = data.len().min(buffer_size);
+    let mut decompressed_data: Vec<u8> = Vec::with_capacity(initial_capacity);
+    match limited.read_to_end(&mut decompressed_data) {
+        Ok(_) if decompressed_data.len() <= MAX_DECOMPRESSED_BYTES => Cow::Owned(decompressed_data),
         _ => Cow::Owned(Vec::new()),
     }
 }

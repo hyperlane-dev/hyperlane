@@ -993,6 +993,8 @@ impl WebSocket {
     ///
     /// This asynchronous function continuously monitors for new WebSocket requests
     /// and incoming broadcast messages, processing them according to the configured hooks.
+    /// When the broadcast type is `BroadcastType::Unknown`, the stream is closed and
+    /// the function returns without panicking.
     ///
     /// # Type Parameters
     ///
@@ -1001,11 +1003,6 @@ impl WebSocket {
     /// # Arguments
     ///
     /// - `WebSocketConfig<'_, B>` - The WebSocket configuration containing the configuration for this WebSocket instance.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the context in the WebSocket configuration is not set (i.e., it's the default context).
-    /// Panics if the broadcast type in the WebSocket configuration is `BroadcastType::Unknown`.
     pub async fn run<B>(&self, websocket_config: WebSocketConfig<'_, B>)
     where
         B: BroadcastTypeTrait,
@@ -1023,40 +1020,62 @@ impl WebSocket {
         let mut receiver: Receiver<Vec<u8>> = match &broadcast_type {
             BroadcastType::PointToPoint(key1, key2) => self.point_to_point(key1, key2, capacity),
             BroadcastType::PointToGroup(key) => self.point_to_group(key, capacity),
-            BroadcastType::Unknown => panic!("BroadcastType must be PointToPoint or PointToGroup"),
+            BroadcastType::Unknown => {
+                stream.set_closed(true);
+                return;
+            }
         };
         let key: String = BroadcastType::get_key(broadcast_type);
-        if connected_hook(stream, ctx).await.is_reject() {
-            return;
-        }
-        let mut is_reject: bool;
-        loop {
-            tokio::select! {
-                request_res = stream.try_get_websocket_request() => {
-                    if let Ok(body) = request_res {
-                        ctx.get_mut_request().set_body(body);
-                        is_reject = request_hook(stream, ctx).await.is_reject();
-                    } else {
-                        is_reject = true;
-                        closed_hook(stream, ctx).await;
-                    }
-                    let body: ResponseBody = ctx.get_response().get_body().clone();
-                    let is_err: bool = self.get_broadcast_map().try_send(&key, body).is_err();
-                    if is_err || sended_hook(stream, ctx).await.is_reject() || is_reject {
-                        break;
-                    }
-                },
-                msg_res = receiver.recv() => {
-                    if let Ok(msg) = &msg_res {
-                        if stream.try_send_list(&WebSocketFrame::create_frame_list(msg)).await.is_ok() {
-                            continue;
+        let mut closed_called: bool = false;
+        if connected_hook(stream, ctx).await.is_continue() {
+            loop {
+                tokio::select! {
+                    request_res = stream.try_get_websocket_request() => {
+                        if let Ok(body) = request_res {
+                            ctx.get_mut_request().set_body(body);
+                            let is_reject: bool = request_hook(stream, ctx).await.is_reject();
+                            let body: ResponseBody = ctx.get_response().get_body().clone();
+                            let is_err: bool = self.get_broadcast_map().try_send(&key, body).is_err();
+                            if is_err || sended_hook(stream, ctx).await.is_reject() || is_reject {
+                                break;
+                            }
                         } else {
+                            closed_called = true;
+                            ctx.get_mut_response().set_body(Vec::new());
+                            closed_hook(stream, ctx).await;
+                            let body: ResponseBody = ctx.get_response().get_body().clone();
+                            if !body.is_empty() {
+                                let _: Result<Option<ReceiverCount>, SendError<Vec<u8>>> =
+                                    self.get_broadcast_map().try_send(&key, body);
+                                let _: Status = sended_hook(stream, ctx).await;
+                            }
                             break;
                         }
+                    },
+                    msg_res = receiver.recv() => {
+                        if let Ok(msg) = &msg_res {
+                            if stream.try_send_list(&WebSocketFrame::create_frame_list(msg)).await.is_ok() {
+                                continue;
+                            }
+                            break;
+                        }
+                        break;
                     }
-                    break;
                 }
             }
+        }
+        if !closed_called {
+            ctx.get_mut_response().set_body(Vec::new());
+            closed_hook(stream, ctx).await;
+            let body: ResponseBody = ctx.get_response().get_body().clone();
+            if !body.is_empty() {
+                let _: Result<Option<ReceiverCount>, SendError<Vec<u8>>> =
+                    self.get_broadcast_map().try_send(&key, body);
+            }
+        }
+        drop(receiver);
+        if self.get_broadcast_map().receiver_count(&key) == Some(0) {
+            let _: Option<Broadcast<Vec<u8>>> = self.get_broadcast_map().unsubscribe(&key);
         }
         stream.set_closed(true);
     }

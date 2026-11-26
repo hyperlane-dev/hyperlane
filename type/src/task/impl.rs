@@ -17,15 +17,18 @@ impl Default for Task {
     }
 }
 
-/// Automatically shuts down the task pool when the Task instance is dropped.
+/// Automatically shuts down the task pool when the last Task handle is dropped.
 impl Drop for Task {
-    /// Shuts down the task pool when the Task instance is dropped.
+    /// Shuts down the task pool when the last Task handle is dropped.
     #[inline(always)]
     fn drop(&mut self) {
-        self.shutdown();
+        if Arc::strong_count(self.get_counter()) == 1 {
+            self.shutdown();
+        }
     }
 }
 
+/// Inherent implementation of [`Task`].
 impl Task {
     /// Creates a new Task instance.
     ///
@@ -99,7 +102,7 @@ impl Task {
             return false;
         }
         let index: usize = index_opt
-            .unwrap_or(self.get_counter().fetch_add(1, atomic::Ordering::Relaxed))
+            .unwrap_or_else(|| self.get_counter().fetch_add(1, atomic::Ordering::Relaxed))
             .wrapping_rem(self.get_pool().len());
         if let Some(sender) = self.get_pool().get(index) {
             let result: bool = sender.send(Box::pin(hook)).is_ok();

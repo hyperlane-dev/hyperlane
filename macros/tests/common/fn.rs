@@ -92,3 +92,11 @@ fn context_leak_generation_preserves_the_unsafe_mode() {
         quote!(ctx.leak_mut()).to_string()
     );
 }
+
+#[test]
+fn order_expression_accepts_negative_integer_literal() {
+    let neg: Expr = parse_quote!(-120);
+    let tokens: TokenStream = expr_to_isize(&Some(neg));
+    let _: Expr = parse2(tokens.clone()).unwrap();
+    assert_eq!(tokens.to_string().replace(' ', ""), "Some(-120isize)");
+}

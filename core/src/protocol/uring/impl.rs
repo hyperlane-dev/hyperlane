@@ -8,7 +8,7 @@ impl UringWakeState {
         let Self {
             eventfd, signaled, ..
         } = self;
-        if !signaled.swap(true, AtomicOrdering::AcqRel) {
+        if !signaled.swap(true, AtomicOrdering::SeqCst) {
             let val: u64 = 1;
             // SAFETY: `eventfd` is a valid open nonblocking eventfd and `val` is an 8-byte u64.
             let _: isize = unsafe {
@@ -38,7 +38,7 @@ impl UringWakeState {
     /// Requests graceful shutdown and wakes the owning `io_uring` worker immediately.
     pub(crate) fn trigger_shutdown(&self) {
         let Self { shutdown, .. } = self;
-        shutdown.store(true, AtomicOrdering::Release);
+        shutdown.store(true, AtomicOrdering::SeqCst);
         self.notify_eventfd();
     }
 }

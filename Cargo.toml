@@ -12,7 +12,7 @@ categories = ["network-programming", "web-programming"]
 exclude.workspace = true
 
 [workspace.package]
-version = "22.8.2"
+version = "22.9.0"
 readme = "README.md"
 edition = "2024"
 authors = ["root@devhub.vip"]
@@ -42,19 +42,26 @@ members = [
     "core",
     "macros",
     "cli",
+    "plugin/gateway",
+    "plugin/grpc",
     "plugin/logger",
+    "plugin/mcp",
+    "plugin/mq",
     "plugin/negotiate",
+    "plugin/rpc",
+    "plugin/sse",
     "plugin/websocket",
     "performance",
 ]
 
 [workspace.dependencies]
-hyperlane = { path = ".", version = "22.8.2" }
-http-type = { path = "type", version = "22.8.2" }
-hyperlane-core = { path = "core", version = "22.8.2" }
-http-compress = { path = "compress", version = "22.8.2" }
-http-constant = { path = "constant", version = "22.8.2" }
-hyperlane-macros = { path = "macros", version = "22.8.2" }
+hyperlane = { path = ".", version = "22.9.0" }
+http-type = { path = "type", version = "22.9.0" }
+hyperlane-core = { path = "core", version = "22.9.0" }
+http-request = { path = "request", version = "22.9.0" }
+http-compress = { path = "compress", version = "22.9.0" }
+http-constant = { path = "constant", version = "22.9.0" }
+hyperlane-macros = { path = "macros", version = "22.9.0" }
 
 h3 = "0.0.8"
 h2 = "0.4.20"

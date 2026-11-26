@@ -20,6 +20,7 @@ mod protocol;
 mod rc_rwlock;
 mod request;
 mod response;
+mod security;
 mod status;
 mod stream;
 mod task;

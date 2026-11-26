@@ -1,47 +1,33 @@
 use super::*;
 
-/// Execute cargo run command and capture output through log.
+/// Spawns `cargo run` as a managed child process that terminates cleanly on restart or drop.
 ///
 /// # Returns
 ///
-/// - `Result<(), io::Error>` - Success or error
-async fn run_cargo_run() -> Result<(), io::Error> {
-    let output: Output = Command::new(CARGO_RUN_PROGRAM)
+/// - `Result<Child, io::Error>` - The spawned child process handle.
+fn spawn_cargo_run() -> Result<Child, io::Error> {
+    Command::new(CARGO_RUN_PROGRAM)
         .arg("run")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .await?;
-    let stdout: String = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let stderr: String = String::from_utf8_lossy(&output.stderr).trim().to_string();
-    if !stdout.is_empty() {
-        for line in stdout.lines() {
-            log::info!("{line}");
-        }
+        .kill_on_drop(true)
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()
+}
+
+/// Terminates any active watched child process before restarting.
+///
+/// # Arguments
+///
+/// - `&mut Option<Child>` - The active child process handle, if one is running.
+async fn stop_cargo_run(child: &mut Option<Child>) {
+    if let Some(mut process) = child.take() {
+        let _: Result<(), io::Error> = process.kill().await;
+        let _: Result<_, io::Error> = process.wait().await;
     }
-    if !stderr.is_empty() {
-        if output.status.success() {
-            for line in stderr.lines() {
-                if line.is_empty() {
-                    continue;
-                }
-                log::info!("{line}");
-            }
-        } else {
-            for line in stderr.lines() {
-                if line.is_empty() {
-                    continue;
-                }
-                log::error!("{line}");
-            }
-            log::error!("cargo run failed");
-        }
-    }
-    Ok(())
 }
 
 /// Execute watch command using notify crate to monitor file changes
-/// and re-run cargo run when source files are modified.
+/// and restart `cargo run` when source files are modified.
 ///
 /// # Returns
 ///
@@ -51,7 +37,7 @@ pub async fn execute_watch() -> Result<(), io::Error> {
     if !src_path.exists() {
         return Err(io::Error::other(ERROR_SRC_DIRECTORY_NOT_FOUND));
     }
-    run_cargo_run().await?;
+    let mut active_child: Option<Child> = Some(spawn_cargo_run()?);
     let (tx, mut rx): (Sender<Event>, Receiver<Event>) = channel(Event::new(EventKind::Any));
     let mut watcher: RecommendedWatcher =
         recommended_watcher(move |result: Result<Event, Error>| {
@@ -78,7 +64,9 @@ pub async fn execute_watch() -> Result<(), io::Error> {
         log::warn!("File change detected: {}", event.paths[0].display());
         debounce.reset();
         sleep(Duration::from_millis(300)).await;
-        run_cargo_run().await?;
+        stop_cargo_run(&mut active_child).await;
+        active_child = Some(spawn_cargo_run()?);
     }
+    stop_cargo_run(&mut active_child).await;
     Ok(())
 }

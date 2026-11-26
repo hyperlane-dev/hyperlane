@@ -309,7 +309,7 @@ impl RoutePattern {
         if route.is_empty() {
             return Err(RouteError::EmptyPattern);
         }
-        let route: &str = route.trim_start_matches(DEFAULT_HTTP_PATH);
+        let route: &str = route.strip_prefix(DEFAULT_HTTP_PATH).unwrap_or(route);
         if route.is_empty() {
             return Ok(Vec::new());
         }
@@ -319,7 +319,8 @@ impl RoutePattern {
             if segment.starts_with(LEFT_BRACKET) && segment.ends_with(RIGHT_BRACKET) {
                 let content: &str = &segment[1..segment.len() - 1];
                 if let Some((name, pattern)) = content.split_once(COLON) {
-                    match Regex::new(pattern) {
+                    let anchored: String = format!("\\A(?:{pattern})\\z");
+                    match Regex::new(&anchored) {
                         Ok(regex) => {
                             segments.push(RouteSegment::Regex(name.to_owned(), regex));
                         }
@@ -411,7 +412,7 @@ impl RoutePattern {
     ///
     /// - `bool` - `true` if the pattern matched and `params` was populated.
     pub(crate) fn try_match_path_into(&self, path: &str, params: &mut RouteParams) -> bool {
-        let trimmed: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
+        let trimmed: &str = path.strip_prefix(DEFAULT_HTTP_PATH).unwrap_or(path);
         let route_segments: &[RouteSegment] = self.get_0().as_slice();
         let route_segments_len: usize = route_segments.len();
         if trimmed.is_empty() {
@@ -422,10 +423,13 @@ impl RoutePattern {
         }
         let is_tail_regex: bool = matches!(route_segments.last(), Some(RouteSegment::Regex(_, _)));
         if !is_tail_regex {
+            let mut captured: [(&str, &str); 16] = [("", ""); 16];
+            let mut captured_len: usize = 0;
+            let mut overflow: Option<Vec<(&str, &str)>> = None;
             let mut seg_idx: usize = 0;
             for part in trimmed.split(DEFAULT_HTTP_PATH) {
                 if part.is_empty() {
-                    continue;
+                    return false;
                 }
                 let Some(expected) = route_segments.get(seg_idx) else {
                     return false;
@@ -436,13 +440,27 @@ impl RoutePattern {
                             return false;
                         }
                     }
-                    RouteSegment::Dynamic(_) => {}
-                    RouteSegment::Regex(_, regex) => {
-                        let Some(mat) = regex.find(part) else {
+                    RouteSegment::Dynamic(param_name) => {
+                        if captured_len < captured.len() {
+                            captured[captured_len] = (param_name.as_str(), part);
+                            captured_len += 1;
+                        } else {
+                            overflow
+                                .get_or_insert_with(Vec::new)
+                                .push((param_name.as_str(), part));
+                        }
+                    }
+                    RouteSegment::Regex(param_name, regex) => {
+                        if !regex.is_match(part) {
                             return false;
-                        };
-                        if mat.start() != 0 || mat.end() != part.len() {
-                            return false;
+                        }
+                        if captured_len < captured.len() {
+                            captured[captured_len] = (param_name.as_str(), part);
+                            captured_len += 1;
+                        } else {
+                            overflow
+                                .get_or_insert_with(Vec::new)
+                                .push((param_name.as_str(), part));
                         }
                     }
                 }
@@ -451,21 +469,19 @@ impl RoutePattern {
             if seg_idx != route_segments_len {
                 return false;
             }
-            let mut write_idx: usize = 0;
-            for part in trimmed.split(DEFAULT_HTTP_PATH) {
-                if part.is_empty() {
-                    continue;
+            for &(param_name, part) in &captured[..captured_len] {
+                let (mut key, mut val): (String, String) = take_route_param_entry();
+                key.push_str(param_name);
+                val.push_str(part);
+                params.insert(key, val);
+            }
+            if let Some(extra) = overflow {
+                for (param_name, part) in extra {
+                    let (mut key, mut val): (String, String) = take_route_param_entry();
+                    key.push_str(param_name);
+                    val.push_str(part);
+                    params.insert(key, val);
                 }
-                match &route_segments[write_idx] {
-                    RouteSegment::Static(_) => {}
-                    RouteSegment::Dynamic(param_name) | RouteSegment::Regex(param_name, _) => {
-                        let (mut key, mut val): (String, String) = take_route_param_entry();
-                        key.push_str(param_name);
-                        val.push_str(part);
-                        params.insert(key, val);
-                    }
-                }
-                write_idx += 1;
             }
             return true;
         }
@@ -490,7 +506,7 @@ impl RoutePattern {
     ///
     /// - `Option<RouteParams>` - Some with parameters if matched, None otherwise.
     pub(crate) fn try_match_path(&self, path: &str) -> Option<RouteParams> {
-        let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
+        let path: &str = path.strip_prefix(DEFAULT_HTTP_PATH).unwrap_or(path);
         let route_segments_len: usize = self.get_0().len();
         let is_tail_regex: bool = matches!(self.get_0().last(), Some(RouteSegment::Regex(_, _)));
         if path.is_empty() {
@@ -503,19 +519,16 @@ impl RoutePattern {
             return self.try_match_static_path(path);
         }
         let mut path_segments: PathComponentList = Vec::with_capacity(route_segments_len);
-        let path_bytes: &[u8] = path.as_bytes();
-        let path_separator_byte: u8 = DEFAULT_HTTP_PATH_BYTES[0];
-        let mut segment_start: usize = 0;
-        for (byte_index, &current_byte) in path_bytes.iter().enumerate() {
-            if current_byte == path_separator_byte {
-                if segment_start < byte_index {
-                    path_segments.push(&path[segment_start..byte_index]);
+        for segment in path.split(DEFAULT_HTTP_PATH) {
+            if segment.is_empty() {
+                if !is_tail_regex {
+                    return None;
                 }
-                segment_start = byte_index + 1;
+                if path_segments.len() < route_segments_len - 1 {
+                    return None;
+                }
             }
-        }
-        if segment_start < path.len() {
-            path_segments.push(&path[segment_start..]);
+            path_segments.push(segment);
         }
         let path_segments_len: usize = path_segments.len();
         if (!is_tail_regex && path_segments_len != route_segments_len)
@@ -532,27 +545,26 @@ impl RoutePattern {
                     }
                 }
                 RouteSegment::Dynamic(param_name) => {
-                    params.insert(param_name.clone(), path_segments.get(idx)?.to_string());
+                    let val: &str = path_segments.get(idx)?;
+                    if val.is_empty() {
+                        return None;
+                    }
+                    params.insert(param_name.clone(), val.to_string());
                 }
                 RouteSegment::Regex(param_name, regex) => {
-                    let segment_value: String = if idx == route_segments_len - 1 {
-                        path_segments[idx..].join(DEFAULT_HTTP_PATH)
-                    } else {
-                        {
-                            let val: &&str = path_segments.get(idx)?;
-                            val.to_string()
-                        }
-                    };
-                    {
-                        let mat: Match<'_> = regex.find(&segment_value)?;
-                        if mat.start() != 0 || mat.end() != segment_value.len() {
+                    if idx == route_segments_len - 1 {
+                        let segment_value: String = path_segments[idx..].join(DEFAULT_HTTP_PATH);
+                        if !regex.is_match(&segment_value) {
                             return None;
                         }
-                    }
-                    params.insert(param_name.clone(), segment_value);
-                    if idx == route_segments_len - 1 {
+                        params.insert(param_name.clone(), segment_value);
                         return Some(params);
                     }
+                    let val: &str = path_segments.get(idx)?;
+                    if !regex.is_match(val) {
+                        return None;
+                    }
+                    params.insert(param_name.clone(), val.to_string());
                 }
             }
         }
@@ -634,7 +646,7 @@ impl RouteMatcher {
     /// - `usize` - The number of segments.
     #[inline(always)]
     fn count_path_segments(path: &str) -> usize {
-        let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
+        let path: &str = path.strip_prefix(DEFAULT_HTTP_PATH).unwrap_or(path);
         if path.is_empty() {
             return 0;
         }
@@ -725,7 +737,7 @@ impl RouteMatcher {
             }
         }
         for (&segment_count, routes) in self.get_regex_route() {
-            if segment_count >= path_segment_count {
+            if segment_count == path_segment_count || segment_count > path_segment_count + 1 {
                 continue;
             }
             for (pattern, hook) in routes {

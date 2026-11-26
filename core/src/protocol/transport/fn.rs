@@ -183,5 +183,6 @@ where
         out_len,
         peer_closed: false,
         write_closed: false,
+        needs_process: true,
     })
 }

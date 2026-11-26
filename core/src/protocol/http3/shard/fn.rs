@@ -83,7 +83,8 @@ async fn run_quic_shard_dispatcher(
     let mut metas: Vec<RecvMeta> = vec![RecvMeta::default(); BATCH_SIZE];
     let shard_count: usize = queues.len();
     let mut wakers_to_wake: [Option<Waker>; 64] = [const { None }; 64];
-    let mut staged: Vec<Vec<(usize, usize, usize, RecvMeta)>> = (0..shard_count)
+    let mut local_pool: Vec<Vec<u8>> = Vec::with_capacity(QUIC_SHARD_POOL_CAP);
+    let mut staged: Vec<Vec<ShardDatagram>> = (0..shard_count)
         .map(|_: usize| Vec::with_capacity(BATCH_SIZE))
         .collect();
     loop {
@@ -114,7 +115,15 @@ async fn run_quic_shard_dispatcher(
                 let mut seg_meta: RecvMeta = meta;
                 seg_meta.len = slice.len();
                 seg_meta.stride = slice.len();
-                staged[shard_idx].push((idx, offset, end, seg_meta));
+                let mut payload: Vec<u8> = local_pool
+                    .pop()
+                    .unwrap_or_else(|| Vec::with_capacity(slice.len().max(QUIC_DATAGRAM_INIT_CAP)));
+                payload.clear();
+                payload.extend_from_slice(slice);
+                staged[shard_idx].push(ShardDatagram {
+                    data: payload,
+                    meta: seg_meta,
+                });
                 if shard_idx < 64 {
                     touched_mask |= 1u64 << shard_idx;
                 }
@@ -123,35 +132,39 @@ async fn run_quic_shard_dispatcher(
         }
         let mut wake_mask: u64 = 0;
         let mut iter_mask: u64 = touched_mask;
+        let max_local_pool: usize = QUIC_SHARD_POOL_CAP.saturating_mul(2);
         while iter_mask != 0 {
             let shard_idx: usize = iter_mask.trailing_zeros() as usize;
             iter_mask &= iter_mask - 1;
-            let batch: &mut Vec<(usize, usize, usize, RecvMeta)> = &mut staged[shard_idx];
+            let batch: &mut Vec<ShardDatagram> = &mut staged[shard_idx];
             if batch.is_empty() {
                 continue;
             }
             if let Ok(mut q) = queues[shard_idx].lock() {
-                for &(buf_idx, start, end, seg_meta) in batch.iter() {
-                    if q.queue.len() >= QUIC_SHARD_QUEUE_CAP {
-                        break;
-                    }
-                    let slice: &[u8] = &buffers[buf_idx][start..end];
-                    let mut payload: Vec<u8> = q.pool.pop().unwrap_or_else(|| {
-                        Vec::with_capacity(slice.len().max(QUIC_DATAGRAM_INIT_CAP))
-                    });
-                    payload.clear();
-                    payload.extend_from_slice(slice);
-                    q.queue.push_back(ShardDatagram {
-                        data: payload,
-                        meta: seg_meta,
-                    });
+                let room: usize = QUIC_SHARD_QUEUE_CAP.saturating_sub(q.queue.len());
+                if room > 0 {
+                    let take: usize = room.min(batch.len());
+                    q.queue.extend(batch.drain(..take));
+                }
+                if local_pool.len() < max_local_pool && !q.pool.is_empty() {
+                    let pull: usize = (max_local_pool - local_pool.len()).min(q.pool.len());
+                    let split: usize = q.pool.len() - pull;
+                    local_pool.extend(q.pool.drain(split..));
                 }
                 if let Some(waker) = q.waker.take() {
                     wakers_to_wake[shard_idx] = Some(waker);
                     wake_mask |= 1u64 << shard_idx;
                 }
             }
-            batch.clear();
+            for dropped in batch.drain(..) {
+                if local_pool.len() < max_local_pool
+                    && dropped.data.capacity() <= QUIC_DATAGRAM_INIT_CAP * 4
+                {
+                    let mut buf: Vec<u8> = dropped.data;
+                    buf.clear();
+                    local_pool.push(buf);
+                }
+            }
         }
         let mut mask: u64 = wake_mask;
         while mask != 0 {
@@ -177,6 +190,21 @@ async fn run_quic_shard_dispatcher(
     }
 }
 
+/// Builds a tuned Quinn [`TransportConfig`] sized for high-concurrency HTTP/3 workloads.
+///
+/// # Returns
+///
+/// - `Arc<TransportConfig>` - Shared transport configuration for every QUIC endpoint shard.
+fn build_quic_transport_config() -> Arc<TransportConfig> {
+    let mut transport: TransportConfig = TransportConfig::default();
+    transport.max_concurrent_bidi_streams(VarInt::from_u32(512));
+    transport.stream_receive_window(VarInt::from_u32(256 * 1024));
+    transport.receive_window(VarInt::from_u32(2 * 1024 * 1024));
+    transport.send_window(2 * 1024 * 1024);
+    transport.datagram_receive_buffer_size(None);
+    Arc::new(transport)
+}
+
 /// Binds one exclusive OS UDP socket and creates `num_workers` CID-steered QUIC endpoints.
 ///
 /// Single-worker runtimes bind one direct `Endpoint::server` with zero dispatcher overhead.
@@ -196,6 +224,7 @@ pub(crate) fn create_quic_endpoint_set(
     quic_config: Arc<QuicServerConfig>,
     bind_addr: SocketAddr,
 ) -> Result<QuicEndpointSet, Box<ServerError>> {
+    let transport_config: Arc<TransportConfig> = build_quic_transport_config();
     let workers: usize = Handle::current().metrics().num_workers();
     if workers <= 1 {
         let domain: Domain = if bind_addr.is_ipv6() {
@@ -216,7 +245,11 @@ pub(crate) fn create_quic_endpoint_set(
         let std_udp: StdUdpSocket = StdUdpSocket::from(socket);
         let endpoint: Endpoint = Endpoint::new(
             EndpointConfig::default(),
-            Some(quinn::ServerConfig::with_crypto(quic_config)),
+            Some(
+                quinn::ServerConfig::with_crypto(quic_config)
+                    .transport_config(transport_config)
+                    .clone(),
+            ),
             std_udp,
             Arc::new(TokioRuntime),
         )
@@ -252,6 +285,7 @@ pub(crate) fn create_quic_endpoint_set(
         let shard_socket: Arc<ShardUdpSocket> = Arc::new(ShardUdpSocket {
             real_socket: Arc::clone(&tx_socket),
             queue: Arc::clone(&queue),
+            recycle: Mutex::new(Vec::with_capacity(BATCH_SIZE)),
         });
         let mut endpoint_config: EndpointConfig = EndpointConfig::default();
         let shard_id: u8 = shard_idx as u8;
@@ -265,7 +299,11 @@ pub(crate) fn create_quic_endpoint_set(
         let crypto: Arc<QuicServerConfig> = Arc::clone(&quic_config);
         let endpoint: Endpoint = Endpoint::new_with_abstract_socket(
             endpoint_config,
-            Some(quinn::ServerConfig::with_crypto(crypto)),
+            Some(
+                quinn::ServerConfig::with_crypto(crypto)
+                    .transport_config(Arc::clone(&transport_config))
+                    .clone(),
+            ),
             shard_socket,
             Arc::clone(&runtime),
         )

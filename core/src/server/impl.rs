@@ -586,6 +586,10 @@ impl Server {
                     return;
                 }
                 Err(error) => {
+                    ctx.get_mut_response().reset();
+                    ctx.clear_route_params();
+                    ctx.reset_request_attributes();
+                    let _: Option<String> = ctx.take_original_target();
                     ctx.set_original_head(None);
                     let version: Option<HttpVersion> = h1_error_response_version(stream, &error);
                     Box::pin(reply_to_request_error(self, stream, ctx, &error, version)).await;
@@ -621,8 +625,11 @@ impl Server {
         let panicked: Option<PanicData> =
             catch_connection_panic(self.handle_connection(pipeline, stream, &mut ctx)).await;
         if let Some(panic) = panicked {
+            let version: RequestVersion = ctx.get_request().get_version().clone();
             ctx.set_task_panic(panic)
                 .get_mut_response()
+                .reset()
+                .set_version(version)
                 .set_status_code(HttpStatus::InternalServerError.code());
             stream.set_closed(false);
             for hook in self.get_task_panic().iter() {
@@ -656,8 +663,11 @@ impl Server {
         let Some(panic) = panicked else {
             return;
         };
+        let version: RequestVersion = ctx.get_request().get_version().clone();
         ctx.set_task_panic(panic)
             .get_mut_response()
+            .reset()
+            .set_version(version)
             .set_status_code(HttpStatus::InternalServerError.code());
         stream.set_closed(false);
         for hook in self.get_task_panic().iter() {
@@ -717,15 +727,18 @@ impl Server {
                         },
                     )?,
                 );
-                let bind_addr: SocketAddr =
-                    bind_address
-                        .parse::<SocketAddr>()
-                        .map_err(|error: AddrParseError| {
-                            Box::new(ServerError::Tls(format!(
-                                "invalid bind address {}: {}",
-                                bind_address, error
+                let bind_addr: SocketAddr = match bind_address.parse::<SocketAddr>() {
+                    Ok(addr) => addr,
+                    Err(_) => lookup_host(bind_address)
+                        .await
+                        .map_err(|error: io::Error| Box::new(ServerError::from(error)))?
+                        .next()
+                        .ok_or_else(|| {
+                            Box::new(ServerError::TcpBind(format!(
+                                "invalid bind address {bind_address}"
                             )))
-                        })?;
+                        })?,
+                };
                 let endpoints: QuicEndpointSet = bind_quic_endpoints(quic_config, bind_addr)?;
                 let env: ConnectionEnv = ConnectionEnv {
                     shared: Arc::new(ConnectionShared {
@@ -762,7 +775,9 @@ impl Server {
             let mut running_receiver_clone: Receiver<bool> = running_receiver.clone();
             Box::pin(async move {
                 while !*running_receiver_clone.borrow_and_update() {
-                    let _: Result<(), RecvError> = running_receiver_clone.changed().await;
+                    if running_receiver_clone.changed().await.is_err() {
+                        break;
+                    }
                 }
             })
         });

@@ -92,88 +92,141 @@ pub(crate) async fn serve_h3_connection(
         }
         Err(_) => return,
     };
+    let shared: &ConnectionShared = &env.shared;
     let control_state: H3ControlState = H3ControlState::default();
     let mut first_req: Pin<&mut Option<_>> = pin!(None);
     let mut extra_reqs: Option<FuturesUnordered<_>> = None;
     let mut first_uni: Pin<&mut Option<_>> = pin!(None);
     let mut extra_unis: Option<FuturesUnordered<_>> = None;
-    loop {
-        let has_extra_reqs: bool = extra_reqs
-            .as_ref()
-            .is_some_and(|queue: &FuturesUnordered<_>| !queue.is_empty());
-        let has_extra_unis: bool = extra_unis
-            .as_ref()
-            .is_some_and(|queue: &FuturesUnordered<_>| !queue.is_empty());
-        tokio::select! {
-            biased;
-            _ = async {
-                if let Some(fut) = first_req.as_mut().as_pin_mut() {
-                    let _: Result<(), Box<dyn Any + Send>> = fut.await;
-                }
-            }, if first_req.is_some() => {
+    let mut accept_bi: Pin<&mut Option<_>> = pin!(None);
+    let mut accept_uni: Pin<&mut Option<_>> = pin!(None);
+    poll_fn(|cx: &mut task::Context<'_>| -> Poll<()> {
+        loop {
+            let mut progressed: bool = false;
+            if let Some(fut) = first_req.as_mut().as_pin_mut()
+                && Future::poll(fut, cx).is_ready()
+            {
                 first_req.set(None);
+                progressed = true;
             }
-            _ = async {
-                if let Some(queue) = extra_reqs.as_mut() {
-                    let _: Option<Result<(), Box<dyn Any + Send>>> = queue.next().await;
+            let mut completed_reqs: usize = 0;
+            if let Some(queue) = extra_reqs.as_mut() {
+                while !queue.is_empty() && completed_reqs < 64 {
+                    match queue.poll_next_unpin(cx) {
+                        Poll::Ready(Some(_)) => {
+                            completed_reqs += 1;
+                            progressed = true;
+                        }
+                        Poll::Ready(None) | Poll::Pending => break,
+                    }
                 }
-            }, if has_extra_reqs => {}
-            _ = async {
-                if let Some(fut) = first_uni.as_mut().as_pin_mut() {
-                    fut.await;
-                }
-            }, if first_uni.is_some() => {
+            }
+            if let Some(fut) = first_uni.as_mut().as_pin_mut()
+                && Future::poll(fut, cx).is_ready()
+            {
                 first_uni.set(None);
+                progressed = true;
             }
-            _ = async {
-                if let Some(queue) = extra_unis.as_mut() {
-                    let _: Option<()> = queue.next().await;
+            if let Some(queue) = extra_unis.as_mut() {
+                while !queue.is_empty() {
+                    match queue.poll_next_unpin(cx) {
+                        Poll::Ready(Some(())) => {
+                            progressed = true;
+                        }
+                        Poll::Ready(None) | Poll::Pending => break,
+                    }
                 }
-            }, if has_extra_unis => {}
-            accepted = connection.accept_bi() => {
-                match accepted {
-                    Ok((send, recv)) => {
-                        let req_env: H3RequestEnv = H3RequestEnv {
-                            shared: Arc::clone(&env.shared),
-                            peers,
-                        };
+            }
+            let mut accepted_bi: usize = 0;
+            while accepted_bi < 64 {
+                if accept_bi.is_none() {
+                    accept_bi.set(Some(connection.accept_bi()));
+                }
+                let Some(bi_fut) = accept_bi.as_mut().as_pin_mut() else {
+                    break;
+                };
+                match Future::poll(bi_fut, cx) {
+                    Poll::Ready(Ok((send, recv))) => {
+                        accept_bi.set(None);
                         if first_req.is_none() {
                             first_req.set(Some(
-                                AssertUnwindSafe(h3_request_task(req_env, &connection, send, recv))
-                                    .catch_unwind(),
+                                AssertUnwindSafe(h3_request_task(
+                                    shared,
+                                    peers,
+                                    &connection,
+                                    send,
+                                    recv,
+                                ))
+                                .catch_unwind(),
                             ));
+                            if let Some(fut) = first_req.as_mut().as_pin_mut()
+                                && Future::poll(fut, cx).is_ready()
+                            {
+                                first_req.set(None);
+                            }
                         } else {
-                            extra_reqs
-                                .get_or_insert_with(FuturesUnordered::new)
-                                .push(
-                                    AssertUnwindSafe(h3_request_task(req_env, &connection, send, recv))
-                                        .catch_unwind(),
-                                );
+                            extra_reqs.get_or_insert_with(FuturesUnordered::new).push(
+                                AssertUnwindSafe(h3_request_task(
+                                    shared,
+                                    peers,
+                                    &connection,
+                                    send,
+                                    recv,
+                                ))
+                                .catch_unwind(),
+                            );
                         }
+                        accepted_bi += 1;
+                        progressed = true;
                     }
-                    Err(_) => break,
+                    Poll::Ready(Err(_)) => return Poll::Ready(()),
+                    Poll::Pending => break,
                 }
             }
-            uni = connection.accept_uni() => {
-                match uni {
-                    Ok(recv) => {
+            let mut accepted_uni: usize = 0;
+            while accepted_uni < 8 {
+                if accept_uni.is_none() {
+                    accept_uni.set(Some(connection.accept_uni()));
+                }
+                let Some(uni_fut) = accept_uni.as_mut().as_pin_mut() else {
+                    break;
+                };
+                match Future::poll(uni_fut, cx) {
+                    Poll::Ready(Ok(recv)) => {
+                        accept_uni.set(None);
                         if first_uni.is_none() {
                             first_uni.set(Some(handle_h3_uni_stream(
                                 &connection,
                                 recv,
                                 &control_state,
                             )));
+                            if let Some(fut) = first_uni.as_mut().as_pin_mut()
+                                && Future::poll(fut, cx).is_ready()
+                            {
+                                first_uni.set(None);
+                            }
                         } else {
                             extra_unis
                                 .get_or_insert_with(FuturesUnordered::new)
                                 .push(handle_h3_uni_stream(&connection, recv, &control_state));
                         }
+                        accepted_uni += 1;
+                        progressed = true;
                     }
-                    Err(_) => break,
+                    Poll::Ready(Err(_)) => return Poll::Ready(()),
+                    Poll::Pending => break,
                 }
             }
+            if !progressed {
+                return Poll::Pending;
+            }
+            if accepted_bi == 64 || completed_reqs == 64 {
+                cx.waker().wake_by_ref();
+                return Poll::Pending;
+            }
         }
-    }
+    })
+    .await;
     let _: Option<QuicSendStream> = control_stream.take();
 }
 
@@ -219,6 +272,26 @@ fn validate_h3_settings_payload(payload: &[u8]) -> Result<(), u32> {
     Ok(())
 }
 
+/// Compacts consumed leading bytes from an HTTP/3 read buffer so `buf` stays bounded.
+///
+/// # Arguments
+///
+/// - `&mut Vec<u8>` - The pooled HTTP/3 read buffer.
+/// - `&mut usize` - Read cursor inside `buf`.
+#[inline(always)]
+fn compact_h3_buffer(buf: &mut Vec<u8>, pos: &mut usize) {
+    if *pos == 0 {
+        return;
+    }
+    if *pos >= buf.len() {
+        buf.clear();
+        *pos = 0;
+    } else if *pos >= H3_READ_CHUNK_SIZE {
+        buf.drain(..*pos);
+        *pos = 0;
+    }
+}
+
 /// Validates and drains the peer's HTTP/3 unidirectional control stream per RFC 9114 §6.2.1.
 ///
 /// # Arguments
@@ -229,11 +302,9 @@ async fn drive_h3_control_stream(connection: &QuicConnection, recv: &mut QuicRec
     let mut buf: Vec<u8> = take_h3_buffer();
     let mut pos: usize = 0;
     let mut settings_seen: bool = false;
+    let mut skipped_total: usize = 0;
     loop {
-        if pos == buf.len() {
-            buf.clear();
-            pos = 0;
-        }
+        compact_h3_buffer(&mut buf, &mut pos);
         let header: Option<(u64, usize)> =
             match read_h3_frame_header(recv, &mut buf, &mut pos).await {
                 Ok(Some(pair)) => Some(pair),
@@ -316,7 +387,7 @@ async fn drive_h3_control_stream(connection: &QuicConnection, recv: &mut QuicRec
                 return;
             }
             _ => {
-                if skip_h3_payload(recv, &mut buf, &mut pos, payload_len)
+                if skip_h3_payload(recv, &mut buf, &mut pos, payload_len, &mut skipped_total)
                     .await
                     .is_err()
                 {
@@ -411,6 +482,8 @@ async fn handle_h3_uni_stream(
                 return;
             }
             let mut buf: [u8; 64] = [0; 64];
+            let mut in_cancel_continuation: bool = false;
+            let mut cancel_cont_bytes: u8 = 0;
             loop {
                 match recv.read(&mut buf).await {
                     Ok(Some(0)) | Ok(None) => {
@@ -421,16 +494,32 @@ async fn handle_h3_uni_stream(
                         return;
                     }
                     Ok(Some(n)) => {
-                        if buf[..n].iter().any(|b: &u8| {
-                            let is_inc: bool = (*b & 0xc0) == 0x00;
-                            let is_ack: bool = (*b & 0x80) == 0x80;
-                            is_inc || is_ack
-                        }) {
-                            connection.close(
-                                VarInt::from_u32(H3_QPACK_DECODER_STREAM_ERROR),
-                                H3_REASON_QPACK_DECODER_INVALID,
-                            );
-                            return;
+                        for &byte in &buf[..n] {
+                            if in_cancel_continuation {
+                                cancel_cont_bytes += 1;
+                                if cancel_cont_bytes > H3_MAX_QPACK_INT_CONTINUATIONS {
+                                    connection.close(
+                                        VarInt::from_u32(H3_QPACK_DECODER_STREAM_ERROR),
+                                        H3_REASON_QPACK_DECODER_INVALID,
+                                    );
+                                    return;
+                                }
+                                if (byte & 0x80) == 0 {
+                                    in_cancel_continuation = false;
+                                    cancel_cont_bytes = 0;
+                                }
+                            } else if (byte & 0xc0) == 0x40 {
+                                if (byte & 0x3f) == 0x3f {
+                                    in_cancel_continuation = true;
+                                    cancel_cont_bytes = 0;
+                                }
+                            } else {
+                                connection.close(
+                                    VarInt::from_u32(H3_QPACK_DECODER_STREAM_ERROR),
+                                    H3_REASON_QPACK_DECODER_INVALID,
+                                );
+                                return;
+                            }
                         }
                     }
                     Err(_) => return,
@@ -469,19 +558,16 @@ async fn ensure_h3_bytes(
     needed: usize,
 ) -> Result<bool, RequestError> {
     while buf.len() - pos < needed {
-        let old_len: usize = buf.len();
-        let grow: usize = H3_READ_CHUNK_SIZE.max(needed - (old_len - pos));
-        buf.resize(old_len + grow, 0);
-        match recv.read(&mut buf[old_len..]).await {
-            Ok(Some(n)) if n > 0 => {
-                buf.truncate(old_len + n);
+        let grow: usize = H3_READ_CHUNK_SIZE.max(needed - (buf.len() - pos));
+        let chunk_res: Result<Option<Chunk>, ReadError> = recv.read_chunk(grow, true).await;
+        match chunk_res {
+            Ok(Some(chunk)) if !chunk.bytes.is_empty() => {
+                buf.extend_from_slice(&chunk.bytes);
             }
             Ok(Some(_)) | Ok(None) => {
-                buf.truncate(old_len);
                 return Ok(false);
             }
             Err(error) => {
-                buf.truncate(old_len);
                 return Err(RequestError::Request(error.to_string()));
             }
         }
@@ -559,16 +645,23 @@ async fn read_h3_frame_header(
 /// - `&mut Vec<u8>` - The pooled read buffer.
 /// - `&mut usize` - Read cursor inside `buf`.
 /// - `usize` - Number of bytes to discard.
+/// - `&mut usize` - Running total of skipped bytes on this stream.
 ///
 /// # Returns
 ///
-/// - `Result<(), RequestError>` - `Ok(())` once discarded.
+/// - `Result<(), RequestError>` - `Ok(())` once discarded, or bad request if the skip budget is exceeded.
 async fn skip_h3_payload(
     recv: &mut QuicRecvStream,
     buf: &mut Vec<u8>,
     pos: &mut usize,
     mut remaining: usize,
+    skipped_total: &mut usize,
 ) -> Result<(), RequestError> {
+    let next_total: usize = skipped_total.saturating_add(remaining);
+    if next_total > H3_MAX_SKIP_PAYLOAD_BYTES {
+        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+    }
+    *skipped_total = next_total;
     while remaining > 0 {
         let avail: usize = buf.len() - *pos;
         if avail > 0 {
@@ -610,7 +703,9 @@ async fn read_h3_request_headers(
     request: &mut Request,
     target: &mut String,
 ) -> Result<Option<H3DecodedRequestMeta>, RequestError> {
+    let mut skipped_total: usize = 0;
     loop {
+        compact_h3_buffer(buf, pos);
         let Some((frame_type, payload_len)) = read_h3_frame_header(recv, buf, pos).await? else {
             return Ok(None);
         };
@@ -626,7 +721,7 @@ async fn read_h3_request_headers(
                 connection.close(VarInt::from_u32(H3_FRAME_UNEXPECTED), reason);
                 return Err(RequestError::HttpRead(HttpStatus::BadRequest));
             }
-            skip_h3_payload(recv, buf, pos, payload_len).await?;
+            skip_h3_payload(recv, buf, pos, payload_len, &mut skipped_total).await?;
             continue;
         }
         if payload_len > H3_MAX_HEADERS_FRAME_LEN {
@@ -654,6 +749,7 @@ async fn read_h3_request_headers(
 /// - `&mut Vec<u8>` - The pooled read buffer containing any bytes already read after `HEADERS`.
 /// - `&mut usize` - Read cursor inside `buf`.
 /// - `usize` - Maximum permitted body length.
+/// - `Option<usize>` - Declared `content-length`, if present.
 /// - `&mut Vec<u8>` - Destination request body buffer.
 ///
 /// # Returns
@@ -665,14 +761,13 @@ async fn collect_h3_data_frames(
     buf: &mut Vec<u8>,
     pos: &mut usize,
     max_body_size: usize,
+    declared: Option<usize>,
     body: &mut Vec<u8>,
 ) -> Result<(), RequestError> {
     let mut trailers_seen: bool = false;
+    let mut skipped_total: usize = 0;
     loop {
-        if *pos == buf.len() {
-            buf.clear();
-            *pos = 0;
-        }
+        compact_h3_buffer(buf, pos);
         let Some((frame_type, payload_len)) = read_h3_frame_header(recv, buf, pos).await? else {
             return Ok(());
         };
@@ -685,8 +780,14 @@ async fn collect_h3_data_frames(
                     );
                     return Err(RequestError::HttpRead(HttpStatus::BadRequest));
                 }
+                if let Some(expected) = declared
+                    && payload_len > expected.saturating_sub(body.len())
+                {
+                    let _: Result<(), _> = recv.stop(VarInt::from_u32(H3_NO_ERROR));
+                    return Err(RequestError::Request(CONTENT_LENGTH_MISMATCH.to_owned()));
+                }
                 if max_body_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE
-                    && body.len().saturating_add(payload_len) > max_body_size
+                    && payload_len > max_body_size.saturating_sub(body.len())
                 {
                     let _: Result<(), _> = recv.stop(VarInt::from_u32(H3_NO_ERROR));
                     return Err(RequestError::ContentLengthTooLarge(
@@ -703,20 +804,18 @@ async fn collect_h3_data_frames(
                         remaining -= take;
                         continue;
                     }
-                    let old_len: usize = body.len();
                     let chunk_len: usize = remaining.min(MAX_POOLED_BUFFER_CAPACITY);
-                    body.resize(old_len + chunk_len, 0);
-                    match recv.read(&mut body[old_len..]).await {
-                        Ok(Some(n)) if n > 0 => {
-                            body.truncate(old_len + n);
-                            remaining -= n;
+                    let chunk_res: Result<Option<Chunk>, ReadError> =
+                        recv.read_chunk(chunk_len, true).await;
+                    match chunk_res {
+                        Ok(Some(chunk)) if !chunk.bytes.is_empty() => {
+                            body.extend_from_slice(&chunk.bytes);
+                            remaining -= chunk.bytes.len();
                         }
                         Ok(Some(_)) | Ok(None) => {
-                            body.truncate(old_len);
                             return Err(RequestError::HttpRead(HttpStatus::BadRequest));
                         }
                         Err(error) => {
-                            body.truncate(old_len);
                             return Err(RequestError::Request(error.to_string()));
                         }
                     }
@@ -731,10 +830,10 @@ async fn collect_h3_data_frames(
                     return Err(RequestError::HttpRead(HttpStatus::BadRequest));
                 }
                 trailers_seen = true;
-                skip_h3_payload(recv, buf, pos, payload_len).await?;
+                skip_h3_payload(recv, buf, pos, payload_len, &mut skipped_total).await?;
             }
             other if is_grease_id(other) => {
-                skip_h3_payload(recv, buf, pos, payload_len).await?;
+                skip_h3_payload(recv, buf, pos, payload_len, &mut skipped_total).await?;
             }
             H3_FRAME_SETTINGS
             | H3_FRAME_GOAWAY
@@ -755,76 +854,142 @@ async fn collect_h3_data_frames(
                 return Err(RequestError::HttpRead(HttpStatus::BadRequest));
             }
             _ => {
-                skip_h3_payload(recv, buf, pos, payload_len).await?;
+                skip_h3_payload(recv, buf, pos, payload_len, &mut skipped_total).await?;
             }
         }
     }
+}
+
+/// Attempts to decode an HTTP/3 request head directly from the first QUIC chunk without a scratch buffer.
+///
+/// # Arguments
+///
+/// - `&QuicConnection` - The owning QUIC connection closed on connection-level frame violations.
+/// - `&mut QuicRecvStream` - The QUIC receive stream.
+/// - `&mut Option<Vec<u8>>` - Lazily-allocated pooled buffer populated only when trailing bytes or multi-chunk reads occur.
+/// - `&mut usize` - Read cursor inside the optional buffer.
+/// - `&RequestConfig` - Security limits.
+/// - `&mut Request` - The destination framework request.
+/// - `&mut String` - The destination target buffer.
+///
+/// # Returns
+///
+/// - `Result<Option<H3DecodedRequestMeta>, RequestError>` - Decoded head metadata, `None` on clean idle EOF, or error.
+async fn read_h3_request_headers_fast(
+    connection: &QuicConnection,
+    recv: &mut QuicRecvStream,
+    read_buf: &mut Option<Vec<u8>>,
+    read_pos: &mut usize,
+    config: &RequestConfig,
+    request: &mut Request,
+    target: &mut String,
+) -> Result<Option<H3DecodedRequestMeta>, RequestError> {
+    let chunk_res: Result<Option<Chunk>, ReadError> =
+        recv.read_chunk(H3_READ_CHUNK_SIZE, true).await;
+    let first_chunk: Chunk = match chunk_res {
+        Ok(Some(chunk)) if !chunk.bytes.is_empty() => chunk,
+        Ok(Some(_)) | Ok(None) => return Ok(None),
+        Err(error) => return Err(RequestError::Request(error.to_string())),
+    };
+    let bytes: &[u8] = &first_chunk.bytes;
+    if let Some((frame_type, type_len)) = decode_varint(bytes)
+        && frame_type == H3_FRAME_HEADERS
+        && let Some((payload_len_u64, len_bytes)) = decode_varint(&bytes[type_len..])
+        && let Ok(payload_len) = usize::try_from(payload_len_u64)
+    {
+        if payload_len > H3_MAX_HEADERS_FRAME_LEN {
+            return Err(RequestError::HeaderValueTooLong(
+                HttpStatus::RequestHeaderFieldsTooLarge,
+            ));
+        }
+        let header_start: usize = type_len + len_bytes;
+        if let Some(frame_end) = header_start.checked_add(payload_len)
+            && frame_end <= bytes.len()
+        {
+            let meta: H3DecodedRequestMeta =
+                decode_qpack_request(&bytes[header_start..frame_end], config, request, target)?;
+            if frame_end < bytes.len() {
+                let buf: &mut Vec<u8> = read_buf.get_or_insert_with(take_h3_buffer);
+                buf.extend_from_slice(&bytes[frame_end..]);
+                *read_pos = 0;
+            }
+            return Ok(Some(meta));
+        }
+    }
+    let buf: &mut Vec<u8> = read_buf.get_or_insert_with(take_h3_buffer);
+    buf.extend_from_slice(bytes);
+    *read_pos = 0;
+    read_h3_request_headers(connection, recv, buf, read_pos, config, request, target).await
 }
 
 /// Runs the framework lifecycle directly over one QUIC bidirectional stream speaking HTTP/3.
 ///
 /// # Arguments
 ///
-/// - `H3RequestEnv` - Shared server state, compiled pipeline and connection addresses.
+/// - `&ConnectionShared` - Shared server state, compiled pipeline and request limits.
+/// - `StreamPeers` - Local and remote addresses of the QUIC connection.
 /// - `&QuicConnection` - The owning QUIC connection closed on connection-level frame violations.
 /// - `QuicSendStream` - The QUIC send stream for the response.
 /// - `QuicRecvStream` - The QUIC receive stream for the request.
 pub(crate) async fn h3_request_task(
-    env: H3RequestEnv,
+    shared: &ConnectionShared,
+    peers: StreamPeers,
     connection: &QuicConnection,
     mut send_stream: QuicSendStream,
     mut recv_stream: QuicRecvStream,
 ) {
-    let H3RequestEnv { shared, peers } = env;
     let server: &Server = &shared.server;
     let request_config: RequestConfig = shared.request_config;
-    let mut read_buf: Vec<u8> = take_h3_buffer();
+    let mut read_buf: Option<Vec<u8>> = None;
     let mut read_pos: usize = 0;
     let mut ctx: Context = take_pooled_context();
     let mut target: String = take_target_buffer();
     let read_timeout_ms: u64 = request_config.get_read_timeout_ms();
-    let head_result: Result<Option<H3DecodedRequestMeta>, RequestError> =
-        if read_timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
-            read_h3_request_headers(
-                connection,
-                &mut recv_stream,
-                &mut read_buf,
-                &mut read_pos,
-                &request_config,
-                ctx.get_mut_request(),
-                &mut target,
-            )
+    let head_result: Result<Option<H3DecodedRequestMeta>, RequestError> = if read_timeout_ms
+        == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS
+    {
+        read_h3_request_headers_fast(
+            connection,
+            &mut recv_stream,
+            &mut read_buf,
+            &mut read_pos,
+            &request_config,
+            ctx.get_mut_request(),
+            &mut target,
+        )
+        .await
+    } else {
+        let mut reading: Pin<&mut _> = pin!(read_h3_request_headers_fast(
+            connection,
+            &mut recv_stream,
+            &mut read_buf,
+            &mut read_pos,
+            &request_config,
+            ctx.get_mut_request(),
+            &mut target,
+        ));
+        match poll_with_timeout_protocol(reading.as_mut(), Duration::from_millis(read_timeout_ms))
             .await
-        } else {
-            let mut reading: Pin<&mut _> = pin!(read_h3_request_headers(
-                connection,
-                &mut recv_stream,
-                &mut read_buf,
-                &mut read_pos,
-                &request_config,
-                ctx.get_mut_request(),
-                &mut target,
-            ));
-            if let Some(done) = poll_once_protocol(reading.as_mut()).await {
-                done
-            } else {
-                match timeout(Duration::from_millis(read_timeout_ms), reading).await {
-                    Ok(done) => done,
-                    Err(_) => Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
-                }
-            }
-        };
+        {
+            Some(done) => done,
+            None => Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
+        }
+    };
     let meta: H3DecodedRequestMeta = match head_result {
         Ok(Some(meta)) => meta,
         Ok(None) => {
-            return_h3_buffer(read_buf);
+            if let Some(buf) = read_buf {
+                return_h3_buffer(buf);
+            }
             return_target_buffer(target);
             return_pooled_context(ctx);
             return;
         }
         Err(error) => {
             let _: Result<(), _> = recv_stream.stop(VarInt::from_u32(H3_NO_ERROR));
-            return_h3_buffer(read_buf);
+            if let Some(buf) = read_buf {
+                return_h3_buffer(buf);
+            }
             return_target_buffer(target);
             h3_fail_request(
                 server,
@@ -856,28 +1021,49 @@ pub(crate) async fn h3_request_task(
                     .await
                     .map_err(|error: QuicWriteError| RequestError::Request(error.to_string()))?;
             }
+            if read_buf.is_none()
+                && !meta.expect_continue
+                && matches!(meta.declared_content_length, None | Some(0))
+            {
+                match recv_stream.read_chunk(H3_READ_CHUNK_SIZE, true).await {
+                    Ok(None) => return Ok(()),
+                    Ok(Some(chunk)) => {
+                        let buf: &mut Vec<u8> = read_buf.get_or_insert_with(take_h3_buffer);
+                        buf.extend_from_slice(&chunk.bytes);
+                        read_pos = 0;
+                    }
+                    Err(error) => return Err(RequestError::Request(error.to_string())),
+                }
+            }
+            let buf: &mut Vec<u8> = read_buf.get_or_insert_with(take_h3_buffer);
             collect_h3_data_frames(
                 connection,
                 &mut recv_stream,
-                &mut read_buf,
+                buf,
                 &mut read_pos,
                 max_body_size,
+                meta.declared_content_length,
                 body,
             )
             .await
         });
         if read_timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
             reading.await
-        } else if let Some(done) = poll_once_protocol(reading.as_mut()).await {
-            done
         } else {
-            match timeout(Duration::from_millis(read_timeout_ms), reading).await {
-                Ok(done) => done,
-                Err(_) => Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
+            match poll_with_timeout_protocol(
+                reading.as_mut(),
+                Duration::from_millis(read_timeout_ms),
+            )
+            .await
+            {
+                Some(done) => done,
+                None => Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
             }
         }
     };
-    return_h3_buffer(read_buf);
+    if let Some(buf) = read_buf {
+        return_h3_buffer(buf);
+    }
     let body_check: Result<(), RequestError> =
         body_result.and_then(|()| match meta.declared_content_length {
             None => Ok(()),
@@ -902,15 +1088,14 @@ pub(crate) async fn h3_request_task(
         return_pooled_context(ctx);
         return;
     }
-    let mut stream: Stream = Stream::from_transport(
-        H3DirectTransport::new(send_stream, peers, meta.is_head),
-        request_config,
-        false,
-    );
-    server
-        .run_protocol_lifecycle_in_place(&shared.pipeline, &mut stream, &mut ctx, target)
-        .await;
-    let _: Result<(), io::Error> = stream.get_mut_stream().shutdown().await;
+    let mut stream_guard: H3StreamGuard =
+        H3StreamGuard::take(send_stream, peers, request_config, meta.is_head);
+    if let Some(stream) = stream_guard.stream_mut() {
+        server
+            .run_protocol_lifecycle_in_place(&shared.pipeline, stream, &mut ctx, target)
+            .await;
+    }
+    stream_guard.finish().await;
     return_pooled_context(ctx);
 }
 
@@ -939,11 +1124,10 @@ pub(crate) async fn h3_fail_request(
     ctx.get_mut_response().reset().set_version(version.clone());
     ctx.clear_route_params();
     ctx.reset_request_attributes();
-    let mut stream: Stream = Stream::from_transport(
-        H3DirectTransport::new(send_stream, peers, false),
-        request_config,
-        false,
-    );
-    reply_to_request_error(server, &mut stream, ctx, &error, Some(version)).await;
-    let _: Result<(), io::Error> = stream.get_mut_stream().shutdown().await;
+    let mut stream_guard: H3StreamGuard =
+        H3StreamGuard::take(send_stream, peers, request_config, false);
+    if let Some(stream) = stream_guard.stream_mut() {
+        reply_to_request_error(server, stream, ctx, &error, Some(version)).await;
+        let _: Result<(), io::Error> = stream.get_mut_stream().shutdown().await;
+    }
 }

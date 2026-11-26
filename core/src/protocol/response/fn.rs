@@ -132,6 +132,54 @@ pub fn find_line_end(bytes: &[u8]) -> Option<usize> {
         .map(|index: usize| index + 1)
 }
 
+/// Attempts to parse the default `Response::build()` 200 OK head layout in one slice check.
+///
+/// # Arguments
+///
+/// - `&[u8]` - Candidate serialized response head bytes.
+/// - `bool` - Whether the incoming request method was `HEAD`.
+///
+/// # Returns
+///
+/// - `Option<ParsedProtocolHead>` - Prebuilt protocol head when `head` matches the canonical fast layout.
+#[inline(always)]
+fn try_parse_fast_200_head(head: &[u8], is_head: bool) -> Option<ParsedProtocolHead> {
+    let rest: &[u8] = head
+        .strip_prefix(FAST_PROTOCOL_H2_200_PREFIX)
+        .or_else(|| head.strip_prefix(FAST_PROTOCOL_H11_200_PREFIX))?;
+    let digits: &[u8] = rest.strip_suffix(FAST_PROTOCOL_DEFAULT_SUFFIX)?;
+    if digits.is_empty() {
+        return None;
+    }
+    let mut length: usize = 0;
+    for &byte in digits {
+        if !byte.is_ascii_digit() {
+            return None;
+        }
+        length = length
+            .checked_mul(10)?
+            .checked_add((byte - b'0') as usize)?;
+    }
+    let mut response: ProtocolResponse<()> = ProtocolResponse::new(());
+    *response.status_mut() = StatusCode::OK;
+    let headers: &mut ProtocolHeaders = response.headers_mut();
+    let cl_value: HeaderValue = if let Some(&static_len) = STATIC_CONTENT_LENGTHS.get(length) {
+        HeaderValue::from_static(static_len)
+    } else {
+        HeaderValue::from_bytes(digits).ok()?
+    };
+    headers.append(HeaderName::from_static(CONTENT_LENGTH), cl_value);
+    headers.append(
+        HeaderName::from_static(CONTENT_TYPE),
+        HeaderValue::from_static(STATIC_CT_HTML_UTF8),
+    );
+    Some(ParsedProtocolHead {
+        response,
+        announced_len: Some(length),
+        suppress_body: is_head,
+    })
+}
+
 /// Parses, validates, and filters a serialized HTTP/1.1 response head into a
 /// protocol response in a single pass.
 ///
@@ -152,6 +200,9 @@ pub(crate) fn parse_protocol_response_head(
     head: &[u8],
     is_head: bool,
 ) -> Result<ParsedProtocolHead, ResponseError> {
+    if let Some(fast) = try_parse_fast_200_head(head, is_head) {
+        return Ok(fast);
+    }
     let text: &str =
         from_utf8(head).map_err(|error: Utf8Error| ResponseError::Send(error.to_string()))?;
     let mut lines: SplitLines<'_> = text.split(CRLF);
@@ -239,9 +290,17 @@ pub(crate) fn parse_protocol_response_head(
             if hide_length {
                 continue;
             }
-            let Ok(header_value) = HeaderValue::from_bytes(trimmed_value.as_bytes()) else {
-                return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
-            };
+            let header_value: HeaderValue =
+                if let Some(&static_len) = STATIC_CONTENT_LENGTHS.get(length) {
+                    HeaderValue::from_static(static_len)
+                } else {
+                    match HeaderValue::from_bytes(trimmed_value.as_bytes()) {
+                        Ok(value) => value,
+                        Err(_) => {
+                            return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+                        }
+                    }
+                };
             headers.append(HeaderName::from_static(CONTENT_LENGTH), header_value);
             continue;
         }

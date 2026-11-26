@@ -2,6 +2,56 @@ use super::*;
 
 /// Inherent implementation of [`H2DirectState`].
 impl H2DirectState {
+    /// Reinitializes pooled state for a new HTTP/2 request stream while retaining buffer capacity.
+    ///
+    /// # Arguments
+    ///
+    /// - `H2SendResponse` - The response half of the new HTTP/2 stream.
+    /// - `StreamPeers` - The local and remote addresses of the carrying TCP connection.
+    /// - `bool` - Whether the incoming request method was `HEAD`.
+    #[inline(always)]
+    pub(super) fn reinit(
+        &mut self,
+        send_response: H2SendResponse,
+        peers: StreamPeers,
+        is_head: bool,
+    ) {
+        self.set_send_response(Some(send_response));
+        self.set_send_stream(None);
+        self.get_mut_pending_head().clear();
+        self.get_mut_pending_body().clear();
+        self.set_pending_body_offset(0);
+        self.set_head_sent(false);
+        self.set_suppress_body(is_head);
+        self.set_is_head(is_head);
+        self.set_announced_len(None);
+        self.set_body_len(0);
+        self.set_finished(false);
+        self.set_failed(false);
+        self.set_peers(peers);
+    }
+
+    /// Cleans up stream handles and trims oversized buffers before returning state to the pool.
+    #[inline(always)]
+    pub(super) fn release(&mut self) {
+        if !self.get_finished() {
+            self.reset();
+        }
+        let _: Option<H2SendResponse> = self.get_mut_send_response().take();
+        let _: Option<H2SendStream> = self.get_mut_send_stream().take();
+        if self.get_pending_head().capacity() > MAX_POOLED_BUFFER_CAPACITY {
+            self.set_pending_head(Vec::new());
+        } else {
+            self.get_mut_pending_head().clear();
+        }
+        if self.get_pending_body().capacity() > MAX_POOLED_BUFFER_CAPACITY {
+            self.set_pending_body(Vec::new());
+        } else {
+            self.get_mut_pending_body().clear();
+        }
+        self.set_pending_body_offset(0);
+    }
+
     /// Resets the underlying HTTP/2 stream after a framing error or truncation.
     pub(super) fn reset(&mut self) {
         if let Some(mut send_response) = self.get_mut_send_response().take() {
@@ -61,15 +111,20 @@ impl H2DirectState {
                     let start: usize = self.get_pending_body_offset();
                     let end: usize = start + take;
                     let new_len: usize = self.get_body_len() + take;
+                    let is_final: bool = self.try_get_announced_len() == Some(new_len);
                     let chunk: Bytes = Bytes::copy_from_slice(&self.get_pending_body()[start..end]);
                     let Some(send_stream) = self.get_mut_send_stream().as_mut() else {
                         return Poll::Ready(Err(self.fail(MISSING_SEND_CAPACITY)));
                     };
-                    if let Err(error) = send_stream.send_data(chunk, false) {
+                    if let Err(error) = send_stream.send_data(chunk, is_final) {
                         return Poll::Ready(Err(self.fail(&error.to_string())));
                     }
                     self.set_body_len(new_len);
                     self.set_pending_body_offset(end);
+                    if is_final {
+                        self.set_finished(true);
+                        let _: Option<H2SendStream> = self.get_mut_send_stream().take();
+                    }
                 }
                 Poll::Ready(Some(Ok(_))) => continue,
                 Poll::Ready(Some(Err(error))) => {
@@ -125,6 +180,14 @@ impl H2DirectState {
             send_response.send_reset(Reason::INTERNAL_ERROR);
             return Err(self.fail(OVERFLOWING_RESPONSE_BODY));
         }
+        if parsed.announced_len == Some(0) && body_bytes.is_empty() {
+            if let Err(error) = send_response.send_response(parsed.response, true) {
+                return Err(self.fail(&error.to_string()));
+            }
+            self.set_head_sent(true);
+            self.set_finished(true);
+            return Ok(0);
+        }
         let mut send_stream: H2SendStream =
             match send_response.send_response(parsed.response, false) {
                 Ok(stream) => stream,
@@ -139,12 +202,17 @@ impl H2DirectState {
         match send_stream.poll_capacity(context) {
             Poll::Ready(Some(Ok(capacity))) if capacity > 0 => {
                 let take: usize = capacity.min(body_bytes.len());
+                let is_final: bool = self.try_get_announced_len() == Some(take);
                 let chunk: Bytes = Bytes::copy_from_slice(&body_bytes[..take]);
-                if let Err(error) = send_stream.send_data(chunk, false) {
+                if let Err(error) = send_stream.send_data(chunk, is_final) {
                     return Err(self.fail(&error.to_string()));
                 }
                 self.set_body_len(take);
-                self.set_send_stream(Some(send_stream));
+                if is_final {
+                    self.set_finished(true);
+                } else {
+                    self.set_send_stream(Some(send_stream));
+                }
                 Ok(take)
             }
             Poll::Ready(Some(Ok(_))) | Poll::Pending => {
@@ -159,35 +227,142 @@ impl H2DirectState {
 
 /// Inherent implementation of [`H2DirectTransport`].
 impl H2DirectTransport {
-    /// Creates a direct HTTP/2 transport over one request stream.
+    /// Creates a direct HTTP/2 transport backed by a shared pooled state handle.
+    ///
+    /// # Arguments
+    ///
+    /// - `Arc<Mutex<H2DirectState>>` - Shared framing state recycled across requests.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - The direct HTTP/2 transport.
+    pub(crate) fn from_shared(state: Arc<Mutex<H2DirectState>>) -> Self {
+        Self { state }
+    }
+}
+
+/// Inherent implementation of [`H2StreamGuard`].
+impl H2StreamGuard {
+    /// Takes a pooled boxed HTTP/2 `Stream` (or allocates one on first use) and binds it to the request stream.
     ///
     /// # Arguments
     ///
     /// - `H2SendResponse` - The response half of the HTTP/2 stream.
     /// - `StreamPeers` - The local and remote addresses of the carrying TCP connection.
+    /// - `RequestConfig` - The active request limits for the stream.
     /// - `bool` - Whether the incoming request method was `HEAD`.
     ///
     /// # Returns
     ///
-    /// - `Self` - The direct HTTP/2 transport.
-    pub(crate) fn new(send_response: H2SendResponse, peers: StreamPeers, is_head: bool) -> Self {
-        Self {
-            state: Mutex::new(H2DirectState {
-                send_response: Some(send_response),
-                send_stream: None,
-                pending_head: Vec::new(),
-                pending_body: Vec::new(),
-                pending_body_offset: 0,
-                head_sent: false,
-                suppress_body: is_head,
-                is_head,
-                announced_len: None,
-                body_len: 0,
-                finished: false,
-                failed: false,
-            }),
-            peers,
+    /// - `Self` - Guard owning the ready `Stream` until dropped.
+    #[inline(always)]
+    pub(crate) fn take(
+        send_response: H2SendResponse,
+        peers: StreamPeers,
+        request_config: RequestConfig,
+        is_head: bool,
+    ) -> Self {
+        let pooled: Option<PooledH2Stream> =
+            H2_STREAM_POOL.with(|pool: &RefCell<Vec<PooledH2Stream>>| pool.borrow_mut().pop());
+        let pair: PooledH2Stream = match pooled {
+            Some((mut stream, state)) if *stream.get_request_config() == request_config => {
+                if let Ok(mut guard) = state.lock() {
+                    guard.reinit(send_response, peers, is_head);
+                }
+                stream.set_closed(false);
+                (stream, state)
+            }
+            _ => {
+                let state: Arc<Mutex<H2DirectState>> = Arc::new(Mutex::new(H2DirectState {
+                    send_response: Some(send_response),
+                    send_stream: None,
+                    pending_head: Vec::new(),
+                    pending_body: Vec::new(),
+                    pending_body_offset: 0,
+                    head_sent: false,
+                    suppress_body: is_head,
+                    is_head,
+                    announced_len: None,
+                    body_len: 0,
+                    finished: false,
+                    failed: false,
+                    peers,
+                }));
+                let stream: Stream = Stream::from_transport(
+                    H2DirectTransport::from_shared(Arc::clone(&state)),
+                    request_config,
+                    false,
+                );
+                (stream, state)
+            }
+        };
+        Self { inner: Some(pair) }
+    }
+
+    /// Returns a mutable reference to the pooled `Stream`.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<&mut Stream>` - The active HTTP/2 stream wrapper, or `None` once finalized.
+    #[inline(always)]
+    pub(crate) fn stream_mut(&mut self) -> Option<&mut Stream> {
+        let Self { inner } = self;
+        inner.as_mut().map(|pair: &mut PooledH2Stream| &mut pair.0)
+    }
+
+    /// Finalizes the HTTP/2 stream if end-of-stream was not yet emitted, then recycles it.
+    #[inline(always)]
+    pub(crate) async fn finish(mut self) {
+        let Self { inner } = &mut self;
+        let Some((mut stream, state)) = inner.take() else {
+            return;
+        };
+        let already_finished: bool = match state.lock() {
+            Ok(mut guard) if guard.get_finished() && !guard.get_failed() => {
+                guard.release();
+                true
+            }
+            Ok(_) => false,
+            Err(_) => return,
+        };
+        if !already_finished {
+            let _: Result<(), io::Error> = stream.get_mut_stream().shutdown().await;
+            if let Ok(mut guard) = state.lock() {
+                guard.release();
+            } else {
+                return;
+            }
         }
+        stream.set_closed(false);
+        H2_STREAM_POOL.with(|pool: &RefCell<Vec<PooledH2Stream>>| {
+            let mut pool: RefMut<'_, Vec<PooledH2Stream>> = pool.borrow_mut();
+            if pool.len() < MAX_POOLED_CONTEXTS {
+                pool.push((stream, state));
+            }
+        });
+    }
+}
+
+/// Returns the pooled HTTP/2 `Stream` to [`H2_STREAM_POOL`] after releasing stream handles.
+impl Drop for H2StreamGuard {
+    /// Resets any unfinished stream and recycles the boxed `Stream` wrapper.
+    fn drop(&mut self) {
+        let Self { inner } = self;
+        let Some((mut stream, state)) = inner.take() else {
+            return;
+        };
+        if let Ok(mut guard) = state.lock() {
+            guard.release();
+        } else {
+            return;
+        }
+        stream.set_closed(false);
+        H2_STREAM_POOL.with(|pool: &RefCell<Vec<PooledH2Stream>>| {
+            let mut pool: RefMut<'_, Vec<PooledH2Stream>> = pool.borrow_mut();
+            if pool.len() < MAX_POOLED_CONTEXTS {
+                pool.push((stream, state));
+            }
+        });
     }
 }
 
@@ -195,7 +370,7 @@ impl H2DirectTransport {
 impl Drop for H2DirectTransport {
     /// Resets the stream when dropped before end-of-stream was emitted.
     fn drop(&mut self) {
-        if let Ok(state) = self.get_mut_state().get_mut()
+        if let Ok(mut state) = self.get_state().lock()
             && !state.finished
         {
             state.reset();
@@ -211,7 +386,10 @@ impl Transport for H2DirectTransport {
     ///
     /// - `Result<SocketAddr, io::Error>` - The peer socket address.
     fn peer_addr(&self) -> Result<SocketAddr, io::Error> {
-        Ok(self.get_peers().remote)
+        self.get_state()
+            .lock()
+            .map(|state: MutexGuard<'_, H2DirectState>| state.get_peers().remote)
+            .map_err(|_| io::Error::other(MISSING_SEND_CAPACITY))
     }
 
     /// Reports the local address of the carrying TCP connection.
@@ -220,7 +398,10 @@ impl Transport for H2DirectTransport {
     ///
     /// - `Result<SocketAddr, io::Error>` - The local socket address.
     fn local_addr(&self) -> Result<SocketAddr, io::Error> {
-        Ok(self.get_peers().local)
+        self.get_state()
+            .lock()
+            .map(|state: MutexGuard<'_, H2DirectState>| state.get_peers().local)
+            .map_err(|_| io::Error::other(MISSING_SEND_CAPACITY))
     }
 }
 
@@ -265,7 +446,7 @@ impl AsyncWrite for H2DirectTransport {
         context: &mut task::Context<'_>,
         bytes: &[u8],
     ) -> Poll<io::Result<usize>> {
-        let Ok(state) = self.get_mut().get_mut_state().get_mut() else {
+        let Ok(mut state) = self.get_mut().get_state().lock() else {
             return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
         };
         if state.failed {
@@ -343,24 +524,43 @@ impl AsyncWrite for H2DirectTransport {
             return Poll::Ready(Err(state.fail(OVERFLOWING_RESPONSE_BODY)));
         }
         let current_body_len: usize = state.body_len;
-        let Some(send_stream) = state.send_stream.as_mut() else {
-            return Poll::Ready(Err(state.fail(OVERFLOWING_RESPONSE_BODY)));
-        };
-        send_stream.reserve_capacity(bytes.len());
-        match send_stream.poll_capacity(context) {
-            Poll::Ready(Some(Ok(capacity))) if capacity > 0 => {
-                let take: usize = capacity.min(bytes.len());
-                let new_len: usize = current_body_len + take;
-                let chunk: Bytes = Bytes::copy_from_slice(&bytes[..take]);
-                if let Err(error) = send_stream.send_data(chunk, false) {
+        let announced_len: Option<usize> = state.announced_len;
+        loop {
+            let capacity: Poll<Option<Result<usize, H2Error>>> = {
+                let Some(send_stream) = state.send_stream.as_mut() else {
+                    return Poll::Ready(Err(state.fail(OVERFLOWING_RESPONSE_BODY)));
+                };
+                send_stream.reserve_capacity(bytes.len());
+                send_stream.poll_capacity(context)
+            };
+            match capacity {
+                Poll::Ready(Some(Ok(capacity))) if capacity > 0 => {
+                    let take: usize = capacity.min(bytes.len());
+                    let new_len: usize = current_body_len + take;
+                    let is_final: bool = announced_len == Some(new_len);
+                    let chunk: Bytes = Bytes::copy_from_slice(&bytes[..take]);
+                    let Some(send_stream) = state.send_stream.as_mut() else {
+                        return Poll::Ready(Err(state.fail(OVERFLOWING_RESPONSE_BODY)));
+                    };
+                    if let Err(error) = send_stream.send_data(chunk, is_final) {
+                        return Poll::Ready(Err(state.fail(&error.to_string())));
+                    }
+                    state.body_len = new_len;
+                    if is_final {
+                        state.finished = true;
+                        let _: Option<H2SendStream> = state.send_stream.take();
+                    }
+                    return Poll::Ready(Ok(take));
+                }
+                Poll::Ready(Some(Ok(_))) => continue,
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(Some(Err(error))) => {
                     return Poll::Ready(Err(state.fail(&error.to_string())));
                 }
-                state.body_len = new_len;
-                Poll::Ready(Ok(take))
+                Poll::Ready(None) => {
+                    return Poll::Ready(Err(state.fail(MISSING_SEND_CAPACITY)));
+                }
             }
-            Poll::Ready(Some(Ok(_))) | Poll::Pending => Poll::Pending,
-            Poll::Ready(Some(Err(error))) => Poll::Ready(Err(state.fail(&error.to_string()))),
-            Poll::Ready(None) => Poll::Ready(Err(state.fail(MISSING_SEND_CAPACITY))),
         }
     }
 
@@ -375,7 +575,7 @@ impl AsyncWrite for H2DirectTransport {
     ///
     /// - `Poll<io::Result<()>>` - Ready once flushed.
     fn poll_flush(self: Pin<&mut Self>, context: &mut task::Context<'_>) -> Poll<io::Result<()>> {
-        let Ok(state) = self.get_mut().get_mut_state().get_mut() else {
+        let Ok(mut state) = self.get_mut().get_state().lock() else {
             return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
         };
         if state.failed {
@@ -398,7 +598,7 @@ impl AsyncWrite for H2DirectTransport {
         self: Pin<&mut Self>,
         context: &mut task::Context<'_>,
     ) -> Poll<io::Result<()>> {
-        let Ok(state) = self.get_mut().get_mut_state().get_mut() else {
+        let Ok(mut state) = self.get_mut().get_state().lock() else {
             return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
         };
         if state.failed {

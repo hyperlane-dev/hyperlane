@@ -3,8 +3,9 @@ mod r#negotiate;
 use super::*;
 
 use std::{
+    collections::VecDeque,
     io,
-    net::TcpListener,
+    net::{SocketAddr, TcpListener},
     num::ParseIntError,
     str::{Utf8Error, from_utf8},
     time::Duration,

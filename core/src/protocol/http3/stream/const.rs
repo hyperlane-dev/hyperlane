@@ -151,3 +151,9 @@ pub(crate) const H3_MAX_HEADERS_FRAME_LEN: usize = 256 * 1024;
 
 /// Maximum serialized HTTP/3 peer SETTINGS frame payload accepted on the control stream.
 pub(crate) const H3_MAX_SETTINGS_FRAME_LEN: usize = 16 * 1024;
+
+/// Maximum cumulative ignored (GREASE/trailer/unknown) frame payload bytes skipped per stream.
+pub(crate) const H3_MAX_SKIP_PAYLOAD_BYTES: usize = 64 * 1024;
+
+/// Maximum continuation bytes permitted in a QPACK 6-bit prefix integer before overflow.
+pub(crate) const H3_MAX_QPACK_INT_CONTINUATIONS: u8 = 10;

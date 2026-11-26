@@ -38,3 +38,27 @@ pub(crate) const NO_TIMEOUT_MS: u64 = u64::MAX;
 
 /// Backlog size passed to `listen(2)` for bound TCP listeners.
 pub(crate) const TCP_LISTEN_BACKLOG: i32 = 1024;
+
+/// Backoff delay in milliseconds after a non-peer TCP `accept()` error such as `EMFILE`.
+pub(crate) const TCP_ACCEPT_BACKOFF_MS: u64 = 10;
+
+/// Per-stream initial HTTP/2 flow-control window in bytes.
+pub(crate) const H2_INITIAL_STREAM_WINDOW_SIZE: u32 = 1024 * 1024;
+
+/// Connection-level initial HTTP/2 flow-control window in bytes.
+pub(crate) const H2_INITIAL_CONNECTION_WINDOW_SIZE: u32 = 4 * 1024 * 1024;
+
+/// Maximum concurrent HTTP/2 streams advertised per connection.
+pub(crate) const H2_MAX_CONCURRENT_STREAMS: u32 = 1024;
+
+/// Maximum concurrent reset streams tracked by the HTTP/2 server (mitigates Rapid Reset).
+pub(crate) const H2_MAX_CONCURRENT_RESET_STREAMS: usize = 64;
+
+/// Maximum pending accept reset streams before HTTP/2 tears down the connection.
+pub(crate) const H2_MAX_PENDING_ACCEPT_RESET_STREAMS: usize = 64;
+
+/// Minimum HTTP/2 `SETTINGS_MAX_HEADER_LIST_SIZE` floor so framework error hooks still fire.
+pub(crate) const H2_MIN_MAX_HEADER_LIST_SIZE: u32 = 64 * 1024;
+
+/// Upper cap for HTTP/2 `SETTINGS_MAX_HEADER_LIST_SIZE` even under relaxed configs.
+pub(crate) const H2_MAX_HEADER_LIST_SIZE_CAP: u32 = 1024 * 1024;

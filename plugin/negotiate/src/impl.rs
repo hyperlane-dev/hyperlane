@@ -56,7 +56,7 @@ impl CompressMiddleware {
     pub fn init(config: CompressConfig) -> Result<(), String> {
         CONFIG
             .set(config)
-            .map_err(|_: CompressConfig| "the compress configuration was already set".to_owned())
+            .map_err(|_: CompressConfig| COMPRESS_CONFIG_ALREADY_SET.to_owned())
     }
 
     /// The configuration the middleware works from.
@@ -81,12 +81,41 @@ impl CompressMiddleware {
     ///
     /// - `Option<Compress>` - The coding, or `None` when the client accepts none.
     fn negotiated_coding(request: &Request) -> Option<Compress> {
-        let values: &RequestHeadersValue = request.get_headers().get(ACCEPT_ENCODING)?;
-        let first: &String = values.front()?;
-        if values.len() == 1 {
-            return Compress::from_accept_encoding(first);
+        let mut total_values: usize = 0;
+        let mut total_len: usize = 0;
+        let mut single: Option<&str> = None;
+        for (key, values) in request.get_headers() {
+            if !key.eq_ignore_ascii_case(ACCEPT_ENCODING) {
+                continue;
+            }
+            for value in values {
+                total_values += 1;
+                total_len = total_len.saturating_add(value.len());
+                if total_values == 1 {
+                    single = Some(value.as_str());
+                }
+            }
         }
-        let joined: String = values.iter().cloned().collect::<Vec<String>>().join(COMMA);
+        if total_values == 0 {
+            return None;
+        }
+        if total_values == 1 {
+            return single.and_then(Compress::from_accept_encoding);
+        }
+        let mut joined: String = String::with_capacity(total_len + total_values);
+        let mut first: bool = true;
+        for (key, values) in request.get_headers() {
+            if !key.eq_ignore_ascii_case(ACCEPT_ENCODING) {
+                continue;
+            }
+            for value in values {
+                if !first {
+                    joined.push_str(COMMA);
+                }
+                joined.push_str(value);
+                first = false;
+            }
+        }
         Compress::from_accept_encoding(joined)
     }
 }
@@ -128,7 +157,8 @@ impl ServerHook for CompressMiddleware {
             return Status::Continue;
         };
         let response: &mut Response = ctx.get_mut_response();
-        if response.get_headers().contains_key(CONTENT_ENCODING)
+        if has_response_header_ci(response, CONTENT_ENCODING)
+            || has_no_transform(response)
             || response.get_body().len() < Self::config().get_min_length()
             || has_no_body(response.get_status_code())
             || is_event_stream(response)
@@ -192,8 +222,9 @@ impl ConditionalMiddleware {
     fn entity_tag(response: &mut Response) -> EntityTag {
         let existing: Option<String> = response
             .get_headers()
-            .get(ETAG)
-            .and_then(|values: &ResponseHeadersValue| values.back().cloned());
+            .iter()
+            .find(|(key, _): &(&String, &ResponseHeadersValue)| key.eq_ignore_ascii_case(ETAG))
+            .and_then(|(_, values): (&String, &ResponseHeadersValue)| values.back().cloned());
         match existing {
             Some(etag) => EntityTag(etag),
             None => {
@@ -242,7 +273,8 @@ impl ServerHook for ConditionalMiddleware {
         if !method.is_get() && !method.is_head() {
             return Status::Continue;
         }
-        if has_no_body(ctx.get_response().get_status_code()) {
+        let status_code: ResponseStatusCode = ctx.get_response().get_status_code();
+        if !(200..300).contains(&status_code) || has_no_body(status_code) {
             return Status::Continue;
         }
         let etag: EntityTag = Self::entity_tag(ctx.get_mut_response());

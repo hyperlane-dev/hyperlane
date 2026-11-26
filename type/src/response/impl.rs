@@ -85,6 +85,9 @@ impl Response {
     #[inline(always)]
     pub fn set_reason_phrase(&mut self, val: impl AsRef<str>) -> &mut Self {
         let text: &str = val.as_ref();
+        if !Self::is_valid_header_value(text) {
+            return self;
+        }
         self.reason_phrase.clear();
         self.reason_phrase.push_str(text);
         self
@@ -274,7 +277,8 @@ impl Response {
         V: AsRef<str>,
     {
         if let Some(values) = self.get_headers().get(key.as_ref()) {
-            values.contains(&value.as_ref().to_owned())
+            let target: &str = value.as_ref();
+            values.iter().any(|data: &String| data == target)
         } else {
             false
         }
@@ -397,6 +401,92 @@ impl Response {
         self.try_get_body_json().unwrap()
     }
 
+    /// Validates whether a response header name is a non-empty RFC 9110 token.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - The header key to inspect.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if every byte is a valid HTTP token character.
+    #[inline(always)]
+    fn is_valid_header_name(key: &str) -> bool {
+        !key.is_empty()
+            && key
+                .bytes()
+                .all(|byte: u8| HTTP_HEADER_TOKEN_TABLE[byte as usize])
+    }
+
+    /// Validates whether a response header value or reason phrase contains no control bytes.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - The header value or reason phrase to inspect.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if every byte is allowed inside an HTTP field value.
+    #[inline(always)]
+    fn is_valid_header_value(value: &str) -> bool {
+        value
+            .bytes()
+            .all(|byte: u8| HTTP_HEADER_VALUE_VALID_TABLE[byte as usize])
+    }
+
+    /// Validates whether an HTTP version token contains no whitespace or control bytes.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - The HTTP version text to inspect.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if the version token is safe to emit on the status line.
+    #[inline(always)]
+    fn is_valid_http_version(version: &str) -> bool {
+        !version.is_empty()
+            && version
+                .bytes()
+                .all(|byte: u8| byte > SPACE_U8 && byte < HTTP_HEADER_DELETE)
+    }
+
+    /// Looks up the last value of a response header case-insensitively.
+    ///
+    /// # Arguments
+    ///
+    /// - `&'a ResponseHeaders` - The header map to search.
+    /// - `&str` - The lowercase canonical header name.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<&'a String>` - The last header value if present.
+    #[inline(always)]
+    fn find_header_back_ci<'a>(headers: &'a ResponseHeaders, target: &str) -> Option<&'a String> {
+        if let Some(values) = headers.get(target) {
+            return values.back();
+        }
+        headers
+            .iter()
+            .find(|(name, _): &(&String, &ResponseHeadersValue)| name.eq_ignore_ascii_case(target))
+            .and_then(|(_, values): (&String, &ResponseHeadersValue)| values.back())
+    }
+
+    /// Checks whether a response header exists case-insensitively with at least one value.
+    ///
+    /// # Arguments
+    ///
+    /// - `&ResponseHeaders` - The header map to search.
+    /// - `&str` - The lowercase canonical header name.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if any matching header has at least one value.
+    #[inline(always)]
+    fn has_header_ci(headers: &ResponseHeaders, target: &str) -> bool {
+        Self::find_header_back_ci(headers, target).is_some()
+    }
+
     /// Determines whether the header should be skipped during setting.
     ///
     /// # Arguments
@@ -405,10 +495,10 @@ impl Response {
     ///
     /// # Returns
     ///
-    /// - `bool` - `true` if the header is empty or not allowed, `false` if the header can be set.
+    /// - `bool` - `true` if the header is invalid or framing-controlled, `false` otherwise.
     #[inline(always)]
     fn should_skip_header(&self, key: &str) -> bool {
-        key.trim().is_empty() || key == CONTENT_LENGTH
+        !Self::is_valid_header_name(key) || key.eq_ignore_ascii_case(CONTENT_LENGTH)
     }
 
     /// Sets a header in the response, replacing any existing values.
@@ -484,7 +574,8 @@ impl Response {
         V: AsRef<str>,
     {
         let key: &str = key.as_ref();
-        if self.should_skip_header(key) {
+        let value: &str = value.as_ref();
+        if self.should_skip_header(key) || !Self::is_valid_header_value(value) {
             return self;
         }
         self.set_header_without_check(key, value)
@@ -509,14 +600,29 @@ impl Response {
         K: AsRef<str>,
         V: AsRef<str>,
     {
-        let key: ResponseHeadersKey = key.as_ref().to_owned();
-        if self.should_skip_header(&key) {
+        let key_ref: &str = key.as_ref();
+        let value_ref: &str = value.as_ref();
+        if self.should_skip_header(key_ref) || !Self::is_valid_header_value(value_ref) {
             return self;
         }
-        self.get_mut_headers()
-            .entry(key)
-            .or_default()
-            .push_back(value.as_ref().to_owned());
+        if let Some(existing) = self.get_mut_headers().get_mut(key_ref) {
+            existing.push_back(value_ref.to_owned());
+            return self;
+        }
+        let (mut name, mut values): (String, VecDeque<String>) =
+            take_header_entry().unwrap_or_else(|| (String::new(), VecDeque::new()));
+        name.clear();
+        name.push_str(key_ref);
+        while values.len() > 1 {
+            values.pop_back();
+        }
+        if let Some(slot) = values.front_mut() {
+            slot.clear();
+            slot.push_str(value_ref);
+        } else {
+            values.push_back(value_ref.to_owned());
+        }
+        self.get_mut_headers().insert(name, values);
         self
     }
 
@@ -560,12 +666,16 @@ impl Response {
         K: AsRef<str>,
         V: AsRef<str>,
     {
-        let key: ResponseHeadersKey = key.as_ref().to_owned();
-        if let Some(values) = self.get_mut_headers().get_mut(&key) {
-            values.retain(|data: &String| data != &value.as_ref().to_owned());
-            if values.is_empty() {
-                self.get_mut_headers().remove(&key);
-            }
+        let key_ref: &str = key.as_ref();
+        let value_ref: &str = value.as_ref();
+        let should_remove: bool = if let Some(values) = self.get_mut_headers().get_mut(key_ref) {
+            values.retain(|data: &String| data != value_ref);
+            values.is_empty()
+        } else {
+            false
+        };
+        if should_remove {
+            self.get_mut_headers().remove(key_ref);
         }
         self
     }
@@ -579,7 +689,7 @@ impl Response {
     /// - `&mut Self` - A mutable reference to self for chaining.
     #[inline(always)]
     pub fn clear_headers(&mut self) -> &mut Self {
-        self.get_mut_headers().clear();
+        self.recycle_headers();
         self
     }
 
@@ -593,13 +703,14 @@ impl Response {
     /// - `&mut Self` - A mutable reference to self for chaining.
     pub fn reset(&mut self) -> &mut Self {
         let http_status: HttpStatus = HttpStatus::default();
+        self.set_version(HttpVersion::Http1_1);
         self.set_status_code(http_status.code());
-        // The phrase is written into the existing buffer rather than
-        // replaced, so a response that is reset over and over stops
-        // allocating for it.
+        let phrase: &'static str = HttpStatus::phrase_ref(http_status.code());
         let stored: &mut ResponseReasonPhrase = self.get_mut_reason_phrase();
-        stored.clear();
-        stored.push_str(HttpStatus::phrase_ref(http_status.code()));
+        if stored.as_str() != phrase {
+            stored.clear();
+            stored.push_str(phrase);
+        }
         self.recycle_headers();
         self.get_mut_body().clear();
         self
@@ -632,8 +743,21 @@ impl Response {
     /// - `Option<Cookies>` - The parsed cookies if the `Set-Cookie` header exists, otherwise `None`.
     #[inline(always)]
     pub fn try_get_cookies(&self) -> Option<Cookies> {
-        self.try_get_header_back(SET_COOKIE)
-            .map(|cookie_header: String| Cookie::parse(cookie_header))
+        let mut cookies: Cookies = hash_map_xx_hash3_64();
+        let mut found_header: bool = false;
+        for (name, values) in self.get_headers() {
+            if !name.eq_ignore_ascii_case(SET_COOKIE) {
+                continue;
+            }
+            for header_value in values {
+                found_header = true;
+                let parsed: CookieBuilder = CookieBuilder::parse(header_value);
+                if !parsed.get_name().is_empty() {
+                    cookies.insert(parsed.get_name().clone(), parsed.get_value().clone());
+                }
+            }
+        }
+        found_header.then_some(cookies)
     }
 
     /// Parses cookies from the `Set-Cookie` headers.
@@ -748,7 +872,10 @@ impl Response {
     /// - `ResponseData` - The encoded HTTP response.
     fn build_wire<const INCLUDE_BODY: bool>(&mut self) -> ResponseData {
         let status_code: ResponseStatusCode = self.get_status_code();
-        if self.get_reason_phrase().is_empty() || self.get_reason_phrase().as_str() == OK {
+        if self.get_reason_phrase().is_empty()
+            || self.get_reason_phrase().as_str() == OK
+            || !Self::is_valid_header_value(self.get_reason_phrase())
+        {
             // The phrase is written into the existing buffer rather than
             // replaced, so a response that announces the same status over and
             // over stops allocating for it.
@@ -766,55 +893,66 @@ impl Response {
             && status_code != HttpStatus::ResetContent.code()
             && status_code != HttpStatus::NotModified.code()
         {
+            let raw_version: &str = self.get_version().as_str();
+            let version_str: &str = if Self::is_valid_http_version(raw_version) {
+                raw_version
+            } else {
+                HTTP_VERSION_1_1
+            };
             let content_type: &str = default_content_type();
             let body_len: usize = self.get_body().len();
             let mut digits: [u8; B_20] = [0; B_20];
             let rendered_len: &str = render_length(body_len, &mut digits);
-            let mut code_digits: [u8; B_20] = [0; B_20];
-            let rendered_code: &str = render_length(status_code, &mut code_digits);
-            let version_str: &str = self.get_version().as_str();
             let phrase_str: &str = self.get_reason_phrase().as_str();
-            let total_size: usize = version_str.len()
-                + 1
-                + rendered_code.len()
-                + 1
-                + phrase_str.len()
-                + HTTP_BR.len()
-                + CONNECTION.len()
-                + COLON.len()
-                + KEEP_ALIVE.len()
-                + HTTP_BR.len()
-                + CONTENT_TYPE.len()
-                + COLON.len()
-                + content_type.len()
-                + HTTP_BR.len()
-                + CONTENT_LENGTH.len()
-                + COLON.len()
-                + rendered_len.len()
-                + HTTP_BR.len()
-                + HTTP_BR.len()
-                + body_len;
-            let mut response_bytes: Vec<u8> = Vec::with_capacity(total_size);
-            response_bytes.extend_from_slice(version_str.as_bytes());
-            response_bytes.push(b' ');
-            response_bytes.extend_from_slice(rendered_code.as_bytes());
-            response_bytes.push(b' ');
-            response_bytes.extend_from_slice(phrase_str.as_bytes());
-            response_bytes.extend_from_slice(HTTP_BR.as_bytes());
-            Self::push_header(&mut response_bytes, CONTENT_LENGTH, rendered_len);
-            Self::push_header(&mut response_bytes, CONNECTION, KEEP_ALIVE);
-            Self::push_header(&mut response_bytes, CONTENT_TYPE, content_type);
-            response_bytes.extend_from_slice(HTTP_BR.as_bytes());
+            let fast_prefix: Option<&[u8]> =
+                if status_code == HttpStatus::Ok.code() && phrase_str == OK {
+                    match version_str {
+                        HTTP_VERSION_1_1 => Some(FAST_HTTP11_200_CL_PREFIX),
+                        HTTP_VERSION_2 => Some(FAST_HTTP2_200_CL_PREFIX),
+                        HTTP_VERSION_3 => Some(FAST_HTTP3_200_CL_PREFIX),
+                        _ => None,
+                    }
+                } else {
+                    None
+                };
+            let mut response_bytes: Vec<u8> = if let Some(prefix) = fast_prefix {
+                let total_size: usize = prefix.len()
+                    + rendered_len.len()
+                    + FAST_DEFAULT_HEADERS_SUFFIX.len()
+                    + body_len;
+                let mut out: Vec<u8> = Vec::with_capacity(total_size);
+                out.extend_from_slice(prefix);
+                out.extend_from_slice(rendered_len.as_bytes());
+                out.extend_from_slice(FAST_DEFAULT_HEADERS_SUFFIX);
+                out
+            } else {
+                let mut code_digits: [u8; B_20] = [0; B_20];
+                let rendered_code: &str = render_length(status_code, &mut code_digits);
+                let total_size: usize = version_str.len()
+                    + 1
+                    + rendered_code.len()
+                    + 1
+                    + phrase_str.len()
+                    + FAST_CL_PREFIX.len()
+                    + rendered_len.len()
+                    + FAST_DEFAULT_HEADERS_SUFFIX.len()
+                    + body_len;
+                let mut out: Vec<u8> = Vec::with_capacity(total_size);
+                out.extend_from_slice(version_str.as_bytes());
+                out.push(b' ');
+                out.extend_from_slice(rendered_code.as_bytes());
+                out.push(b' ');
+                out.extend_from_slice(phrase_str.as_bytes());
+                out.extend_from_slice(FAST_CL_PREFIX);
+                out.extend_from_slice(rendered_len.as_bytes());
+                out.extend_from_slice(FAST_DEFAULT_HEADERS_SUFFIX);
+                out
+            };
             response_bytes.extend_from_slice(self.get_body().as_slice());
             self.populate_default_headers_batch(content_type, rendered_len);
             return response_bytes;
         }
-        if self
-            .get_headers()
-            .get(CONNECTION)
-            .and_then(|values: &VecDeque<String>| values.back())
-            .is_none()
-        {
+        if !Self::has_header_ci(self.get_headers(), CONNECTION) {
             self.set_header_without_check(CONNECTION, KEEP_ALIVE);
         }
         let compressed_body: Option<ResponseBody>;
@@ -827,21 +965,24 @@ impl Response {
                 &[]
             }
             _ => {
-                let content_type: Option<&String> = self
-                    .get_headers()
-                    .get(CONTENT_TYPE)
-                    .and_then(|values: &ResponseHeadersValue| values.back());
-                let is_event_stream: bool = if let Some(value) = content_type {
-                    value.eq_ignore_ascii_case(TEXT_EVENT_STREAM)
+                let is_event_stream: bool = if let Some(value) =
+                    Self::find_header_back_ci(self.get_headers(), CONTENT_TYPE)
+                {
+                    value
+                        .split(SEMICOLON)
+                        .next()
+                        .unwrap_or(EMPTY_STR)
+                        .trim()
+                        .eq_ignore_ascii_case(TEXT_EVENT_STREAM)
                 } else {
                     self.set_header_without_check(CONTENT_TYPE, default_content_type());
                     false
                 };
-                let compress_type: Option<Compress> = self
-                    .get_headers()
-                    .get(CONTENT_ENCODING)
-                    .and_then(|values: &ResponseHeadersValue| values.back())
-                    .map(|value: &String| value.parse::<Compress>().unwrap_or_default());
+                let has_transfer_encoding: bool =
+                    Self::has_header_ci(self.get_headers(), TRANSFER_ENCODING);
+                let compress_type: Option<Compress> =
+                    Self::find_header_back_ci(self.get_headers(), CONTENT_ENCODING)
+                        .map(|value: &String| value.parse::<Compress>().unwrap_or_default());
                 if INCLUDE_BODY {
                     compressed_body = match compress_type {
                         Some(encoding) if !encoding.is_unknown() => Some(
@@ -851,7 +992,18 @@ impl Response {
                         ),
                         _ => None,
                     };
-                    if !is_event_stream {
+                    if has_transfer_encoding {
+                        self.get_mut_headers().retain(
+                            |name: &String, _: &mut ResponseHeadersValue| {
+                                !name.eq_ignore_ascii_case(CONTENT_LENGTH)
+                            },
+                        );
+                    } else if !is_event_stream {
+                        self.get_mut_headers().retain(
+                            |name: &String, _: &mut ResponseHeadersValue| {
+                                name == CONTENT_LENGTH || !name.eq_ignore_ascii_case(CONTENT_LENGTH)
+                            },
+                        );
                         let body_len: usize = compressed_body
                             .as_ref()
                             .map_or_else(|| self.get_body().len(), Vec::len);
@@ -887,8 +1039,14 @@ impl Response {
                     .sum::<usize>()
             })
             .sum::<usize>();
+        let raw_version: &str = self.get_version().as_str();
+        let version_str: &str = if Self::is_valid_http_version(raw_version) {
+            raw_version
+        } else {
+            HTTP_VERSION_1_1
+        };
         let mut response_bytes: Vec<u8> = Vec::with_capacity(head_size + body.len());
-        response_bytes.extend_from_slice(self.get_version().as_str().as_bytes());
+        response_bytes.extend_from_slice(version_str.as_bytes());
         response_bytes.push(b' ');
         let mut code: [u8; B_20] = [0; B_20];
         response_bytes.extend_from_slice(render_length(status_code, &mut code).as_bytes());
@@ -899,8 +1057,13 @@ impl Response {
             .iter()
             .for_each(|header_entry: (&String, &VecDeque<String>)| {
                 let (header_key, header_values): (&String, &VecDeque<String>) = header_entry;
+                if !Self::is_valid_header_name(header_key) {
+                    return;
+                }
                 for header_value in header_values.iter() {
-                    Self::push_header(&mut response_bytes, header_key, header_value);
+                    if Self::is_valid_header_value(header_value) {
+                        Self::push_header(&mut response_bytes, header_key, header_value);
+                    }
                 }
             });
         response_bytes.extend_from_slice(HTTP_BR.as_bytes());

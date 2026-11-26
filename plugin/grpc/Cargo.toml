@@ -1,0 +1,20 @@
+[package]
+name = "hyperlane-plugin-grpc"
+autotests = false
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A gRPC over HTTP/2 server plugin for the Hyperlane framework with length-prefixed framing, bounded decompression, gRPC status codes, timeout parsing, service routing, and an opt-in ServerHook."""
+keywords = ["http", "grpc", "http2", "rpc", "hyperlane"]
+categories = ["network-programming", "web-programming"]
+exclude.workspace = true
+publish = true
+
+[dependencies]
+hyperlane = { workspace = true }
+http-compress = { workspace = true }
+
+lombok-macros = { workspace = true }

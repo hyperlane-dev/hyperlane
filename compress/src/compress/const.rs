@@ -7,6 +7,9 @@ pub(crate) const EMPTY_STR: &str = "";
 /// The content encoding type for gzip.
 pub(crate) const CONTENT_ENCODING_GZIP: &str = "gzip";
 
+/// The legacy alias for the gzip content encoding.
+pub(crate) const CONTENT_ENCODING_X_GZIP: &str = "x-gzip";
+
 /// The content encoding type for deflate.
 pub(crate) const CONTENT_ENCODING_DEFLATE: &str = "deflate";
 
@@ -36,3 +39,6 @@ pub(crate) const ACCEPT_ENCODING_QUALITY: &str = "q";
 
 /// The quality a coding counts as when the field names no `q` parameter for it.
 pub(crate) const DEFAULT_QUALITY: f32 = 1.0;
+
+/// Maximum decompressed output size permitted per decode call to defend against decompression bombs.
+pub(crate) const MAX_DECOMPRESSED_BYTES: usize = 64 * 1024 * 1024;

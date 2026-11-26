@@ -212,7 +212,11 @@ async fn run_uring_h1_tls(env: ConnectionEnv, transport: UringTcpTransport) {
         .server
         .serve_h1_connection_stream(&env.shared.pipeline, &mut stream)
         .await;
-    let _: Result<(), io::Error> = stream.shutdown().await;
+    let _: Result<Result<(), io::Error>, Elapsed> = bounded_handshake(
+        env.shared.request_config,
+        stream.get_mut_stream().shutdown(),
+    )
+    .await;
 }
 
 /// Polls every connection slot currently queued in `reactor.local_ready`.
@@ -513,7 +517,7 @@ fn run_uring_worker_thread(
                         reactor
                             .wake_state
                             .signaled
-                            .store(false, AtomicOrdering::Release);
+                            .store(false, AtomicOrdering::SeqCst);
                         let mut external: Vec<usize> = Vec::new();
                         if let Ok(mut ready_list) = reactor.wake_state.ready.lock() {
                             mem::swap(&mut *ready_list, &mut external);
@@ -521,7 +525,7 @@ fn run_uring_worker_thread(
                         for slot_id in external {
                             reactor.schedule_local(slot_id);
                         }
-                        if reactor.wake_state.shutdown.load(AtomicOrdering::Acquire) {
+                        if reactor.wake_state.shutdown.load(AtomicOrdering::SeqCst) {
                             shutdown_now = true;
                         } else {
                             arm_eventfd_poll(reactor);
@@ -531,7 +535,7 @@ fn run_uring_worker_thread(
                 }
             }
             if !shutdown_initiated
-                && (shutdown_now || reactor.wake_state.shutdown.load(AtomicOrdering::Acquire))
+                && (shutdown_now || reactor.wake_state.shutdown.load(AtomicOrdering::SeqCst))
             {
                 shutdown_initiated = true;
                 for (acc_idx, acc) in accept_slots.iter().enumerate() {

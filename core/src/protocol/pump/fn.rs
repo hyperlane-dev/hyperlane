@@ -153,25 +153,48 @@ pub(crate) fn return_route_param_entry(mut pair: (String, String)) {
     });
 }
 
-/// Polls a future once before arming a timeout on the hot path.
+/// Polls a future once before lazily arming a sleep timer, avoiding both timer
+/// churn on immediately ready reads and a redundant second poll on pending reads.
 ///
 /// # Arguments
 ///
-/// - `Pin<&mut F>` - The future to poll.
+/// - `Pin<&mut F>` - The future to drive.
+/// - `Duration` - Maximum wait time once the first poll returns `Poll::Pending`.
 ///
 /// # Returns
 ///
-/// - `Option<F::Output>` - `Some` when the future completed immediately, `None` when still pending.
-pub(crate) async fn poll_once_protocol<F>(mut future: Pin<&mut F>) -> Option<F::Output>
+/// - `Option<F::Output>` - `Some` with the completed value, or `None` on timeout.
+pub(crate) async fn poll_with_timeout_protocol<F>(
+    mut future: Pin<&mut F>,
+    duration: Duration,
+) -> Option<F::Output>
 where
     F: Future,
 {
-    poll_fn(
-        |context: &mut task::Context<'_>| match future.as_mut().poll(context) {
-            Poll::Ready(value) => Poll::Ready(Some(value)),
-            Poll::Pending => Poll::Ready(None),
-        },
-    )
+    let mut deadline: Pin<&mut Option<Sleep>> = pin!(None);
+    poll_fn(|context: &mut task::Context<'_>| {
+        if deadline.is_none() {
+            if let Poll::Ready(value) = future.as_mut().poll(context) {
+                return Poll::Ready(Some(value));
+            }
+            deadline.set(Some(sleep(duration)));
+            if let Some(timer) = deadline.as_mut().as_pin_mut()
+                && timer.poll(context).is_ready()
+            {
+                return Poll::Ready(None);
+            }
+            return Poll::Pending;
+        }
+        if let Poll::Ready(value) = future.as_mut().poll(context) {
+            return Poll::Ready(Some(value));
+        }
+        if let Some(timer) = deadline.as_mut().as_pin_mut()
+            && timer.poll(context).is_ready()
+        {
+            return Poll::Ready(None);
+        }
+        Poll::Pending
+    })
     .await
 }
 

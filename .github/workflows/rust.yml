@@ -267,7 +267,14 @@ jobs:
             "hyperlane"
             "hyperlane-cli"
             "hyperlane-plugin-logger"
+            "hyperlane-plugin-negotiate"
             "hyperlane-plugin-websocket"
+            "hyperlane-plugin-sse"
+            "hyperlane-plugin-mq"
+            "hyperlane-plugin-rpc"
+            "hyperlane-plugin-grpc"
+            "hyperlane-plugin-mcp"
+            "hyperlane-plugin-gateway"
             "hyperlane-performance"
           )
 

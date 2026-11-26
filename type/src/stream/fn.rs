@@ -151,27 +151,57 @@ where
     });
 }
 
-/// Polls a future exactly once.
+/// Polls a future once before lazily arming or reusing a connection-scoped sleep timer.
+///
+/// The reusable timer stays armed in Tokio's timer wheel across consecutive
+/// keep-alive requests so high-concurrency loops avoid per-request timer wheel
+/// insertion and removal while still firing at the exact request deadline.
 ///
 /// # Arguments
 ///
-/// - `Pin<&mut F>` - The future to poll.
+/// - `Pin<&mut F>` - The future to drive.
+/// - `&mut Option<Pin<Box<Sleep>>>` - Reusable sleep slot owned by the connection.
+/// - `Duration` - Maximum time to wait once the first poll returns `Poll::Pending`.
 ///
 /// # Returns
 ///
-/// - `Option<F::Output>` - `Some` with the value when the future completed on
-///   that first poll, `None` when it is still pending. A pending future stays
-///   registered with its waker, so it can be awaited normally afterwards.
-pub(crate) async fn poll_once<F>(mut future: Pin<&mut F>) -> Option<F::Output>
+/// - `Option<F::Output>` - `Some` with the completed value, or `None` on timeout.
+pub(crate) async fn poll_with_timeout<F>(
+    mut future: Pin<&mut F>,
+    timer_slot: &mut Option<Pin<Box<Sleep>>>,
+    duration: Duration,
+) -> Option<F::Output>
 where
     F: Future,
 {
-    future::poll_fn(
-        |context: &mut Context<'_>| match future.as_mut().poll(context) {
-            Poll::Ready(value) => Poll::Ready(Some(value)),
-            Poll::Pending => Poll::Ready(None),
-        },
-    )
+    let mut exact_deadline: Option<Instant> = None;
+    future::poll_fn(|context: &mut Context<'_>| {
+        if let Poll::Ready(value) = future.as_mut().poll(context) {
+            return Poll::Ready(Some(value));
+        }
+        let deadline: Instant = *exact_deadline.get_or_insert_with(|| Instant::now() + duration);
+        let timer: &mut Pin<Box<Sleep>> = match timer_slot {
+            Some(existing) => {
+                if existing.deadline() > deadline {
+                    existing.as_mut().reset(deadline);
+                }
+                existing
+            }
+            None => timer_slot.insert(Box::pin(sleep_until(deadline))),
+        };
+        loop {
+            match timer.as_mut().poll(context) {
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(()) => {
+                    if Instant::now() < deadline {
+                        timer.as_mut().reset(deadline);
+                        continue;
+                    }
+                    return Poll::Ready(None);
+                }
+            }
+        }
+    })
     .await
 }
 

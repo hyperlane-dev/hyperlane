@@ -30,4 +30,13 @@ pub struct RequestConfig {
     /// Optional proxy configuration. `None` means direct connection.
     #[get(type(clone))]
     pub(crate) proxy: Option<Proxy>,
+    /// Optional TCP connect timeout in milliseconds (`0` inherits `timeout`).
+    #[get(type(copy))]
+    pub(crate) connect_timeout: u64,
+    /// Maximum automatic retry attempts for idempotent transient failures (`0` = disabled).
+    #[get(type(copy))]
+    pub(crate) max_retries: usize,
+    /// Enable HTTP keep-alive connection pooling (`false` = close connection after each request).
+    #[get(type(copy))]
+    pub(crate) keep_alive: bool,
 }

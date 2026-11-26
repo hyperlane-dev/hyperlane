@@ -18,8 +18,8 @@ pub use {command::*, config::*, help::*, logger::*, new::*, template::*, version
 pub(crate) use std::{
     env::args,
     fmt::Arguments,
-    io,
-    path::{Path, PathBuf},
+    io::{self, ErrorKind},
+    path::{Component, Components, Path, PathBuf},
     process::{Output, Stdio},
     str::FromStr,
 };
@@ -34,8 +34,8 @@ pub(crate) use {
     },
     std::ffi::OsStr,
     tokio::{
-        fs::{create_dir_all, write},
-        process::Command,
+        fs::{canonicalize, create_dir_all, write},
+        process::{Child, Command},
         sync::watch::{Receiver, Sender, channel, error::SendError},
         time::{Duration, Interval, interval, sleep},
     },

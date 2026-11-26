@@ -1,5 +1,6 @@
 use super::*;
 
+/// Inherent implementation of [`FileExtension`].
 impl FileExtension {
     /// Parses a string into a `FileExtension`.
     ///
@@ -33,9 +34,13 @@ impl FileExtension {
         F: AsRef<str>,
     {
         let full_path_ref: &str = full_path.as_ref();
-        full_path_ref
+        let file_name: &str = full_path_ref
+            .rsplit(['/', '\\'])
+            .next()
+            .unwrap_or(full_path_ref);
+        file_name
             .rfind(POINT)
-            .map(|index: usize| full_path_ref[index + 1..].to_string())
+            .map(|index: usize| file_name[index + 1..].to_string())
             .unwrap_or_default()
     }
 
@@ -1129,6 +1134,7 @@ impl FileExtension {
     }
 }
 
+/// Implements [`FromStr`] for [`FileExtension`].
 impl FromStr for FileExtension {
     type Err = ();
 
@@ -2209,6 +2215,7 @@ impl FromStr for FileExtension {
     }
 }
 
+/// Formatting / debug-printing for [`FileExtension`].
 impl Display for FileExtension {
     /// Formats the `FileExtension` into a string.
     ///

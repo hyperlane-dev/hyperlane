@@ -79,12 +79,21 @@ where
                     })
                     .collect();
                 let gen_code: proc_macro2::TokenStream = match tail_expr {
+                    Some(expr) if matches!(sig.output, ReturnType::Default) => quote! {
+                        #(#attrs)*
+                        #vis #sig {
+                            #(#normalized_leading)*
+                            #expr;
+                            #after_code
+                        }
+                    },
                     Some(expr) => quote! {
                         #(#attrs)*
                         #vis #sig {
                             #(#normalized_leading)*
+                            let __hyperlane_epilogue_result = { #expr };
                             #after_code
-                            #expr
+                            __hyperlane_epilogue_result
                         }
                     },
                     None => quote! {
@@ -287,17 +296,36 @@ pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> proc_macro2::TokenStream
             Expr::Lit(ExprLit {
                 lit: Lit::Int(lit_int),
                 ..
-            }) => {
-                let value: isize = lit_int.base10_parse::<isize>().unwrap();
-                quote! { Some(#value) }
-            }
+            }) => match lit_int.base10_parse::<isize>() {
+                Ok(value) => quote! { Some(#value) },
+                Err(error) => error.to_compile_error(),
+            },
+            Expr::Unary(ExprUnary {
+                op: UnOp::Neg(_),
+                expr: inner,
+                ..
+            }) => match inner.as_ref() {
+                Expr::Lit(ExprLit {
+                    lit: Lit::Int(lit_int),
+                    ..
+                }) => {
+                    let negated: String = format!("-{}", lit_int.base10_digits());
+                    match negated.parse::<isize>() {
+                        Ok(value) => quote! { Some(#value) },
+                        Err(_) => {
+                            Error::new_spanned(expr, CANNOT_PARSE_TO_ISIZE).to_compile_error()
+                        }
+                    }
+                }
+                _ => quote! { None },
+            },
             Expr::Lit(ExprLit {
                 lit: Lit::Str(lit_str),
                 ..
-            }) => {
-                let value: isize = lit_str.value().parse().expect(CANNOT_PARSE_TO_ISIZE);
-                quote! { Some(#value) }
-            }
+            }) => match lit_str.value().parse::<isize>() {
+                Ok(value) => quote! { Some(#value) },
+                Err(_) => Error::new_spanned(lit_str, CANNOT_PARSE_TO_ISIZE).to_compile_error(),
+            },
             _ => quote! { None },
         },
         None => quote! { None },

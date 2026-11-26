@@ -45,6 +45,7 @@ pub(crate) async fn bind_tcp_listeners(
     for _ in 0..shard_count {
         let socket: Socket = Socket::new(Domain::for_address(bind_addr), Type::STREAM, None)
             .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        #[cfg(unix)]
         if bind_addr.port() != 0 {
             socket
                 .set_reuse_address(true)
@@ -80,18 +81,35 @@ async fn tcp_accept_loop(
     tcp_listener: Arc<TcpListener>,
     mut shutdown_receiver: Receiver<()>,
 ) {
+    let local: Option<SocketAddr> = tcp_listener.local_addr().ok();
     loop {
-        let accepted: Option<(TcpStream, SocketAddr)> = tokio::select! {
+        let accepted: Option<io::Result<(TcpStream, SocketAddr)>> = tokio::select! {
             biased;
             _ = shutdown_receiver.changed() => None,
-            accepted = tcp_listener.accept() => accepted.ok(),
+            accepted = tcp_listener.accept() => Some(accepted),
         };
-        let Some((stream, remote)) = accepted else {
+        let Some(result) = accepted else {
             break;
         };
+        let (stream, remote): (TcpStream, SocketAddr) = match result {
+            Ok(pair) => pair,
+            Err(error) => {
+                if !matches!(
+                    error.kind(),
+                    ErrorKind::ConnectionAborted
+                        | ErrorKind::ConnectionReset
+                        | ErrorKind::Interrupted
+                        | ErrorKind::WouldBlock
+                ) {
+                    sleep(Duration::from_millis(TCP_ACCEPT_BACKOFF_MS)).await;
+                }
+                continue;
+            }
+        };
         let env: ConnectionEnv = env.clone();
+        let conn_shutdown: Receiver<()> = shutdown_receiver.clone();
         spawn(async move {
-            serve_tcp_connection(env, stream, remote).await;
+            serve_tcp_connection(env, stream, local, remote, conn_shutdown).await;
         });
     }
     drop(tcp_listener);
@@ -128,7 +146,9 @@ async fn quic_accept_loop(
         let remote: SocketAddr = connecting.remote_address();
         let env: ConnectionEnv = env.clone();
         spawn(async move {
-            let Ok(connection) = connecting.await else {
+            let Ok(Ok(connection)) =
+                bounded_handshake(env.shared.request_config, async move { connecting.await }).await
+            else {
                 return;
             };
             if !negotiated_quic_protocol_matches(&connection) {
@@ -263,7 +283,9 @@ pub(crate) async fn quic_accept_all(
 ///
 /// - `ConnectionEnv` - The shared server, compiled pipeline, TLS acceptor, limits and protocol.
 /// - `TcpStream` - The accepted socket, before its socket options are applied.
+/// - `Option<SocketAddr>` - The cached local listener address, if known.
 /// - `SocketAddr` - The remote address of the accepted socket.
+/// - `Receiver<()>` - Graceful shutdown signal for multiplexed connections.
 ///
 /// # Returns
 ///
@@ -271,21 +293,31 @@ pub(crate) async fn quic_accept_all(
 pub(crate) async fn serve_tcp_connection(
     env: ConnectionEnv,
     stream: TcpStream,
+    cached_local: Option<SocketAddr>,
     remote: SocketAddr,
+    shutdown_receiver: Receiver<()>,
 ) {
     let shared: &ConnectionShared = &env.shared;
     configure_socket(&stream, &shared.server);
     let Some(tls_config) = shared.tls_config.as_ref() else {
         if shared.protocol == ServerProtocol::Http2 {
-            let local: SocketAddr = stream.local_addr().unwrap_or(remote);
-            serve_plain_tcp(env, StreamPeers { local, remote }, stream).await;
+            let local: SocketAddr = cached_local
+                .or_else(|| stream.local_addr().ok())
+                .unwrap_or(remote);
+            serve_plain_tcp(
+                env,
+                StreamPeers { local, remote },
+                stream,
+                shutdown_receiver,
+            )
+            .await;
         } else {
             serve_h1_connection(env, stream).await;
         }
         return;
     };
     let local: Option<SocketAddr> = if shared.protocol == ServerProtocol::Http2 {
-        stream.local_addr().ok()
+        cached_local.or_else(|| stream.local_addr().ok())
     } else {
         None
     };
@@ -308,7 +340,7 @@ pub(crate) async fn serve_tcp_connection(
             local: local.unwrap_or(remote),
             remote,
         };
-        serve_tls_stream(env, peers, transport).await;
+        serve_tls_stream(env, peers, transport, shutdown_receiver).await;
     } else {
         serve_h1_transport(env, transport).await;
     }
@@ -420,17 +452,43 @@ pub(crate) fn configure_socket(stream: &TcpStream, server: &Server) {
     }
 }
 
-/// Builds the HTTP/2 server handshake builder with tuned flow-control windows.
+/// Builds the HTTP/2 server handshake builder with tuned flow-control windows and DoS bounds.
+///
+/// # Arguments
+///
+/// - `&RequestConfig` - Request limits used to derive `SETTINGS_MAX_HEADER_LIST_SIZE`.
 ///
 /// # Returns
 ///
 /// - `H2ServerBuilder` - The configured HTTP/2 server handshake builder.
-fn h2_server_builder() -> H2ServerBuilder {
+fn h2_server_builder(request_config: &RequestConfig) -> H2ServerBuilder {
+    let max_header_count: usize = request_config.get_max_header_count();
+    let max_header_key_size: usize = request_config.get_max_header_key_size();
+    let max_header_value_size: usize = request_config.get_max_header_value_size();
+    let is_low_security: bool = max_header_count == DEFAULT_LOW_SECURITY_MAX_HEADER_COUNT
+        || max_header_key_size == DEFAULT_LOW_SECURITY_MAX_HEADER_KEY_SIZE
+        || max_header_value_size == DEFAULT_LOW_SECURITY_MAX_HEADER_VALUE_SIZE;
+    let max_header_list_size: u32 = if is_low_security {
+        H2_MAX_HEADER_LIST_SIZE_CAP
+    } else {
+        let per_header: usize = max_header_key_size
+            .saturating_add(max_header_value_size)
+            .saturating_add(32);
+        let budget: usize = max_header_count
+            .saturating_mul(per_header)
+            .saturating_add(request_config.get_max_path_size());
+        u32::try_from(budget)
+            .unwrap_or(H2_MAX_HEADER_LIST_SIZE_CAP)
+            .clamp(H2_MIN_MAX_HEADER_LIST_SIZE, H2_MAX_HEADER_LIST_SIZE_CAP)
+    };
     let mut builder: H2ServerBuilder = H2ServerBuilder::new();
     builder
-        .initial_window_size(1024 * 1024)
-        .initial_connection_window_size(4 * 1024 * 1024)
-        .max_concurrent_streams(1024);
+        .initial_window_size(H2_INITIAL_STREAM_WINDOW_SIZE)
+        .initial_connection_window_size(H2_INITIAL_CONNECTION_WINDOW_SIZE)
+        .max_concurrent_streams(H2_MAX_CONCURRENT_STREAMS)
+        .max_header_list_size(max_header_list_size)
+        .max_concurrent_reset_streams(H2_MAX_CONCURRENT_RESET_STREAMS)
+        .max_pending_accept_reset_streams(H2_MAX_PENDING_ACCEPT_RESET_STREAMS);
     builder
 }
 
@@ -441,23 +499,29 @@ fn h2_server_builder() -> H2ServerBuilder {
 /// - `ConnectionEnv` - The server, limits and protocol for the connection.
 /// - `StreamPeers` - The addresses of the connection.
 /// - `TcpStream` - The accepted socket.
+/// - `Receiver<()>` - Graceful shutdown signal for HTTP/2 connections.
 ///
 /// # Returns
 ///
 /// - `()` - Resolves once the connection is finished.
-pub(crate) async fn serve_plain_tcp(env: ConnectionEnv, peers: StreamPeers, stream: TcpStream) {
+pub(crate) async fn serve_plain_tcp(
+    env: ConnectionEnv,
+    peers: StreamPeers,
+    stream: TcpStream,
+    shutdown_receiver: Receiver<()>,
+) {
     match env.shared.protocol {
         ServerProtocol::Http2 => {
             let handshake: Result<ConnectionH2<TcpStream>, String> = bounded_handshake(
                 env.shared.request_config,
-                h2_server_builder().handshake(stream),
+                h2_server_builder(&env.shared.request_config).handshake(stream),
             )
             .await
             .map_err(|_: Elapsed| H2_HANDSHAKE_TIMEOUT.to_owned())
             .and_then(|connection: Result<_, H2Error>| {
                 connection.map_err(|error: H2Error| error.to_string())
             });
-            serve_h2_connection(env, peers, handshake).await;
+            serve_h2_connection(env, peers, handshake, shutdown_receiver).await;
         }
         _ => {
             serve_h1_connection(env, stream).await;
@@ -476,6 +540,7 @@ pub(crate) async fn serve_plain_tcp(env: ConnectionEnv, peers: StreamPeers, stre
 /// - `ConnectionEnv` - The server, limits and protocol for the connection.
 /// - `StreamPeers` - The addresses of the connection.
 /// - `TlsTransport` - The negotiated session carrying the connection.
+/// - `Receiver<()>` - Graceful shutdown signal for HTTP/2 connections.
 ///
 /// # Returns
 ///
@@ -484,20 +549,21 @@ pub(crate) async fn serve_tls_stream(
     env: ConnectionEnv,
     peers: StreamPeers,
     transport: TlsTransport,
+    shutdown_receiver: Receiver<()>,
 ) {
     match env.shared.protocol {
         ServerProtocol::Http2 => {
             let session: TlsTransport = transport;
             let handshake: Result<ConnectionH2<TlsTransport>, String> = bounded_handshake(
                 env.shared.request_config,
-                h2_server_builder().handshake(session),
+                h2_server_builder(&env.shared.request_config).handshake(session),
             )
             .await
             .map_err(|_: Elapsed| H2_HANDSHAKE_TIMEOUT.to_owned())
             .and_then(|connection: Result<_, H2Error>| {
                 connection.map_err(|error: H2Error| error.to_string())
             });
-            serve_h2_connection(env, peers, handshake).await;
+            serve_h2_connection(env, peers, handshake, shutdown_receiver).await;
         }
         _ => {
             serve_h1_transport(env, transport).await;

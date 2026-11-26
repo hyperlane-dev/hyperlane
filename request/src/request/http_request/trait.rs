@@ -33,5 +33,5 @@ pub trait RequestTrait: Send + Debug {
 
 /// Blanket AsyncRead+AsyncWrite+Unpin+Send for any compatible stream.
 pub(crate) trait AsyncReadWrite: AsyncRead + AsyncWrite + Unpin + Send {}
-/// Blanket Read+Write for any compatible stream.
-pub(crate) trait ReadWrite: Read + Write {}
+/// Blanket Read+Write+Send for any compatible stream.
+pub(crate) trait ReadWrite: Read + Write + Send {}

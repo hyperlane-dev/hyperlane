@@ -19,15 +19,29 @@ pub(crate) fn referer_macro(
 ) -> TokenStream {
     let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_referer.referer_values.iter().map(|referer_value: &Expr| {
+        let checks: Vec<proc_macro2::TokenStream> = multi_referer
+            .referer_values
+            .iter()
+            .map(|referer_value: &Expr| {
+                quote! {
+                    referer_header == #referer_value
+                }
+            })
+            .collect();
+        if checks.is_empty() {
+            quote! {}
+        } else {
             quote! {
-                if #context.get_request().try_get_header_back(::hyperlane::REFERER).map_or(true, |referer_header: ::hyperlane::RequestHeadersValueItem| referer_header != #referer_value) {
+                if #context
+                    .get_request()
+                    .try_get_header_back(::hyperlane::REFERER)
+                    .map_or(true, |referer_header: ::hyperlane::RequestHeadersValueItem| {
+                        !(#(#checks)||*)
+                    })
+                {
                     return ::hyperlane::Status::Continue;
                 }
             }
-        }).collect();
-        quote! {
-            #(#statements)*
         }
     })
 }
@@ -51,15 +65,29 @@ pub(crate) fn reject_referer_macro(
 ) -> TokenStream {
     let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_referer.referer_values.iter().map(|referer_value: &Expr| {
+        let checks: Vec<proc_macro2::TokenStream> = multi_referer
+            .referer_values
+            .iter()
+            .map(|referer_value: &Expr| {
+                quote! {
+                    referer_header == #referer_value
+                }
+            })
+            .collect();
+        if checks.is_empty() {
+            quote! {}
+        } else {
             quote! {
-                if #context.get_request().try_get_header_back(::hyperlane::REFERER).map_or(false, |referer_header: ::hyperlane::RequestHeadersValueItem| referer_header == #referer_value) {
+                if #context
+                    .get_request()
+                    .try_get_header_back(::hyperlane::REFERER)
+                    .map_or(false, |referer_header: ::hyperlane::RequestHeadersValueItem| {
+                        #(#checks)||*
+                    })
+                {
                     return ::hyperlane::Status::Continue;
                 }
             }
-        }).collect();
-        quote! {
-            #(#statements)*
         }
     })
 }

@@ -105,6 +105,96 @@ pub(crate) fn write_request_target(path: &str, query: Option<&str>, target: &mut
     }
 }
 
+/// Reports whether a raw `:authority` or `host` header value has valid RFC 9110 authority syntax.
+///
+/// # Arguments
+///
+/// - `&str` - The candidate authority or host header value.
+///
+/// # Returns
+///
+/// - `bool` - `true` when the value is syntactically valid and contains no userinfo or control bytes.
+fn is_valid_authority_value(value: &str) -> bool {
+    if value.is_empty() {
+        return false;
+    }
+    for byte in value.bytes() {
+        let forbidden: bool = match byte {
+            b'@' | b'/' | b'\\' | b'?' | b'#' | b',' | b';' => true,
+            _ => byte <= 0x20 || byte >= 0x7f,
+        };
+        if forbidden {
+            return false;
+        }
+    }
+    let (host, port): (&str, Option<&str>) = split_authority_port(value);
+    if host.is_empty() {
+        return false;
+    }
+    if host.starts_with('[') {
+        let Some(inner) = host
+            .strip_prefix('[')
+            .and_then(|s: &str| s.strip_suffix(']'))
+        else {
+            return false;
+        };
+        if inner.is_empty()
+            || !inner
+                .bytes()
+                .all(|b: u8| b.is_ascii_hexdigit() || b == b':' || b == b'.')
+        {
+            return false;
+        }
+    } else if host.contains('[') || host.contains(']') || host.contains(':') {
+        return false;
+    }
+    if let Some(port) = port {
+        let all_digits: bool = port.bytes().all(|b: u8| b.is_ascii_digit());
+        if port.is_empty() || !all_digits {
+            return false;
+        }
+        if port.parse::<u16>().is_err() {
+            return false;
+        }
+    }
+    true
+}
+
+/// Reports whether an HTTP/2 or HTTP/3 request header name/value is a forbidden connection header.
+///
+/// # Arguments
+///
+/// - `&str` - Lowercase header name.
+/// - `&[u8]` - Raw header value bytes.
+///
+/// # Returns
+///
+/// - `bool` - `true` when RFC 9113 §8.2.2 forbids this header on incoming requests.
+fn is_forbidden_h2_header(name: &str, value: &[u8]) -> bool {
+    match name {
+        CONNECTION | KEEP_ALIVE | PROXY_CONNECTION | TRANSFER_ENCODING | UPGRADE => true,
+        TE => !value.eq_ignore_ascii_case(HTTP_TE_TRAILERS.as_bytes()),
+        _ => false,
+    }
+}
+
+/// Reports whether an HTTP/2 request carries any forbidden connection-specific header.
+///
+/// # Arguments
+///
+/// - `&ProtocolHeaders` - Incoming HTTP/2 request headers.
+///
+/// # Returns
+///
+/// - `bool` - `true` when any header violates RFC 9113 §8.2.2.
+pub(crate) fn has_forbidden_h2_request_header(headers: &ProtocolHeaders) -> bool {
+    headers
+        .iter()
+        .any(|(name, value): (&HeaderName, &HeaderValue)| {
+            is_forbidden_h2_header(name.as_str(), value.as_bytes())
+        })
+}
+
 /// Checks that the request authority and the host header name the same host.
 ///
 /// HTTP/2 and HTTP/3 carry the authority in a pseudo header, and a client may
@@ -149,12 +239,12 @@ pub fn check_request_authority(headers: &ProtocolHeaders, uri: &Uri) -> Result<(
         },
     };
     if let Some(authority) = authority
-        && authority.contains(AT_SIGN)
+        && !is_valid_authority_value(authority)
     {
         return Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest));
     }
     if let Some(host) = host
-        && host.contains(AT_SIGN)
+        && !is_valid_authority_value(host)
     {
         return Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest));
     }
@@ -285,14 +375,12 @@ pub fn split_target_query(
     query_index: Option<usize>,
     hash_index: Option<usize>,
 ) -> &str {
-    query_index.map_or(EMPTY_STR, |query_index: usize| {
-        let rest: &str = &target[query_index + 1..];
-        match hash_index {
-            None => rest,
-            Some(hash_index) if hash_index <= query_index => rest,
-            Some(hash_index) => &rest[..hash_index - query_index - 1],
-        }
-    })
+    match (query_index, hash_index) {
+        (Some(query_index), Some(hash_index)) if hash_index < query_index => EMPTY_STR,
+        (Some(query_index), Some(hash_index)) => &target[query_index + 1..hash_index],
+        (Some(query_index), None) => &target[query_index + 1..],
+        (None, _) => EMPTY_STR,
+    }
 }
 
 /// Extracts the path portion from a protocol request target.
@@ -301,6 +389,7 @@ pub fn split_target_query(
 ///
 /// - `&str` - The request target.
 /// - `Option<usize>` - The index of the `?` separator, if present.
+/// - `Option<usize>` - The index of the `#` separator, if present.
 ///
 /// # Returns
 ///
@@ -310,9 +399,11 @@ pub fn split_target_path(
     query_index: Option<usize>,
     hash_index: Option<usize>,
 ) -> &str {
-    match query_index.or(hash_index) {
-        Some(separator_index) => &target[..separator_index],
-        None => target,
+    match (query_index, hash_index) {
+        (Some(query_index), Some(hash_index)) => &target[..query_index.min(hash_index)],
+        (Some(query_index), None) => &target[..query_index],
+        (None, Some(hash_index)) => &target[..hash_index],
+        (None, None) => target,
     }
 }
 
@@ -325,21 +416,31 @@ pub fn split_target_path(
 ///
 /// - `&str` - The query string.
 /// - `&mut RequestQuerys` - The map to fill.
-///
 pub fn fill_request_querys(query: &str, querys: &mut RequestQuerys) {
     if query.is_empty() {
         return;
     }
+    let mut param_count: usize = 0;
     for pair in query.split(AND) {
+        if param_count >= PROTOCOL_MAX_QUERY_PARAM_COUNT {
+            break;
+        }
         if let Some((key, value)) = pair.split_once(EQUAL) {
             if !key.is_empty() {
-                querys
-                    .entry(key.to_string())
-                    .or_default()
-                    .push_back(value.to_string());
+                param_count += 1;
+                if let Some(existing) = querys.get_mut(key) {
+                    existing.push_back(value.to_owned());
+                } else {
+                    let mut values: VecDeque<String> = VecDeque::with_capacity(1);
+                    values.push_back(value.to_owned());
+                    querys.insert(key.to_owned(), values);
+                }
             }
         } else if !pair.is_empty() {
-            querys.entry(pair.to_string()).or_default();
+            param_count += 1;
+            if !querys.contains_key(pair) {
+                querys.insert(pair.to_owned(), VecDeque::new());
+            }
         }
     }
 }
@@ -405,52 +506,59 @@ pub fn fill_request_headers(
     let max_header_value_size: usize = config.get_max_header_value_size();
     let target_headers: &mut RequestHeaders = request.get_mut_headers();
     let mut header_count: usize = 0;
-    for (name, value) in headers.iter() {
-        let key: &str = name.as_str();
-        if key.starts_with(PSEUDO_HEADER_PREFIX) || is_hop_by_hop(key) {
-            continue;
+    PROTOCOL_HEADER_POOL.with(|pool: &RefCell<Vec<(String, VecDeque<String>)>>| {
+        let mut pool_guard: RefMut<'_, Vec<(String, VecDeque<String>)>> = pool.borrow_mut();
+        for (name, value) in headers.iter() {
+            let key: &str = name.as_str();
+            if key.starts_with(PSEUDO_HEADER_PREFIX) {
+                continue;
+            }
+            if is_forbidden_h2_header(key, value.as_bytes()) {
+                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+            }
+            let Ok(value) = value.to_str() else {
+                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+            };
+            header_count += 1;
+            if header_count > max_header_count
+                && max_header_count != DEFAULT_LOW_SECURITY_MAX_HEADER_COUNT
+            {
+                return Err(RequestError::TooManyHeaders(
+                    HttpStatus::RequestHeaderFieldsTooLarge,
+                ));
+            }
+            if key.len() > max_header_key_size
+                && max_header_key_size != DEFAULT_LOW_SECURITY_MAX_HEADER_KEY_SIZE
+            {
+                return Err(RequestError::HeaderKeyTooLong(HttpStatus::BadRequest));
+            }
+            if value.len() > max_header_value_size
+                && max_header_value_size != DEFAULT_LOW_SECURITY_MAX_HEADER_VALUE_SIZE
+            {
+                return Err(RequestError::HeaderValueTooLong(HttpStatus::BadRequest));
+            }
+            if let Some(existing) = target_headers.get_mut(key) {
+                existing.push_back(value.to_owned());
+                continue;
+            }
+            let (mut pooled_key, mut pooled_values): (String, VecDeque<String>) = pool_guard
+                .pop()
+                .unwrap_or_else(|| (String::new(), VecDeque::new()));
+            pooled_key.clear();
+            pooled_key.push_str(key);
+            while pooled_values.len() > 1 {
+                pooled_values.pop_back();
+            }
+            if let Some(slot) = pooled_values.front_mut() {
+                slot.clear();
+                slot.push_str(value);
+            } else {
+                pooled_values.push_back(value.to_owned());
+            }
+            target_headers.insert(pooled_key, pooled_values);
         }
-        let Ok(value) = value.to_str() else {
-            continue;
-        };
-        header_count += 1;
-        if header_count > max_header_count
-            && max_header_count != DEFAULT_LOW_SECURITY_MAX_HEADER_COUNT
-        {
-            return Err(RequestError::TooManyHeaders(
-                HttpStatus::RequestHeaderFieldsTooLarge,
-            ));
-        }
-        if key.len() > max_header_key_size
-            && max_header_key_size != DEFAULT_LOW_SECURITY_MAX_HEADER_KEY_SIZE
-        {
-            return Err(RequestError::HeaderKeyTooLong(HttpStatus::BadRequest));
-        }
-        if value.len() > max_header_value_size
-            && max_header_value_size != DEFAULT_LOW_SECURITY_MAX_HEADER_VALUE_SIZE
-        {
-            return Err(RequestError::HeaderValueTooLong(HttpStatus::BadRequest));
-        }
-        if let Some(existing) = target_headers.get_mut(key) {
-            existing.push_back(value.to_owned());
-            continue;
-        }
-        let (mut pooled_key, mut pooled_values): (String, VecDeque<String>) =
-            take_protocol_header_entry().unwrap_or_else(|| (String::new(), VecDeque::new()));
-        pooled_key.clear();
-        pooled_key.push_str(key);
-        while pooled_values.len() > 1 {
-            pooled_values.pop_back();
-        }
-        if let Some(slot) = pooled_values.front_mut() {
-            slot.clear();
-            slot.push_str(value);
-        } else {
-            pooled_values.push_back(value.to_owned());
-        }
-        target_headers.insert(pooled_key, pooled_values);
-    }
-    Ok(())
+        Ok(())
+    })
 }
 
 /// Reports whether a header is hop by hop for the HTTP/2 and HTTP/3 framing.
@@ -496,19 +604,23 @@ pub fn declared_content_length(
     headers: &ProtocolHeaders,
     max_body_size: usize,
 ) -> Result<Option<usize>, RequestError> {
-    let Some(value) = headers.get(CONTENT_LENGTH) else {
-        return Ok(None);
-    };
-    let Ok(value) = value.to_str() else {
-        return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
-    };
-    let declared: usize = parse_ascii_length(value)?;
-    if declared > max_body_size && max_body_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE {
-        return Err(RequestError::ContentLengthTooLarge(
-            HttpStatus::PayloadTooLarge,
-        ));
+    let mut declared: Option<usize> = None;
+    for value in headers.get_all(CONTENT_LENGTH).iter() {
+        if declared.is_some() {
+            return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
+        }
+        let Ok(value) = value.to_str() else {
+            return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
+        };
+        let parsed: usize = parse_ascii_length(value)?;
+        if parsed > max_body_size && max_body_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE {
+            return Err(RequestError::ContentLengthTooLarge(
+                HttpStatus::PayloadTooLarge,
+            ));
+        }
+        declared = Some(parsed);
     }
-    Ok(Some(declared))
+    Ok(declared)
 }
 
 /// Reports whether any Expect field requests a 100 Continue response.
@@ -516,6 +628,7 @@ pub fn declared_content_length(
 /// # Arguments
 ///
 /// - `&ProtocolHeaders` - The request headers.
+///
 /// # Returns
 ///
 /// - `bool` - Whether an unparameterized continue expectation is present.
@@ -532,10 +645,11 @@ pub(crate) fn has_continue_expectation(headers: &ProtocolHeaders) -> bool {
 /// # Arguments
 ///
 /// - `&[u8]` - One Expect field value.
+///
 /// # Returns
 ///
 /// - `bool` - Whether the field contains the continue token.
-fn contains_continue_member(value: &[u8]) -> bool {
+pub(crate) fn contains_continue_member(value: &[u8]) -> bool {
     let token: &[u8] = CONTINUE_EXPECT.as_bytes();
     let mut start: usize = 0;
     let mut quoted: bool = false;
@@ -603,6 +717,7 @@ pub fn is_bodyless_status(status_code: usize, is_head: bool) -> bool {
     is_head
         || status_code < 200
         || status_code == HttpStatus::NoContent.code()
+        || status_code == HttpStatus::ResetContent.code()
         || status_code == HttpStatus::NotModified.code()
 }
 
@@ -617,17 +732,18 @@ pub fn is_bodyless_status(status_code: usize, is_head: bool) -> bool {
 ///
 /// - `usize` - The maximum number of body bytes to accept.
 /// - `&mut Vec<u8>` - The buffer to append into.
-/// - `Bytes` - The `value` argument.
+/// - `Bytes` - The incoming body chunk.
 ///
 /// # Returns
 ///
-/// - `Result<(), RequestError>` - `Ok(())` while the body stays within the cap,
+/// - `Result<(), RequestError>` - `Ok(())` while the body stays within the cap, or payload-too-large error.
 pub fn push_bounded_body(
     limit: usize,
     body: &mut Vec<u8>,
     chunk: Bytes,
 ) -> Result<(), RequestError> {
-    if body.len() + chunk.len() > limit && limit != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE {
+    if limit != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE && chunk.len() > limit.saturating_sub(body.len())
+    {
         return Err(RequestError::ContentLengthTooLarge(
             HttpStatus::PayloadTooLarge,
         ));

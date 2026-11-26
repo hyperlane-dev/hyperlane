@@ -38,6 +38,8 @@ pub(crate) struct ShardUdpSocket {
     pub(super) real_socket: Arc<dyn AsyncUdpSocket>,
     /// Inbound datagram queue and per-shard buffer pool for this shard.
     pub(super) queue: Arc<Mutex<ShardQueueState>>,
+    /// Uncontended shard-local recycled buffers flushed to `queue.pool` on the next `poll_recv`.
+    pub(super) recycle: Mutex<Vec<Vec<u8>>>,
 }
 
 /// Collection of one or more QUIC endpoints plus the optional exclusive-socket dispatcher thread.

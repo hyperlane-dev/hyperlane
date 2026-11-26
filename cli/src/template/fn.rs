@@ -365,6 +365,40 @@ async fn create_model_template(
     Ok(())
 }
 
+/// Validates that a template component name is a single safe path segment without traversal.
+///
+/// # Arguments
+///
+/// - `&str` - Candidate component name supplied by the caller.
+///
+/// # Returns
+///
+/// - `Result<(), TemplateError>` - `Ok(())` when safe, or an invalid-input error.
+fn validate_component_name(component_name: &str) -> Result<(), TemplateError> {
+    if component_name.is_empty()
+        || component_name.contains('/')
+        || component_name.contains('\\')
+        || component_name.contains('\0')
+        || !component_name
+            .bytes()
+            .all(|byte: u8| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+        || component_name.starts_with('-')
+    {
+        return Err(TemplateError::IoError(io::Error::new(
+            ErrorKind::InvalidInput,
+            ERROR_INVALID_COMPONENT_NAME,
+        )));
+    }
+    let mut components: Components<'_> = Path::new(component_name).components();
+    match (components.next(), components.next()) {
+        (Some(Component::Normal(_)), None) => Ok(()),
+        _ => Err(TemplateError::IoError(io::Error::new(
+            ErrorKind::InvalidInput,
+            ERROR_INVALID_COMPONENT_NAME,
+        ))),
+    }
+}
+
 /// Execute template generation
 ///
 /// # Arguments
@@ -381,6 +415,7 @@ pub async fn execute_template(
     component_name: &str,
     model_sub_type: Option<ModelSubType>,
 ) -> Result<(), TemplateError> {
+    validate_component_name(component_name)?;
     let config: TemplateConfig =
         TemplateConfig::new(template_type, component_name.to_string(), model_sub_type);
     let base_path: PathBuf = PathBuf::from(&config.base_directory);
@@ -393,6 +428,14 @@ pub async fn execute_template(
         ));
     }
     ensure_directory(&type_dir).await?;
+    let canonical_base: PathBuf = canonicalize(&base_path).await?;
+    let canonical_type: PathBuf = canonicalize(&type_dir).await?;
+    if !canonical_type.starts_with(&canonical_base) {
+        return Err(TemplateError::IoError(io::Error::new(
+            ErrorKind::PermissionDenied,
+            ERROR_INVALID_COMPONENT_NAME,
+        )));
+    }
     match config.template_type {
         TemplateType::Controller => {
             create_controller_template(&target_dir, &config.component_name).await?

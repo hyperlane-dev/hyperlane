@@ -1,0 +1,19 @@
+[package]
+name = "hyperlane-plugin-sse"
+autotests = false
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A Server-Sent Events (SSE) streaming and topic pub/sub plugin for the Hyperlane framework with Last-Event-ID replay, heartbeat, and CRLF-safe event framing."""
+keywords = ["http", "sse", "server-sent-events", "streaming", "hyperlane"]
+categories = ["network-programming", "web-programming"]
+exclude.workspace = true
+publish = true
+
+[dependencies]
+hyperlane = { workspace = true }
+
+lombok-macros = { workspace = true }

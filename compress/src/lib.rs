@@ -20,7 +20,7 @@ use std::{
     borrow::Cow,
     collections::HashMap,
     fmt,
-    io::{self, BufReader, BufWriter, Read, prelude::*},
+    io::{self, Read, Write},
     mem::MaybeUninit,
     ptr, slice,
     str::FromStr,
@@ -31,7 +31,7 @@ use {
     core::hash::BuildHasherDefault,
     flate2::{
         Compression,
-        read::{DeflateDecoder, GzDecoder},
+        read::{DeflateDecoder, MultiGzDecoder},
         write::{DeflateEncoder, GzEncoder},
     },
     twox_hash::xxhash3_64::{self, DEFAULT_SECRET_LENGTH, RawHasher, SecretBuffer},

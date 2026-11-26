@@ -33,15 +33,6 @@ pub(crate) const WIRE_VERSION_1_1: &[u8] = HTTP_VERSION_1_1.as_bytes();
 /// Wire bytes for the HTTP version 1.0.
 pub(crate) const WIRE_VERSION_1_0: &[u8] = HTTP_VERSION_1_0.as_bytes();
 
-/// Wire bytes for the HTTP version 0.9.
-pub(crate) const WIRE_VERSION_0_9: &[u8] = HTTP_VERSION_0_9.as_bytes();
-
-/// Wire bytes for the HTTP version 2.
-pub(crate) const WIRE_VERSION_2: &[u8] = HTTP_VERSION_2.as_bytes();
-
-/// Wire bytes for the HTTP version 3.
-pub(crate) const WIRE_VERSION_3: &[u8] = HTTP_VERSION_3.as_bytes();
-
 /// The horizontal tab allowed within a field value.
 pub(crate) const HTTP_HEADER_TAB: u8 = b'\t';
 
@@ -92,6 +83,18 @@ pub(crate) const HTTP_HEADER_OPTIONAL_WHITESPACE: [char; 2] = [' ', '\t'];
 
 /// Maximum header name length lowercased on the stack without heap allocation.
 pub(crate) const STACK_HEADER_KEY_LIMIT: usize = B_64;
+
+/// Additional byte budget beyond `max_path_size` for the HTTP request line framing.
+pub(crate) const HTTP_REQUEST_LINE_OVERHEAD: usize = 1024;
+
+/// Additional byte budget beyond key and value limits for one HTTP header line.
+pub(crate) const HTTP_HEADER_LINE_OVERHEAD: usize = 1024;
+
+/// Maximum chunk size pre-allocated per incremental body read.
+pub(crate) const HTTP_BODY_READ_CHUNK_SIZE: usize = 64 * 1024;
+
+/// Maximum number of query parameters accepted per request unless limits are disabled.
+pub(crate) const HTTP_MAX_QUERY_PARAM_COUNT: usize = 1024;
 
 /// Compile-time lookup table of valid RFC 9110 HTTP header token bytes.
 pub(crate) const HTTP_HEADER_TOKEN_TABLE: [bool; 256] = {
