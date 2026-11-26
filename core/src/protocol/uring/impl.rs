@@ -56,21 +56,6 @@ impl Drop for UringWakeState {
     }
 }
 
-/// Closes any live socket descriptor owned by [`UringConnSlot`] if dropped abnormally.
-impl Drop for UringConnSlot {
-    /// Releases the socket descriptor when no kernel `Close` SQE owns it.
-    fn drop(&mut self) {
-        let Self {
-            fd, close_inflight, ..
-        } = self;
-        if *fd >= 0 && !*close_inflight {
-            // SAFETY: `fd` is still owned by this slot and has no in-flight `Close` SQE.
-            let _: c_int = unsafe { close(*fd) };
-            *fd = -1;
-        }
-    }
-}
-
 /// Implements [`Wake`] for [`UringSlotWaker`] so Tokio timers, channels, and async hooks resume seamlessly.
 impl Wake for UringSlotWaker {
     /// Schedules the owning connection slot for polling on its `io_uring` worker.
@@ -563,9 +548,9 @@ impl UringReactor {
                 None
             }
         };
-        if let Some(mut slot) = taken {
-            self.return_buf(mem::take(&mut slot.read_buf));
-            self.return_buf(mem::take(&mut slot.write_buf));
+        if let Some(slot) = taken {
+            self.return_buf(slot.read_buf);
+            self.return_buf(slot.write_buf);
         }
     }
 }
