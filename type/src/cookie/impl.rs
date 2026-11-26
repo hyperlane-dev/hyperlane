@@ -1,5 +1,30 @@
 use super::*;
 
+/// Implements the `std::error::Error` trait for `CookieError`.
+impl Error for CookieError {}
+
+/// Implements the `Display` trait for `CookieError`.
+impl Display for CookieError {
+    /// Formats the `CookieError` variant into a human-readable string.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut Formatter<'_>` - The formatter used for writing the formatted string.
+    ///
+    /// # Returns
+    ///
+    /// - `fmt::Result` - The formatting result.
+    #[inline(always)]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidName => write!(f, "Invalid cookie name"),
+            Self::InvalidValue => write!(f, "Invalid cookie value"),
+            Self::InvalidAttribute => write!(f, "Invalid cookie attribute"),
+            Self::Unknown => write!(f, "Unknown cookie error"),
+        }
+    }
+}
+
 /// Implementation for `CookieBuilder`.
 impl CookieBuilder {
     /// Creates a new cookie builder instance.
@@ -64,12 +89,9 @@ impl CookieBuilder {
                 let name: &str = name.trim();
                 let value: &str = value.trim();
                 if is_cookie_name_valid(name) && !value.bytes().any(is_control_byte) {
-                    cookie_builder.name = name.to_owned();
-                    cookie_builder.value = value.to_owned();
+                    cookie_builder.set_name(name);
+                    cookie_builder.set_value(value);
                 }
-            } else if is_cookie_name_valid(name_value_pair) {
-                cookie_builder.name = name_value_pair.to_owned();
-                cookie_builder.value = String::new();
             }
         }
         for part in parts.iter().skip(1) {
@@ -389,10 +411,10 @@ impl Cookie {
                 let name: &str = name.trim();
                 let value: &str = value.trim();
                 if is_cookie_name_valid(name) && !value.bytes().any(is_control_byte) {
-                    cookies.insert(name.to_owned(), value.to_owned());
+                    cookies
+                        .entry(name.to_owned())
+                        .or_insert_with(|| value.to_owned());
                 }
-            } else if is_cookie_name_valid(part) {
-                cookies.insert(part.to_owned(), String::new());
             }
         }
         cookies

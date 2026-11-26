@@ -1,0 +1,21 @@
+[package]
+name = "hyperlane-plugin-mcp"
+autotests = false
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A Model Context Protocol (MCP) Streamable HTTP server plugin for the Hyperlane framework with tool, resource, and prompt registries, session lifecycle management, DNS-rebinding Origin validation, and an opt-in ServerHook."""
+keywords = ["http", "mcp", "ai", "json-rpc", "hyperlane"]
+categories = ["network-programming", "web-programming"]
+exclude.workspace = true
+publish = true
+
+[dependencies]
+hyperlane = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+lombok-macros = { workspace = true }

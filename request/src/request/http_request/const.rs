@@ -13,14 +13,8 @@ pub(crate) const TRANSFER_ENCODING_PATTERN: &[u8] = b"transfer-encoding:";
 /// Used for case-sensitive matching of the chunked transfer encoding value.
 pub(crate) const CHUNKED_PATTERN: &[u8] = b"chunked";
 
-/// Error message used when the request method is unsupported.
-pub(crate) const METHOD_NOT_ALLOWED: &str = "Method Not Allowed";
-
 /// Error message used when a redirect was signalled but no target was found.
 pub(crate) const MISSING_REDIRECT_URL: &str = "Missing Redirect URL";
-
-/// Error message used when redirect handling is disabled by configuration.
-pub(crate) const REDIRECT_NOT_ENABLED: &str = "Redirect Not Enabled";
 
 /// Error message used when a redirect target was already visited.
 pub(crate) const REDIRECT_URL_DEAD_LOOP: &str = "Redirect URL Dead Loop";
@@ -31,17 +25,41 @@ pub(crate) const MAX_REDIRECT_TIMES_EXCEEDED: &str = "Max Redirect Times Exceede
 /// Error message used when a proxy handshake fails.
 pub(crate) const INTERNAL_SERVER_ERROR: &str = "Internal Server Error";
 
-/// Prefix of a successful HTTP/1.1 proxy response status line.
-pub(crate) const HTTP_1_1_OK_PREFIX: &str = "HTTP/1.1 200";
+/// Error message used when an outgoing HTTP version token is malformed.
+pub(crate) const INVALID_HTTP_VERSION: &str = "Invalid HTTP version";
 
-/// Prefix of a successful HTTP/1.0 proxy response status line.
-pub(crate) const HTTP_1_0_OK_PREFIX: &str = "HTTP/1.0 200";
+/// Error message used when an outgoing HTTP method token is malformed.
+pub(crate) const INVALID_HTTP_METHOD: &str = "Invalid HTTP method";
 
-/// Separator marking the end of an HTTP header block.
-pub(crate) const HEADER_TERMINATOR: &str = "\r\n\r\n";
+/// Error message used when proxy credentials or target host exceed protocol limits.
+pub(crate) const PROXY_AUTH_ERROR: &str = "Invalid proxy authentication or target";
 
-/// HTTP request-line method token for POST.
-pub(crate) const HTTP_METHOD_POST: &str = "POST";
+/// Prefix of an HTTP/1.1 proxy CONNECT status line.
+pub(crate) const HTTP_CONNECT_PREFIX_1_1: &[u8] = b"HTTP/1.1 ";
+
+/// Prefix of an HTTP/1.0 proxy CONNECT status line.
+pub(crate) const HTTP_CONNECT_PREFIX_1_0: &[u8] = b"HTTP/1.0 ";
+
+/// Effective fallback read buffer size when `RequestConfig::buffer_size` is zero.
+pub(crate) const DEFAULT_EFFECTIVE_BUFFER_SIZE: usize = 4096;
+
+/// Maximum response head size accepted from an HTTP CONNECT proxy.
+pub(crate) const MAX_CONNECT_HEAD_BYTES: usize = 16 * 1024;
+
+/// Default TCP port for cleartext HTTP URLs.
+pub(crate) const HTTP_DEFAULT_PORT: u16 = 80;
+
+/// Default TCP port for HTTPS URLs.
+pub(crate) const HTTPS_DEFAULT_PORT: u16 = 443;
+
+/// Sensitive authorization header name stripped on cross-origin or downgrade redirects.
+pub(crate) const HEADER_AUTHORIZATION: &str = "authorization";
+
+/// Sensitive proxy authorization header name stripped on cross-origin or downgrade redirects.
+pub(crate) const HEADER_PROXY_AUTHORIZATION: &str = "proxy-authorization";
+
+/// Sensitive cookie header name stripped on cross-origin or downgrade redirects.
+pub(crate) const HEADER_COOKIE: &str = "cookie";
 
 /// The `": "` separator written between a header name and its value.
 pub(crate) const HEADER_VALUE_SEPARATOR: &[u8] = b": ";

@@ -223,7 +223,7 @@ impl CompiledPipeline {
         if dynamic_routes.is_empty() && regex_routes.is_empty() {
             return None;
         }
-        let trimmed: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
+        let trimmed: &str = path.strip_prefix(DEFAULT_HTTP_PATH).unwrap_or(path);
         let segment_count: usize = if trimmed.is_empty() {
             0
         } else {
@@ -245,7 +245,7 @@ impl CompiledPipeline {
                 }
             }
             for (&pattern_seg_count, routes) in regex_routes.iter() {
-                if pattern_seg_count != segment_count {
+                if pattern_seg_count != segment_count && pattern_seg_count <= segment_count + 1 {
                     for (pattern, hook) in routes.iter() {
                         if pattern.has_tail_regex() && pattern.try_match_path_into(path, params) {
                             return Some(hook);
@@ -255,6 +255,49 @@ impl CompiledPipeline {
             }
         }
         None
+    }
+
+    /// Checks whether both the request and response allow keeping the connection open.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Context` - The request context after running hooks.
+    /// - `bool` - Whether the request itself allowed keep-alive.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `false` when the request or response demands closing the connection.
+    #[inline(always)]
+    fn response_allows_keep_alive(ctx: &Context, req_keep_alive: bool) -> bool {
+        if !req_keep_alive {
+            return false;
+        }
+        let headers: &ResponseHeaders = ctx.get_response().get_headers();
+        if let Some(values) = headers.get(CONNECTION) {
+            for header_value in values {
+                if header_value == KEEP_ALIVE {
+                    continue;
+                }
+                for token in header_value.split(COMMA) {
+                    if token.trim().eq_ignore_ascii_case(CLOSE) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+        for (name, values) in headers {
+            if name.eq_ignore_ascii_case(CONNECTION) {
+                for header_value in values {
+                    for token in header_value.split(COMMA) {
+                        if token.trim().eq_ignore_ascii_case(CLOSE) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+        true
     }
 
     /// Executes the full request pipeline inline without per-hook `Box::pin` allocations.
@@ -294,14 +337,14 @@ impl CompiledPipeline {
                 if let Some(target) = stream.get_line_buffer().split_ascii_whitespace().nth(1) {
                     ctx.set_request_target(target);
                 } else {
-                    ctx.clear_attribute();
+                    let _: Option<String> = ctx.take_original_target();
                 }
             }
         }
         stream.set_closed(false);
         for hook in request_middleware.iter() {
             if hook.call(stream, ctx).await.is_reject() {
-                return stream.is_keep_alive(keep_alive);
+                return stream.is_keep_alive(Self::response_allows_keep_alive(ctx, keep_alive));
             }
         }
         let matched_hook: Option<&CompiledHook> = {
@@ -311,13 +354,13 @@ impl CompiledPipeline {
         if let Some(hook) = matched_hook
             && hook.call(stream, ctx).await.is_reject()
         {
-            return stream.is_keep_alive(keep_alive);
+            return stream.is_keep_alive(Self::response_allows_keep_alive(ctx, keep_alive));
         }
         for hook in response_middleware.iter() {
             if hook.call(stream, ctx).await.is_reject() {
-                return stream.is_keep_alive(keep_alive);
+                return stream.is_keep_alive(Self::response_allows_keep_alive(ctx, keep_alive));
             }
         }
-        stream.is_keep_alive(keep_alive)
+        stream.is_keep_alive(Self::response_allows_keep_alive(ctx, keep_alive))
     }
 }

@@ -2,6 +2,54 @@ use super::*;
 
 /// Inherent implementation of [`H3DirectState`].
 impl H3DirectState {
+    /// Reinitializes pooled state for a new QUIC send stream while retaining `pending_wire` capacity.
+    ///
+    /// # Arguments
+    ///
+    /// - `QuicSendStream` - The QUIC send half of the new request stream.
+    /// - `StreamPeers` - The local and remote addresses of the carrying QUIC connection.
+    /// - `bool` - Whether the incoming request method was `HEAD`.
+    #[inline(always)]
+    pub(super) fn reinit(
+        &mut self,
+        send_stream: QuicSendStream,
+        peers: StreamPeers,
+        is_head: bool,
+    ) {
+        self.set_send_stream(Some(send_stream));
+        self.get_mut_pending_wire().clear();
+        self.set_pending_wire_offset(0);
+        self.get_mut_pending_head().clear();
+        self.set_head_sent(false);
+        self.set_suppress_body(is_head);
+        self.set_is_head(is_head);
+        self.set_announced_len(None);
+        self.set_body_len(0);
+        self.set_finished(false);
+        self.set_failed(false);
+        self.set_peers(peers);
+    }
+
+    /// Cleans up stream handles and trims oversized buffers before returning state to the pool.
+    #[inline(always)]
+    pub(super) fn release(&mut self) {
+        if !self.get_finished() {
+            self.reset();
+        }
+        let _: Option<QuicSendStream> = self.get_mut_send_stream().take();
+        if self.get_pending_wire().capacity() > MAX_POOLED_BUFFER_CAPACITY {
+            self.set_pending_wire(Vec::with_capacity(H3_READ_CHUNK_SIZE));
+        } else {
+            self.get_mut_pending_wire().clear();
+        }
+        if self.get_pending_head().capacity() > MAX_POOLED_BUFFER_CAPACITY {
+            self.set_pending_head(Vec::new());
+        } else {
+            self.get_mut_pending_head().clear();
+        }
+        self.set_pending_wire_offset(0);
+    }
+
     /// Resets the underlying QUIC send stream with `H3_INTERNAL_ERROR`.
     pub(super) fn reset(&mut self) {
         if let Some(mut stream) = self.get_mut_send_stream().take() {
@@ -115,43 +163,161 @@ impl H3DirectState {
             self.set_body_len(accepted_body);
         }
         self.set_pending_wire_offset(0);
+        let is_complete: bool =
+            meta.suppress_body || self.try_get_announced_len() == Some(accepted_body);
         match self.poll_drain_pending_wire(context) {
             Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
-            Poll::Ready(Ok(())) | Poll::Pending => Poll::Ready(Ok(consumed)),
+            Poll::Ready(Ok(())) => {
+                if is_complete && !self.get_finished() {
+                    self.set_finished(true);
+                    if let Some(mut stream) = self.get_mut_send_stream().take() {
+                        let _: Result<(), _> = stream.finish();
+                    }
+                }
+                Poll::Ready(Ok(consumed))
+            }
+            Poll::Pending => Poll::Ready(Ok(consumed)),
         }
     }
 }
 
 /// Inherent implementation of [`H3DirectTransport`].
 impl H3DirectTransport {
-    /// Creates a direct HTTP/3 transport over one QUIC send stream.
+    /// Creates a direct HTTP/3 transport backed by a shared pooled state handle.
+    ///
+    /// # Arguments
+    ///
+    /// - `Arc<Mutex<H3DirectState>>` - Shared framing state recycled across requests.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - The direct HTTP/3 transport.
+    pub(crate) fn from_shared(state: Arc<Mutex<H3DirectState>>) -> Self {
+        Self { state }
+    }
+}
+
+/// Inherent implementation of [`H3StreamGuard`].
+impl H3StreamGuard {
+    /// Takes a pooled boxed HTTP/3 `Stream` (or allocates one on first use) and binds it to the send stream.
     ///
     /// # Arguments
     ///
     /// - `QuicSendStream` - The QUIC send half of the bidirectional request stream.
     /// - `StreamPeers` - The local and remote addresses of the carrying QUIC connection.
+    /// - `RequestConfig` - The active request limits for the stream.
     /// - `bool` - Whether the incoming request method was `HEAD`.
     ///
     /// # Returns
     ///
-    /// - `Self` - The direct HTTP/3 transport.
-    pub(crate) fn new(send_stream: QuicSendStream, peers: StreamPeers, is_head: bool) -> Self {
-        Self {
-            state: Mutex::new(H3DirectState {
-                send_stream: Some(send_stream),
-                pending_wire: take_h3_buffer(),
-                pending_wire_offset: 0,
-                pending_head: Vec::new(),
-                head_sent: false,
-                suppress_body: is_head,
-                is_head,
-                announced_len: None,
-                body_len: 0,
-                finished: false,
-                failed: false,
-            }),
-            peers,
+    /// - `Self` - Guard owning the ready `Stream` until dropped.
+    #[inline(always)]
+    pub(crate) fn take(
+        send_stream: QuicSendStream,
+        peers: StreamPeers,
+        request_config: RequestConfig,
+        is_head: bool,
+    ) -> Self {
+        let pooled: Option<PooledH3Stream> =
+            H3_STREAM_POOL.with(|pool: &RefCell<Vec<PooledH3Stream>>| pool.borrow_mut().pop());
+        let pair: PooledH3Stream = match pooled {
+            Some((mut stream, state)) if *stream.get_request_config() == request_config => {
+                if let Ok(mut guard) = state.lock() {
+                    guard.reinit(send_stream, peers, is_head);
+                }
+                stream.set_closed(false);
+                (stream, state)
+            }
+            _ => {
+                let state: Arc<Mutex<H3DirectState>> = Arc::new(Mutex::new(H3DirectState {
+                    send_stream: Some(send_stream),
+                    pending_wire: Vec::with_capacity(H3_READ_CHUNK_SIZE),
+                    pending_wire_offset: 0,
+                    pending_head: Vec::new(),
+                    head_sent: false,
+                    suppress_body: is_head,
+                    is_head,
+                    announced_len: None,
+                    body_len: 0,
+                    finished: false,
+                    failed: false,
+                    peers,
+                }));
+                let stream: Stream = Stream::from_transport(
+                    H3DirectTransport::from_shared(Arc::clone(&state)),
+                    request_config,
+                    false,
+                );
+                (stream, state)
+            }
+        };
+        Self { inner: Some(pair) }
+    }
+
+    /// Returns a mutable reference to the pooled `Stream`.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<&mut Stream>` - The active HTTP/3 stream wrapper, or `None` once finalized.
+    #[inline(always)]
+    pub(crate) fn stream_mut(&mut self) -> Option<&mut Stream> {
+        let Self { inner } = self;
+        inner.as_mut().map(|pair: &mut PooledH3Stream| &mut pair.0)
+    }
+
+    /// Finalizes the QUIC send stream if not yet finished, then recycles the pooled `Stream`.
+    #[inline(always)]
+    pub(crate) async fn finish(mut self) {
+        let Self { inner } = &mut self;
+        let Some((mut stream, state)) = inner.take() else {
+            return;
+        };
+        let already_finished: bool = match state.lock() {
+            Ok(mut guard) if guard.get_finished() && !guard.get_failed() => {
+                guard.release();
+                true
+            }
+            Ok(_) => false,
+            Err(_) => return,
+        };
+        if !already_finished {
+            let _: Result<(), io::Error> = stream.get_mut_stream().shutdown().await;
+            if let Ok(mut guard) = state.lock() {
+                guard.release();
+            } else {
+                return;
+            }
         }
+        stream.set_closed(false);
+        H3_STREAM_POOL.with(|pool: &RefCell<Vec<PooledH3Stream>>| {
+            let mut pool: RefMut<'_, Vec<PooledH3Stream>> = pool.borrow_mut();
+            if pool.len() < MAX_POOLED_CONTEXTS {
+                pool.push((stream, state));
+            }
+        });
+    }
+}
+
+/// Returns the pooled HTTP/3 `Stream` to [`H3_STREAM_POOL`] after releasing stream handles.
+impl Drop for H3StreamGuard {
+    /// Resets any unfinished stream and recycles the boxed `Stream` wrapper.
+    fn drop(&mut self) {
+        let Self { inner } = self;
+        let Some((mut stream, state)) = inner.take() else {
+            return;
+        };
+        if let Ok(mut guard) = state.lock() {
+            guard.release();
+        } else {
+            return;
+        }
+        stream.set_closed(false);
+        H3_STREAM_POOL.with(|pool: &RefCell<Vec<PooledH3Stream>>| {
+            let mut pool: RefMut<'_, Vec<PooledH3Stream>> = pool.borrow_mut();
+            if pool.len() < MAX_POOLED_CONTEXTS {
+                pool.push((stream, state));
+            }
+        });
     }
 }
 
@@ -167,10 +333,7 @@ impl fmt::Debug for H3DirectTransport {
     ///
     /// - `fmt::Result` - The formatting result.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("H3DirectTransport")
-            .field("peers", &self.peers)
-            .finish()
+        formatter.debug_struct("H3DirectTransport").finish()
     }
 }
 
@@ -178,7 +341,7 @@ impl fmt::Debug for H3DirectTransport {
 impl Drop for H3DirectTransport {
     /// Resets the stream when dropped before finishing cleanly and recycles its wire buffer.
     fn drop(&mut self) {
-        if let Ok(state) = self.get_mut_state().get_mut() {
+        if let Ok(mut state) = self.get_state().lock() {
             if !state.finished {
                 state.reset();
             }
@@ -196,7 +359,10 @@ impl Transport for H3DirectTransport {
     ///
     /// - `Result<SocketAddr, io::Error>` - The peer socket address.
     fn peer_addr(&self) -> Result<SocketAddr, io::Error> {
-        Ok(self.get_peers().remote)
+        self.get_state()
+            .lock()
+            .map(|state: MutexGuard<'_, H3DirectState>| state.get_peers().remote)
+            .map_err(|_| io::Error::other(MISSING_SEND_CAPACITY))
     }
 
     /// Reports the local address of the carrying QUIC connection.
@@ -205,7 +371,10 @@ impl Transport for H3DirectTransport {
     ///
     /// - `Result<SocketAddr, io::Error>` - The local socket address.
     fn local_addr(&self) -> Result<SocketAddr, io::Error> {
-        Ok(self.get_peers().local)
+        self.get_state()
+            .lock()
+            .map(|state: MutexGuard<'_, H3DirectState>| state.get_peers().local)
+            .map_err(|_| io::Error::other(MISSING_SEND_CAPACITY))
     }
 }
 
@@ -250,7 +419,7 @@ impl AsyncWrite for H3DirectTransport {
         context: &mut task::Context<'_>,
         bytes: &[u8],
     ) -> Poll<io::Result<usize>> {
-        let Ok(state) = self.get_mut().get_mut_state().get_mut() else {
+        let Ok(mut state) = self.get_mut().get_state().lock() else {
             return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
         };
         if state.failed {
@@ -323,9 +492,19 @@ impl AsyncWrite for H3DirectTransport {
         encode_varint(accepted as u64, wire);
         wire.extend_from_slice(&bytes[..accepted]);
         state.pending_wire_offset = 0;
+        let is_complete: bool = state.announced_len == Some(state.body_len);
         match state.poll_drain_pending_wire(context) {
             Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
-            Poll::Ready(Ok(())) | Poll::Pending => Poll::Ready(Ok(accepted)),
+            Poll::Ready(Ok(())) => {
+                if is_complete && !state.finished {
+                    state.finished = true;
+                    if let Some(mut stream) = state.send_stream.take() {
+                        let _: Result<(), _> = stream.finish();
+                    }
+                }
+                Poll::Ready(Ok(accepted))
+            }
+            Poll::Pending => Poll::Ready(Ok(accepted)),
         }
     }
 
@@ -340,7 +519,7 @@ impl AsyncWrite for H3DirectTransport {
     ///
     /// - `Poll<io::Result<()>>` - Ready once flushed.
     fn poll_flush(self: Pin<&mut Self>, context: &mut task::Context<'_>) -> Poll<io::Result<()>> {
-        let Ok(state) = self.get_mut().get_mut_state().get_mut() else {
+        let Ok(mut state) = self.get_mut().get_state().lock() else {
             return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
         };
         if state.failed {
@@ -363,7 +542,7 @@ impl AsyncWrite for H3DirectTransport {
         self: Pin<&mut Self>,
         context: &mut task::Context<'_>,
     ) -> Poll<io::Result<()>> {
-        let Ok(state) = self.get_mut().get_mut_state().get_mut() else {
+        let Ok(mut state) = self.get_mut().get_state().lock() else {
             return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
         };
         if state.failed {

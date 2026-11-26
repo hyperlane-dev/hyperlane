@@ -41,10 +41,12 @@ pub fn encode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
 ///
 /// - `Cow<'_, [u8]>`: the decompressed bytes, or an empty owned `Vec<u8>` on failure.
 pub fn decode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
-    let mut decompressor: Decompressor<&[u8]> = Decompressor::new(data, buffer_size);
+    let decompressor: Decompressor<&[u8]> = Decompressor::new(data, buffer_size);
+    let mut limited: io::Take<Decompressor<&[u8]>> =
+        decompressor.take((MAX_DECOMPRESSED_BYTES + 1) as u64);
     let mut decompressed_data: Vec<u8> = Vec::new();
-    match decompressor.read_to_end(&mut decompressed_data) {
-        Ok(_) => Cow::Owned(decompressed_data),
+    match limited.read_to_end(&mut decompressed_data) {
+        Ok(_) if decompressed_data.len() <= MAX_DECOMPRESSED_BYTES => Cow::Owned(decompressed_data),
         _ => Cow::Owned(Vec::new()),
     }
 }

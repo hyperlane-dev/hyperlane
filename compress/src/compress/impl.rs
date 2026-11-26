@@ -25,11 +25,16 @@ impl FromStr for Compress {
     ///   or `Ok(Compress::Unknown)` for unknown strings. Never returns `Err`.
     #[inline(always)]
     fn from_str(data: &str) -> Result<Self, Self::Err> {
-        match data.to_lowercase().as_str() {
-            _data if _data == CONTENT_ENCODING_GZIP => Ok(Self::Gzip),
-            _data if _data == CONTENT_ENCODING_DEFLATE => Ok(Self::Deflate),
-            _data if _data == CONTENT_ENCODING_BROTLI => Ok(Self::Br),
-            _ => Ok(Self::Unknown),
+        if data.eq_ignore_ascii_case(CONTENT_ENCODING_GZIP)
+            || data.eq_ignore_ascii_case(CONTENT_ENCODING_X_GZIP)
+        {
+            Ok(Self::Gzip)
+        } else if data.eq_ignore_ascii_case(CONTENT_ENCODING_DEFLATE) {
+            Ok(Self::Deflate)
+        } else if data.eq_ignore_ascii_case(CONTENT_ENCODING_BROTLI) {
+            Ok(Self::Br)
+        } else {
+            Ok(Self::Unknown)
         }
     }
 }
@@ -126,7 +131,9 @@ impl Compress {
                 wildcard = Some(quality);
             } else if coding.eq_ignore_ascii_case(CONTENT_ENCODING_BROTLI) {
                 brotli = Some(quality);
-            } else if coding.eq_ignore_ascii_case(CONTENT_ENCODING_GZIP) {
+            } else if coding.eq_ignore_ascii_case(CONTENT_ENCODING_GZIP)
+                || coding.eq_ignore_ascii_case(CONTENT_ENCODING_X_GZIP)
+            {
                 gzip = Some(quality);
             } else if coding.eq_ignore_ascii_case(CONTENT_ENCODING_DEFLATE) {
                 deflate = Some(quality);
@@ -182,13 +189,38 @@ impl Compress {
             if !name.trim().eq_ignore_ascii_case(ACCEPT_ENCODING_QUALITY) {
                 continue;
             }
-            let quality: f32 = value.trim().parse().ok()?;
-            if !(0.0..=1.0).contains(&quality) {
+            let quality_text: &str = value.trim();
+            if !Self::is_valid_qvalue(quality_text) {
                 return None;
             }
+            let quality: f32 = quality_text.parse().ok()?;
             return Some((coding, quality));
         }
         Some((coding, DEFAULT_QUALITY))
+    }
+
+    /// Validates an RFC 9110 Section 12.4.2 quality value (`qvalue`).
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - The trimmed quality parameter value.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` when the value matches `0[.0-9{0,3}]` or `1[.0{0,3}]`.
+    #[inline(always)]
+    fn is_valid_qvalue(value: &str) -> bool {
+        let bytes: &[u8] = value.as_bytes();
+        match bytes {
+            [b'0'] | [b'1'] => true,
+            [b'0', b'.', frac @ ..] if frac.len() <= 3 => {
+                frac.iter().all(|byte: &u8| byte.is_ascii_digit())
+            }
+            [b'1', b'.', frac @ ..] if frac.len() <= 3 => {
+                frac.iter().all(|byte: &u8| *byte == b'0')
+            }
+            _ => false,
+        }
     }
 
     /// Extracts the compression type from an HTTP header.
@@ -209,6 +241,14 @@ impl Compress {
     pub fn from(header: &HashMap<String, String, BuildHasherDefault<XxHash3_64>>) -> Self {
         header
             .get(CONTENT_ENCODING)
+            .or_else(|| {
+                header
+                    .iter()
+                    .find(|(key, _): &(&String, &String)| {
+                        key.eq_ignore_ascii_case(CONTENT_ENCODING)
+                    })
+                    .map(|(_, value): (&String, &String)| value)
+            })
             .map(|value: &String| value.parse::<Compress>().unwrap_or_default())
             .unwrap_or_default()
     }
@@ -231,14 +271,14 @@ impl Compress {
     /// # Returns
     ///
     /// - `Cow<'a, [u8]>` - The decompressed data. If the compression algorithm
-    ///   is `Unknown`, the original data is returned unchanged, as an owned buffer. Otherwise,
+    ///   is `Unknown`, the original data is returned borrowed without copying. Otherwise,
     ///   the decompressed data is returned as an owned `Vec<u8>`.
     pub fn decode<'a>(&self, data: &'a [u8], buffer_size: usize) -> Cow<'a, [u8]> {
         match self {
             Self::Gzip => gzip::decode(data, buffer_size),
             Self::Deflate => deflate::decode(data, buffer_size),
             Self::Br => brotli::decode(data, buffer_size),
-            Self::Unknown => Cow::Owned(data.to_vec()),
+            Self::Unknown => Cow::Borrowed(data),
         }
     }
 
@@ -260,14 +300,14 @@ impl Compress {
     /// # Returns
     ///
     /// - `Cow<'a, [u8]>` - The compressed data. If the compression algorithm
-    ///   is `Unknown`, the original data is returned unchanged, as an owned buffer. Otherwise,
+    ///   is `Unknown`, the original data is returned borrowed without copying. Otherwise,
     ///   the compressed data is returned as an owned `Vec<u8>`.
     pub fn encode<'a>(&self, data: &'a [u8], buffer_size: usize) -> Cow<'a, [u8]> {
         match self {
             Self::Gzip => gzip::encode(data, buffer_size),
             Self::Deflate => deflate::encode(data, buffer_size),
             Self::Br => brotli::encode(data, buffer_size),
-            Self::Unknown => Cow::Owned(data.to_vec()),
+            Self::Unknown => Cow::Borrowed(data),
         }
     }
 }

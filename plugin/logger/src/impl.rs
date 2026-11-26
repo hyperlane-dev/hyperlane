@@ -26,17 +26,24 @@ impl log::Log for LoggerPlugin {
     /// # Returns
     ///
     /// - `bool` - Whether the record is written.
-    fn enabled(&self, _: &Metadata<'_>) -> bool {
-        true
+    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
+        CONFIG
+            .get()
+            .is_none_or(|config: &LoggerConfig| metadata.level() <= config.level)
     }
 
-    /// Writes one record.
+    /// Writes one sanitized record without allowing CRLF or terminal control injection.
     ///
     /// # Arguments
     ///
     /// - `&Record<'_>` - The record to write.
     fn log(&self, record: &Record<'_>) {
-        let line: String = format!("{} {}", record.level(), record.args());
+        if !self.enabled(record.metadata()) {
+            return;
+        }
+        let raw_message: String = format!("{}", record.args());
+        let safe_message: String = Self::sanitize_log_text(&raw_message);
+        let line: String = format!("{} {}", record.level(), safe_message);
         if let Some(file) = FILE.get()
             && let Ok(mut file) = file.lock()
             && let Some(file) = file.as_mut()
@@ -59,6 +66,30 @@ impl log::Log for LoggerPlugin {
 
 /// Inherent implementation of [`LoggerPlugin`].
 impl LoggerPlugin {
+    /// Escapes CR, LF, ESC, and control characters to prevent log forging and terminal injection.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - Raw log text.
+    ///
+    /// # Returns
+    ///
+    /// - `String` - Single-line sanitized log text.
+    pub(crate) fn sanitize_log_text(input: &str) -> String {
+        let mut out: String = String::with_capacity(input.len());
+        for ch in input.chars() {
+            match ch {
+                '\r' => out.push_str(ESCAPED_CR),
+                '\n' => out.push_str(ESCAPED_LF),
+                '\x1b' => out.push_str(ESCAPED_ESC),
+                '\t' => out.push('\t'),
+                c if c.is_control() => out.push(' '),
+                c => out.push(c),
+            }
+        }
+        out
+    }
+
     /// Installs the logger.
     ///
     /// # Arguments
@@ -69,6 +100,12 @@ impl LoggerPlugin {
     ///
     /// - `Result<(), String>` - Nothing, or the reason the logger was refused.
     pub fn init(config: LoggerConfig) -> Result<(), String> {
+        if CONFIG.get().is_some() {
+            return Err(ERROR_CONFIG_ALREADY_SET.to_owned());
+        }
+        if FILE.get().is_some() {
+            return Err(ERROR_FILE_ALREADY_SET.to_owned());
+        }
         let file: Option<File> = match config.file.as_ref() {
             Some(path) => match OpenOptions::new().create(true).append(true).open(path) {
                 Ok(file) => Some(file),
@@ -76,19 +113,15 @@ impl LoggerPlugin {
             },
             None => None,
         };
+        let level: LevelFilter = config.level;
+        set_logger(&LoggerPlugin)
+            .map_err(|_: SetLoggerError| ERROR_LOGGER_ALREADY_INSTALLED.to_owned())?;
+        FILE.set(Mutex::new(file))
+            .map_err(|_: Mutex<Option<File>>| ERROR_FILE_ALREADY_SET.to_owned())?;
         CONFIG
             .set(config)
-            .map_err(|_: LoggerConfig| "the logger configuration was already set".to_owned())?;
-        FILE.set(Mutex::new(file))
-            .map_err(|_: Mutex<Option<File>>| "the log file was already set".to_owned())?;
-        set_logger(&LoggerPlugin)
-            .map_err(|_: SetLoggerError| "a logger was already installed".to_owned())?;
-        set_max_level(
-            CONFIG
-                .get()
-                .map(|config: &LoggerConfig| config.level)
-                .unwrap_or(LevelFilter::Info),
-        );
+            .map_err(|_: LoggerConfig| ERROR_CONFIG_ALREADY_SET.to_owned())?;
+        set_max_level(level);
         Ok(())
     }
 

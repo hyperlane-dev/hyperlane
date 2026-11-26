@@ -85,5 +85,8 @@ pub(crate) const KEYWORD_FILE_HEADER: &str = "use super::*;\n";
 /// Message reported when a model template is requested without a sub type.
 pub(crate) const ERROR_MISSING_MODEL_SUB_TYPE: &str = "Missing model subtype";
 
+/// Message reported when a template component name is empty or attempts path traversal.
+pub(crate) const ERROR_INVALID_COMPONENT_NAME: &str = "Invalid template component name";
+
 /// Program used to format the freshly generated template code.
 pub(crate) const CARGO_FMT_PROGRAM: &str = "cargo";

@@ -19,30 +19,26 @@ use super::*;
 ///   compressed data is returned as an owned `Vec<u8>`. If an error occurs, an empty owned `Vec<u8>`
 ///   is returned.
 pub fn encode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
-    let encoder: GzEncoder<Vec<u8>> = GzEncoder::new(Vec::new(), Compression::default());
-    let mut buffered_writer: BufWriter<GzEncoder<Vec<u8>>> =
-        BufWriter::with_capacity(buffer_size, encoder);
-    if buffered_writer.write_all(data).is_err() {
+    let initial_capacity: usize = data.len().min(buffer_size);
+    let mut encoder: GzEncoder<Vec<u8>> =
+        GzEncoder::new(Vec::with_capacity(initial_capacity), Compression::default());
+    if encoder.write_all(data).is_err() {
         return Cow::Owned(Vec::new());
     }
-    match buffered_writer.into_inner() {
-        Ok(encoder) => Cow::Owned(encoder.finish().unwrap_or_else(|_: io::Error| Vec::new())),
-        Err(_) => Cow::Owned(Vec::new()),
-    }
+    Cow::Owned(encoder.finish().unwrap_or_else(|_: io::Error| Vec::new()))
 }
 
 /// Decompresses the given Gzip-compressed data.
 ///
-/// This function takes a byte slice of Gzip-compressed data and decompresses it using the `GzDecoder`
-/// from the `flate2` crate. The decompression is done in a buffered manner to optimize performance.
-/// If decompression is successful, the result is returned as an owned `Vec<u8>`. If an error occurs
-/// during decompression, an empty `Vec<u8>` is returned.
+/// This function takes a byte slice of Gzip-compressed data and decompresses it using the
+/// `MultiGzDecoder` from the `flate2` crate, supporting both single-member and concatenated
+/// multi-member gzip streams. If decompression is successful, the result is returned as an
+/// owned `Vec<u8>`. If an error occurs during decompression, an empty `Vec<u8>` is returned.
 ///
 /// # Arguments
 ///
 /// - `&'_ [u8]` - A reference to a byte slice containing the Gzip-compressed data.
-/// - `usize` - The buffer size to use for the buffered reader. A larger buffer size can improve
-///   performance for larger datasets.
+/// - `usize` - A capacity hint for the output buffer.
 ///
 /// # Returns
 ///
@@ -50,12 +46,13 @@ pub fn encode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
 ///   decompressed data is returned as an owned `Vec<u8>`. If an error occurs, an empty owned `Vec<u8>`
 ///   is returned.
 pub fn decode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
-    let decoder: GzDecoder<&[u8]> = GzDecoder::new(data);
-    let mut buffered_reader: BufReader<GzDecoder<&[u8]>> =
-        BufReader::with_capacity(buffer_size, decoder);
-    let mut decompressed_data: Vec<u8> = Vec::new();
-    match buffered_reader.read_to_end(&mut decompressed_data) {
-        Ok(_) => Cow::Owned(decompressed_data),
+    let decoder: MultiGzDecoder<&[u8]> = MultiGzDecoder::new(data);
+    let mut limited: io::Take<MultiGzDecoder<&[u8]>> =
+        decoder.take((MAX_DECOMPRESSED_BYTES + 1) as u64);
+    let initial_capacity: usize = data.len().min(buffer_size);
+    let mut decompressed_data: Vec<u8> = Vec::with_capacity(initial_capacity);
+    match limited.read_to_end(&mut decompressed_data) {
+        Ok(_) if decompressed_data.len() <= MAX_DECOMPRESSED_BYTES => Cow::Owned(decompressed_data),
         _ => Cow::Owned(Vec::new()),
     }
 }

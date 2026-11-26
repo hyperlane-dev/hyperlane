@@ -20,7 +20,10 @@ impl MultipartFormData {
     where
         C: AsRef<str>,
     {
-        for parameter in content_type.as_ref().split(SEMICOLON).skip(1) {
+        for parameter in Self::split_header_parameters(content_type.as_ref())
+            .into_iter()
+            .skip(1)
+        {
             let Some((key, value)) = parameter.trim().split_once(EQUAL) else {
                 continue;
             };
@@ -36,6 +39,36 @@ impl MultipartFormData {
             }
         }
         None
+    }
+
+    /// Splits a header value on semicolons that appear outside quoted strings.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - The header value to split into parameter segments.
+    ///
+    /// # Returns
+    ///
+    /// - `Vec<&str>` - The unquoted-semicolon-delimited segments.
+    pub(crate) fn split_header_parameters(input: &str) -> Vec<&str> {
+        let mut segments: Vec<&str> = Vec::new();
+        let mut start: usize = 0;
+        let mut quoted: bool = false;
+        let mut escaped: bool = false;
+        for (offset, byte) in input.bytes().enumerate() {
+            match byte {
+                _ if escaped => escaped = false,
+                b'\\' if quoted => escaped = true,
+                b'"' => quoted = !quoted,
+                b';' if !quoted => {
+                    segments.push(&input[start..offset]);
+                    start = offset + 1;
+                }
+                _ => {}
+            }
+        }
+        segments.push(&input[start..]);
+        segments
     }
 
     /// Checks whether a content type declares a `multipart/form-data` body.
@@ -169,9 +202,13 @@ impl MultipartFormData {
                 break;
             };
             let position: usize = offset + found;
+            let at_line_start: bool = position == 0 || body[position - 1] == b'\n';
             let after: usize = position + delimiter.len();
-            if after == body.len() || Self::is_boundary_tail(&body[after..]) {
+            if at_line_start && (after == body.len() || Self::is_boundary_tail(&body[after..])) {
                 positions.push(position);
+                if Self::is_closing_delimiter(&body[after..]) {
+                    break;
+                }
             }
             offset = position + 1;
         }
@@ -193,7 +230,10 @@ impl MultipartFormData {
     ///
     /// - `&[u8]` - The segment without its surrounding boundary line breaks.
     fn trim_boundary_breaks(segment: &[u8]) -> &[u8] {
-        let segment: &[u8] = segment.strip_prefix(HTTP_BR.as_bytes()).unwrap_or(segment);
+        let segment: &[u8] = segment
+            .strip_prefix(HTTP_BR.as_bytes())
+            .or_else(|| segment.strip_prefix(MULTIPART_LINE_FEED))
+            .unwrap_or(segment);
         if let Some(trimmed) = segment.strip_suffix(HTTP_BR.as_bytes()) {
             return trimmed;
         }
@@ -267,8 +307,8 @@ impl MultipartFormData {
     fn parse_part_headers(header_block: &[u8]) -> Option<BodyPartHeaders> {
         let header_text: &str = from_utf8(header_block).ok()?;
         let mut headers: BodyPartHeaders = hash_map_xx_hash3_64();
-        for line in header_text.split(HTTP_BR) {
-            let line: &str = line.trim_end_matches('\n').trim();
+        for raw_line in header_text.split('\n') {
+            let line: &str = raw_line.strip_suffix('\r').unwrap_or(raw_line).trim();
             if line.is_empty() {
                 continue;
             }
@@ -294,7 +334,10 @@ impl MultipartFormData {
     fn parse_part_disposition(disposition: &str) -> (BodyPartName, BodyPartFileName) {
         let mut name: BodyPartName = String::new();
         let mut file_name: BodyPartFileName = String::new();
-        for parameter in disposition.split(SEMICOLON).skip(1) {
+        for parameter in Self::split_header_parameters(disposition)
+            .into_iter()
+            .skip(1)
+        {
             let Some((key, value)) = parameter.trim().split_once(EQUAL) else {
                 continue;
             };
@@ -510,6 +553,7 @@ impl MultipartFormData {
     }
 }
 
+/// Inherent implementation of [`BodyPart`].
 impl BodyPart {
     /// Tries to get the form field name of this part.
     ///
@@ -555,7 +599,15 @@ impl BodyPart {
     where
         K: AsRef<str>,
     {
-        self.get_headers().get(key.as_ref())
+        let key_ref: &str = key.as_ref();
+        if !key_ref
+            .as_bytes()
+            .iter()
+            .any(|byte: &u8| byte.is_ascii_uppercase())
+        {
+            return self.get_headers().get(key_ref);
+        }
+        self.get_headers().get(&key_ref.to_ascii_lowercase())
     }
 
     /// Tries to get this part's raw content.

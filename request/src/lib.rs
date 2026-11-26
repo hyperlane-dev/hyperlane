@@ -3,11 +3,14 @@
 //! An HTTP request library providing client-side HTTP request construction and response parsing.
 
 mod common;
+mod pool;
+mod protocol;
 mod request;
 mod response;
 #[cfg(test)]
 #[path = "../tests/mod.rs"]
 mod tests;
+mod tls;
 mod utils;
 
 pub use {request::*, response::*};
@@ -50,4 +53,25 @@ pub use {
 pub use common::*;
 pub use lombok_macros::*;
 
-use http_type::{GET, HEAD};
+pub(crate) use {pool::*, protocol::*, tls::*};
+
+use std::{
+    cell::{RefCell, RefMut},
+    net::{SocketAddr, ToSocketAddrs},
+    sync::{Mutex, OnceLock},
+    thread,
+    time::Instant,
+};
+
+use {
+    bytes::Bytes,
+    h2::{RecvStream, client::SendRequest},
+    http::{HeaderName, HeaderValue, Request, Response, StatusCode, Uri, request::Builder},
+    http_type::{
+        BodyPart, CLOSE, CONNECTION, COOKIE, CookieBuilder, Cookies, KEEP_ALIVE, SET_COOKIE, tokio,
+    },
+    rustls::client::Resumption,
+    rustls_pki_types::{CertificateDer, pem::PemObject},
+    serde::de::DeserializeOwned,
+    serde_json::from_slice,
+};

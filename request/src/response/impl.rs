@@ -1,5 +1,6 @@
 use super::*;
 
+/// Default construction for [`HttpResponse`].
 impl Default for HttpResponse {
     /// Returns the default `HttpResponse`.
     ///
@@ -16,6 +17,7 @@ impl Default for HttpResponse {
     }
 }
 
+/// Inherent implementation of [`HttpResponse`].
 impl HttpResponse {
     /// Construct from raw response bytes (status line + headers + body).
     ///
@@ -143,7 +145,25 @@ impl HttpResponse {
         (300..400).contains(&self.get_status_code())
     }
 
-    /// Look up a single header value (case-insensitive).
+    /// Was the response a 4xx client error?
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` when the status code lies in the `400..500` range.
+    pub fn is_client_error(&self) -> bool {
+        (400..500).contains(&self.get_status_code())
+    }
+
+    /// Was the response a 5xx server error?
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` when the status code lies in the `500..600` range.
+    pub fn is_server_error(&self) -> bool {
+        (500..600).contains(&self.get_status_code())
+    }
+
+    /// Look up a single header value (case-insensitive) without heap allocation for short keys.
     ///
     /// # Arguments
     ///
@@ -152,9 +172,26 @@ impl HttpResponse {
     /// # Returns
     ///
     /// - `Option<&str>` - The header value, or `None` when the header is absent.
-    pub fn get_header<K: AsRef<str>>(&self, key: K) -> Option<&str> {
-        let normalized: String = key.as_ref().to_ascii_lowercase();
-        self.headers.get(&normalized).map(String::as_str)
+    pub fn get_header<K>(&self, key: K) -> Option<&str>
+    where
+        K: AsRef<str>,
+    {
+        let raw: &str = key.as_ref();
+        let bytes: &[u8] = raw.as_bytes();
+        if !bytes.iter().any(|b: &u8| b.is_ascii_uppercase()) {
+            return self.get_headers().get(raw).map(String::as_str);
+        }
+        if bytes.len() <= RESPONSE_HEADER_STACK_LIMIT {
+            let mut stack_buf: [u8; RESPONSE_HEADER_STACK_LIMIT] = [0; RESPONSE_HEADER_STACK_LIMIT];
+            for (idx, &byte) in bytes.iter().enumerate() {
+                stack_buf[idx] = byte.to_ascii_lowercase();
+            }
+            if let Ok(lower) = from_utf8(&stack_buf[..bytes.len()]) {
+                return self.get_headers().get(lower).map(String::as_str);
+            }
+        }
+        let normalized: String = raw.to_ascii_lowercase();
+        self.get_headers().get(&normalized).map(String::as_str)
     }
 
     /// Get the response body as a UTF-8 string (lossy on invalid bytes).
@@ -175,6 +212,33 @@ impl HttpResponse {
         self.get_body()
     }
 
+    /// Deserialize the response body from JSON into `T`.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<T, serde_json::Error>` - Parsed JSON payload or a deserialization error.
+    pub fn json<T>(&self) -> Result<T, serde_json::Error>
+    where
+        T: DeserializeOwned,
+    {
+        from_slice(self.get_body())
+    }
+
+    /// Parses cookies declared by the response's `Set-Cookie` header, when present.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<Cookies>` - Parsed cookie map, or `None` when `Set-Cookie` is absent.
+    pub fn try_get_cookies(&self) -> Option<Cookies> {
+        let header: &str = self.get_header(SET_COOKIE)?;
+        let parsed: CookieBuilder = CookieBuilder::parse(header);
+        let mut cookies: Cookies = hash_map_xx_hash3_64();
+        if !parsed.get_name().is_empty() {
+            cookies.insert(parsed.get_name().clone(), parsed.get_value().clone());
+        }
+        Some(cookies)
+    }
+
     /// Decode the body using the headers' Content-Encoding (gzip / deflate /
     /// br). Returns a fresh response with the decoded body — the original is
     /// untouched. `buffer_size` controls the chunk size for streaming decoders.
@@ -188,8 +252,7 @@ impl HttpResponse {
     /// - `HttpResponse` - A new response identical to this one except that its
     ///   body holds the decoded bytes.
     pub fn decode(&self, buffer_size: usize) -> HttpResponse {
-        let flat_headers: HttpResponseHeaders = self.get_headers().clone();
-        let decoded: ResponseBody = Compress::from(&flat_headers)
+        let decoded: ResponseBody = Compress::from(self.get_headers())
             .decode(self.get_body(), buffer_size)
             .into_owned();
         HttpResponse {

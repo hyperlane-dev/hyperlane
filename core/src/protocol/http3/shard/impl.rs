@@ -108,42 +108,62 @@ impl AsyncUdpSocket for ShardUdpSocket {
         bufs: &mut [IoSliceMut<'_>],
         meta: &mut [RecvMeta],
     ) -> Poll<io::Result<usize>> {
-        let Self { queue, .. } = self;
-        let max_take: usize = bufs.len().min(meta.len());
+        let Self { queue, recycle, .. } = self;
+        let max_take: usize = bufs.len().min(meta.len()).min(BATCH_SIZE);
         if max_take == 0 {
             return Poll::Ready(Ok(0));
         }
-        let Ok(mut state) = queue.lock() else {
-            return Poll::Ready(Err(io::Error::other("quic shard queue poisoned")));
-        };
+        let mut taken: [Option<ShardDatagram>; BATCH_SIZE] = [const { None }; BATCH_SIZE];
         let mut delivered: usize = 0;
-        while delivered < max_take {
-            let Some(mut datagram) = state.queue.pop_front() else {
-                break;
+        {
+            let Ok(mut state) = queue.lock() else {
+                return Poll::Ready(Err(io::Error::other("quic shard queue poisoned")));
             };
-            let copy_len: usize = datagram.data.len().min(bufs[delivered].len());
-            bufs[delivered][..copy_len].copy_from_slice(&datagram.data[..copy_len]);
-            let mut item_meta: RecvMeta = datagram.meta;
-            item_meta.len = copy_len;
-            item_meta.stride = copy_len;
-            meta[delivered] = item_meta;
-            delivered += 1;
-            if state.pool.len() < QUIC_SHARD_POOL_CAP
-                && datagram.data.capacity() <= QUIC_DATAGRAM_INIT_CAP * 4
+            if let Ok(mut recycled) = recycle.lock()
+                && !recycled.is_empty()
             {
-                datagram.data.clear();
-                state.pool.push(datagram.data);
+                let room: usize = QUIC_SHARD_POOL_CAP.saturating_sub(state.pool.len());
+                if room > 0 {
+                    let take: usize = room.min(recycled.len());
+                    state.pool.extend(recycled.drain(..take));
+                }
+                recycled.clear();
+            }
+            while delivered < max_take {
+                let Some(datagram) = state.queue.pop_front() else {
+                    break;
+                };
+                taken[delivered] = Some(datagram);
+                delivered += 1;
+            }
+            if delivered == 0 {
+                if state.closed {
+                    return Poll::Ready(Err(io::Error::new(
+                        io::ErrorKind::ConnectionAborted,
+                        "quic shard dispatcher stopped",
+                    )));
+                }
+                state.waker = Some(cx.waker().clone());
+                return Poll::Pending;
             }
         }
-        if delivered == 0 {
-            if state.closed {
-                return Poll::Ready(Err(io::Error::new(
-                    io::ErrorKind::ConnectionAborted,
-                    "quic shard dispatcher stopped",
-                )));
+        let mut recycled_guard: Option<MutexGuard<'_, Vec<Vec<u8>>>> = recycle.lock().ok();
+        for idx in 0..delivered {
+            if let Some(mut datagram) = taken[idx].take() {
+                let copy_len: usize = datagram.data.len().min(bufs[idx].len());
+                bufs[idx][..copy_len].copy_from_slice(&datagram.data[..copy_len]);
+                let mut item_meta: RecvMeta = datagram.meta;
+                item_meta.len = copy_len;
+                item_meta.stride = copy_len;
+                meta[idx] = item_meta;
+                if let Some(recycled) = recycled_guard.as_mut()
+                    && recycled.len() < QUIC_SHARD_POOL_CAP
+                    && datagram.data.capacity() <= QUIC_DATAGRAM_INIT_CAP * 4
+                {
+                    datagram.data.clear();
+                    recycled.push(datagram.data);
+                }
             }
-            state.waker = Some(cx.waker().clone());
-            return Poll::Pending;
         }
         Poll::Ready(Ok(delivered))
     }

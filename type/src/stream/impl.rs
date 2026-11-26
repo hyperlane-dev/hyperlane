@@ -267,6 +267,25 @@ impl AsyncBufRead for PooledReader<'_> {
     }
 }
 
+/// Default construction for [`WebSocketReadState`].
+impl Default for WebSocketReadState {
+    /// Initializes WebSocket parsing state with an active heartbeat window.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - The initial WebSocket read state.
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            buffer: Vec::new(),
+            cursor: 0,
+            full_frame: Vec::new(),
+            fragment_opcode: None,
+            is_client_response: true,
+        }
+    }
+}
+
 /// Inherent implementation of [`Stream`].
 impl Stream {
     /// Boxes a transport into a `Stream` for the request pipeline.
@@ -300,6 +319,7 @@ impl Stream {
             line_buffer: String::new(),
             header_line_buffer: String::new(),
             websocket_state: None,
+            read_timer: None,
         }
     }
 
@@ -419,7 +439,10 @@ impl Stream {
             Pin::new(&mut reader).poll_fill_buf(cx).map_ok(<[u8]>::len)
         })
         .await?;
-        let fast_framing: Option<RequestFraming> = if filled_len > 0 {
+        if filled_len == 0 {
+            return Err(RequestError::ClientClosedConnection(HttpStatus::BadRequest));
+        }
+        let fast_framing: Option<RequestFraming> = {
             let slice: &[u8] = &reader.get_buffer()[reader.get_start()..reader.get_end()];
             match request.parse_http_head_from_slice(slice, &config, line_buffer)? {
                 Some((framing, consumed)) => {
@@ -428,21 +451,39 @@ impl Stream {
                 }
                 None => None,
             }
-        } else {
-            None
         };
         let framing: RequestFraming = match fast_framing {
             Some(framing) => framing,
             None => {
-                line_buffer.clear();
-                AsyncBufReadExt::read_line(&mut reader, line_buffer).await?;
+                let max_request_line: usize = if max_path_size == DEFAULT_LOW_SECURITY_MAX_PATH_SIZE
+                {
+                    usize::MAX
+                } else {
+                    max_path_size.saturating_add(HTTP_REQUEST_LINE_OVERHEAD)
+                };
+                let line_len: usize = read_http_line_bounded(
+                    &mut reader,
+                    line_buffer,
+                    max_request_line,
+                    RequestError::RequestTooLong(HttpStatus::URITooLong),
+                )
+                .await?;
+                if line_len == 0 {
+                    return Err(RequestError::ClientClosedConnection(HttpStatus::BadRequest));
+                }
                 let (method, path, version): (RequestMethod, &str, RequestVersion) =
                     Request::get_http_first_line(line_buffer)?;
                 Request::check_http_path_size(path, max_path_size)?;
-                let hash_index: Option<usize> = path.find(HASH);
-                let query_index: Option<usize> = path.find(QUERY);
+                let (query_index, hash_index): (Option<usize>, Option<usize>) =
+                    Request::find_path_separators(path);
                 let query: &str = Request::get_http_query(path, query_index, hash_index);
-                Request::fill_http_querys(query, request.get_mut_querys());
+                let max_query_count: usize = if max_path_size == DEFAULT_LOW_SECURITY_MAX_PATH_SIZE
+                {
+                    usize::MAX
+                } else {
+                    HTTP_MAX_QUERY_PARAM_COUNT
+                };
+                Request::fill_http_querys(query, request.get_mut_querys(), max_query_count)?;
                 let path_slice: &str = Request::get_http_path(path, query_index, hash_index);
                 request.get_mut_path().push_str(path_slice);
                 request.set_version(version);
@@ -524,18 +565,20 @@ impl Stream {
             return self.fill_http_from_stream(request).await;
         }
         let duration: Duration = Duration::from_millis(timeout_ms);
-        let mut reading: Pin<&mut _> = pin!(self.fill_http_from_stream(request));
-        // A request whose bytes have already arrived is read on the first
-        // poll, so the ordinary case never arms a timer at all. Arming one
-        // costs a timer registration and a cancellation per request, and that
-        // churn is the most expensive thing a request path can do once the
-        // concurrency is high enough for the timer driver to become a
-        // bottleneck. The timer is armed only when the read really has to
-        // wait, which is exactly when the timeout can still fire.
-        if let Some(result) = poll_once(reading.as_mut()).await {
-            return result;
+        let mut timer_slot: Option<Pin<Box<Sleep>>> = {
+            let Stream { read_timer, .. } = self;
+            read_timer.take()
+        };
+        let outcome: Option<Result<(), RequestError>> = {
+            let mut reading: Pin<&mut _> = pin!(self.fill_http_from_stream(request));
+            poll_with_timeout(reading.as_mut(), &mut timer_slot, duration).await
+        };
+        let Stream { read_timer, .. } = self;
+        *read_timer = timer_slot;
+        match outcome {
+            Some(result) => result,
+            None => Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
         }
-        timeout(duration, reading).await?
     }
 
     /// Parses an HTTP request from a TCP stream.
@@ -587,10 +630,24 @@ impl Stream {
                 Some(Duration::from_millis(adjusted_timeout_ms))
             };
         loop {
-            let parsed: Result<Option<RequestBody>, RequestError> =
+            let parsed: Result<WebSocketParseStep, RequestError> =
                 self.try_parse_websocket_request();
-            if let Some(body) = self.reset_websocket_state_on_error(parsed)? {
-                return Ok(body);
+            match self.reset_websocket_state_on_error(parsed)? {
+                WebSocketParseStep::Message(body) => return Ok(body),
+                WebSocketParseStep::Ping(payload) => {
+                    let mut pong: Vec<u8> = Vec::with_capacity(2 + payload.len());
+                    pong.push(0x8A);
+                    pong.push(payload.len() as u8);
+                    pong.extend_from_slice(&payload);
+                    let send_result: Result<(), RequestError> =
+                        self.try_send(&pong).await.map_err(Into::into);
+                    self.reset_websocket_state_on_error(send_result)?;
+                    let flush_result: Result<(), RequestError> =
+                        self.try_flush().await.map_err(Into::into);
+                    self.reset_websocket_state_on_error(flush_result)?;
+                    continue;
+                }
+                WebSocketParseStep::NeedMore => {}
             }
             let read: Result<Option<usize>, RequestError> =
                 self.get_websocket_from_stream(duration_opt).await;
@@ -624,48 +681,127 @@ impl Stream {
 
     /// Parses buffered frames without discarding incomplete or subsequent input.
     ///
+    /// Enforces RFC 6455 control frame constraints, continuation sequencing, UTF-8 validity
+    /// for text messages, close-code validity, and the configured `max_body_size` cap.
+    ///
     /// # Returns
     ///
-    /// - `Result<Option<RequestBody>, RequestError>` - A complete message, pending input, or a protocol error.
-    fn try_parse_websocket_request(&mut self) -> Result<Option<RequestBody>, RequestError> {
+    /// - `Result<WebSocketParseStep, RequestError>` - A complete message, a ping requiring pong, pending input, or a protocol error.
+    fn try_parse_websocket_request(&mut self) -> Result<WebSocketParseStep, RequestError> {
+        let max_body_size: usize = self.get_request_config().get_max_body_size();
         let state: &mut WebSocketReadState = self.get_mut_websocket_state().as_deref_mut().ok_or(
             RequestError::IncompleteWebSocketFrame(HttpStatus::BadRequest),
         )?;
         let WebSocketReadState {
             buffer,
+            cursor,
             full_frame,
+            fragment_opcode,
             is_client_response,
         }: &mut WebSocketReadState = state;
-        while let Some((frame, consumed)) = WebSocketFrame::decode_ws_frame(&buffer[..]) {
+        while let Some((frame, consumed)) =
+            WebSocketFrame::decode_ws_frame_checked(&buffer[*cursor..], max_body_size)?
+        {
             *is_client_response = true;
-            buffer.drain(..consumed);
-            if buffer.is_empty() {
+            *cursor += consumed;
+            if *cursor >= buffer.len() {
+                *cursor = 0;
                 let mut recycled: Vec<u8> = mem::take(buffer);
                 recycled.resize(recycled.capacity().min(MAX_POOLED_READ_BUFFER_SIZE), 0);
                 return_read_buffer(recycled);
+            } else if *cursor >= MAX_POOLED_READ_BUFFER_SIZE {
+                buffer.drain(..*cursor);
+                *cursor = 0;
             }
             match frame.get_opcode() {
                 WebSocketOpcode::Close => {
+                    let payload: &[u8] = frame.get_payload_data();
+                    if payload.len() == 1 {
+                        return Err(RequestError::WebSocketInvalidCloseCode(
+                            HttpStatus::BadRequest,
+                        ));
+                    }
+                    if payload.len() >= 2 {
+                        let code: u16 = u16::from_be_bytes([payload[0], payload[1]]);
+                        let is_std_close: bool =
+                            (1000..=1003).contains(&code) || (1007..=1011).contains(&code);
+                        let valid_code: bool = is_std_close || (3000..=4999).contains(&code);
+                        if !valid_code {
+                            return Err(RequestError::WebSocketInvalidCloseCode(
+                                HttpStatus::BadRequest,
+                            ));
+                        }
+                        if from_utf8(&payload[2..]).is_err() {
+                            return Err(RequestError::WebSocketInvalidUtf8(HttpStatus::BadRequest));
+                        }
+                    }
                     return Err(RequestError::ClientClosedConnection(HttpStatus::BadRequest));
                 }
-                WebSocketOpcode::Ping | WebSocketOpcode::Pong => continue,
+                WebSocketOpcode::Ping => {
+                    let WebSocketFrame { payload_data, .. }: WebSocketFrame = frame;
+                    return Ok(WebSocketParseStep::Ping(payload_data));
+                }
+                WebSocketOpcode::Pong => continue,
                 WebSocketOpcode::Text | WebSocketOpcode::Binary => {
-                    if frame.get_fin() && full_frame.is_empty() {
-                        let WebSocketFrame { payload_data, .. }: WebSocketFrame = frame;
-                        return Ok(Some(payload_data));
+                    if fragment_opcode.is_some() {
+                        return Err(RequestError::WebSocketPayloadCorrupted(
+                            HttpStatus::BadRequest,
+                        ));
                     }
-                    if let Some(body) = frame.build_full_frame(full_frame)? {
-                        return Ok(Some(body));
+                    let is_text: bool = frame.is_text_opcode();
+                    if frame.get_fin() {
+                        let WebSocketFrame { payload_data, .. }: WebSocketFrame = frame;
+                        if is_text && from_utf8(&payload_data).is_err() {
+                            return Err(RequestError::WebSocketInvalidUtf8(HttpStatus::BadRequest));
+                        }
+                        return Ok(WebSocketParseStep::Message(payload_data));
+                    }
+                    let opcode: WebSocketOpcode = *frame.get_opcode();
+                    let payload: &[u8] = frame.get_payload_data();
+                    if max_body_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE
+                        && payload.len() > max_body_size
+                    {
+                        return Err(RequestError::WebSocketFrameTooLarge(
+                            HttpStatus::PayloadTooLarge,
+                        ));
+                    }
+                    full_frame.clear();
+                    full_frame.extend_from_slice(payload);
+                    *fragment_opcode = Some(opcode);
+                }
+                WebSocketOpcode::Continuation => {
+                    let Some(active_opcode) = fragment_opcode.as_ref() else {
+                        return Err(RequestError::WebSocketPayloadCorrupted(
+                            HttpStatus::BadRequest,
+                        ));
+                    };
+                    let is_text: bool = active_opcode.is_text();
+                    let payload: &[u8] = frame.get_payload_data();
+                    if max_body_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE
+                        && payload.len() > max_body_size.saturating_sub(full_frame.len())
+                    {
+                        return Err(RequestError::WebSocketFrameTooLarge(
+                            HttpStatus::PayloadTooLarge,
+                        ));
+                    }
+                    full_frame.extend_from_slice(payload);
+                    if frame.get_fin() {
+                        *fragment_opcode = None;
+                        let body: RequestBody = mem::take(full_frame);
+                        if is_text && from_utf8(&body).is_err() {
+                            return Err(RequestError::WebSocketInvalidUtf8(HttpStatus::BadRequest));
+                        }
+                        return Ok(WebSocketParseStep::Message(body));
                     }
                 }
-                _ => {
+                WebSocketOpcode::Reserved(_) => {
                     return Err(RequestError::WebSocketOpcodeUnsupported(
                         HttpStatus::NotImplemented,
                     ));
                 }
             }
         }
-        Ok(None)
+        Ok(WebSocketParseStep::NeedMore)
     }
 
     /// Polls a WebSocket read using a buffer retained only while data is ready.
@@ -679,6 +815,18 @@ impl Stream {
     /// - `Poll<io::Result<usize>>` - The bytes appended to persistent parsing state.
     fn poll_websocket_read(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
         let capacity: usize = self.get_request_config().get_buffer_size();
+        let max_body_size: usize = self.get_request_config().get_max_body_size();
+        if let Some(state) = self.try_get_websocket_state().as_deref() {
+            let unread: usize = state.get_buffer().len().saturating_sub(state.get_cursor());
+            if max_body_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE
+                && unread > max_body_size.saturating_add(14)
+            {
+                return Poll::Ready(Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    WEBSOCKET_FRAME_TOO_LARGE_ERROR,
+                )));
+            }
+        }
         let mut temporary: Vec<u8> = take_read_buffer(capacity);
         let mut read_buffer: ReadBuf<'_> = ReadBuf::new(&mut temporary[..capacity]);
         match Pin::new(&mut **self.get_mut_stream()).poll_read(cx, &mut read_buffer) {
@@ -696,6 +844,14 @@ impl Stream {
                             )));
                         }
                     };
+                let cursor: usize = state.get_cursor();
+                if cursor >= state.get_buffer().len() {
+                    state.set_cursor(0);
+                    state.get_mut_buffer().clear();
+                } else if cursor > 0 {
+                    state.get_mut_buffer().drain(..cursor);
+                    state.set_cursor(0);
+                }
                 if state.get_buffer().is_empty() {
                     mem::swap(state.get_mut_buffer(), &mut temporary);
                 } else {

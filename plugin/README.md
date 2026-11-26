@@ -68,6 +68,20 @@ plugin is held to the same rules as the framework.
   `# Returns`.
 - **No `#[allow]`.**
 
+## Official plugins in this repository
+
+| crate | path | capabilities |
+|---|---|---|
+| `hyperlane-plugin-logger` | `plugin/logger` | console and file logging with CRLF/ANSI sanitization |
+| `hyperlane-plugin-negotiate` | `plugin/negotiate` | `Accept-Encoding` compression negotiation and conditional `304 Not Modified` ETag validation |
+| `hyperlane-plugin-websocket` | `plugin/websocket` | WebSocket room broadcast and connection lifecycle hooks |
+| `hyperlane-plugin-sse` | `plugin/sse` | WHATWG Server-Sent Events framing, CRLF sanitization, topic pub/sub, `Last-Event-ID` replay, heartbeats |
+| `hyperlane-plugin-mq` | `plugin/mq` | pluggable `MessageBroker` trait and `InMemoryBroker` with consumer groups, TTL, retries, visibility timeouts, DLQ |
+| `hyperlane-plugin-rpc` | `plugin/rpc` | JSON-RPC 2.0 async router, single/batch/notification dispatch, payload & batch DoS caps, `RpcHook` |
+| `hyperlane-plugin-grpc` | `plugin/grpc` | gRPC over HTTP/2 5-byte framing, bounded compression, canonical status codes `0..=16`, `grpc-timeout`, `GrpcHook` |
+| `hyperlane-plugin-mcp` | `plugin/mcp` | Model Context Protocol Streamable HTTP server, tools/resources/prompts registries, `Mcp-Session-Id`, `Origin` guard, `McpHook` |
+| `hyperlane-plugin-gateway` | `plugin/gateway` | reverse proxy & API gateway with pooled H1/H2 `http-request`, load balancing, circuit breaker, token-bucket rate limiting, RFC 9110 hop-by-hop stripping, `GatewayHook` |
+
 ## The plugins, in the order they are worth building
 
 ### P0 - the ground every service needs

@@ -1,7 +1,12 @@
 use super::*;
 
+/// Inherent implementation of [`Body`].
 impl Body {
     /// Empty body.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - An empty body with zero bytes.
     pub const fn empty() -> Self {
         Self { bytes: Vec::new() }
     }
@@ -11,7 +16,14 @@ impl Body {
     /// # Arguments
     ///
     /// - `B` - The raw bytes to store, converted into the owned `Vec<u8>`.
-    pub fn from_bytes<B: Into<Vec<u8>>>(bytes: B) -> Self {
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - A body owning the converted bytes.
+    pub fn from_bytes<B>(bytes: B) -> Self
+    where
+        B: Into<Vec<u8>>,
+    {
         Self {
             bytes: bytes.into(),
         }
@@ -37,6 +49,7 @@ impl Body {
     }
 }
 
+/// Formatting / debug-printing for [`Body`].
 impl Display for Body {
     /// Formats the `Body` as its UTF-8 text, falling back to the debug
     /// representation of the raw bytes when the body is not valid UTF-8.

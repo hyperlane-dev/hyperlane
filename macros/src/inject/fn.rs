@@ -20,22 +20,28 @@ use super::*;
 /// This function will panic if the macro is not found, if the macro format is unsupported,
 /// or if a simple macro is given attributes.
 fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) -> TokenStream {
-    let (macro_name, macro_attr) = match macro_meta {
-        Meta::Path(path) => (
-            path.get_ident()
-                .expect(MACRO_PATH_SHOULD_HAVE_IDENTIFIER)
-                .to_string(),
-            TokenStream::new(),
-        ),
-        Meta::List(meta_list) => (
-            meta_list
-                .path
-                .get_ident()
-                .expect(MACRO_PATH_SHOULD_HAVE_IDENTIFIER)
-                .to_string(),
-            meta_list.tokens.clone().into(),
-        ),
-        _ => panic!("Unsupported macro format in inject macro"),
+    let (macro_name, macro_attr): (String, TokenStream) = match macro_meta {
+        Meta::Path(path) => match path.get_ident() {
+            Some(ident) => (ident.to_string(), TokenStream::new()),
+            None => {
+                return Error::new_spanned(path, MACRO_PATH_SHOULD_HAVE_IDENTIFIER)
+                    .to_compile_error()
+                    .into();
+            }
+        },
+        Meta::List(meta_list) => match meta_list.path.get_ident() {
+            Some(ident) => (ident.to_string(), meta_list.tokens.clone().into()),
+            None => {
+                return Error::new_spanned(&meta_list.path, MACRO_PATH_SHOULD_HAVE_IDENTIFIER)
+                    .to_compile_error()
+                    .into();
+            }
+        },
+        _ => {
+            return Error::new_spanned(macro_meta, UNSUPPORTED_MACRO_FORMAT)
+                .to_compile_error()
+                .into();
+        }
     };
     for injectable_macro in INJECTABLE_MACROS {
         if injectable_macro.name == macro_name {
@@ -43,7 +49,12 @@ fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) 
                 Handler::WithAttr(handler) => handler(macro_attr, item_stream),
                 Handler::NoAttrPosition(handler) => {
                     if !macro_attr.is_empty() {
-                        panic!("Macro {macro_name} does not take attributes");
+                        return Error::new_spanned(
+                            macro_meta,
+                            format!("Macro {macro_name} does not take attributes"),
+                        )
+                        .to_compile_error()
+                        .into();
                     }
                     handler(item_stream, position)
                 }
@@ -51,7 +62,9 @@ fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) 
             };
         }
     }
-    panic!("Unsupported macro: {macro_name}");
+    Error::new_spanned(macro_meta, format!("Unsupported macro: {macro_name}"))
+        .to_compile_error()
+        .into()
 }
 
 /// Injects a list of macros before the decorated function.
@@ -66,11 +79,13 @@ fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) 
 ///
 /// # Returns
 ///
-/// The resulting token stream after applying all the prologue hooks.
+/// - `TokenStream` - The resulting token stream after applying all the prologue hooks.
 pub(crate) fn prologue_macros_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let metas: Punctuated<Meta, Comma> = Punctuated::<Meta, Token![,]>::parse_terminated
-        .parse(attr)
-        .expect(FAILED_TO_PARSE_MACRO_ATTRIBUTES);
+    let metas: Punctuated<Meta, Comma> =
+        match Punctuated::<Meta, Token![,]>::parse_terminated.parse(attr) {
+            Ok(metas) => metas,
+            Err(error) => return error.to_compile_error().into(),
+        };
     let mut current_stream: TokenStream = item;
     for meta in metas.iter().rev() {
         current_stream = apply_macro(meta, current_stream, Position::Prologue);
@@ -90,11 +105,13 @@ pub(crate) fn prologue_macros_macro(attr: TokenStream, item: TokenStream) -> Tok
 ///
 /// # Returns
 ///
-/// The resulting token stream after applying all the epilogue hooks.
+/// - `TokenStream` - The resulting token stream after applying all the epilogue hooks.
 pub(crate) fn epilogue_macros_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let metas: Punctuated<Meta, Comma> = Punctuated::<Meta, Token![,]>::parse_terminated
-        .parse(attr)
-        .expect(FAILED_TO_PARSE_MACRO_ATTRIBUTES);
+    let metas: Punctuated<Meta, Comma> =
+        match Punctuated::<Meta, Token![,]>::parse_terminated.parse(attr) {
+            Ok(metas) => metas,
+            Err(error) => return error.to_compile_error().into(),
+        };
     let mut current_stream: TokenStream = item;
     for meta in metas.iter() {
         current_stream = apply_macro(meta, current_stream, Position::Epilogue);

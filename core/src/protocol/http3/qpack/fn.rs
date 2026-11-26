@@ -305,13 +305,13 @@ fn encode_prefix_int(flags: u8, prefix_bits: u8, mut val: u64, out: &mut Vec<u8>
     out.push(val as u8);
 }
 
-/// Decodes a QPACK string literal (raw or Huffman) into a slice or scratch buffer.
+/// Decodes a QPACK string literal (raw or Huffman) into a slice or lazily-borrowed scratch buffer.
 ///
 /// # Arguments
 ///
 /// - `&'a [u8]` - Input slice starting at the string length prefix byte.
 /// - `u8` - Number of length prefix bits (`7` for 8-bit string, `3` for literal name).
-/// - `&mut Vec<u8>` - Scratch buffer used only when the string is Huffman-encoded.
+/// - `&mut Option<Vec<u8>>` - Lazy scratch buffer taken from the pool only when Huffman-encoded.
 ///
 /// # Returns
 ///
@@ -320,7 +320,7 @@ fn encode_prefix_int(flags: u8, prefix_bits: u8, mut val: u64, out: &mut Vec<u8>
 fn decode_qpack_string<'a>(
     buf: &'a [u8],
     prefix_bits: u8,
-    scratch: &mut Vec<u8>,
+    scratch: &mut Option<Vec<u8>>,
 ) -> Result<(&'a [u8], bool, usize), RequestError> {
     let first: u8 = *buf
         .first()
@@ -337,7 +337,8 @@ fn decode_qpack_string<'a>(
         .get(int_bytes..end)
         .ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
     if is_huffman {
-        decode_huffman(raw, scratch)?;
+        let scratch_buf: &mut Vec<u8> = scratch.get_or_insert_with(take_h3_buffer);
+        decode_huffman(raw, scratch_buf)?;
         Ok((&[], true, end))
     } else {
         Ok((raw, false, end))
@@ -398,11 +399,7 @@ fn validate_h3_header_value(bytes: &[u8]) -> Result<&str, RequestError> {
 ///
 /// - `bool` - `true` when the value names `100-continue`.
 fn value_has_continue_expectation(value: &str) -> bool {
-    value.split(',').any(|member: &str| {
-        member
-            .trim_matches([' ', '\t'])
-            .eq_ignore_ascii_case(CONTINUE_EXPECT)
-    })
+    contains_continue_member(value.as_bytes())
 }
 
 /// Inserts a decoded lowercase header directly into `RequestHeaders` using pooled entries.
@@ -455,6 +452,47 @@ pub(crate) fn decode_qpack_request(
     request: &mut Request,
     target: &mut String,
 ) -> Result<H3DecodedRequestMeta, RequestError> {
+    let mut name_scratch: Option<Vec<u8>> = None;
+    let mut val_scratch: Option<Vec<u8>> = None;
+    let result: Result<H3DecodedRequestMeta, RequestError> = decode_qpack_request_inner(
+        payload,
+        config,
+        request,
+        target,
+        &mut name_scratch,
+        &mut val_scratch,
+    );
+    if let Some(buf) = name_scratch {
+        return_h3_buffer(buf);
+    }
+    if let Some(buf) = val_scratch {
+        return_h3_buffer(buf);
+    }
+    result
+}
+
+/// Inner QPACK request decoder borrowing optional lazy Huffman scratch buffers.
+///
+/// # Arguments
+///
+/// - `&[u8]` - The `HEADERS` frame payload bytes.
+/// - `&RequestConfig` - Security limits for path, headers and body size.
+/// - `&mut Request` - The pooled framework request to populate in place.
+/// - `&mut String` - The pooled target buffer to populate with the raw `:path`.
+/// - `&mut Option<Vec<u8>>` - Lazy Huffman name scratch buffer.
+/// - `&mut Option<Vec<u8>>` - Lazy Huffman value scratch buffer.
+///
+/// # Returns
+///
+/// - `Result<H3DecodedRequestMeta, RequestError>` - Extracted framing metadata or protocol error.
+fn decode_qpack_request_inner(
+    payload: &[u8],
+    config: &RequestConfig,
+    request: &mut Request,
+    target: &mut String,
+    name_scratch: &mut Option<Vec<u8>>,
+    val_scratch: &mut Option<Vec<u8>>,
+) -> Result<H3DecodedRequestMeta, RequestError> {
     if payload.len() < 2 {
         return Err(RequestError::HttpRead(HttpStatus::BadRequest));
     }
@@ -490,8 +528,6 @@ pub(crate) fn decode_qpack_request(
     let mut expect_continue: bool = false;
     let mut seen_regular_header: bool = false;
     let mut header_count: usize = 0;
-    let mut name_scratch: Vec<u8> = take_h3_buffer();
-    let mut val_scratch: Vec<u8> = take_h3_buffer();
     while pos < payload.len() {
         let first: u8 = payload[pos];
         let (name_slice, val_slice): (&str, &str) = if (first & 0x80) != 0 {
@@ -517,10 +553,10 @@ pub(crate) fn decode_qpack_request(
                 .get(idx)
                 .ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
             let (raw_val, used_scratch, val_consumed): (&[u8], bool, usize) =
-                decode_qpack_string(&payload[pos..], 7, &mut val_scratch)?;
+                decode_qpack_string(&payload[pos..], 7, val_scratch)?;
             pos += val_consumed;
             let val_bytes: &[u8] = if used_scratch {
-                val_scratch.as_slice()
+                val_scratch.as_deref().unwrap_or(&[])
             } else {
                 raw_val
             };
@@ -528,18 +564,18 @@ pub(crate) fn decode_qpack_request(
             (static_name, val_str)
         } else if (first & 0x20) != 0 {
             let (raw_name, used_name_scratch, name_consumed): (&[u8], bool, usize) =
-                decode_qpack_string(&payload[pos..], 3, &mut name_scratch)?;
+                decode_qpack_string(&payload[pos..], 3, name_scratch)?;
             pos += name_consumed;
             let name_bytes: &[u8] = if used_name_scratch {
-                name_scratch.as_slice()
+                name_scratch.as_deref().unwrap_or(&[])
             } else {
                 raw_name
             };
             let (raw_val, used_val_scratch, val_consumed): (&[u8], bool, usize) =
-                decode_qpack_string(&payload[pos..], 7, &mut val_scratch)?;
+                decode_qpack_string(&payload[pos..], 7, val_scratch)?;
             pos += val_consumed;
             let val_bytes: &[u8] = if used_val_scratch {
-                val_scratch.as_slice()
+                val_scratch.as_deref().unwrap_or(&[])
             } else {
                 raw_val
             };
@@ -582,8 +618,6 @@ pub(crate) fn decode_qpack_request(
                 }
                 ":scheme" => {
                     if scheme.is_some() || scheme_owned.is_some() || val_slice.is_empty() {
-                        return_h3_buffer(name_scratch);
-                        return_h3_buffer(val_scratch);
                         return Err(RequestError::HttpRead(HttpStatus::BadRequest));
                     }
                     if val_slice == HTTP_SCHEME {
@@ -596,8 +630,6 @@ pub(crate) fn decode_qpack_request(
                 }
                 ":path" => {
                     if has_path || val_slice.is_empty() {
-                        return_h3_buffer(name_scratch);
-                        return_h3_buffer(val_scratch);
                         return Err(RequestError::HttpRead(HttpStatus::BadRequest));
                     }
                     has_path = true;
@@ -605,8 +637,6 @@ pub(crate) fn decode_qpack_request(
                 }
                 ":authority" => {
                     if has_authority {
-                        return_h3_buffer(name_scratch);
-                        return_h3_buffer(val_scratch);
                         return Err(RequestError::HttpRead(HttpStatus::BadRequest));
                     }
                     has_authority = true;
@@ -654,8 +684,6 @@ pub(crate) fn decode_qpack_request(
             }
             "host" => {
                 if has_host {
-                    return_h3_buffer(name_scratch);
-                    return_h3_buffer(val_scratch);
                     return Err(RequestError::HttpRead(HttpStatus::BadRequest));
                 }
                 has_host = true;
@@ -679,8 +707,6 @@ pub(crate) fn decode_qpack_request(
                     .map_err(|_| RequestError::InvalidContentLength(HttpStatus::BadRequest))?;
                 if max_body_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE && parsed_len > max_body_size
                 {
-                    return_h3_buffer(name_scratch);
-                    return_h3_buffer(val_scratch);
                     return Err(RequestError::ContentLengthTooLarge(
                         HttpStatus::PayloadTooLarge,
                     ));
@@ -694,8 +720,6 @@ pub(crate) fn decode_qpack_request(
         }
         insert_pooled_h3_header(request.get_mut_headers(), name_slice, val_slice);
     }
-    return_h3_buffer(name_scratch);
-    return_h3_buffer(val_scratch);
     let method: Method = method.ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
     let scheme_str: Option<&str> = scheme.or(scheme_owned.as_deref());
     if method == Method::Connect {
@@ -774,15 +798,22 @@ pub(crate) fn decode_qpack_request(
     request.get_mut_path().push_str(clean_path);
     if !query_str.is_empty() {
         let querys: &mut RequestQuerys = request.get_mut_querys();
+        let mut param_count: usize = 0;
         for pair in query_str.split(AND) {
-            if pair.is_empty() {
-                continue;
+            if param_count >= PROTOCOL_MAX_QUERY_PARAM_COUNT {
+                break;
             }
-            let (k, v): (&str, &str) = match pair.split_once(EQUAL) {
-                Some((k, v)) => (k, v),
-                None => (pair, ""),
-            };
-            insert_pooled_h3_header(querys, k, v);
+            if let Some((k, v)) = pair.split_once(EQUAL) {
+                if !k.is_empty() {
+                    param_count += 1;
+                    insert_pooled_h3_header(querys, k, v);
+                }
+            } else if !pair.is_empty() {
+                param_count += 1;
+                if !querys.contains_key(pair) {
+                    querys.insert(pair.to_owned(), VecDeque::new());
+                }
+            }
         }
     }
     let is_head: bool = method.is_head();
@@ -961,6 +992,60 @@ fn is_hop_by_hop_h3_header(name: &str) -> bool {
         || name.eq_ignore_ascii_case(TRAILER_HEADER)
 }
 
+/// Fast-path QPACK encoder for canonical `Response::build()` 200 OK heads without UTF-8 or scratch buffers.
+///
+/// # Arguments
+///
+/// - `&[u8]` - Serialized HTTP response head bytes.
+/// - `bool` - Whether the incoming request method was `HEAD`.
+/// - `&mut Vec<u8>` - Destination wire buffer receiving the complete HTTP/3 `HEADERS` frame.
+///
+/// # Returns
+///
+/// - `Option<H3EncodedResponseMeta>` - Framing metadata when `head` matched the fast layout.
+#[inline(always)]
+fn try_encode_fast_h3_200_head(
+    head: &[u8],
+    is_head: bool,
+    out: &mut Vec<u8>,
+) -> Option<H3EncodedResponseMeta> {
+    let rest: &[u8] = head
+        .strip_prefix(FAST_PROTOCOL_H3_200_PREFIX)
+        .or_else(|| head.strip_prefix(FAST_PROTOCOL_H11_200_PREFIX))?;
+    let digits: &[u8] = rest.strip_suffix(FAST_PROTOCOL_DEFAULT_SUFFIX)?;
+    if digits.is_empty() || digits.len() > 20 {
+        return None;
+    }
+    let mut length: usize = 0;
+    for &byte in digits {
+        if !byte.is_ascii_digit() {
+            return None;
+        }
+        length = length
+            .checked_mul(10)?
+            .checked_add((byte - b'0') as usize)?;
+    }
+    let block_len: usize = if digits == b"0" { 5 } else { 6 + digits.len() };
+    out.reserve(2 + block_len);
+    out.push(H3_FRAME_HEADERS as u8);
+    out.push(block_len as u8);
+    out.push(0x00);
+    out.push(0x00);
+    out.push(0xC0 | 25);
+    if digits == b"0" {
+        out.push(0xC0 | 4);
+    } else {
+        out.push(0x50 | 4);
+        out.push(digits.len() as u8);
+        out.extend_from_slice(digits);
+    }
+    out.push(0xC0 | 52);
+    Some(H3EncodedResponseMeta {
+        announced_len: if is_head { None } else { Some(length) },
+        suppress_body: is_head,
+    })
+}
+
 /// Parses an HTTP/1.1 response head and writes an HTTP/3 `HEADERS` frame directly into `out`.
 ///
 /// Validates status code, header names/values, rejects `transfer-encoding`, strips hop-by-hop
@@ -981,6 +1066,9 @@ pub(crate) fn encode_h3_response_head(
     is_head: bool,
     out: &mut Vec<u8>,
 ) -> Result<H3EncodedResponseMeta, ResponseError> {
+    if let Some(fast) = try_encode_fast_h3_200_head(head, is_head, out) {
+        return Ok(fast);
+    }
     let text: &str =
         from_utf8(head).map_err(|error: Utf8Error| ResponseError::Send(error.to_string()))?;
     let mut lines: SplitLines<'_> = text.split(CRLF);
@@ -1002,10 +1090,7 @@ pub(crate) fn encode_h3_response_head(
         .map_err(|error: ParseIntError| ResponseError::Send(error.to_string()))?;
     validate_status_code(status_code)?;
     let hide_length: bool = hides_entity_length(status_code, is_head);
-    let suppress_body: bool = is_head
-        || status_code < HttpStatus::Ok.code()
-        || status_code == HttpStatus::NoContent.code()
-        || status_code == HttpStatus::NotModified.code();
+    let suppress_body: bool = is_bodyless_status(status_code, is_head);
     let mut parsed_lines: [(&str, &str); 32] = [("", ""); 32];
     let mut parsed_count: usize = 0;
     let mut overflow_lines: Vec<(&str, &str)> = Vec::new();
@@ -1070,9 +1155,12 @@ pub(crate) fn encode_h3_response_head(
             overflow_lines.push((trimmed_name, trimmed_value));
         }
     }
-    let mut block: Vec<u8> = take_h3_buffer();
-    block.extend_from_slice(&[0, 0]);
-    encode_qpack_status(status_code, &mut block);
+    let frame_start: usize = out.len();
+    out.push(H3_FRAME_HEADERS as u8);
+    out.push(0);
+    let payload_start: usize = out.len();
+    out.extend_from_slice(&[0, 0]);
+    encode_qpack_status(status_code, out);
     let mut lower_buf: [u8; 64] = [0; 64];
     let nom_slice: &[&str] = &nominated[..nominated_count];
     for &(name, value) in parsed_lines[..parsed_count]
@@ -1090,21 +1178,29 @@ pub(crate) fn encode_h3_response_head(
         let name_bytes: &[u8] = name.as_bytes();
         let has_upper: bool = name_bytes.iter().any(|b: &u8| b.is_ascii_uppercase());
         if !has_upper {
-            encode_qpack_header(name_bytes, value.as_bytes(), &mut block);
+            encode_qpack_header(name_bytes, value.as_bytes(), out);
         } else if name_bytes.len() <= lower_buf.len() {
             for (idx, &b) in name_bytes.iter().enumerate() {
                 lower_buf[idx] = b.to_ascii_lowercase();
             }
-            encode_qpack_header(&lower_buf[..name_bytes.len()], value.as_bytes(), &mut block);
+            encode_qpack_header(&lower_buf[..name_bytes.len()], value.as_bytes(), out);
         } else {
             let lowered: String = name.to_ascii_lowercase();
-            encode_qpack_header(lowered.as_bytes(), value.as_bytes(), &mut block);
+            encode_qpack_header(lowered.as_bytes(), value.as_bytes(), out);
         }
     }
-    out.push(H3_FRAME_HEADERS as u8);
-    encode_varint(block.len() as u64, out);
-    out.extend_from_slice(&block);
-    return_h3_buffer(block);
+    let block_len: usize = out.len() - payload_start;
+    if block_len < 64 {
+        out[frame_start + 1] = block_len as u8;
+    } else {
+        let mut len_buf: Vec<u8> = Vec::with_capacity(8);
+        encode_varint(block_len as u64, &mut len_buf);
+        let extra: usize = len_buf.len() - 1;
+        let old_len: usize = out.len();
+        out.resize(old_len + extra, 0);
+        out.copy_within(payload_start..old_len, payload_start + extra);
+        out[frame_start + 1..frame_start + 1 + len_buf.len()].copy_from_slice(&len_buf);
+    }
     Ok(H3EncodedResponseMeta {
         announced_len: if suppress_body { None } else { announced_len },
         suppress_body,

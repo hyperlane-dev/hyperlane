@@ -131,7 +131,13 @@ where
                         match encoded {
                             Ok(n) => break n,
                             Err(EncryptError::InsufficientSize(need)) => {
-                                out_buf.resize(*out_len + need.required_size, 0);
+                                let next_len: usize = out_len.saturating_add(need.required_size);
+                                if next_len > TLS_MAX_OUTGOING_BUFFER {
+                                    return Poll::Ready(Err(io::Error::other(
+                                        TLS_OUTGOING_BUFFER_EXCEEDED,
+                                    )));
+                                }
+                                out_buf.resize(next_len, 0);
                             }
                             Err(error) => {
                                 return Poll::Ready(Err(io::Error::other(format!("{error:?}"))));
@@ -166,7 +172,13 @@ where
                             break;
                         }
                         Err(EncodeError::InsufficientSize(need)) => {
-                            out_buf.resize(*out_len + need.required_size, 0);
+                            let next_len: usize = out_len.saturating_add(need.required_size);
+                            if next_len > TLS_MAX_OUTGOING_BUFFER {
+                                return Poll::Ready(Err(io::Error::other(
+                                    TLS_OUTGOING_BUFFER_EXCEEDED,
+                                )));
+                            }
+                            out_buf.resize(next_len, 0);
                         }
                         Err(error) => {
                             return Poll::Ready(Err(io::Error::other(format!("{error:?}"))));
@@ -312,10 +324,8 @@ where
         buffer: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         let this: &mut Self = self.get_mut();
-        match this.poll_flush_out(context) {
-            Poll::Ready(Ok(())) => {}
-            Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
-            Poll::Pending => return Poll::Pending,
+        if let Poll::Ready(Err(error)) = this.poll_flush_out(context) {
+            return Poll::Ready(Err(error));
         }
         {
             let Self {
@@ -343,8 +353,17 @@ where
             return Poll::Ready(Ok(()));
         }
         let initial_filled: usize = buffer.filled().len();
+        let mut empty_app_records: usize = 0;
         loop {
-            {
+            let should_process: bool = {
+                let Self {
+                    in_len,
+                    needs_process,
+                    ..
+                } = this;
+                *in_len > 0 || *needs_process
+            };
+            if should_process {
                 let (discard, action): (usize, Result<u8, io::Error>) = {
                     let Self {
                         conn,
@@ -361,10 +380,22 @@ where
                     let step: Result<u8, io::Error> = match state {
                         Ok(ConnectionState::ReadTraffic(mut rt)) => {
                             let mut err: Option<io::Error> = None;
+                            let mut saw_non_empty: bool = false;
                             while let Some(rec) = rt.next_record() {
                                 match rec {
                                     Ok(app) => {
                                         let payload: &[u8] = app.payload;
+                                        if payload.is_empty() {
+                                            empty_app_records += 1;
+                                            if empty_app_records > TLS_MAX_EMPTY_APP_RECORDS {
+                                                err = Some(io::Error::other(
+                                                    TLS_EMPTY_RECORDS_EXCEEDED,
+                                                ));
+                                                break;
+                                            }
+                                            continue;
+                                        }
+                                        saw_non_empty = true;
                                         if plain_buf.is_empty() && buffer.remaining() > 0 {
                                             let direct: usize =
                                                 payload.len().min(buffer.remaining());
@@ -382,6 +413,9 @@ where
                                     }
                                 }
                             }
+                            if saw_non_empty {
+                                empty_app_records = 0;
+                            }
                             match err {
                                 Some(error) => Err(error),
                                 None => Ok(1),
@@ -394,7 +428,12 @@ where
                                     break Ok(2);
                                 }
                                 Err(EncodeError::InsufficientSize(need)) => {
-                                    out_buf.resize(*out_len + need.required_size, 0);
+                                    let next_len: usize =
+                                        out_len.saturating_add(need.required_size);
+                                    if next_len > TLS_MAX_OUTGOING_BUFFER {
+                                        break Err(io::Error::other(TLS_OUTGOING_BUFFER_EXCEEDED));
+                                    }
+                                    out_buf.resize(next_len, 0);
                                 }
                                 Err(error) => {
                                     break Err(io::Error::other(format!("{error:?}")));
@@ -438,7 +477,16 @@ where
                         Poll::Pending => return Poll::Pending,
                     },
                     Ok(4) => return Poll::Ready(Ok(())),
-                    Ok(_) => {}
+                    Ok(_) => {
+                        let Self {
+                            in_len,
+                            needs_process,
+                            ..
+                        } = this;
+                        if *in_len == 0 {
+                            *needs_process = false;
+                        }
+                    }
                     Err(error) => return Poll::Ready(Err(error)),
                 }
             }
@@ -446,6 +494,7 @@ where
                 tcp,
                 in_buf,
                 in_len,
+                needs_process,
                 ..
             } = this;
             if *in_len == in_buf.len() {
@@ -468,6 +517,7 @@ where
                         )));
                     }
                     *in_len += read_len;
+                    *needs_process = true;
                 }
             }
         }

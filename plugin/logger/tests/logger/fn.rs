@@ -30,3 +30,15 @@ fn is_a_unit_type() {
     let copied: LoggerPlugin = plugin;
     assert_eq!(format!("{copied:?}"), format!("{plugin:?}"));
 }
+
+#[test]
+fn test_security_log_sanitization_strips_crlf_and_ansi_escapes() {
+    let forged: &str = "user=alice\r\nERROR injected\x1b[31mred\x00end";
+    let safe: String = LoggerPlugin::sanitize_log_text(forged);
+    assert!(!safe.contains('\r'));
+    assert!(!safe.contains('\n'));
+    assert!(!safe.contains('\x1b'));
+    assert!(!safe.contains('\0'));
+    assert!(safe.contains("\\r\\n"));
+    assert!(safe.contains("\\x1b"));
+}

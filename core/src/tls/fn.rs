@@ -52,6 +52,10 @@ pub fn build_server_tls_config(
             .map_err(|error: TlsError| Box::new(ServerError::Tls(error.to_string())))?;
     server_config.alpn_protocols = vec![alpn.to_vec()];
     server_config.ignore_client_order = true;
+    server_config.session_storage = ServerSessionMemoryCache::new(8192);
+    if let Ok(ticketer) = Ticketer::new() {
+        server_config.ticketer = ticketer;
+    }
     Ok(Arc::new(server_config))
 }
 

@@ -25,6 +25,8 @@ pub(crate) struct TlsTransport<T = TcpStream> {
     pub(super) peer_closed: bool,
     /// Whether this side has already queued `close_notify`.
     pub(super) write_closed: bool,
+    /// Whether rustls still has pending internal state to process when `in_len == 0`.
+    pub(super) needs_process: bool,
 }
 
 /// Shared immutable server state owned once per listener and cloned via a single `Arc`.

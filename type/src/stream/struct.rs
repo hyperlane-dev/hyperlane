@@ -52,21 +52,36 @@ pub struct Stream {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) websocket_state: Option<Box<WebSocketReadState>>,
+    /// Reusable read-timeout sleep timer kept armed across keep-alive requests.
+    #[get(skip)]
+    #[get_mut(skip)]
+    #[set(skip)]
+    pub(super) read_timer: Option<Pin<Box<Sleep>>>,
 }
 
 /// Partial WebSocket input that must survive selection of an outbound message.
-#[derive(Clone, Data, Debug, Default)]
+#[derive(Clone, Data, Debug)]
 pub(super) struct WebSocketReadState {
     /// Wire bytes not yet consumed by a complete frame.
     #[get(pub(super), type(ref))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) buffer: Vec<u8>,
+    /// Start offset of unconsumed wire bytes within `buffer`.
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) cursor: usize,
     /// Payload accumulated from a message spanning multiple frames.
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) full_frame: Vec<u8>,
+    /// Data opcode of the currently active fragmented message, if any.
+    #[get(pub(super), type(ref))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) fragment_opcode: Option<WebSocketOpcode>,
     /// Whether a peer response has arrived since the last heartbeat.
     #[get(pub(super), type(copy))]
     #[get_mut(pub(super))]

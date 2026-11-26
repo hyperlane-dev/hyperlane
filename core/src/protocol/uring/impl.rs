@@ -8,7 +8,7 @@ impl UringWakeState {
         let Self {
             eventfd, signaled, ..
         } = self;
-        if !signaled.swap(true, AtomicOrdering::AcqRel) {
+        if !signaled.swap(true, AtomicOrdering::SeqCst) {
             let val: u64 = 1;
             // SAFETY: `eventfd` is a valid open nonblocking eventfd and `val` is an 8-byte u64.
             let _: isize = unsafe {
@@ -38,7 +38,7 @@ impl UringWakeState {
     /// Requests graceful shutdown and wakes the owning `io_uring` worker immediately.
     pub(crate) fn trigger_shutdown(&self) {
         let Self { shutdown, .. } = self;
-        shutdown.store(true, AtomicOrdering::Release);
+        shutdown.store(true, AtomicOrdering::SeqCst);
         self.notify_eventfd();
     }
 }
@@ -52,6 +52,21 @@ impl Drop for UringWakeState {
             // SAFETY: `eventfd` was created by `libc::eventfd` and owned exclusively by `UringWakeState`.
             let _: c_int = unsafe { close(*eventfd) };
             *eventfd = -1;
+        }
+    }
+}
+
+/// Closes any live socket descriptor owned by [`UringConnSlot`] if dropped abnormally.
+impl Drop for UringConnSlot {
+    /// Releases the socket descriptor when no kernel `Close` SQE owns it.
+    fn drop(&mut self) {
+        let Self {
+            fd, close_inflight, ..
+        } = self;
+        if *fd >= 0 && !*close_inflight {
+            // SAFETY: `fd` is still owned by this slot and has no in-flight `Close` SQE.
+            let _: c_int = unsafe { close(*fd) };
+            *fd = -1;
         }
     }
 }
@@ -548,9 +563,9 @@ impl UringReactor {
                 None
             }
         };
-        if let Some(slot) = taken {
-            self.return_buf(slot.read_buf);
-            self.return_buf(slot.write_buf);
+        if let Some(mut slot) = taken {
+            self.return_buf(mem::take(&mut slot.read_buf));
+            self.return_buf(mem::take(&mut slot.write_buf));
         }
     }
 }

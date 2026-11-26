@@ -9,6 +9,9 @@ pub(crate) const HTTP_QUOTED_FIELD_ESCAPE: u8 = b'\\';
 /// The diagnostic for a WebSocket read attempted before parser initialization.
 pub(crate) const WEBSOCKET_STATE_ERROR: &str = "WebSocket state must be initialized";
 
+/// The diagnostic for a WebSocket read whose unread buffer exceeds the configured limit.
+pub(crate) const WEBSOCKET_FRAME_TOO_LARGE_ERROR: &str = "WebSocket frame exceeds max body size";
+
 /// The complete HTTP/1.1 interim response with no fields or body.
 pub(super) const HTTP_CONTINUE_RESPONSE: &[u8] = b"HTTP/1.1 100 Continue\r\n\r\n";
 

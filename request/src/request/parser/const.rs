@@ -37,8 +37,23 @@ pub(crate) const INVALID_REQUEST_HEADER: &str = "Invalid HTTP request header";
 /// The maximum accepted size of one buffered response chunk.
 pub(crate) const MAX_RESPONSE_CHUNK_SIZE: usize = 64 * 1024 * 1024;
 
+/// The maximum accepted size of an HTTP response header block.
+pub(crate) const MAX_RESPONSE_HEAD_BYTES: usize = 64 * 1024;
+
+/// The maximum accepted total size of a buffered HTTP response body.
+pub(crate) const MAX_RESPONSE_BODY_BYTES: usize = 64 * 1024 * 1024;
+
+/// The maximum number of consecutive 1xx interim responses accepted before failing.
+pub(crate) const MAX_INTERIM_RESPONSES: usize = 16;
+
 /// The error for invalid or conflicting response framing.
 pub(crate) const INVALID_RESPONSE_FRAMING: &str = "Invalid or ambiguous HTTP response framing";
+
+/// The error for an HTTP response that exceeds the configured head or body cap.
+pub(crate) const RESPONSE_TOO_LARGE: &str = "HTTP response exceeds maximum allowed size";
+
+/// The error for an excessive sequence of 1xx interim responses.
+pub(crate) const TOO_MANY_INTERIM_RESPONSES: &str = "Too many interim HTTP responses";
 
 /// The separator before a chunk extension.
 pub(crate) const CHUNK_EXTENSION_SEPARATOR: u8 = b';';

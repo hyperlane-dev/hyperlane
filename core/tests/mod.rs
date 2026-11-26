@@ -4,6 +4,7 @@ mod error;
 mod framing;
 mod protocol;
 mod route;
+mod security;
 mod server;
 #[cfg(target_os = "linux")]
 mod uring;
@@ -27,7 +28,10 @@ use std::{
 };
 
 use bytes::{Buf, Bytes};
-use h2::{Error, RecvStream, SendStream, client::ResponseFuture, client::handshake};
+use h2::{
+    Error, RecvStream, SendStream,
+    client::{ResponseFuture, SendRequest, handshake},
+};
 use h3::{
     client::RequestStream,
     client::new,

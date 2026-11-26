@@ -81,8 +81,8 @@ impl core::hash::Hasher for XxHash3_64 {
             *prefix_len = current_len + incoming_len;
             return;
         }
-        let mut hasher: RawHasher<&'static [u8; DEFAULT_SECRET_LENGTH]> =
-            RawHasher::new(SecretBuffer::default());
+        let mut hasher: Box<RawHasher<&'static [u8; DEFAULT_SECRET_LENGTH]>> =
+            Box::new(RawHasher::new(SecretBuffer::default()));
         // SAFETY: `0..current_len` bytes in `prefix` were initialized by prior writes.
         let initialized: &[u8] =
             unsafe { slice::from_raw_parts(prefix.as_ptr().cast::<u8>(), current_len) };
@@ -113,8 +113,8 @@ impl core::hash::Hasher for XxHash3_64 {
             *prefix_len = current_len + 1;
             return;
         }
-        let mut hasher: RawHasher<&'static [u8; DEFAULT_SECRET_LENGTH]> =
-            RawHasher::new(SecretBuffer::default());
+        let mut hasher: Box<RawHasher<&'static [u8; DEFAULT_SECRET_LENGTH]>> =
+            Box::new(RawHasher::new(SecretBuffer::default()));
         // SAFETY: `0..current_len` bytes in `prefix` were initialized by prior writes.
         let initialized: &[u8] =
             unsafe { slice::from_raw_parts(prefix.as_ptr().cast::<u8>(), current_len) };

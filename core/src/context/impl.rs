@@ -338,6 +338,63 @@ impl Context {
         self
     }
 
+    /// Reports whether an external attribute key formats identically to raw ASCII without debug escaping.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - Candidate external attribute key.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` when every byte is printable ASCII excluding `"` and `\`.
+    #[inline(always)]
+    fn is_plain_external_key(key: &str) -> bool {
+        key.len() <= EXTERNAL_ATTR_STACK_LIMIT
+            && key
+                .bytes()
+                .all(|byte: u8| (0x20..0x7f).contains(&byte) && byte != b'"' && byte != b'\\')
+    }
+
+    /// Formats a plain external attribute key into a caller-provided stack buffer.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - Plain external attribute key verified by [`Self::is_plain_external_key`].
+    /// - `&'a mut [u8; 128]` - Stack buffer receiving `External("<key>")`.
+    ///
+    /// # Returns
+    ///
+    /// - `&'a str` - Borrowed formatted attribute map key.
+    #[inline(always)]
+    fn format_plain_external_key<'a>(key: &str, buf: &'a mut [u8; 128]) -> &'a str {
+        let prefix_len: usize = EXTERNAL_ATTR_PREFIX.len();
+        let key_bytes: &[u8] = key.as_bytes();
+        let suffix_len: usize = EXTERNAL_ATTR_SUFFIX.len();
+        buf[..prefix_len].copy_from_slice(EXTERNAL_ATTR_PREFIX);
+        buf[prefix_len..prefix_len + key_bytes.len()].copy_from_slice(key_bytes);
+        let suffix_start: usize = prefix_len + key_bytes.len();
+        buf[suffix_start..suffix_start + suffix_len].copy_from_slice(EXTERNAL_ATTR_SUFFIX);
+        let total: usize = suffix_start + suffix_len;
+        from_utf8(&buf[..total]).unwrap_or_default()
+    }
+
+    /// Returns the static map key for an internal framework attribute.
+    ///
+    /// # Arguments
+    ///
+    /// - `InternalAttribute` - The internal attribute variant.
+    ///
+    /// # Returns
+    ///
+    /// - `&'static str` - Formatted map key matching `Attribute::Internal(key).to_string()`.
+    #[inline(always)]
+    fn internal_attribute_key(key: InternalAttribute) -> &'static str {
+        match key {
+            InternalAttribute::TaskPanicData => INTERNAL_TASK_PANIC_KEY,
+            InternalAttribute::RequestErrorData => INTERNAL_REQUEST_ERROR_KEY,
+        }
+    }
+
     /// Attempts to retrieve a specific attribute by its key, casting it to the specified type.
     ///
     /// The original request target is readable under its own key, because the
@@ -370,6 +427,15 @@ impl Context {
                 }
                 None => None,
             };
+        }
+        if Self::is_plain_external_key(key) {
+            let mut stack_buf: [u8; 128] = [0; 128];
+            let formatted: &str = Self::format_plain_external_key(key, &mut stack_buf);
+            return self
+                .get_attributes()
+                .get(formatted)
+                .and_then(|arc: &ArcAnySendSync| arc.downcast_ref::<V>())
+                .cloned();
         }
         self.get_attributes()
             .get(&Attribute::External(key.to_owned()).to_string())
@@ -415,10 +481,14 @@ impl Context {
         K: AsRef<str>,
         V: AnySendSyncClone,
     {
-        self.get_mut_attributes().insert(
-            Attribute::External(key.as_ref().to_owned()).to_string(),
-            Arc::new(value),
-        );
+        let key_str: &str = key.as_ref();
+        let map_key: String = if Self::is_plain_external_key(key_str) {
+            let mut stack_buf: [u8; 128] = [0; 128];
+            Self::format_plain_external_key(key_str, &mut stack_buf).to_owned()
+        } else {
+            Attribute::External(key_str.to_owned()).to_string()
+        };
+        self.get_mut_attributes().insert(map_key, Arc::new(value));
         self
     }
 
@@ -436,8 +506,15 @@ impl Context {
     where
         K: AsRef<str>,
     {
+        let key_str: &str = key.as_ref();
+        if Self::is_plain_external_key(key_str) {
+            let mut stack_buf: [u8; 128] = [0; 128];
+            let formatted: &str = Self::format_plain_external_key(key_str, &mut stack_buf);
+            self.get_mut_attributes().remove(formatted);
+            return self;
+        }
         self.get_mut_attributes()
-            .remove(&Attribute::External(key.as_ref().to_owned()).to_string());
+            .remove(&Attribute::External(key_str.to_owned()).to_string());
         self
     }
 
@@ -467,7 +544,7 @@ impl Context {
         V: AnySendSyncClone,
     {
         self.get_attributes()
-            .get(&Attribute::Internal(key).to_string())
+            .get(Self::internal_attribute_key(key))
             .and_then(|arc: &ArcAnySendSync| arc.downcast_ref::<V>())
             .cloned()
     }
@@ -508,8 +585,10 @@ impl Context {
     where
         V: AnySendSyncClone,
     {
-        self.get_mut_attributes()
-            .insert(Attribute::Internal(key).to_string(), Arc::new(value));
+        self.get_mut_attributes().insert(
+            Self::internal_attribute_key(key).to_owned(),
+            Arc::new(value),
+        );
         self
     }
 

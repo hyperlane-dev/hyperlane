@@ -58,22 +58,28 @@ pub(crate) struct H3DirectState {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) failed: bool,
+    /// The local and remote addresses of the carrying QUIC connection.
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) peers: StreamPeers,
 }
 
 /// Direct `Transport` implementation that encodes HTTP/1.1 bytes straight into
 /// HTTP/3 `HEADERS` and `DATA` frames on a `quinn::SendStream` with zero async boxing.
 #[derive(Data)]
 pub(crate) struct H3DirectTransport {
-    /// Exclusively owned framing state wrapped in a mutex to satisfy `Transport: Sync`.
-    #[get(skip)]
+    /// Shared framing state recycled across requests via [`H3_STREAM_POOL`].
+    #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) state: Mutex<H3DirectState>,
-    /// The local and remote addresses of the carrying QUIC connection.
-    #[get(pub(super), type(copy))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) peers: StreamPeers,
+    pub(super) state: H3DirectStateHandle,
+}
+
+/// RAII guard borrowing a pooled boxed HTTP/3 `Stream` and returning it on drop.
+pub(crate) struct H3StreamGuard {
+    /// Pooled `(Stream, state)` pair released back to [`H3_STREAM_POOL`] on drop.
+    pub(super) inner: Option<PooledH3Stream>,
 }
 
 /// Shared per-connection atomic flags tracking peer-initiated HTTP/3 critical streams.
@@ -85,13 +91,4 @@ pub(crate) struct H3ControlState {
     pub(super) qpack_enc_seen: AtomicBool,
     /// Set immediately upon recognizing the peer's QPACK decoder stream (`0x03`).
     pub(super) qpack_dec_seen: AtomicBool,
-}
-
-/// The environment one HTTP/3 request stream is served in.
-#[derive(Clone)]
-pub(crate) struct H3RequestEnv {
-    /// Shared listener state containing the server and compiled inline pipeline.
-    pub(crate) shared: Arc<ConnectionShared>,
-    /// The addresses of the connection carrying the request.
-    pub(crate) peers: StreamPeers,
 }

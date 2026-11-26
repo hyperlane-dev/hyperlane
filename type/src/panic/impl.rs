@@ -38,7 +38,7 @@ impl PanicData {
         let default_message: String = join_error.to_string();
         let mut message: Option<String> = if let Ok(panic_join_error) = join_error.try_into_panic()
         {
-            Self::try_extract_panic_message(&panic_join_error)
+            Self::try_extract_panic_message(&*panic_join_error)
         } else {
             None
         };

@@ -63,17 +63,6 @@ pub(crate) struct H2DirectState {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) failed: bool,
-}
-
-/// Direct `Transport` implementation that frames written HTTP/1.1 bytes straight
-/// onto an HTTP/2 stream without a duplex pipe or background pump task.
-#[derive(Data, Debug)]
-pub(crate) struct H2DirectTransport {
-    /// Exclusively owned framing state wrapped in a mutex to satisfy `Transport: Sync`.
-    #[get(skip)]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) state: Mutex<H2DirectState>,
     /// The local and remote addresses of the carrying TCP connection.
     #[get(pub(super), type(copy))]
     #[get_mut(pub(super))]
@@ -81,20 +70,19 @@ pub(crate) struct H2DirectTransport {
     pub(super) peers: StreamPeers,
 }
 
-/// The environment one HTTP/2 request stream is served in.
-///
-/// A request stream needs the server that serves it, the limits and read timeout
-/// its head and body are bounded by, and the addresses the duplex transport
-/// reports to the framework. Carried together they stop being the same four
-/// parameters repeated in the same order at every layer of the HTTP/2 path.
-///
-/// Every field but the server handle is `Copy`. The handle is an `Arc` the
-/// connection loop already cloned, so passing the environment by value moves that
-/// handle instead of cloning it again.
-#[derive(Clone)]
-pub(crate) struct H2RequestEnv {
-    /// Shared listener state containing the server and compiled inline pipeline.
-    pub(crate) shared: Arc<ConnectionShared>,
-    /// The addresses of the connection carrying the request.
-    pub(crate) peers: StreamPeers,
+/// Direct `Transport` implementation that frames written HTTP/1.1 bytes straight
+/// onto an HTTP/2 stream without a duplex pipe or background pump task.
+#[derive(Data, Debug)]
+pub(crate) struct H2DirectTransport {
+    /// Shared framing state recycled across requests via [`H2_STREAM_POOL`].
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) state: H2DirectStateHandle,
+}
+
+/// RAII guard borrowing a pooled boxed HTTP/2 `Stream` and returning it on drop.
+pub(crate) struct H2StreamGuard {
+    /// Pooled `(Stream, state)` pair released back to [`H2_STREAM_POOL`] on drop.
+    pub(super) inner: Option<PooledH2Stream>,
 }

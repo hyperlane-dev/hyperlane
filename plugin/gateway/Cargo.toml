@@ -1,0 +1,20 @@
+[package]
+name = "hyperlane-plugin-gateway"
+autotests = false
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A reverse proxy and API gateway plugin for the Hyperlane framework with load balancing, path-prefix routing, token-bucket rate limiting, circuit breaking, RFC 9110 hop-by-hop header stripping, and pooled HTTP/1.1 + HTTP/2 upstream forwarding."""
+keywords = ["http", "gateway", "proxy", "load-balancer", "hyperlane"]
+categories = ["network-programming", "web-programming"]
+exclude.workspace = true
+publish = true
+
+[dependencies]
+hyperlane = { workspace = true }
+http-request = { workspace = true }
+
+lombok-macros = { workspace = true }

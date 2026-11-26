@@ -1,5 +1,11 @@
 use super::*;
 
+/// Implements the standard error trait for [`ServerError`].
+impl Error for ServerError {}
+
+/// Implements the standard error trait for [`RouteError`].
+impl Error for RouteError {}
+
 /// Implementation of `From` trait for converting external errors into `ServerError`.
 ///
 /// This allows using the `?` operator to automatically convert `IoError`

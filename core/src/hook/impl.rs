@@ -205,27 +205,27 @@ impl Hash for HookType {
             HookType::TaskPanic(order, factory) => {
                 0u8.hash(state);
                 order.hash(state);
-                (factory as *const fn() -> ServerHookHandler).hash(state);
+                (*factory as usize).hash(state);
             }
             HookType::RequestError(order, factory) => {
                 1u8.hash(state);
                 order.hash(state);
-                (factory as *const fn() -> ServerHookHandler).hash(state);
+                (*factory as usize).hash(state);
             }
             HookType::RequestMiddleware(order, factory) => {
                 2u8.hash(state);
                 order.hash(state);
-                (factory as *const fn() -> ServerHookHandler).hash(state);
+                (*factory as usize).hash(state);
             }
             HookType::Route(path, factory) => {
                 3u8.hash(state);
                 path.hash(state);
-                (factory as *const fn() -> ServerHookHandler).hash(state);
+                (*factory as usize).hash(state);
             }
             HookType::ResponseMiddleware(order, factory) => {
                 4u8.hash(state);
                 order.hash(state);
-                (factory as *const fn() -> ServerHookHandler).hash(state);
+                (*factory as usize).hash(state);
             }
         }
     }
@@ -293,10 +293,17 @@ impl HookType {
     ///   displaying the hook type and order in the error message.
     #[inline(always)]
     pub fn assert_unique_order(list: Vec<HookType>) {
-        let mut seen: HashSet<(HookType, isize)> = HashSet::new();
+        let mut seen: HashSet<(u8, isize)> = HashSet::new();
         list.iter().for_each(|hook: &HookType| {
+            let kind: u8 = match hook {
+                HookType::TaskPanic(_, _) => 0,
+                HookType::RequestError(_, _) => 1,
+                HookType::RequestMiddleware(_, _) => 2,
+                HookType::Route(_, _) => 3,
+                HookType::ResponseMiddleware(_, _) => 4,
+            };
             if let Some(order) = hook.try_get_order()
-                && !seen.insert((*hook, order))
+                && !seen.insert((kind, order))
             {
                 panic!("Duplicate hook detected: {} with order {}", hook, order);
             }

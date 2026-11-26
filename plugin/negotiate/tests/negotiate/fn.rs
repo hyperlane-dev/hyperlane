@@ -485,3 +485,48 @@ async fn keeps_the_variance_when_the_validator_matches() -> Result<(), String> {
     assert_header(&wire, VARY, VARY_ACCEPT_ENCODING)?;
     Ok(())
 }
+
+#[tokio::test]
+async fn test_security_conditional_never_turns_error_status_into_304_and_honors_no_transform() {
+    let listener: tokio::net::TcpListener =
+        tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+    let (client_res, accept_res): (io::Result<TcpStream>, io::Result<(TcpStream, SocketAddr)>) =
+        tokio::join!(TcpStream::connect(addr), listener.accept());
+    let _client: TcpStream = client_res.unwrap();
+    let (server_tcp, _): (TcpStream, SocketAddr) = accept_res.unwrap();
+    let mut stream: Stream = Stream::new(server_tcp, RequestConfig::default(), false);
+    let mut err_ctx: Context = Context::default();
+    err_ctx
+        .get_mut_request()
+        .set_method(Method::Get)
+        .get_mut_headers()
+        .insert(IF_NONE_MATCH.to_owned(), VecDeque::from(["*".to_owned()]));
+    err_ctx
+        .get_mut_response()
+        .set_status_code(HttpStatus::InternalServerError.code())
+        .set_body("error-body");
+    let cond: ConditionalMiddleware = ConditionalMiddleware::new(&mut stream, &mut err_ctx).await;
+    let _: Status = cond.handle(&mut stream, &mut err_ctx).await;
+    assert_eq!(
+        err_ctx.get_response().get_status_code(),
+        HttpStatus::InternalServerError.code()
+    );
+    let mut nt_ctx: Context = Context::default();
+    nt_ctx
+        .get_mut_request()
+        .set_method(Method::Get)
+        .get_mut_headers()
+        .insert(
+            ACCEPT_ENCODING.to_owned(),
+            VecDeque::from(["gzip".to_owned()]),
+        );
+    nt_ctx
+        .get_mut_response()
+        .set_status_code(HttpStatus::Ok.code())
+        .set_header(CACHE_CONTROL, "public, no-transform")
+        .set_body("x".repeat(4096));
+    let comp: CompressMiddleware = CompressMiddleware::new(&mut stream, &mut nt_ctx).await;
+    let _: Status = comp.handle(&mut stream, &mut nt_ctx).await;
+    assert!(!nt_ctx.get_response().has_header(CONTENT_ENCODING));
+}

@@ -93,7 +93,7 @@ Select the wire protocol per listener with [`ServerConfig`][config].
 | [`hyperlane`][api], [`hyperlane-core`](core/README.md), [`hyperlane-macros`](macros/README.md)              | Server API, routing, and procedural macros |
 | [`http-type`](type/README.md), [`http-constant`](constant/README.md), [`http-compress`](compress/README.md) | HTTP types, constants, and compression     |
 | [`http-request`](request/README.md)                                                                         | Synchronous and asynchronous HTTP client   |
-| [WebSocket plugin](plugin/websocket/README.md), [Logger plugin](plugin/logger/README.md), [Negotiate plugin](plugin/negotiate/README.md)                    | Opt-in plugins                             |
+| [Logger](plugin/logger/README.md), [Negotiate](plugin/negotiate/README.md), [WebSocket](plugin/websocket/README.md), [SSE](plugin/sse/README.md), [MQ](plugin/mq/README.md), [RPC](plugin/rpc/README.md), [gRPC](plugin/grpc/README.md), [MCP](plugin/mcp/README.md), [Gateway](plugin/gateway/README.md) | Opt-in plugins |
 | [`hyperlane-cli`](cli/README.md), [`hyperlane-performance`](performance/README.md)                          | Project and benchmark tooling              |
 
 ## Protocol notes

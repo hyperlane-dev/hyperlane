@@ -1,5 +1,6 @@
 use super::*;
 
+/// Inherent implementation of [`ProxyTunnelStream`].
 impl ProxyTunnelStream {
     /// Creates an asynchronous proxy tunnel stream.
     ///
@@ -15,6 +16,7 @@ impl ProxyTunnelStream {
     }
 }
 
+/// Implements [`AsyncRead`] for [`ProxyTunnelStream`].
 impl AsyncRead for ProxyTunnelStream {
     /// Reads the pre-read handshake data before delegating to the inner stream.
     ///
@@ -42,6 +44,7 @@ impl AsyncRead for ProxyTunnelStream {
     }
 }
 
+/// Implements [`AsyncWrite`] for [`ProxyTunnelStream`].
 impl AsyncWrite for ProxyTunnelStream {
     /// Writes bytes to the inner stream through the proxy tunnel.
     ///
@@ -94,8 +97,10 @@ impl AsyncWrite for ProxyTunnelStream {
     }
 }
 
+/// Implements [`Unpin`] for [`ProxyTunnelStream`].
 impl Unpin for ProxyTunnelStream {}
 
+/// Inherent implementation of [`SyncProxyTunnelStream`].
 impl SyncProxyTunnelStream {
     /// Creates a synchronous proxy tunnel stream.
     ///
@@ -111,6 +116,7 @@ impl SyncProxyTunnelStream {
     }
 }
 
+/// Implements [`Read`] for [`SyncProxyTunnelStream`].
 impl Read for SyncProxyTunnelStream {
     /// Reads the pre-read handshake data before delegating to the inner stream.
     ///
@@ -132,6 +138,7 @@ impl Read for SyncProxyTunnelStream {
     }
 }
 
+/// Implements [`Write`] for [`SyncProxyTunnelStream`].
 impl Write for SyncProxyTunnelStream {
     /// Writes bytes to the inner stream through the proxy tunnel.
     ///
@@ -156,6 +163,7 @@ impl Write for SyncProxyTunnelStream {
     }
 }
 
+/// Inherent implementation of [`Proxy`].
 impl Proxy {
     /// Creates a plain HTTP proxy.
     ///
@@ -163,7 +171,14 @@ impl Proxy {
     ///
     /// - `H` - The proxy host, converted to a string slice.
     /// - `u16` - The proxy port.
-    pub fn http<H: AsRef<str>>(host: H, port: u16) -> Self {
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - The configured HTTP proxy.
+    pub fn http<H>(host: H, port: u16) -> Self
+    where
+        H: AsRef<str>,
+    {
         Self::new(ProxyType::Http, host, port)
     }
 
@@ -173,7 +188,14 @@ impl Proxy {
     ///
     /// - `H` - The proxy host, converted to a string slice.
     /// - `u16` - The proxy port.
-    pub fn https<H: AsRef<str>>(host: H, port: u16) -> Self {
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - The configured HTTPS proxy.
+    pub fn https<H>(host: H, port: u16) -> Self
+    where
+        H: AsRef<str>,
+    {
         Self::new(ProxyType::Https, host, port)
     }
 
@@ -183,7 +205,14 @@ impl Proxy {
     ///
     /// - `H` - The proxy host, converted to a string slice.
     /// - `u16` - The proxy port.
-    pub fn socks5<H: AsRef<str>>(host: H, port: u16) -> Self {
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - The configured SOCKS5 proxy.
+    pub fn socks5<H>(host: H, port: u16) -> Self
+    where
+        H: AsRef<str>,
+    {
         Self::new(ProxyType::Socks5, host, port)
     }
 
@@ -193,7 +222,15 @@ impl Proxy {
     ///
     /// - `U` - The proxy username, converted to a string slice.
     /// - `P` - The proxy password, converted to a string slice.
-    pub fn auth<U: AsRef<str>, P: AsRef<str>>(mut self, username: U, password: P) -> Self {
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - The proxy updated with credentials.
+    pub fn auth<U, P>(mut self, username: U, password: P) -> Self
+    where
+        U: AsRef<str>,
+        P: AsRef<str>,
+    {
         self.set_username(Some(username.as_ref().to_owned()));
         self.set_password(Some(password.as_ref().to_owned()));
         self
@@ -206,7 +243,14 @@ impl Proxy {
     /// - `ProxyType` - The protocol used to reach the proxy.
     /// - `H` - The proxy host, converted to a string slice.
     /// - `u16` - The proxy port.
-    fn new<H: AsRef<str>>(proxy_type: ProxyType, host: H, port: u16) -> Self {
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - The newly constructed proxy.
+    fn new<H>(proxy_type: ProxyType, host: H, port: u16) -> Self
+    where
+        H: AsRef<str>,
+    {
         Self {
             proxy_type,
             host: host.as_ref().to_owned(),

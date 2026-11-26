@@ -72,6 +72,7 @@ pub(crate) fn split_whitespace(input: &[u8]) -> Vec<&[u8]> {
 /// # Returns
 ///
 /// - `Vec<u8>`: The complete request bytes, ready to write to the wire.
+#[cfg(test)]
 pub(crate) fn build_http_request(
     method: &str,
     path: String,
@@ -180,6 +181,7 @@ pub(crate) fn parse_chunk_size(line: &[u8]) -> Result<usize, RequestError> {
 /// - `Result<Option<usize>, RequestError>` - The completed body end, incomplete input, or invalid framing.
 pub(crate) fn chunked_body_end(body_bytes: &[u8]) -> Result<Option<usize>, RequestError> {
     let mut pos: usize = 0;
+    let mut total_decoded: usize = 0;
     while pos < body_bytes.len() {
         let Some(line_end) = find_crlf(body_bytes, pos) else {
             return Ok(None);
@@ -192,10 +194,20 @@ pub(crate) fn chunked_body_end(body_bytes: &[u8]) -> Result<Option<usize>, Reque
             }
             if let Some(trailer_end) = find_double_crlf(body_bytes, data_start) {
                 let end: usize = trailer_end + HTTP_BR_BYTES.len() * 2;
-                let _: Option<&[u8]> = response_header_value(&body_bytes[data_start..end], &[])?;
+                let _: Option<&[u8]> =
+                    validate_header_block(&body_bytes[data_start..end], &[], false)?;
                 return Ok(Some(end));
             }
+            if body_bytes.len().saturating_sub(data_start) > MAX_RESPONSE_HEAD_BYTES {
+                return Err(RequestError::Request(RESPONSE_TOO_LARGE.to_owned()));
+            }
             return Ok(None);
+        }
+        total_decoded = total_decoded
+            .checked_add(chunk_size)
+            .ok_or(RequestError::ContentLengthTooLarge(HttpStatus::BadRequest))?;
+        if total_decoded > MAX_RESPONSE_BODY_BYTES {
+            return Err(RequestError::ContentLengthTooLarge(HttpStatus::BadRequest));
         }
         let data_end: usize = data_start
             .checked_add(chunk_size)
@@ -411,6 +423,55 @@ pub(crate) fn validate_request_headers(
     Ok(())
 }
 
+/// Validate every header field line in `headers_bytes` and optionally extract `field_name`.
+///
+/// # Arguments
+///
+/// - `&'a [u8]` - The header or trailer block bytes.
+/// - `&[u8]` - The exact field name without its colon (or empty to validate only).
+/// - `bool` - Whether line 0 may be an HTTP status line starting with `HTTP/`.
+///
+/// # Returns
+///
+/// - `Result<Option<&'a [u8]>, RequestError>` - The trimmed value, absence, or framing error.
+pub(crate) fn validate_header_block<'a>(
+    headers_bytes: &'a [u8],
+    field_name: &[u8],
+    skip_status_line: bool,
+) -> Result<Option<&'a [u8]>, RequestError> {
+    let mut value: Option<&[u8]> = None;
+    let mut pos: usize = 0;
+    while pos < headers_bytes.len() {
+        let end: usize = find_crlf(headers_bytes, pos).unwrap_or(headers_bytes.len());
+        let line: &[u8] = &headers_bytes[pos..end];
+        if line.is_empty() {
+            break;
+        }
+        if !(skip_status_line && pos == 0 && line.starts_with(HTTP_STATUS_PREFIX)) {
+            let separator: usize = line
+                .iter()
+                .position(|byte: &u8| *byte == COLON_U8)
+                .ok_or_else(|| RequestError::Request(INVALID_RESPONSE_FRAMING.to_owned()))?;
+            let name: &[u8] = &line[..separator];
+            let raw_value: &[u8] = &line[separator + 1..];
+            if !is_valid_header_name(name) || !is_valid_header_value(raw_value) {
+                return Err(RequestError::Request(INVALID_RESPONSE_FRAMING.to_owned()));
+            }
+            if !field_name.is_empty() && name.eq_ignore_ascii_case(field_name) {
+                if value.is_some() {
+                    return Err(RequestError::Request(INVALID_RESPONSE_FRAMING.to_owned()));
+                }
+                value = Some(raw_value.trim_ascii());
+            }
+        }
+        if end == headers_bytes.len() {
+            break;
+        }
+        pos = end + HTTP_BR_BYTES.len();
+    }
+    Ok(value)
+}
+
 /// Look up one complete field name, stopping at the header/body boundary.
 ///
 /// # Arguments
@@ -425,37 +486,7 @@ pub(crate) fn response_header_value<'a>(
     headers_bytes: &'a [u8],
     field_name: &[u8],
 ) -> Result<Option<&'a [u8]>, RequestError> {
-    let mut value: Option<&[u8]> = None;
-    let mut pos: usize = 0;
-    while pos < headers_bytes.len() {
-        let end: usize = find_crlf(headers_bytes, pos).unwrap_or(headers_bytes.len());
-        let line: &[u8] = &headers_bytes[pos..end];
-        if line.is_empty() {
-            break;
-        }
-        if !(pos == 0 && line.starts_with(HTTP_STATUS_PREFIX)) {
-            let separator: usize = line
-                .iter()
-                .position(|byte: &u8| *byte == COLON_U8)
-                .ok_or_else(|| RequestError::Request(INVALID_RESPONSE_FRAMING.to_owned()))?;
-            let name: &[u8] = &line[..separator];
-            let raw_value: &[u8] = &line[separator + 1..];
-            if !is_valid_header_name(name) || !is_valid_header_value(raw_value) {
-                return Err(RequestError::Request(INVALID_RESPONSE_FRAMING.to_owned()));
-            }
-            if name.eq_ignore_ascii_case(field_name) {
-                if value.is_some() {
-                    return Err(RequestError::Request(INVALID_RESPONSE_FRAMING.to_owned()));
-                }
-                value = Some(raw_value.trim_ascii());
-            }
-        }
-        if end == headers_bytes.len() {
-            break;
-        }
-        pos = end + HTTP_BR_BYTES.len();
-    }
-    Ok(value)
+    validate_header_block(headers_bytes, field_name, true)
 }
 
 /// Parse the 3-byte ASCII status code from the response status line.
@@ -498,16 +529,16 @@ pub(crate) fn calculate_buffer_capacity(
     n: usize,
     current_capacity: usize,
 ) -> usize {
-    if response_bytes.len() + n <= current_capacity {
+    let needed_cap: usize = response_bytes.len().saturating_add(n);
+    if needed_cap <= current_capacity {
         return 0;
     }
-    let needed_cap: usize = response_bytes.len() + n;
     if current_capacity == 0 {
         needed_cap.max(1024)
-    } else if needed_cap <= current_capacity * 2 {
-        current_capacity * 2
+    } else if needed_cap <= current_capacity.saturating_mul(2) {
+        current_capacity.saturating_mul(2)
     } else {
-        (needed_cap * 3) / 2
+        needed_cap.saturating_add(needed_cap / 2)
     }
 }
 
@@ -553,12 +584,18 @@ pub(crate) fn parse_response_headers(
                 return Err(RequestError::Request(INVALID_RESPONSE_FRAMING.to_owned()));
             }
             (None, true) => ResponseFraming::Chunked,
-            (Some(length), false) => ResponseFraming::Fixed(length),
+            (Some(length), false) => {
+                if length > MAX_RESPONSE_BODY_BYTES {
+                    return Err(RequestError::ContentLengthTooLarge(HttpStatus::BadRequest));
+                }
+                ResponseFraming::Fixed(length)
+            }
             (None, false) => ResponseFraming::Close,
         }
     };
     if status_code == HttpStatus::SwitchingProtocols.code()
         || status_code == HttpStatus::NoContent.code()
+        || status_code == HttpStatus::ResetContent.code()
         || status_code == HttpStatus::NotModified.code()
     {
         return Ok(Some((ResponseFraming::Fixed(0), None)));
@@ -566,8 +603,7 @@ pub(crate) fn parse_response_headers(
     if status_code < HttpStatus::Ok.code() {
         return Ok(None);
     }
-
-    let redirect: Option<Vec<u8>> = if (300..=399).contains(&status_code) {
+    let redirect: Option<Vec<u8>> = if [301, 302, 303, 307, 308].contains(&status_code) {
         response_header_value(headers_bytes, LOCATION.as_bytes())?.map(<[u8]>::to_vec)
     } else {
         None
@@ -582,6 +618,7 @@ pub(crate) fn parse_response_headers(
 /// - `&mut Vec<u8>` - The accumulated response bytes.
 /// - `usize` - The earliest position where a new header terminator could start.
 /// - `bool` - Whether the response answers a HEAD request.
+/// - `&mut usize` - Running count of 1xx interim responses already discarded.
 ///
 /// # Returns
 ///
@@ -590,21 +627,32 @@ pub(crate) fn find_final_response_head(
     bytes: &mut Vec<u8>,
     mut search_start: usize,
     is_head: bool,
+    interim_count: &mut usize,
 ) -> Result<Option<FinalResponseHead>, RequestError> {
     let mut start: usize = 0;
     while let Some(position) = find_double_crlf(bytes, search_start) {
         let end: usize = position + HTTP_BR_BYTES.len() * 2;
+        if end.saturating_sub(start) > MAX_RESPONSE_HEAD_BYTES {
+            return Err(RequestError::Request(RESPONSE_TOO_LARGE.to_owned()));
+        }
         if let Some((framing, redirect)) = parse_response_headers(&bytes[start..end], is_head)? {
             if start != 0 {
                 drop(bytes.drain(..start));
             }
             return Ok(Some((end - start, framing, redirect)));
         }
+        *interim_count += 1;
+        if *interim_count > MAX_INTERIM_RESPONSES {
+            return Err(RequestError::Request(TOO_MANY_INTERIM_RESPONSES.to_owned()));
+        }
         start = end;
         search_start = end;
     }
     if start != 0 {
         drop(bytes.drain(..start));
+    }
+    if bytes.len() > MAX_RESPONSE_HEAD_BYTES {
+        return Err(RequestError::Request(RESPONSE_TOO_LARGE.to_owned()));
     }
     Ok(None)
 }

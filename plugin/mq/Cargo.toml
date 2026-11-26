@@ -1,0 +1,20 @@
+[package]
+name = "hyperlane-plugin-mq"
+autotests = false
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A message queue plugin for the Hyperlane framework providing a pluggable MessageBroker trait and an in-memory broker with consumer groups, visibility timeouts, retries, TTL expiration, and dead-letter queues."""
+keywords = ["http", "mq", "message-queue", "broker", "hyperlane"]
+categories = ["network-programming", "web-programming"]
+exclude.workspace = true
+publish = true
+
+[dependencies]
+lombok-macros = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

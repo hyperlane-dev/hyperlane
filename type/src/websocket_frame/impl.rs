@@ -195,7 +195,11 @@ impl WebSocketFrame {
             if data_ref.len() < index + 8 {
                 return None;
             }
-            payload_len = u64::from_be_bytes(data_ref[index..index + 8].try_into().ok()?) as usize;
+            let raw_len: u64 = u64::from_be_bytes(data_ref[index..index + 8].try_into().ok()?);
+            if (raw_len >> 63) != 0 {
+                return None;
+            }
+            payload_len = usize::try_from(raw_len).ok()?;
             index += 8;
         }
         let mask_key: Option<[u8; 4]> = if mask {
@@ -208,23 +212,164 @@ impl WebSocketFrame {
         } else {
             None
         };
-        if data_ref.len() < index + payload_len {
+        let total_len: usize = index.checked_add(payload_len)?;
+        if data_ref.len() < total_len {
             return None;
         }
-        let mut payload: Vec<u8> = data_ref[index..index + payload_len].to_vec();
+        let mut payload: Vec<u8> = data_ref[index..total_len].to_vec();
         if let Some(mask_key) = mask_key {
-            for (byte_index, payload_byte) in payload.iter_mut().enumerate() {
-                *payload_byte ^= mask_key[byte_index % 4];
-            }
+            Self::apply_mask(&mut payload, mask_key);
         }
-        index += payload_len;
         let frame: WebSocketFrame = WebSocketFrame {
             fin,
             opcode,
             mask,
             payload_data: payload,
         };
-        Some((frame, index))
+        Some((frame, total_len))
+    }
+
+    /// Decodes and validates one WebSocket frame against RFC 6455 rules and a payload size cap.
+    ///
+    /// Unlike [`Self::decode_ws_frame`], this method rejects protocol violations immediately
+    /// instead of waiting for more bytes, preventing memory exhaustion on oversized or
+    /// malformed headers.
+    ///
+    /// # Arguments
+    ///
+    /// - `&[u8]` - The buffered unread wire bytes.
+    /// - `usize` - The maximum permitted payload length in bytes.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Option<(WebSocketFrame, usize)>, RequestError>` - A decoded frame and consumed
+    ///   byte count, `Ok(None)` when more wire bytes are needed, or a protocol error.
+    pub(crate) fn decode_ws_frame_checked(
+        data_ref: &[u8],
+        max_payload_size: usize,
+    ) -> Result<Option<(WebSocketFrame, usize)>, RequestError> {
+        if data_ref.len() < 2 {
+            return Ok(None);
+        }
+        let first_byte: u8 = data_ref[0];
+        let second_byte: u8 = data_ref[1];
+        if (first_byte & 0b0111_0000) != 0 {
+            return Err(RequestError::WebSocketInvalidExtension(
+                HttpStatus::BadRequest,
+            ));
+        }
+        let fin: bool = (first_byte & 0b1000_0000) != 0;
+        let opcode: WebSocketOpcode = WebSocketOpcode::from_u8(first_byte & 0b0000_1111);
+        if opcode.is_reserved() {
+            return Err(RequestError::WebSocketOpcodeUnsupported(
+                HttpStatus::NotImplemented,
+            ));
+        }
+        let mask: bool = (second_byte & 0b1000_0000) != 0;
+        let len_code: u8 = second_byte & 0b0111_1111;
+        if opcode.is_control() && (!fin || len_code >= 126) {
+            return Err(RequestError::WebSocketPayloadCorrupted(
+                HttpStatus::BadRequest,
+            ));
+        }
+        let mut index: usize = 2;
+        let payload_len: usize = if len_code == 126 {
+            if data_ref.len() < index + 2 {
+                return Ok(None);
+            }
+            let raw_len: u16 = u16::from_be_bytes([data_ref[index], data_ref[index + 1]]);
+            if raw_len < 126 {
+                return Err(RequestError::WebSocketPayloadCorrupted(
+                    HttpStatus::BadRequest,
+                ));
+            }
+            index += 2;
+            usize::from(raw_len)
+        } else if len_code == 127 {
+            if data_ref.len() < index + 8 {
+                return Ok(None);
+            }
+            let raw_len: u64 = u64::from_be_bytes([
+                data_ref[index],
+                data_ref[index + 1],
+                data_ref[index + 2],
+                data_ref[index + 3],
+                data_ref[index + 4],
+                data_ref[index + 5],
+                data_ref[index + 6],
+                data_ref[index + 7],
+            ]);
+            if (raw_len >> 63) != 0 || raw_len <= u64::from(u16::MAX) {
+                return Err(RequestError::WebSocketPayloadCorrupted(
+                    HttpStatus::BadRequest,
+                ));
+            }
+            index += 8;
+            usize::try_from(raw_len)
+                .map_err(|_| RequestError::WebSocketFrameTooLarge(HttpStatus::PayloadTooLarge))?
+        } else {
+            usize::from(len_code)
+        };
+        if max_payload_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE && payload_len > max_payload_size
+        {
+            return Err(RequestError::WebSocketFrameTooLarge(
+                HttpStatus::PayloadTooLarge,
+            ));
+        }
+        let mask_key: Option<[u8; 4]> = if mask {
+            if data_ref.len() < index + 4 {
+                return Ok(None);
+            }
+            let key: [u8; 4] = [
+                data_ref[index],
+                data_ref[index + 1],
+                data_ref[index + 2],
+                data_ref[index + 3],
+            ];
+            index += 4;
+            Some(key)
+        } else {
+            None
+        };
+        let total_len: usize =
+            index
+                .checked_add(payload_len)
+                .ok_or(RequestError::WebSocketFrameTooLarge(
+                    HttpStatus::PayloadTooLarge,
+                ))?;
+        if data_ref.len() < total_len {
+            return Ok(None);
+        }
+        let mut payload: Vec<u8> = data_ref[index..total_len].to_vec();
+        if let Some(mask_key) = mask_key {
+            Self::apply_mask(&mut payload, mask_key);
+        }
+        let frame: WebSocketFrame = WebSocketFrame {
+            fin,
+            opcode,
+            mask,
+            payload_data: payload,
+        };
+        Ok(Some((frame, total_len)))
+    }
+
+    /// Applies a 4-byte RFC 6455 XOR mask to a payload slice in place.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut [u8]` - The payload bytes to mask or unmask.
+    /// - `[u8; 4]` - The 4-byte masking key.
+    #[inline(always)]
+    fn apply_mask(payload: &mut [u8], mask_key: [u8; 4]) {
+        let mask_u32: u32 = u32::from_ne_bytes(mask_key);
+        let (chunks, remainder): (&mut [[u8; 4]], &mut [u8]) = payload.as_chunks_mut::<4>();
+        for chunk in chunks {
+            let word: u32 = u32::from_ne_bytes(*chunk) ^ mask_u32;
+            *chunk = word.to_ne_bytes();
+        }
+        for (idx, byte) in remainder.iter_mut().enumerate() {
+            *byte ^= mask_key[idx];
+        }
     }
 
     /// Creates a list of response frames from the provided body.
@@ -247,6 +392,9 @@ impl WebSocketFrame {
     {
         let data_ref: &[u8] = data.as_ref();
         let total_len: usize = data_ref.len();
+        if total_len == 0 {
+            return vec![vec![0x81, 0x00]];
+        }
         let mut offset: usize = 0;
         let mut frames_list: Vec<ResponseBody> =
             Vec::with_capacity((total_len / MAX_FRAME_SIZE) + 1);
@@ -279,12 +427,12 @@ impl WebSocketFrame {
             frame.push(fin | opcode_byte);
             if frame_size < 126 {
                 frame.push(frame_size as u8);
-            } else if frame_size <= MAX_FRAME_SIZE {
+            } else if frame_size <= usize::from(u16::MAX) {
                 frame.push(126);
                 frame.extend_from_slice(&(frame_size as u16).to_be_bytes());
             } else {
                 frame.push(127);
-                frame.extend_from_slice(&(frame_size as u16).to_be_bytes());
+                frame.extend_from_slice(&(frame_size as u64).to_be_bytes());
             }
             let end: usize = offset + frame_size;
             frame.extend_from_slice(&data_ref[offset..end]);
@@ -389,9 +537,18 @@ impl WebSocketFrame {
     where
         K: AsRef<str>,
     {
-        let key_ref: &str = key.as_ref();
+        let key_bytes: &[u8] = key.as_ref().as_bytes();
+        if key_bytes.len() != 24
+            || key_bytes[22] != b'='
+            || key_bytes[23] != b'='
+            || !key_bytes[..22]
+                .iter()
+                .all(|byte: &u8| byte.is_ascii_alphanumeric() || *byte == b'+' || *byte == b'/')
+        {
+            return None;
+        }
         let mut data: [u8; 60] = [0u8; 60];
-        data[..24].copy_from_slice(&key_ref.as_bytes()[..24.min(key_ref.len())]);
+        data[..24].copy_from_slice(key_bytes);
         data[24..].copy_from_slice(GUID);
         let hash: [u8; 20] = Self::sha1(data);
         Self::try_base64_encode(hash)
@@ -411,20 +568,24 @@ impl WebSocketFrame {
     /// # Returns
     ///
     /// - `String` - The generated WebSocket accept key (typically for the `Sec-WebSocket-Accept` header).
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if the input key cannot be converted to a UTF-8 string.
     #[inline(always)]
     pub fn generate_accept_key<K>(key: K) -> String
     where
         K: AsRef<str>,
     {
-        let key_ref: &str = key.as_ref();
-        let mut data: [u8; 60] = [0u8; 60];
-        data[..24].copy_from_slice(&key_ref.as_bytes()[..24.min(key_ref.len())]);
-        data[24..].copy_from_slice(GUID);
-        let hash: [u8; 20] = Self::sha1(data);
+        let key_bytes: &[u8] = key.as_ref().as_bytes();
+        if key_bytes.len() <= 24 {
+            let mut data: [u8; 60] = [0u8; 60];
+            let key_len: usize = key_bytes.len();
+            data[..key_len].copy_from_slice(key_bytes);
+            data[key_len..key_len + GUID.len()].copy_from_slice(GUID);
+            let hash: [u8; 20] = Self::sha1(&data[..key_len + GUID.len()]);
+            return Self::base64_encode(hash);
+        }
+        let mut data: Vec<u8> = Vec::with_capacity(key_bytes.len() + GUID.len());
+        data.extend_from_slice(key_bytes);
+        data.extend_from_slice(GUID);
+        let hash: [u8; 20] = Self::sha1(&data);
         Self::base64_encode(hash)
     }
 
@@ -551,27 +712,5 @@ impl WebSocketFrame {
     #[inline(always)]
     pub fn is_reserved_opcode(&self) -> bool {
         self.get_opcode().is_reserved()
-    }
-
-    /// Handles a decoded WebSocket Text or Binary frame and accumulates payload data.
-    ///
-    /// # Arguments
-    ///
-    /// - `&mut Vec<u8>` - The accumulated frame data.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<Option<RequestBody>, RequestError>` - Some(request) if frame is complete, None to continue, or error.
-    #[inline(always)]
-    pub(crate) fn build_full_frame(
-        &self,
-        full_frame: &mut Vec<u8>,
-    ) -> Result<Option<RequestBody>, RequestError> {
-        let payload_data: &[u8] = self.get_payload_data();
-        full_frame.extend_from_slice(payload_data);
-        if self.get_fin() {
-            return Ok(Some(mem::take(full_frame)));
-        }
-        Ok(None)
     }
 }

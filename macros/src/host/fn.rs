@@ -15,19 +15,26 @@ use super::*;
 pub(crate) fn host_macro(attr: TokenStream, item: TokenStream, position: Position) -> TokenStream {
     let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_host
+        let checks: Vec<proc_macro2::TokenStream> = multi_host
             .host_values
             .iter()
             .map(|host_value: &Expr| {
                 quote! {
-                    if #context.get_request().get_host() != #host_value {
-                        return ::hyperlane::Status::Continue;
-                    }
+                    #context
+                        .get_request()
+                        .get_host()
+                        .eq_ignore_ascii_case(::std::convert::AsRef::<str>::as_ref(&(#host_value)))
                 }
             })
             .collect();
-        quote! {
-            #(#statements)*
+        if checks.is_empty() {
+            quote! {}
+        } else {
+            quote! {
+                if !(#(#checks)||*) {
+                    return ::hyperlane::Status::Continue;
+                }
+            }
         }
     })
 }
@@ -51,19 +58,26 @@ pub(crate) fn reject_host_macro(
 ) -> TokenStream {
     let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_host
+        let checks: Vec<proc_macro2::TokenStream> = multi_host
             .host_values
             .iter()
             .map(|host_value: &Expr| {
                 quote! {
-                    if #context.get_request().get_host() == #host_value {
-                        return ::hyperlane::Status::Continue;
-                    }
+                    #context
+                        .get_request()
+                        .get_host()
+                        .eq_ignore_ascii_case(::std::convert::AsRef::<str>::as_ref(&(#host_value)))
                 }
             })
             .collect();
-        quote! {
-            #(#statements)*
+        if checks.is_empty() {
+            quote! {}
+        } else {
+            quote! {
+                if #(#checks)||* {
+                    return ::hyperlane::Status::Continue;
+                }
+            }
         }
     })
 }

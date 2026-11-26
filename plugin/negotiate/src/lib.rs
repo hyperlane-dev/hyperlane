@@ -22,8 +22,8 @@ use std::{hash::Hasher, sync::OnceLock};
 use {
     http_compress::{Compress, XxHash3_64},
     hyperlane::{
-        ACCEPT_ENCODING, COMMA, CONTENT_ENCODING, CONTENT_TYPE, Context, EMPTY_STR, ETAG,
-        HttpStatus, Request, RequestHeadersValue, RequestMethod, Response, ResponseHeadersValue,
+        ACCEPT_ENCODING, CACHE_CONTROL, COMMA, CONTENT_ENCODING, CONTENT_TYPE, Context, EMPTY_STR,
+        ETAG, HttpStatus, Request, RequestMethod, Response, ResponseHeadersValue,
         ResponseStatusCode, ServerHook, Status, Stream, TEXT_EVENT_STREAM, VARY,
         VARY_ACCEPT_ENCODING,
     },
