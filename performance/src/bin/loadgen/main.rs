@@ -3,6 +3,7 @@
 //! A closed-loop HTTP/1.1 load generator for the hyperlane benchmark harness.
 mod config;
 mod r#protocol;
+
 #[cfg(test)]
 #[path = "../../../tests/loadgen/mod.rs"]
 mod tests;

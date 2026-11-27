@@ -33,8 +33,7 @@ use h2::{
     client::{ResponseFuture, SendRequest, handshake},
 };
 use h3::{
-    client::RequestStream,
-    client::new,
+    client::{self, RequestStream, new},
     error::{Code, StreamError},
 };
 use h3_quinn::{BidiStream, OpenStreams};

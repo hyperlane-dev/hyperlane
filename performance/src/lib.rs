@@ -6,6 +6,7 @@ mod config;
 mod context;
 mod report;
 mod runner;
+
 #[cfg(test)]
 #[path = "../tests/mod.rs"]
 mod tests;

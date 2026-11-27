@@ -285,7 +285,7 @@ async fn http2_one_connection_answers_a_fast_stream_while_a_slow_stream_is_block
     let order: Arc<Mutex<Vec<&'static str>>> = Arc::new(Mutex::new(Vec::new()));
     let slow_target: String = format!("http://{TLS_SERVER_NAME}:{port}{SLOW_ROUTE_PATH}");
     let slow_order: Arc<Mutex<Vec<&'static str>>> = Arc::clone(&order);
-    let mut slow_sender: h2::client::SendRequest<Bytes> = sender.clone();
+    let mut slow_sender: SendRequest<Bytes> = sender.clone();
     let slow: JoinHandle<Result<H2Reply, String>> = spawn(async move {
         let outcome: Result<H2Reply, String> =
             h2_request(&mut slow_sender, "GET", &slow_target, &[]).await;
@@ -295,7 +295,7 @@ async fn http2_one_connection_answers_a_fast_stream_while_a_slow_stream_is_block
     route_gate(GateSlot::SlowHttp2).await_slow_entered().await;
     let fast_target: String = format!("http://{TLS_SERVER_NAME}:{port}{VERSION_ROUTE_PATH}");
     let fast_order: Arc<Mutex<Vec<&'static str>>> = Arc::clone(&order);
-    let mut fast_sender: h2::client::SendRequest<Bytes> = sender.clone();
+    let mut fast_sender: SendRequest<Bytes> = sender.clone();
     let fast: JoinHandle<Result<H2Reply, String>> = spawn(async move {
         let outcome: Result<H2Reply, String> =
             h2_request(&mut fast_sender, "GET", &fast_target, &[]).await;

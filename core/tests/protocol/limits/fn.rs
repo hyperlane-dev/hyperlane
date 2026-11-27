@@ -76,10 +76,8 @@ pub(super) fn http1_body_request(payload: &[u8]) -> Vec<u8> {
 pub(super) async fn h2_oversized_body_then_get(
     port: u16,
 ) -> Result<(u16, HeaderMap, Vec<u8>), String> {
-    let (mut sender, connection): (
-        h2::client::SendRequest<Bytes>,
-        h2::client::Connection<TcpStream, Bytes>,
-    ) = h2_plaintext_session(port).await?;
+    let (mut sender, connection): (SendRequest<Bytes>, h2::client::Connection<TcpStream, Bytes>) =
+        h2_plaintext_session(port).await?;
     tokio::select! {
         biased;
         result = async {
@@ -107,7 +105,7 @@ pub(super) async fn h3_oversized_body_then_get(
         connect_quic(port, ALPN_HTTP3).await?;
     let (mut driver, mut client): (
         h3::client::Connection<h3_quinn::Connection, Bytes>,
-        h3::client::SendRequest<OpenStreams, Bytes>,
+        client::SendRequest<OpenStreams, Bytes>,
     ) = new(h3_quinn::Connection::new(connection))
         .await
         .map_err(|error: h3::error::ConnectionError| format!("h3 handshake failed: {error}"))?;
@@ -177,10 +175,8 @@ async fn h2_expect_exchange(
     content_length: usize,
     upload: Option<&[u8]>,
 ) -> Result<(u16, Vec<u8>), String> {
-    let (mut sender, connection): (
-        h2::client::SendRequest<Bytes>,
-        h2::client::Connection<TcpStream, Bytes>,
-    ) = h2_plaintext_session(port).await?;
+    let (mut sender, connection): (SendRequest<Bytes>, h2::client::Connection<TcpStream, Bytes>) =
+        h2_plaintext_session(port).await?;
     tokio::select! {
         biased;
         result = async {
@@ -228,7 +224,7 @@ async fn h3_expect_exchange(
         connect_quic(port, ALPN_HTTP3).await?;
     let (mut driver, mut client): (
         h3::client::Connection<h3_quinn::Connection, Bytes>,
-        h3::client::SendRequest<OpenStreams, Bytes>,
+        client::SendRequest<OpenStreams, Bytes>,
     ) = new(h3_quinn::Connection::new(connection))
         .await
         .map_err(|error: h3::error::ConnectionError| format!("h3 handshake failed: {error}"))?;
@@ -275,7 +271,7 @@ pub(crate) fn h2_build_request(
 }
 
 pub(crate) fn h2_open_stream(
-    sender: &mut h2::client::SendRequest<Bytes>,
+    sender: &mut SendRequest<Bytes>,
     request: http::Request<()>,
     end_of_stream: bool,
 ) -> Result<(ResponseFuture, SendStream<Bytes>), String> {
@@ -355,7 +351,7 @@ pub(crate) async fn h2_still_pending(response: ResponseFuture, budget_ms: u64) -
 }
 
 pub(crate) async fn h2_get(
-    sender: &mut h2::client::SendRequest<Bytes>,
+    sender: &mut SendRequest<Bytes>,
     port: u16,
     path: &str,
 ) -> Result<(u16, HeaderMap, Vec<u8>), String> {
@@ -494,7 +490,7 @@ pub(crate) async fn h3_exchange_outcome(
 }
 
 async fn h3_drive(
-    client: &mut h3::client::SendRequest<OpenStreams, Bytes>,
+    client: &mut client::SendRequest<OpenStreams, Bytes>,
     method: &str,
     target: &str,
     body: &[u8],

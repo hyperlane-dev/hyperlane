@@ -28,11 +28,12 @@ mod response;
 mod status;
 mod stream;
 mod task;
+mod upgrade_type;
+mod websocket_frame;
+
 #[cfg(test)]
 #[path = "../tests/mod.rs"]
 mod tests;
-mod upgrade_type;
-mod websocket_frame;
 
 pub use {
     any::*, arc_mutex::*, arc_rwlock::*, attribute::*, body::*, box_leak::*, box_rwlock::*,
