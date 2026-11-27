@@ -4,10 +4,10 @@
 
 **Token-Bucket & Sliding-Window Rate Limiter Plugin**
 
-[![crates.io](https://img.shields.io/crates/v/hyperlane-plugin-rate-limit.svg?style=flat-square)](https://crates.io/crates/hyperlane-plugin-rate-limit)
+[![crates.io](https://flat.badgen.net/crates/v/hyperlane-plugin-rate-limit)](https://crates.io/crates/hyperlane-plugin-rate-limit)
 [![docs.rs](https://img.shields.io/docsrs/hyperlane-plugin-rate-limit?style=flat-square)](https://docs.rs/hyperlane-plugin-rate-limit)
 [![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
-[![License: MIT](https://img.shields.io/crates/l/hyperlane-plugin-rate-limit.svg?style=flat-square)](../../LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](../../LICENSE)
 
 [Workspace Overview](../../README.md) · [API Docs](https://docs.rs/hyperlane-plugin-rate-limit/latest/) · [Agent Engineering Rules](../../AGENTS.md)
 

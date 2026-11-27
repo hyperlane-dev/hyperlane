@@ -4,10 +4,10 @@
 
 **Bounded HTTP Compression & Accept-Encoding Negotiation**
 
-[![crates.io](https://img.shields.io/crates/v/http-compress.svg?style=flat-square)](https://crates.io/crates/http-compress)
+[![crates.io](https://flat.badgen.net/crates/v/http-compress)](https://crates.io/crates/http-compress)
 [![docs.rs](https://img.shields.io/docsrs/http-compress?style=flat-square)](https://docs.rs/http-compress)
 [![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
-[![License: MIT](https://img.shields.io/crates/l/http-compress.svg?style=flat-square)](../LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](../LICENSE)
 
 [Workspace Overview](../README.md) · [API Docs](https://docs.rs/http-compress/latest/) · [Agent Engineering Rules](../AGENTS.md)
 

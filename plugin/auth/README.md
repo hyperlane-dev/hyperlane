@@ -4,10 +4,10 @@
 
 **Authentication & Identity Guard Plugin**
 
-[![crates.io](https://img.shields.io/crates/v/hyperlane-plugin-auth.svg?style=flat-square)](https://crates.io/crates/hyperlane-plugin-auth)
+[![crates.io](https://flat.badgen.net/crates/v/hyperlane-plugin-auth)](https://crates.io/crates/hyperlane-plugin-auth)
 [![docs.rs](https://img.shields.io/docsrs/hyperlane-plugin-auth?style=flat-square)](https://docs.rs/hyperlane-plugin-auth)
 [![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
-[![License: MIT](https://img.shields.io/crates/l/hyperlane-plugin-auth.svg?style=flat-square)](../../LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](../../LICENSE)
 
 [Workspace Overview](../../README.md) · [API Docs](https://docs.rs/hyperlane-plugin-auth/latest/) · [Agent Engineering Rules](../../AGENTS.md)
 

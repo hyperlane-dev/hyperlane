@@ -4,10 +4,10 @@
 
 **Hyperlane Developer CLI & Unified Formatter**
 
-[![crates.io](https://img.shields.io/crates/v/hyperlane-cli.svg?style=flat-square)](https://crates.io/crates/hyperlane-cli)
+[![crates.io](https://flat.badgen.net/crates/v/hyperlane-cli)](https://crates.io/crates/hyperlane-cli)
 [![docs.rs](https://img.shields.io/docsrs/hyperlane-cli?style=flat-square)](https://docs.rs/hyperlane-cli)
 [![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
-[![License: MIT](https://img.shields.io/crates/l/hyperlane-cli.svg?style=flat-square)](../LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](../LICENSE)
 
 [Workspace Overview](../README.md) · [API Docs](https://docs.rs/hyperlane-cli/latest/) · [Agent Engineering Rules](../AGENTS.md)
 

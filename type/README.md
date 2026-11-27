@@ -4,10 +4,10 @@
 
 **RFC 9110/9112 HTTP Wire Types & Builders**
 
-[![crates.io](https://img.shields.io/crates/v/http-type.svg?style=flat-square)](https://crates.io/crates/http-type)
+[![crates.io](https://flat.badgen.net/crates/v/http-type)](https://crates.io/crates/http-type)
 [![docs.rs](https://img.shields.io/docsrs/http-type?style=flat-square)](https://docs.rs/http-type)
 [![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
-[![License: MIT](https://img.shields.io/crates/l/http-type.svg?style=flat-square)](../LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](../LICENSE)
 
 [Workspace Overview](../README.md) · [API Docs](https://docs.rs/http-type/latest/) · [Agent Engineering Rules](../AGENTS.md)
 

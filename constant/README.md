@@ -4,10 +4,10 @@
 
 **Shared HTTP Protocol Constants**
 
-[![crates.io](https://img.shields.io/crates/v/http-constant.svg?style=flat-square)](https://crates.io/crates/http-constant)
+[![crates.io](https://flat.badgen.net/crates/v/http-constant)](https://crates.io/crates/http-constant)
 [![docs.rs](https://img.shields.io/docsrs/http-constant?style=flat-square)](https://docs.rs/http-constant)
 [![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
-[![License: MIT](https://img.shields.io/crates/l/http-constant.svg?style=flat-square)](../LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](../LICENSE)
 
 [Workspace Overview](../README.md) · [API Docs](https://docs.rs/http-constant/latest/) · [Agent Engineering Rules](../AGENTS.md)
 

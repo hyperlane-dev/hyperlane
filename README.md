@@ -6,7 +6,7 @@
 
 **High-Performance Multi-Protocol Asynchronous Rust HTTP/1.x · HTTP/2 · HTTP/3 Web Framework & Plugin Ecosystem**
 
-[![Crates.io](https://img.shields.io/crates/v/hyperlane.svg?style=flat-square)][crate]
+[![Crates.io](https://flat.badgen.net/crates/v/hyperlane)][crate]
 [![Docs.rs](https://img.shields.io/docsrs/hyperlane?style=flat-square)][api]
 [![Rust CI](https://img.shields.io/github/actions/workflow/status/hyperlane-dev/hyperlane/rust.yml?branch=master&style=flat-square&label=CI)][ci]
 [![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
@@ -24,18 +24,12 @@
 
 ```mermaid
 flowchart LR
-    App["User Service
-Routes · Middleware · Hooks"] --> Facade["hyperlane
-Facade Crate"]
-    Facade --> Core["hyperlane-core
-HTTP/1.x · HTTP/2 · HTTP/3 · io_uring"]
-    Facade --> Macros["hyperlane-macros
-#[route] · #[send] · #[hyperlane]"]
+    App["User Service\nRoutes · Middleware · Hooks"] --> Facade["hyperlane\nFacade Crate"]
+    Facade --> Core["hyperlane-core\nHTTP/1.x · HTTP/2 · HTTP/3 · io_uring"]
+    Facade --> Macros["hyperlane-macros\n#[route] · #[send] · #[hyperlane]"]
     Core --> Wire["http-type · http-constant · http-compress"]
-    App --> Plugins["20 Opt-In Plugins
-Auth · Cache · CORS · Gateway · gRPC · MCP · WS · SSE ..."]
-    Plugins --> Client["http-request
-Sync & Async H1/H2 Client"]
+    App --> Plugins["20 Opt-In Plugins\nAuth · Cache · CORS · Gateway · gRPC · MCP · WS · SSE ..."]
+    Plugins --> Client["http-request\nSync & Async H1/H2 Client"]
     Tooling["hyperlane-cli (hyperlane fmt) · hyperlane-performance"] -.-> Facade
 ```
 
@@ -58,8 +52,7 @@ use hyperlane::{Context, Server, ServerConfig, ServerError, ServerHook, Status, 
 
 const ADDRESS: &str = "127.0.0.1:3000";
 const ROOT_PATH: &str = "/";
-const GREETING: &str = "Hello from Hyperlane!
-";
+const GREETING: &str = "Hello from Hyperlane!\n";
 
 struct Hello;
 

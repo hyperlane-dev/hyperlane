@@ -4,10 +4,10 @@
 
 **Sanitized Console & File Logger Plugin**
 
-[![crates.io](https://img.shields.io/crates/v/hyperlane-plugin-logger.svg?style=flat-square)](https://crates.io/crates/hyperlane-plugin-logger)
+[![crates.io](https://flat.badgen.net/crates/v/hyperlane-plugin-logger)](https://crates.io/crates/hyperlane-plugin-logger)
 [![docs.rs](https://img.shields.io/docsrs/hyperlane-plugin-logger?style=flat-square)](https://docs.rs/hyperlane-plugin-logger)
 [![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
-[![License: MIT](https://img.shields.io/crates/l/hyperlane-plugin-logger.svg?style=flat-square)](../../LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](../../LICENSE)
 
 [Workspace Overview](../../README.md) · [API Docs](https://docs.rs/hyperlane-plugin-logger/latest/) · [Agent Engineering Rules](../../AGENTS.md)
 

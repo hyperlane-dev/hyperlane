@@ -4,10 +4,10 @@
 
 **WHATWG Server-Sent Events (SSE) Plugin**
 
-[![crates.io](https://img.shields.io/crates/v/hyperlane-plugin-sse.svg?style=flat-square)](https://crates.io/crates/hyperlane-plugin-sse)
+[![crates.io](https://flat.badgen.net/crates/v/hyperlane-plugin-sse)](https://crates.io/crates/hyperlane-plugin-sse)
 [![docs.rs](https://img.shields.io/docsrs/hyperlane-plugin-sse?style=flat-square)](https://docs.rs/hyperlane-plugin-sse)
 [![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
-[![License: MIT](https://img.shields.io/crates/l/hyperlane-plugin-sse.svg?style=flat-square)](../../LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](../../LICENSE)
 
 [Workspace Overview](../../README.md) · [API Docs](https://docs.rs/hyperlane-plugin-sse/latest/) · [Agent Engineering Rules](../../AGENTS.md)
 

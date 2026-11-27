@@ -4,10 +4,10 @@
 
 **JSON-RPC 2.0 Server Plugin**
 
-[![crates.io](https://img.shields.io/crates/v/hyperlane-plugin-rpc.svg?style=flat-square)](https://crates.io/crates/hyperlane-plugin-rpc)
+[![crates.io](https://flat.badgen.net/crates/v/hyperlane-plugin-rpc)](https://crates.io/crates/hyperlane-plugin-rpc)
 [![docs.rs](https://img.shields.io/docsrs/hyperlane-plugin-rpc?style=flat-square)](https://docs.rs/hyperlane-plugin-rpc)
 [![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
-[![License: MIT](https://img.shields.io/crates/l/hyperlane-plugin-rpc.svg?style=flat-square)](../../LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](../../LICENSE)
 
 [Workspace Overview](../../README.md) · [API Docs](https://docs.rs/hyperlane-plugin-rpc/latest/) · [Agent Engineering Rules](../../AGENTS.md)
 
