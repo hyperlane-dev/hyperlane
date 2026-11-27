@@ -15,7 +15,7 @@ Rust edition `2024`, unified workspace version in root `Cargo.toml`.
 | `http-constant`                 | `constant/`            | Shared HTTP header/method/status/symbol constants                                                                                                                                                                       |
 | `http-compress`                 | `compress/`            | Bounded gzip, deflate, and brotli compression/decompression (`MAX_DECOMPRESSED_BYTES = 64 MiB`), RFC 9110 `Accept-Encoding` negotiation                                                                                 |
 | `http-request`                  | `request/`             | Sync and async HTTP/1.1 + HTTP/2 client with opt-in keep-alive pooling, TLS session resumption, custom PEM roots, retries, form/multipart, and HTTP/SOCKS5 proxies                                                      |
-| `hyperlane-cli`                 | `cli/`                 | CLI project scaffolding and workflow tooling                                                                                                                                                                            |
+| `hyperlane-cli`                 | `cli/`                 | CLI project scaffolding, `hyperlane fmt` (layered on `crate-cli`), and workflow tooling                                                                                                                                 |
 | `hyperlane-performance`         | `performance/`         | Official CPU-pinned Docker and native loadgen / control / alloc-count benchmark harness                                                                                                                                 |
 | `hyperlane-plugin-auth`         | `plugin/auth/`         | Pure-Rust HS256 JWT (`kid` rotation), API key, HTTP Basic, RBAC `AuthPrincipal`, extensible `Authenticator`, `AuthHook`                                                                                                 |
 | `hyperlane-plugin-cache`        | `plugin/cache/`        | 64-way sharded bounded memory cache, single-flight coalescing, pluggable `CacheStore`, HTTP response caching (`CacheRequestHook`/`CacheResponseHook`)                                                                   |
@@ -79,6 +79,31 @@ cargo check --release --workspace --all-features
 ```
 
 For performance changes, validate with real paired measurements (`performance/` harness: `h1`, `h1-tls`, `h2c`, `h2-tls`, `h3`, `errors == 0`, plus deterministic `alloc-count`), never code inspection alone.
+
+## Unified Layered Formatting (`hyperlane fmt`)
+
+`hyperlane-cli` integrates `crate-cli` unified Prettier-aligned formatting as the mandatory first pass before Hyperlane attribute normalization and `cargo fmt --all`:
+
+```sh
+cargo run -p hyperlane-cli -- fmt
+cargo run -p hyperlane-cli -- fmt
+cargo run -p hyperlane-cli -- fmt --check
+cargo fmt --all -- --check
+```
+
+Always run `hyperlane fmt` locally before pushing so `.github/workflows/*.yml` stay pre-formatted (CI `publish` uses `GITHUB_TOKEN`, which cannot push workflow file diffs).
+
+## Unified Documentation & Skill Maintenance Policy
+
+| Change Trigger                                                | Target Document(s)                                                                                        | Mandatory Update Procedure                                                                                                                                                                                          |
+| :------------------------------------------------------------ | :-------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Add, rename, or remove a workspace crate or plugin            | Root `README.md`, `<crate>/README.md`, `plugin/README.md`, root `AGENTS.md`, `.github/workflows/rust.yml` | Update the 29-crate tables, workspace members, CI `PACKAGES`, and crate README in the same commit.                                                                                                                  |
+| Change wire/protocol behavior, `ServerHook`, or security caps | Root `README.md`, `core/README.md`, `type/README.md`, root `AGENTS.md`                                    | Document wire guarantees and verify with real wire-byte tests.                                                                                                                                                      |
+| Add or change CLI subcommands or formatting behavior          | `cli/README.md`, root `README.md`, root `AGENTS.md`, `.agents/skills/hyperlane/SKILL.md`                  | Keep CLI commands, `hyperlane fmt` layering, and verification gates synchronized.                                                                                                                                   |
+| Upgrade upstream `ctares` dependencies or cut a release       | Root `Cargo.toml`, downstream Tier 3/4 repos                                                              | Wait until `ctares` is live on `crates.io`, bump version, run `hyperlane fmt` + full gates, verify green CI + `crates.io` publish, then cascade to `hyperlane-quick-start`, `commerce-suite`, and `web-frameworks`. |
+
+- Run `cargo run -p hyperlane-cli -- fmt --check` after any documentation edit.
+- Keep `.agents/skills/hyperlane/SKILL.md` synchronized with `~/.agents/skills/hyperlane/SKILL.md` (standards, requirements, and workflows only; `<= 160` lines; validated via `audit_skills.py`).
 
 ## Repo-Local Skills
 

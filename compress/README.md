@@ -1,37 +1,55 @@
-<center>
+<div align="center">
 
-## http-compress
+# http-compress
 
-[![](https://img.shields.io/crates/v/http-compress.svg)](https://crates.io/crates/http-compress)
-[![](https://img.shields.io/crates/d/http-compress.svg)](https://img.shields.io/crates/d/http-compress.svg)
-[![](https://docs.rs/http-compress/badge.svg)](https://docs.rs/http-compress)
-[![](https://github.com/hyperlane-dev/http-compress/workflows/Rust/badge.svg)](https://github.com/hyperlane-dev/http-compress/actions?query=workflow:Rust)
-[![](https://img.shields.io/crates/l/http-compress.svg)](./LICENSE)
+**Bounded HTTP Compression & Accept-Encoding Negotiation**
 
-</center>
+[![crates.io](https://img.shields.io/crates/v/http-compress.svg?style=flat-square)](https://crates.io/crates/http-compress)
+[![docs.rs](https://img.shields.io/docsrs/http-compress?style=flat-square)](https://docs.rs/http-compress)
+[![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
+[![License: MIT](https://img.shields.io/crates/l/http-compress.svg?style=flat-square)](../LICENSE)
 
-[Api Docs](https://docs.rs/http-compress/latest/)
+[Workspace Overview](../README.md) · [API Docs](https://docs.rs/http-compress/latest/) · [Agent Engineering Rules](../AGENTS.md)
 
-> A high-performance async library for HTTP compression/decompression, supporting Brotli, Deflate, and Gzip algorithms. Provides both compression and decompression capabilities with optimized memory usage, ideal for HTTP clients/servers and network programming.
+</div>
 
-## Features
+---
+
+## Overview
+
+Gzip, deflate, and brotli encoders/decoders with strict decompression bomb caps (`MAX_DECOMPRESSED_BYTES = 64 MiB`) and zero-allocation RFC 9110 `Accept-Encoding` negotiation.
+
+This crate is a member of the [`hyperlane`](../README.md) unified Rust 2024 workspace. All plugin crates are opt-in and transparent (`Status::Continue`) when unconfigured.
+
+## Responsibilities & Module Layout
+
+- `compress` — `Compress::from_accept_encoding`, `as_str`, and bounded stream codecs
 
 ## Installation
 
-To use this crate, you can run cmd:
-
-```shell
+```sh
 cargo add http-compress
 ```
 
+## Verification
+
+Run crate-scoped formatting, lint, and test gates from the workspace root:
+
+```sh
+cargo run -p hyperlane-cli -- fmt --check
+cargo clippy -p http-compress --all-features --all-targets -- -D warnings
+cargo test -p http-compress --all-features
+```
+
+## Documentation & Governance
+
+- Update this `README.md` alongside any public API, plugin contract, or module-boundary change per [`../AGENTS.md`](../AGENTS.md).
+- Project standards and release workflows live in [`../.agents/skills/hyperlane/SKILL.md`](../.agents/skills/hyperlane/SKILL.md).
+
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Contributing
-
-Contributions are welcome! Please open an issue or submit a pull request.
+This project is licensed under the MIT License. See the [LICENSE](../LICENSE) file for details.
 
 ## Contact
 
-For any inquiries, please reach out to the author at [root@devhub.vip](mailto:root@devhub.vip).
+For inquiries, please contact the author at [root@devhub.vip](mailto:root@devhub.vip).

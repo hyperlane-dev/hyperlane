@@ -12,7 +12,7 @@ categories = ["network-programming", "web-programming"]
 exclude.workspace = true
 
 [workspace.package]
-version = "22.11.0"
+version = "22.12.0"
 readme = "README.md"
 edition = "2024"
 authors = ["root@devhub.vip"]
@@ -66,13 +66,13 @@ members = [
 ]
 
 [workspace.dependencies]
-hyperlane = { path = ".", version = "22.11.0" }
-http-type = { path = "type", version = "22.11.0" }
-hyperlane-core = { path = "core", version = "22.11.0" }
-http-request = { path = "request", version = "22.11.0" }
-http-compress = { path = "compress", version = "22.11.0" }
-http-constant = { path = "constant", version = "22.11.0" }
-hyperlane-macros = { path = "macros", version = "22.11.0" }
+hyperlane = { path = ".", version = "22.12.0" }
+http-type = { path = "type", version = "22.12.0" }
+hyperlane-core = { path = "core", version = "22.12.0" }
+http-request = { path = "request", version = "22.12.0" }
+http-compress = { path = "compress", version = "22.12.0" }
+http-constant = { path = "constant", version = "22.12.0" }
+hyperlane-macros = { path = "macros", version = "22.12.0" }
 
 h3 = "0.0.8"
 h2 = "0.4.20"
@@ -90,18 +90,18 @@ futures = "0.3.34"
 h3-quinn = "0.0.10"
 io-uring = "0.7.16"
 twox-hash = "2.1.5"
-crate-cli = "10.7.0"
+crate-cli = "10.8.0"
 inventory = "0.3.25"
 thiserror = "2.0.21"
 toml_edit = "0.25.20"
 serde-xml-rs = "0.8.2"
 serde_json = "1.0.154"
-color-output = "10.7.0"
+color-output = "10.8.0"
 proc-macro2 = "1.0.107"
 webpki-roots = "1.0.12"
-lombok-macros = "10.7.0"
+lombok-macros = "10.8.0"
 serde_urlencoded = "0.7.1"
-tokio-broadcast = "10.7.0"
+tokio-broadcast = "10.8.0"
 syn = { version = "3.0.10", features = ["full"] }
 socket2 = { version = "0.6.5", features = ["all"] }
 tokio = { version = "1.54.1", features = ["full"] }

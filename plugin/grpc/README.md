@@ -1,3 +1,55 @@
+<div align="center">
+
 # hyperlane-plugin-grpc
 
-A gRPC over HTTP/2 plugin for the Hyperlane framework providing 5-byte length-prefixed framing, bounded compression/decompression, canonical gRPC status codes `0..=16`, percent-encoded `grpc-message`, `grpc-timeout` deadline enforcement, service routing, and an opt-in `GrpcHook` `ServerHook`.
+**gRPC over HTTP/2 Plugin**
+
+[![crates.io](https://img.shields.io/crates/v/hyperlane-plugin-grpc.svg?style=flat-square)](https://crates.io/crates/hyperlane-plugin-grpc)
+[![docs.rs](https://img.shields.io/docsrs/hyperlane-plugin-grpc?style=flat-square)](https://docs.rs/hyperlane-plugin-grpc)
+[![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
+[![License: MIT](https://img.shields.io/crates/l/hyperlane-plugin-grpc.svg?style=flat-square)](../../LICENSE)
+
+[Workspace Overview](../../README.md) · [API Docs](https://docs.rs/hyperlane-plugin-grpc/latest/) · [Agent Engineering Rules](../../AGENTS.md)
+
+</div>
+
+---
+
+## Overview
+
+Opt-in gRPC framing and dispatch over Hyperlane HTTP/2 with 5-byte length-prefixed frames, bounded compression, gRPC status codes `0..=16`, and `grpc-timeout`.
+
+This crate is a member of the [`hyperlane`](../../README.md) unified Rust 2024 workspace. All plugin crates are opt-in and transparent (`Status::Continue`) when unconfigured.
+
+## Responsibilities & Module Layout
+
+- `struct` / `trait` / `impl` — `GrpcHook`, codec helpers, and trailer status mapping
+
+## Installation
+
+```sh
+cargo add hyperlane-plugin-grpc
+```
+
+## Verification
+
+Run crate-scoped formatting, lint, and test gates from the workspace root:
+
+```sh
+cargo run -p hyperlane-cli -- fmt --check
+cargo clippy -p hyperlane-plugin-grpc --all-features --all-targets -- -D warnings
+cargo test -p hyperlane-plugin-grpc --all-features
+```
+
+## Documentation & Governance
+
+- Update this `README.md` alongside any public API, plugin contract, or module-boundary change per [`../../AGENTS.md`](../../AGENTS.md).
+- Project standards and release workflows live in [`../../.agents/skills/hyperlane/SKILL.md`](../../.agents/skills/hyperlane/SKILL.md).
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](../../LICENSE) file for details.
+
+## Contact
+
+For inquiries, please contact the author at [root@devhub.vip](mailto:root@devhub.vip).

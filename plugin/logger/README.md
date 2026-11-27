@@ -1,37 +1,55 @@
+<div align="center">
+
 # hyperlane-plugin-logger
 
-Writes the log of a server to the console, to a file, or to both, and can log
-every request that the server answers.
+**Sanitized Console & File Logger Plugin**
 
-```rust,ignore
-LoggerPlugin::init(LoggerConfig {
-    level: LevelFilter::Info,
-    file: Some("server.log".to_owned()),
-})?;
+[![crates.io](https://img.shields.io/crates/v/hyperlane-plugin-logger.svg?style=flat-square)](https://crates.io/crates/hyperlane-plugin-logger)
+[![docs.rs](https://img.shields.io/docsrs/hyperlane-plugin-logger?style=flat-square)](https://docs.rs/hyperlane-plugin-logger)
+[![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
+[![License: MIT](https://img.shields.io/crates/l/hyperlane-plugin-logger.svg?style=flat-square)](../../LICENSE)
+
+[Workspace Overview](../../README.md) · [API Docs](https://docs.rs/hyperlane-plugin-logger/latest/) · [Agent Engineering Rules](../../AGENTS.md)
+
+</div>
+
+---
+
+## Overview
+
+Opt-in structured request and application logger with CRLF/ANSI injection sanitization and configurable output sinks.
+
+This crate is a member of the [`hyperlane`](../../README.md) unified Rust 2024 workspace. All plugin crates are opt-in and transparent (`Status::Continue`) when unconfigured.
+
+## Responsibilities & Module Layout
+
+- `struct` / `enum` / `trait` / `impl` — Sanitized log formatters, file/console sinks, and lifecycle hooks
+
+## Installation
+
+```sh
+cargo add hyperlane-plugin-logger
 ```
 
-The request log is a middleware pair, so it is installed with the server. It
-does nothing until the logger is configured, so a service that never calls
-`init` writes no request log.
+## Verification
 
-## Configuration
+Run crate-scoped formatting, lint, and test gates from the workspace root:
 
-| field   | meaning                                            |
-| ------- | -------------------------------------------------- |
-| `level` | the highest level that is written                  |
-| `file`  | the file the log is appended to, when there is one |
+```sh
+cargo run -p hyperlane-cli -- fmt --check
+cargo clippy -p hyperlane-plugin-logger --all-features --all-targets -- -D warnings
+cargo test -p hyperlane-plugin-logger --all-features
+```
 
-## The request log
+## Documentation & Governance
 
-Each answered request is written with its method, its path, its status and the
-time it took. The time is measured by a request middleware that notes when the
-request arrived, and read by a response middleware that writes the line.
+- Update this `README.md` alongside any public API, plugin contract, or module-boundary change per [`../../AGENTS.md`](../../AGENTS.md).
+- Project standards and release workflows live in [`../../.agents/skills/hyperlane/SKILL.md`](../../.agents/skills/hyperlane/SKILL.md).
 
-## Order
+## License
 
-The request middleware uses the order `-120`, so it notes the arrival before
-the middlewares of the application run, and the response middleware uses the
-order `100`, so it reports the answer after the application built and sent
-it. The plugins that answer a request keep the negative orders, and an
-application that gives its own middlewares positive orders runs between the
-two.
+This project is licensed under the MIT License. See the [LICENSE](../../LICENSE) file for details.
+
+## Contact
+
+For inquiries, please contact the author at [root@devhub.vip](mailto:root@devhub.vip).

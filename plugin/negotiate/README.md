@@ -1,62 +1,55 @@
+<div align="center">
+
 # hyperlane-plugin-negotiate
 
-Answers a response with the content coding the client accepts, and answers a
-conditional request with `304 Not Modified` while a validator still matches.
+**Content-Encoding & Conditional 304 Plugin**
 
-```rust,ignore
-use hyperlane_plugin_negotiate::{CompressMiddleware, ConditionalMiddleware};
+[![crates.io](https://img.shields.io/crates/v/hyperlane-plugin-negotiate.svg?style=flat-square)](https://crates.io/crates/hyperlane-plugin-negotiate)
+[![docs.rs](https://img.shields.io/docsrs/hyperlane-plugin-negotiate?style=flat-square)](https://docs.rs/hyperlane-plugin-negotiate)
+[![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
+[![License: MIT](https://img.shields.io/crates/l/hyperlane-plugin-negotiate.svg?style=flat-square)](../../LICENSE)
 
-server
-    .response_middleware::<CompressMiddleware>()
-    .response_middleware::<ConditionalMiddleware>()
-    .response_middleware::<SendMiddleware>();
+[Workspace Overview](../../README.md) · [API Docs](https://docs.rs/hyperlane-plugin-negotiate/latest/) · [Agent Engineering Rules](../../AGENTS.md)
+
+</div>
+
+---
+
+## Overview
+
+Opt-in `CompressMiddleware` (`Accept-Encoding` negotiation + `Vary`) and `ConditionalMiddleware` (strong `ETag` generation + `304 Not Modified`).
+
+This crate is a member of the [`hyperlane`](../../README.md) unified Rust 2024 workspace. All plugin crates are opt-in and transparent (`Status::Continue`) when unconfigured.
+
+## Responsibilities & Module Layout
+
+- `struct` / `impl` — `CompressMiddleware`, `CompressConfig`, and `ConditionalMiddleware`
+
+## Installation
+
+```sh
+cargo add hyperlane-plugin-negotiate
 ```
 
-Both are response middlewares, so a route keeps building its response and
-returning `Status::Continue`, and the middleware that writes the response onto
-the stream runs last. A route that answers with `#[hyperlane::send]` writes the
-bytes itself, which leaves nothing for a response middleware to negotiate.
+## Verification
 
-## The content coding
+Run crate-scoped formatting, lint, and test gates from the workspace root:
 
-The middleware reads every `Accept-Encoding` field of the request, picks the
-coding the client wants most among the ones `http-compress` implements, and
-declares it on the response. The response builder applies the coding and the
-length it produces when the sender serializes the response, so the middleware
-never touches the stream.
-
-A response is left alone when it already declares a `Content-Encoding`, when it
-is an event stream, when its status carries no body, and when its body is
-shorter than the threshold. Every coded response also declares
-`Vary: accept-encoding`, so a cache never answers a client with a coding it did
-not ask for. A `Vary` the response already declares is extended rather than
-replaced.
-
-| knob         | default | meaning                                                             |
-| ------------ | ------- | ------------------------------------------------------------------- |
-| `min_length` | `256`   | the body length below which a response is answered without a coding |
-
-The threshold is process wide, because the framework registers a middleware by
-its type and builds a hook per request, so a server cannot carry a configuration
-of its own.
-
-```rust,ignore
-CompressMiddleware::init(CompressConfig::new(1_024))?;
+```sh
+cargo run -p hyperlane-cli -- fmt --check
+cargo clippy -p hyperlane-plugin-negotiate --all-features --all-targets -- -D warnings
+cargo test -p hyperlane-plugin-negotiate --all-features
 ```
 
-## The conditional request
+## Documentation & Governance
 
-The middleware declares a strong entity-tag on every response that carries a
-body and a safe method, unless the response already declares one, and answers
-`304 Not Modified` when the request carries an `If-None-Match` that matches it.
-The tag is the quoted hexadecimal digest of the body, so the same body always
-produces the same tag, across processes and across restarts.
+- Update this `README.md` alongside any public API, plugin contract, or module-boundary change per [`../../AGENTS.md`](../../AGENTS.md).
+- Project standards and release workflows live in [`../../.agents/skills/hyperlane/SKILL.md`](../../.agents/skills/hyperlane/SKILL.md).
 
-A `304` keeps the representation metadata, so the validator, the variance and
-the content type of the answer survive it.
+## License
 
-## Order
+This project is licensed under the MIT License. See the [LICENSE](../../LICENSE) file for details.
 
-Register the coding middleware before the conditional middleware. The coding
-middleware declares the variance, and the conditional middleware can then turn
-the answer into a `304` that keeps it.
+## Contact
+
+For inquiries, please contact the author at [root@devhub.vip](mailto:root@devhub.vip).

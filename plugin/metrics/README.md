@@ -1,7 +1,55 @@
+<div align="center">
+
 # hyperlane-plugin-metrics
 
-Zero-lock Prometheus / OpenMetrics 0.0.4 observability plugin for Hyperlane.
+**Prometheus & Runtime Metrics Plugin**
 
-- Built-in lock-free atomic counters (2xx/3xx/4xx/5xx status classes, response bytes), in-flight gauge, and fixed-bucket request duration histogram.
-- Extensible `MetricsRegistry` returning lock-free `Arc<Counter>`, `Arc<Gauge>`, and `Arc<Histogram>` handles for custom application metrics.
-- Exposes a scrapeable `/metrics` endpoint with optional constant-time bearer token guard.
+[![crates.io](https://img.shields.io/crates/v/hyperlane-plugin-metrics.svg?style=flat-square)](https://crates.io/crates/hyperlane-plugin-metrics)
+[![docs.rs](https://img.shields.io/docsrs/hyperlane-plugin-metrics?style=flat-square)](https://docs.rs/hyperlane-plugin-metrics)
+[![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
+[![License: MIT](https://img.shields.io/crates/l/hyperlane-plugin-metrics.svg?style=flat-square)](../../LICENSE)
+
+[Workspace Overview](../../README.md) · [API Docs](https://docs.rs/hyperlane-plugin-metrics/latest/) · [Agent Engineering Rules](../../AGENTS.md)
+
+</div>
+
+---
+
+## Overview
+
+Opt-in HTTP request counters, latency histograms, in-flight gauges, and Prometheus text-format scrape endpoint hook.
+
+This crate is a member of the [`hyperlane`](../../README.md) unified Rust 2024 workspace. All plugin crates are opt-in and transparent (`Status::Continue`) when unconfigured.
+
+## Responsibilities & Module Layout
+
+- `struct` / `trait` / `impl` — Lock-free metric collectors and scrape handler
+
+## Installation
+
+```sh
+cargo add hyperlane-plugin-metrics
+```
+
+## Verification
+
+Run crate-scoped formatting, lint, and test gates from the workspace root:
+
+```sh
+cargo run -p hyperlane-cli -- fmt --check
+cargo clippy -p hyperlane-plugin-metrics --all-features --all-targets -- -D warnings
+cargo test -p hyperlane-plugin-metrics --all-features
+```
+
+## Documentation & Governance
+
+- Update this `README.md` alongside any public API, plugin contract, or module-boundary change per [`../../AGENTS.md`](../../AGENTS.md).
+- Project standards and release workflows live in [`../../.agents/skills/hyperlane/SKILL.md`](../../.agents/skills/hyperlane/SKILL.md).
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](../../LICENSE) file for details.
+
+## Contact
+
+For inquiries, please contact the author at [root@devhub.vip](mailto:root@devhub.vip).

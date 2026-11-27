@@ -1,45 +1,56 @@
-<center>
+<div align="center">
 
-## hyperlane
+# hyperlane-core
 
-<img src="https://ltpp.vip/github/pages/docs-pages/pages/img/hyperlane.png" alt="" height="160">
+**Multi-Protocol Async HTTP Server Core**
 
-[![](https://img.shields.io/crates/v/hyperlane.svg)](https://crates.io/crates/hyperlane)
-[![](https://img.shields.io/crates/d/hyperlane.svg)](https://img.shields.io/crates/d/hyperlane.svg)
-[![](https://docs.rs/hyperlane/badge.svg)](https://docs.rs/hyperlane)
-[![](https://github.com/hyperlane-dev/hyperlane/workflows/Rust/badge.svg)](https://github.com/hyperlane-dev/hyperlane/actions?query=workflow:Rust)
-[![](https://img.shields.io/crates/l/hyperlane.svg)](./LICENSE)
+[![crates.io](https://img.shields.io/crates/v/hyperlane-core.svg?style=flat-square)](https://crates.io/crates/hyperlane-core)
+[![docs.rs](https://img.shields.io/docsrs/hyperlane-core?style=flat-square)](https://docs.rs/hyperlane-core)
+[![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
+[![License: MIT](https://img.shields.io/crates/l/hyperlane-core.svg?style=flat-square)](../LICENSE)
 
-</center>
+[Workspace Overview](../README.md) · [API Docs](https://docs.rs/hyperlane-core/latest/) · [Agent Engineering Rules](../AGENTS.md)
 
-[Api Docs](https://docs.rs/hyperlane/latest/)
+</div>
 
-> A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
+---
+
+## Overview
+
+Tokio-based HTTP/1.x, HTTP/2 (`h2c`/`h2`), and HTTP/3 (QUIC) server engine with radix routing, `Context`, `ServerHook` lifecycle, and Linux `io_uring` transport.
+
+This crate is a member of the [`hyperlane`](../README.md) unified Rust 2024 workspace. All plugin crates are opt-in and transparent (`Status::Continue`) when unconfigured.
+
+## Responsibilities & Module Layout
+
+- `server` / `route` / `hook` / `context` / `config` / `error` — Public server API and lifecycle traits
+- `listener` / `protocol` / `tls` (`pub(crate)`) — Internal wire framers, connection pumps, and transport engines
 
 ## Installation
 
-To use this crate, you can run cmd:
-
-```shell
-cargo add hyperlane
+```sh
+cargo add hyperlane-core
 ```
 
-## Quick start
+## Verification
 
-- [hyperlane-quick-start git](https://github.com/hyperlane-dev/hyperlane-quick-start)
+Run crate-scoped formatting, lint, and test gates from the workspace root:
 
 ```sh
-git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
+cargo run -p hyperlane-cli -- fmt --check
+cargo clippy -p hyperlane-core --all-features --all-targets -- -D warnings
+cargo test -p hyperlane-core --all-features
 ```
+
+## Documentation & Governance
+
+- Update this `README.md` alongside any public API, plugin contract, or module-boundary change per [`../AGENTS.md`](../AGENTS.md).
+- Project standards and release workflows live in [`../.agents/skills/hyperlane/SKILL.md`](../.agents/skills/hyperlane/SKILL.md).
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Contributing
-
-Contributions are welcome! Please open an issue or submit a pull request.
+This project is licensed under the MIT License. See the [LICENSE](../LICENSE) file for details.
 
 ## Contact
 
-For any inquiries, please reach out to the author at [root@devhub.vip](mailto:root@devhub.vip).
+For inquiries, please contact the author at [root@devhub.vip](mailto:root@devhub.vip).

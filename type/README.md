@@ -1,45 +1,56 @@
-<center>
+<div align="center">
 
-## hyperlane
+# http-type
 
-<img src="https://ltpp.vip/github/pages/docs-pages/pages/img/hyperlane.png" alt="" height="160">
+**RFC 9110/9112 HTTP Wire Types & Builders**
 
-[![](https://img.shields.io/crates/v/hyperlane.svg)](https://crates.io/crates/hyperlane)
-[![](https://img.shields.io/crates/d/hyperlane.svg)](https://img.shields.io/crates/d/hyperlane.svg)
-[![](https://docs.rs/hyperlane/badge.svg)](https://docs.rs/hyperlane)
-[![](https://github.com/hyperlane-dev/hyperlane/workflows/Rust/badge.svg)](https://github.com/hyperlane-dev/hyperlane/actions?query=workflow:Rust)
-[![](https://img.shields.io/crates/l/hyperlane.svg)](./LICENSE)
+[![crates.io](https://img.shields.io/crates/v/http-type.svg?style=flat-square)](https://crates.io/crates/http-type)
+[![docs.rs](https://img.shields.io/docsrs/http-type?style=flat-square)](https://docs.rs/http-type)
+[![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
+[![License: MIT](https://img.shields.io/crates/l/http-type.svg?style=flat-square)](../LICENSE)
 
-</center>
+[Workspace Overview](../README.md) · [API Docs](https://docs.rs/http-type/latest/) · [Agent Engineering Rules](../AGENTS.md)
 
-[Api Docs](https://docs.rs/hyperlane/latest/)
+</div>
 
-> A comprehensive Rust type library for HTTP operations and concurrent programming. Provides core HTTP types (Request/Response with builder patterns, Method, HttpStatus, HttpVersion, ContentType, FileExtension with MIME mapping, Cookie parsing/building, HttpUrl parsing, WebSocket frame/opcode, protocol upgrade types, stream/task management, panic handling), thread-safe concurrent wrappers (ArcMutex, ArcRwLock, BoxRwLock, RcRwLock), dynamic dispatch types (BoxAny, RcAny, ArcAny with Send/Sync variants), high-performance hash collections (HashMapXxHash3_64, HashSetXxHash3_64), and static lifetime utilities (BoxLeak, Lifetime trait).
+---
+
+## Overview
+
+Wire-accurate `Request`, `Response`, `Stream`, `Cookie`, `MultipartFormData`, `WebSocket`, `Status`, and `RequestConfig` with CRLF/smuggling rejection and HEAD-aware response serialization.
+
+This crate is a member of the [`hyperlane`](../README.md) unified Rust 2024 workspace. All plugin crates are opt-in and transparent (`Status::Continue`) when unconfigured.
+
+## Responsibilities & Module Layout
+
+- `request` / `response` — Wire parsers, builders, `matches_if_none_match`, and framing invariants
+- `stream` / `websocket` / `cookie` / `multipart` — Transport stream wrappers and structured payload codecs
 
 ## Installation
 
-To use this crate, you can run cmd:
-
-```shell
-cargo add hyperlane
+```sh
+cargo add http-type
 ```
 
-## Quick start
+## Verification
 
-- [hyperlane-quick-start git](https://github.com/hyperlane-dev/hyperlane-quick-start)
+Run crate-scoped formatting, lint, and test gates from the workspace root:
 
 ```sh
-git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
+cargo run -p hyperlane-cli -- fmt --check
+cargo clippy -p http-type --all-features --all-targets -- -D warnings
+cargo test -p http-type --all-features
 ```
+
+## Documentation & Governance
+
+- Update this `README.md` alongside any public API, plugin contract, or module-boundary change per [`../AGENTS.md`](../AGENTS.md).
+- Project standards and release workflows live in [`../.agents/skills/hyperlane/SKILL.md`](../.agents/skills/hyperlane/SKILL.md).
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Contributing
-
-Contributions are welcome! Please open an issue or submit a pull request.
+This project is licensed under the MIT License. See the [LICENSE](../LICENSE) file for details.
 
 ## Contact
 
-For any inquiries, please reach out to the author at [root@devhub.vip](mailto:root@devhub.vip).
+For inquiries, please contact the author at [root@devhub.vip](mailto:root@devhub.vip).

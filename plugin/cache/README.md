@@ -1,8 +1,55 @@
+<div align="center">
+
 # hyperlane-plugin-cache
 
-High-concurrency response and data caching plugin for Hyperlane.
+**Response & Keyed In-Memory Cache Plugin**
 
-- 64-way `XxHash3_64` sharded in-memory cache (`ShardedMemoryCache`) enforcing both entry-count and total-byte memory budgets with lazy and explicit TTL eviction.
-- Built-in single-flight stampede protection (`get_or_load`) coalescing concurrent misses on the same key via `tokio::sync::Notify`.
-- Pluggable async `CacheStore` trait for Redis, Memcached, or tiered storage backends.
-- HTTP response caching hooks (`CacheRequestHook` / `CacheResponseHook`) honoring `Cache-Control`, `Vary`, `Age`, and `X-Cache: HIT / MISS / BYPASS`.
+[![crates.io](https://img.shields.io/crates/v/hyperlane-plugin-cache.svg?style=flat-square)](https://crates.io/crates/hyperlane-plugin-cache)
+[![docs.rs](https://img.shields.io/docsrs/hyperlane-plugin-cache?style=flat-square)](https://docs.rs/hyperlane-plugin-cache)
+[![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
+[![License: MIT](https://img.shields.io/crates/l/hyperlane-plugin-cache.svg?style=flat-square)](../../LICENSE)
+
+[Workspace Overview](../../README.md) · [API Docs](https://docs.rs/hyperlane-plugin-cache/latest/) · [Agent Engineering Rules](../../AGENTS.md)
+
+</div>
+
+---
+
+## Overview
+
+Opt-in HTTP response caching middleware with TTL eviction, cache-key customization, and safe-method cache controls.
+
+This crate is a member of the [`hyperlane`](../../README.md) unified Rust 2024 workspace. All plugin crates are opt-in and transparent (`Status::Continue`) when unconfigured.
+
+## Responsibilities & Module Layout
+
+- `struct` / `trait` / `impl` — Cache store trait, TTL configuration, and response caching hooks
+
+## Installation
+
+```sh
+cargo add hyperlane-plugin-cache
+```
+
+## Verification
+
+Run crate-scoped formatting, lint, and test gates from the workspace root:
+
+```sh
+cargo run -p hyperlane-cli -- fmt --check
+cargo clippy -p hyperlane-plugin-cache --all-features --all-targets -- -D warnings
+cargo test -p hyperlane-plugin-cache --all-features
+```
+
+## Documentation & Governance
+
+- Update this `README.md` alongside any public API, plugin contract, or module-boundary change per [`../../AGENTS.md`](../../AGENTS.md).
+- Project standards and release workflows live in [`../../.agents/skills/hyperlane/SKILL.md`](../../.agents/skills/hyperlane/SKILL.md).
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](../../LICENSE) file for details.
+
+## Contact
+
+For inquiries, please contact the author at [root@devhub.vip](mailto:root@devhub.vip).

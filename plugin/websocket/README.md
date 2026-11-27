@@ -1,34 +1,55 @@
-<center>
+<div align="center">
 
-## hyperlane-plugin-websocket
+# hyperlane-plugin-websocket
 
-[![](https://img.shields.io/crates/v/hyperlane-plugin-websocket.svg)](https://crates.io/crates/hyperlane-plugin-websocket)
-[![](https://img.shields.io/crates/d/hyperlane-plugin-websocket.svg)](https://img.shields.io/crates/d/hyperlane-plugin-websocket.svg)
-[![](https://docs.rs/hyperlane-plugin-websocket/badge.svg)](https://docs.rs/hyperlane-plugin-websocket)
-[![](https://img.shields.io/crates/l/hyperlane-plugin-websocket.svg)](./LICENSE)
+**Room-Based WebSocket Broadcast Plugin**
 
-</center>
+[![crates.io](https://img.shields.io/crates/v/hyperlane-plugin-websocket.svg?style=flat-square)](https://crates.io/crates/hyperlane-plugin-websocket)
+[![docs.rs](https://img.shields.io/docsrs/hyperlane-plugin-websocket?style=flat-square)](https://docs.rs/hyperlane-plugin-websocket)
+[![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
+[![License: MIT](https://img.shields.io/crates/l/hyperlane-plugin-websocket.svg?style=flat-square)](../../LICENSE)
 
-[Api Docs](https://docs.rs/hyperlane-plugin-websocket/latest/)
+[Workspace Overview](../../README.md) · [API Docs](https://docs.rs/hyperlane-plugin-websocket/latest/) · [Agent Engineering Rules](../../AGENTS.md)
 
-> A WebSocket plugin for the Hyperlane framework, providing robust WebSocket communication capabilities and integrating with tokio-broadcast for efficient message dissemination.
+</div>
+
+---
+
+## Overview
+
+Opt-in WebSocket upgrade, room-keyed broadcast maps, ping/pong lifecycle hooks, and bounded frame/message reassembly.
+
+This crate is a member of the [`hyperlane`](../../README.md) unified Rust 2024 workspace. All plugin crates are opt-in and transparent (`Status::Continue`) when unconfigured.
+
+## Responsibilities & Module Layout
+
+- `struct` / `static` / `impl` — `WebSocketConfig`, room broadcast manager, and lifecycle hooks
 
 ## Installation
 
-To use this crate, you can run cmd:
-
-```shell
+```sh
 cargo add hyperlane-plugin-websocket
 ```
 
+## Verification
+
+Run crate-scoped formatting, lint, and test gates from the workspace root:
+
+```sh
+cargo run -p hyperlane-cli -- fmt --check
+cargo clippy -p hyperlane-plugin-websocket --all-features --all-targets -- -D warnings
+cargo test -p hyperlane-plugin-websocket --all-features
+```
+
+## Documentation & Governance
+
+- Update this `README.md` alongside any public API, plugin contract, or module-boundary change per [`../../AGENTS.md`](../../AGENTS.md).
+- Project standards and release workflows live in [`../../.agents/skills/hyperlane/SKILL.md`](../../.agents/skills/hyperlane/SKILL.md).
+
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Contributing
-
-Contributions are welcome! Please open an issue or submit a pull request.
+This project is licensed under the MIT License. See the [LICENSE](../../LICENSE) file for details.
 
 ## Contact
 
-For any inquiries, please reach out to the author at [root@devhub.vip](mailto:root@devhub.vip).
+For inquiries, please contact the author at [root@devhub.vip](mailto:root@devhub.vip).

@@ -1,35 +1,55 @@
-<center>
+<div align="center">
 
-## hyperlane-performance
+# hyperlane-performance
 
-[![](https://img.shields.io/crates/v/hyperlane-performance.svg)](https://crates.io/crates/hyperlane-performance)
-[![](https://img.shields.io/crates/d/hyperlane-performance.svg)](https://img.shields.io/crates/d/hyperlane-performance.svg)
-[![](https://docs.rs/hyperlane-performance/badge.svg)](https://docs.rs/hyperlane-performance)
-[![](https://github.com/hyperlane-dev/hyperlane/workflows/Rust/badge.svg)](https://github.com/hyperlane-dev/hyperlane/actions?query=workflow:Rust)
-[![](https://img.shields.io/crates/l/hyperlane-performance.svg)](../LICENSE)
+**Official Throughput & Allocation Benchmark Harness**
 
-</center>
+[![crates.io](https://img.shields.io/crates/v/hyperlane-performance.svg?style=flat-square)](https://crates.io/crates/hyperlane-performance)
+[![docs.rs](https://img.shields.io/docsrs/hyperlane-performance?style=flat-square)](https://docs.rs/hyperlane-performance)
+[![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
+[![License: MIT](https://img.shields.io/crates/l/hyperlane-performance.svg?style=flat-square)](../LICENSE)
 
-[Api Docs](https://docs.rs/hyperlane-performance/latest/)
+[Workspace Overview](../README.md) · [API Docs](https://docs.rs/hyperlane-performance/latest/) · [Agent Engineering Rules](../AGENTS.md)
 
-> A Docker-based performance testing toolkit for the Hyperlane framework.
+</div>
+
+---
+
+## Overview
+
+CPU-pinned native and Docker loadgen, control baseline, and allocation-counting benchmark suite verifying Hyperlane wire throughput and latency.
+
+This crate is a member of the [`hyperlane`](../README.md) unified Rust 2024 workspace. All plugin crates are opt-in and transparent (`Status::Continue`) when unconfigured.
+
+## Responsibilities & Module Layout
+
+- `bench` / `server` — Reproducible HTTP throughput and memory-allocation verification harness
 
 ## Installation
 
-To use this crate, you can run cmd:
-
-```shell
-cargo install hyperlane-performance
+```sh
+cargo add hyperlane-performance
 ```
+
+## Verification
+
+Run crate-scoped formatting, lint, and test gates from the workspace root:
+
+```sh
+cargo run -p hyperlane-cli -- fmt --check
+cargo clippy -p hyperlane-performance --all-features --all-targets -- -D warnings
+cargo test -p hyperlane-performance --all-features
+```
+
+## Documentation & Governance
+
+- Update this `README.md` alongside any public API, plugin contract, or module-boundary change per [`../AGENTS.md`](../AGENTS.md).
+- Project standards and release workflows live in [`../.agents/skills/hyperlane/SKILL.md`](../.agents/skills/hyperlane/SKILL.md).
 
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](../LICENSE) file for details.
 
-## Contributing
-
-Contributions are welcome! Please open an issue or submit a pull request.
-
 ## Contact
 
-For any inquiries, please reach out to the author at [root@devhub.vip](mailto:root@devhub.vip).
+For inquiries, please contact the author at [root@devhub.vip](mailto:root@devhub.vip).

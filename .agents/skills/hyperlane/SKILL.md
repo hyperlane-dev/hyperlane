@@ -1,93 +1,63 @@
 ---
 name: hyperlane
-description: Use when building, debugging, optimizing, or reviewing Hyperlane Rust HTTP/1.x, HTTP/2, HTTP/3 services, http-request clients, or Hyperlane plugins (auth, cache, cors, gateway, grpc, health, logger, mcp, metrics, mq, negotiate, rate_limit, rpc, security, session, shutdown, sse, static_files, tracing, websocket).
+description: 'Use when implementing or debugging the Hyperlane Rust HTTP framework: server routes, lifecycle hooks, Context, request targets, the plugin crates, or the perf harness. Publishing to ltpp.vip uses hyperlane-upload instead.'
+license: MIT
+metadata:
+  hermes:
+    related_skills: [rust-standards, git-standards]
 ---
 
-# Hyperlane Development Skill
+# Hyperlane workspace standards and workflow
 
-## Quick Orientation
+## Mandatory Standards
 
-- **Facade crate**: `hyperlane` re-exports `hyperlane-core` (`Server`, `ServerConfig`, `Context`, `ServerHook`, `Status`, `Stream`, `Request`, `Response`, `HttpStatus`, `tokio`) and `hyperlane-macros` (`#[route]`, `#[request_middleware]`, `#[response_middleware]`, `#[hyperlane]`, `#[send]`, `#[host]`, `#[referer]`, etc.).
-- **Protocols**: `HTTP/1.0`, `HTTP/1.1` (TCP & TLS), `HTTP/2` (`h2c` prior knowledge & TLS ALPN `h2`), `HTTP/3` (QUIC + TLS), WebSocket, and Server-Sent Events (SSE).
-- **Client crate**: `http-request` (`RequestBuilder`, `HttpRequest`, `HttpResponse`, `Proxy`) supporting sync/async H1, multiplexed async H2 (`h2`/`h2c`), opt-in connection pooling (`.keep_alive(true)`), TLS session resumption, custom PEM root CAs (`.root_cert_pem()`), idempotent retries (`.retry(n)`), form/multipart bodies, auth helpers, and HTTP/HTTPS/SOCKS5 proxies.
+1. Load `rust-standards` before editing any `.rs` or `Cargo.toml` file. Resolve authoritative crate membership and versions from `Cargo.toml` / `cargo metadata --no-deps --format-version 1`.
+2. Enforce core `ServerHook` and HTTP wire invariants (`AGENTS.md`):
+  - `Server::route::<Handler>(path)` and middleware registrations are synchronous (`&mut Self`; never `.await`).
+  - `Server::run().await` returns `Result<ServerControlHook, Box<ServerError>>`; propagate errors and never mask bind failures.
+  - `ServerHook::new(stream, ctx)` / `handle(self, stream, ctx)` take `stream` first; use `ctx.build_response()` for HEAD-aware serialization; send bytes before returning `Status::Reject`.
+  - Maintain RFC 9110/9112 wire conformance: bodyless 1xx/204/205/304 handling, bounded chunked decoding, `Expect: 100-continue`, request smuggling rejection, CRLF validation, decompression bomb caps (`64 MiB`), and keep-alive `Context` resets.
 
-## ServerHook Pattern
+3. Enforce workspace boundaries & visibility:
+  - Keep `hyperlane-core` internals (`listener`, `protocol`, `tls`) `pub(crate)` and put wire/transport fixes in `core/src/protocol/`, never in route handlers.
+  - Keep public struct fields `pub(crate)` with generated `get_*`/`set_*` accessors; keep plugins opt-in and transparent (`Status::Continue`) when unconfigured.
+  - Register every new publishable plugin in root `Cargo.toml` `[workspace] members` and `.github/workflows/rust.yml` `PACKAGES`.
 
-```rust
-use hyperlane::{Context, ServerHook, Status, Stream};
+4. Keep `hyperlane fmt` layered on `crate-cli`: `hyperlane fmt` MUST invoke `crate_cli::execute_unified_fmt` (Prettier-aligned `.md`/`.yml`/`.json`/`.toml` + derives + `cargo fmt`) first, then Hyperlane attribute normalization and `cargo fmt --all`.
 
-pub struct HealthRoute;
+## Verification Workflow
 
-impl ServerHook for HealthRoute {
-    async fn new(_: &mut Stream, _: &mut Context) -> Self {
-        Self
-    }
+Run every gate locally before committing or pushing:
 
-    #[hyperlane::send]
-    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
-        ctx.get_mut_response().set_body("ok");
-        Status::Reject
-    }
-}
+```sh
+cargo run -p hyperlane-cli -- fmt
+cargo run -p hyperlane-cli -- fmt
+cargo run -p hyperlane-cli -- fmt --check
+cargo fmt --all -- --check
+cargo clippy --workspace --all-features --all-targets -- -D warnings
+cargo test --workspace --all-features
+cargo check --release --workspace --all-features
+python3 ~/.agents/skills/rust-standards/scripts/staged_file_gate.py .
+python3 ~/.agents/skills/rust-standards/scripts/verify_dep_order.py .
 ```
 
-- Return `Status::Continue` to pass execution to the next middleware/route/response hook.
-- Return `Status::Reject` to terminate the request pipeline immediately (ensure the response is sent before rejecting if the client expects a reply).
-- Route dynamic segments use `{name}` or anchored regex `{name:pattern}` (automatically anchored as `^(?:pattern)$`).
+Always exercise real request/response wire bytes for protocol changes and reclaim all task-owned listeners/processes on exit.
 
-## HTTP Client (`http-request`) Pattern
+## Release & Downstream Cascade Workflow
 
-```rust
-use http_request::{HttpRequest, HttpResponse, RequestBuilder};
+`hyperlane` is **Tier 2** (depends on published `ctares`; consumed by `hyperlane-quick-start`, `commerce-suite`, and `web-frameworks`):
 
-let mut builder: RequestBuilder = RequestBuilder::new();
-let mut req: HttpRequest = builder
-    .get("https://api.example.com/v1/items")
-    .query("limit", "20")
-    .bearer_auth("token")
-    .keep_alive(true)
-    .connect_timeout(2000)
-    .timeout(5000)
-    .retry(2)
-    .decode()
-    .build();
-let resp: HttpResponse = req.send_async().await?;
-```
+1. Wait until upstream `ctares` is live on `crates.io`, then upgrade `crate-cli`, `color-output`, `lombok-macros`, and `tokio-broadcast` in root `Cargo.toml`.
+2. Bump `[workspace.package].version` and internal `[workspace.dependencies]` pins in root `Cargo.toml`.
+3. Run `hyperlane fmt` so `.github/workflows/*.yml` are pre-formatted (preventing CI's `GITHUB_TOKEN` from attempting workflow pushes during `publish`).
+4. Validate commit/PR text via `verify_english_only.py`, push/merge to `master`, and wait until `.github/workflows/rust.yml` (`setup`, `check`, `tests`, `clippy`, `build`, `publish`, `release`) finishes green on `crates.io`.
+5. Cascade upgrades to Tier 3 (`hyperlane-quick-start`, `commerce-suite`) and Tier 4 (`web-frameworks`).
 
-- Use `.keep_alive(true)` for high-concurrency pooling (reuses persistent H1 connections and multiplexed H2 senders).
-- Use `.http2_only()` for async `h2` (ALPN over TLS) or cleartext `h2c`.
-- Automatic retries apply strictly to RFC 9110 idempotent methods (`GET`, `HEAD`, `PUT`, `DELETE`, `OPTIONS`) on transient transport errors or `429`/`502`/`503`/`504`.
+## Documentation & Skill Governance
 
-## Official Plugin Ecosystem
+- Update root `README.md`, `<crate>/README.md`, `plugin/README.md`, and `AGENTS.md` in the same commit whenever adding/changing crates, plugins, wire invariants, CLI subcommands, or CI jobs.
+- Keep `.agents/skills/hyperlane/SKILL.md` and `~/.agents/skills/hyperlane/SKILL.md` synchronized and strictly limited to standards, requirements, and workflows (`<= 160` lines); run `audit_skills.py` and `update_skill_lock.py` after edits.
 
-All plugins live under `plugin/` and follow the opt-in `OnceLock` (`init`/`get`) contract — unconfigured hooks return `Status::Continue`:
+## Reference Index
 
-| Plugin                          | Key Types                                                                                                      | Purpose                                                                                        |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `hyperlane-plugin-tracing`      | `TraceContext`, `SpanExporter`, `TracingRequestHook(-130)`, `TracingResponseHook(90)`                          | Lock-free W3C `traceparent`/`tracestate`, `X-Request-Id`, `Server-Timing`, span export         |
-| `hyperlane-plugin-logger`       | `LoggerPlugin`, `LoggerConfig`, `LogSink`, `RequestLogger(-120)`, `ResponseLogger(100)`                        | Non-blocking buffered console/file logging, Plain/JSON formats, CRLF/ANSI sanitization         |
-| `hyperlane-plugin-metrics`      | `MetricsRegistry`, `Counter`, `Gauge`, `Histogram`, `MetricsRequestHook(-115)`, `MetricsResponseHook(95)`      | Lock-free Prometheus/OpenMetrics 0.0.4 `/metrics` observability                                |
-| `hyperlane-plugin-health`       | `HealthRegistry`, `HealthCheck`, `HealthHook(-110)`, `HealthPlugin`                                            | `/healthz`, `/livez`, `/readyz` concurrent probes, snapshot cache, graceful drain flag         |
-| `hyperlane-plugin-security`     | `SecurityConfig`, `SecurityRule`, `SecurityRequestHook(-105)`, `SecurityResponseHook(-75)`                     | Prebuilt HSTS/CSP/COOP/COEP/CORP headers, HMAC-SHA256 CSRF, host/URI/body/traversal guards     |
-| `hyperlane-plugin-cors`         | `CorsConfig`, `AllowOrigin`, `CorsRequestHook(-100)`, `CorsResponseHook(-80)`                                  | Precompiled zero-alloc CORS headers, credentials safety guard, `OPTIONS` preflight             |
-| `hyperlane-plugin-rate-limit`   | `ShardedRateLimiter`, `KeyExtractor`, `RateLimitStore`, `RateLimitHook(-95)`                                   | 64-shard lock-free GCRA & fixed-window limiter, bounded key store, RFC `RateLimit-*` headers   |
-| `hyperlane-plugin-auth`         | `JwtCodec`, `Authenticator`, `AuthPrincipal`, `AuthHook(-90)`, `AuthPlugin`                                    | Pure-Rust HS256 JWT (`kid` rotation), API key, HTTP Basic, RBAC, async authenticators          |
-| `hyperlane-plugin-session`      | `SessionStore`, `InMemorySessionStore`, `SessionHandle`, `SessionRequestHook(-85)`, `SessionResponseHook(-70)` | 64-shard sessions, HMAC-SHA256 signed cookies, dirty-tracked reads, `regenerate_id()`          |
-| `hyperlane-plugin-cache`        | `ShardedMemoryCache`, `CacheStore`, `CacheRequestHook(-80)`, `CacheResponseHook(-65)`                          | 64-shard bounded cache, single-flight coalescing, RFC `Cache-Control`/`Age`/`X-Cache`          |
-| `hyperlane-plugin-rpc`          | `RpcRouter`, `RpcInterceptor`, `RpcHook(-70)`, `RpcPlugin`                                                     | JSON-RPC 2.0 `XxHash3_64` router, concurrent batch dispatch, DoS caps                          |
-| `hyperlane-plugin-grpc`         | `GrpcFrame`, `GrpcRouter`, `GrpcInterceptor`, `GrpcHook(-65)`, `GrpcPlugin`                                    | 5-byte gRPC framing, bounded compression, `grpc-timeout` enforcement                           |
-| `hyperlane-plugin-mcp`          | `McpRegistry`, `McpTool`, `McpResource`, `McpPrompt`, `McpHook(-60)`                                           | MCP Streamable HTTP server, 16-shard TTL sessions, `Origin` DNS-rebinding guard                |
-| `hyperlane-plugin-static-files` | `StaticFilesRuntime`, `StaticFilesConfig`, `StaticFilesHook(-55)`                                              | Traversal-proof static server, `FileExtension` MIME, 64-shard cache, `.br`/`.gz`, `Range`, SPA |
-| `hyperlane-plugin-gateway`      | `GatewayRuntime`, `GatewayRoute`, `GatewayInterceptor`, `GatewayHook(-50)`                                     | Reverse proxy with pooled H1/H2, RR/Weighted/LC/P2C LB, circuit breaker, lock-free GCRA        |
-| `hyperlane-plugin-negotiate`    | `CompressMiddleware`, `ConditionalMiddleware`, `EntityTag`                                                     | `Accept-Encoding` compression + `304 Not Modified` strong/weak ETag                            |
-| `hyperlane-plugin-shutdown`     | `ShutdownCoordinator`, `ShutdownGuard`, `ShutdownCallback`, `ShutdownPlugin`                                   | Graceful shutdown (`SIGINT`/`SIGTERM`), RAII draining, LIFO async callbacks                    |
-| `hyperlane-plugin-websocket`    | `WebSocket`, `WebSocketConfig`, `WebSocketPlugin`                                                              | WebSocket room broadcast with lag recovery and lifecycle hooks                                 |
-| `hyperlane-plugin-sse`          | `SseEvent`, `SseHub`, `SseStream`, `SsePlugin`                                                                 | CRLF-safe SSE framing, 64-shard topic fan-out, `Last-Event-ID` replay, heartbeats              |
-| `hyperlane-plugin-mq`           | `MessageBroker`, `InMemoryBroker`, `MqMessage`, `MqPlugin`                                                     | 64-shard consumer groups, TTL, $O(\log N)$ visibility timeout heap, retries, DLQ               |
-
-## Verification & Performance Rules
-
-1. Run `cargo fmt --all -- --check`, `cargo clippy --workspace --all-features --all-targets -- -D warnings`, and `cargo test --workspace --all-features`.
-2. Note two long-running integration tests (`core/tests/server/fn.rs::main` and `plugin/websocket/tests/websocket/fn.rs::main`) sleep 60 s; skip only during tight iteration (`-- --skip "::main"`), and run the full suite before committing.
-3. Validate throughput/latency changes with paired runs in `performance/` (`h1`, `h1-tls`, `h2c`, `h2-tls`, `h3`, `errors == 0`) and deterministic `alloc-count` before claiming improvements.
-4. On Linux targets, verify `#[cfg(target_os = "linux")]` `io_uring` code builds and passes tests cleanly.
+Consult cached references only as secondary lookup (source and compiler remain authoritative; ltpp.vip uploads use [hyperlane-upload](../hyperlane-upload/SKILL.md)): [Core](references/api-core.md) · [Macros](references/api-macros.md) · [HTTP Types](references/api-type.md) · [Client](references/api-request.md) · [Compression](references/api-compress.md) · [Constants](references/api-constant.md) · [Negotiate](references/plugin-negotiate.md) · [Plugins](references/plugins.md) · [Wire](references/wire-behaviour.md) · [WS](references/hyperlane-plugin-websocket.md) · [SSE](references/sse.md) · [Bench](references/bench.md) · [Release](references/release-bump-flow.md) · [Ownership](references/request-path-ownership.md) · [Visibility](references/field-visibility.md).

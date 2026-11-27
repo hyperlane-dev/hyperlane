@@ -1,57 +1,55 @@
-<center>
+<div align="center">
 
-## http-request
+# http-request
 
-[![](https://img.shields.io/crates/v/http-request.svg)](https://crates.io/crates/http-request)
-[![](https://img.shields.io/crates/d/http-request.svg)](https://img.shields.io/crates/d/http-request.svg)
-[![](https://docs.rs/http-request/badge.svg)](https://docs.rs/http-request)
-[![](https://github.com/hyperlane-dev/http-request/workflows/Rust/badge.svg)](https://github.com/hyperlane-dev/http-request/actions?query=workflow:Rust)
-[![](https://img.shields.io/crates/l/http-request.svg)](./LICENSE)
+**Sync & Async HTTP/1.1 + HTTP/2 Client**
 
-</center>
+[![crates.io](https://img.shields.io/crates/v/http-request.svg?style=flat-square)](https://crates.io/crates/http-request)
+[![docs.rs](https://img.shields.io/docsrs/http-request?style=flat-square)](https://docs.rs/http-request)
+[![Rust 2024](https://img.shields.io/badge/edition-2024-orange.svg?style=flat-square)](https://www.rust-lang.org)
+[![License: MIT](https://img.shields.io/crates/l/http-request.svg?style=flat-square)](../LICENSE)
 
-[Api Docs](https://docs.rs/http-request/latest/)
+[Workspace Overview](../README.md) · [API Docs](https://docs.rs/http-request/latest/) · [Agent Engineering Rules](../AGENTS.md)
 
-> A lightweight, efficient library for building, sending, and handling HTTP/HTTPS requests in Rust applications. http-request provides a simple and intuitive API, allowing developers to easily interact with web services, whether they use the "HTTP" or "HTTPS" protocol. The library supports various HTTP methods, custom headers, request bodies, timeout, automatic handling of redirects (including detecting redirect loops), and enhanced response body decoding (both automatic and manual), enabling fast and secure communication. Whether working with secure "HTTPS" connections or standard "HTTP" requests, the library is optimized for performance, minimal resource usage, and easy integration into Rust projects.
+</div>
 
-## Features
+---
 
-- **Support for HTTP/HTTPS**: Supports both HTTP and HTTPS protocols.
-- **WebSocket Support**: Full WebSocket support with both synchronous and asynchronous APIs for real-time communication.
-- **Lightweight Design**: The `http_request` crate provides a simple and efficient API for building, sending, and handling HTTP requests while minimizing resource consumption.
-- **HTTP Methods**: Supports GET, POST, and HEAD. Select HEAD with `set_method(Method::Head)`.
-  The client returns an empty body as soon as it reads the final response headers,
-  preserving representation metadata such as `Content-Length` and `Content-Encoding`.
-- **Flexible Request Building**: Offers rich configuration options through `RequestBuilder` to set request headers, bodies, and URLs.
-- **Simple Error Handling**: Utilizes the `Result` type to handle errors in requests and responses, making error handling straightforward.
-- **Custom Headers and Request Bodies**: Easily add custom headers and request bodies.
-- **Response Handling**: Provides a simple wrapper around HTTP responses, making it easy to access and process response data.
-- **Optimized Memory Management**: Implements efficient memory management to minimize unnecessary memory allocations and improve performance.
-- **Redirect Handling**: Supports redirect handling, allows setting the maximum number of redirects, and includes redirect loop detection.
-- **timeout**: Supports timeout.
-- **Automatic and Manual Response Body Decoding**: Supports both automatic and manual decoding of response bodies, allowing for seamless interaction with different content types (e.g., JSON, XML, etc.).
-- **Proxy Support**: Comprehensive proxy support including HTTP, HTTPS, and SOCKS5 proxies with authentication for both HTTP requests and WebSocket connections.
+## Overview
+
+Ergonomic HTTP client supporting opt-in keep-alive pooling, TLS session resumption, custom PEM roots, bounded retries, multipart/form uploads, and HTTP/SOCKS5 proxies.
+
+This crate is a member of the [`hyperlane`](../README.md) unified Rust 2024 workspace. All plugin crates are opt-in and transparent (`Status::Continue`) when unconfigured.
+
+## Responsibilities & Module Layout
+
+- `client` / `pool` / `tls` — Sync and Tokio-async HTTP/1.1 + HTTP/2 transports with redirect credential stripping
 
 ## Installation
 
-To use this crate, you can run cmd:
-
-```shell
+```sh
 cargo add http-request
 ```
 
-## Help
+## Verification
 
-Ensure that CMake is installed on the system
+Run crate-scoped formatting, lint, and test gates from the workspace root:
+
+```sh
+cargo run -p hyperlane-cli -- fmt --check
+cargo clippy -p http-request --all-features --all-targets -- -D warnings
+cargo test -p http-request --all-features
+```
+
+## Documentation & Governance
+
+- Update this `README.md` alongside any public API, plugin contract, or module-boundary change per [`../AGENTS.md`](../AGENTS.md).
+- Project standards and release workflows live in [`../.agents/skills/hyperlane/SKILL.md`](../.agents/skills/hyperlane/SKILL.md).
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Contributing
-
-Contributions are welcome! Please open an issue or submit a pull request.
+This project is licensed under the MIT License. See the [LICENSE](../LICENSE) file for details.
 
 ## Contact
 
-For any inquiries, please reach out to the author at [root@devhub.vip](mailto:root@devhub.vip).
+For inquiries, please contact the author at [root@devhub.vip](mailto:root@devhub.vip).
