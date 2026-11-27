@@ -23,11 +23,12 @@ mod response_middleware;
 mod route;
 mod send;
 mod stream;
+mod upgrade;
+mod version;
+
 #[cfg(test)]
 #[path = "../tests/mod.rs"]
 mod tests;
-mod upgrade;
-mod version;
 
 use {
     closed::*, common::*, context::*, filter::*, flush::*, from_stream::*, hook::*, host::*,

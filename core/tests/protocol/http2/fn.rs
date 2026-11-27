@@ -2,13 +2,7 @@ use super::*;
 
 pub(crate) async fn h2_plaintext_session(
     port: u16,
-) -> Result<
-    (
-        h2::client::SendRequest<Bytes>,
-        h2::client::Connection<TcpStream, Bytes>,
-    ),
-    String,
-> {
+) -> Result<(SendRequest<Bytes>, h2::client::Connection<TcpStream, Bytes>), String> {
     let socket: TcpStream = connect_tcp(port)
         .await
         .map_err(|error: io::Error| format!("h2 plaintext connect failed: {error}"))?;
@@ -31,7 +25,7 @@ pub(crate) async fn h2_tls_alpn(port: u16) -> Result<(Option<Vec<u8>>, H2TlsSess
 }
 
 pub(crate) async fn h2_request(
-    sender: &mut h2::client::SendRequest<Bytes>,
+    sender: &mut SendRequest<Bytes>,
     method: &str,
     target: &str,
     body: &[u8],
@@ -80,7 +74,7 @@ pub(crate) async fn h2_request(
 }
 
 pub(crate) async fn h2_request_with_headers(
-    sender: &mut h2::client::SendRequest<Bytes>,
+    sender: &mut SendRequest<Bytes>,
     method: &str,
     target: &str,
     body: &[u8],
@@ -178,7 +172,7 @@ pub(crate) async fn h2_stream_until(port: u16, target: &str, needle: &str) -> (V
 }
 
 pub(crate) async fn h2_request_with_host_header(
-    sender: &mut h2::client::SendRequest<Bytes>,
+    sender: &mut SendRequest<Bytes>,
     method: &str,
     target: &str,
     host: &str,
