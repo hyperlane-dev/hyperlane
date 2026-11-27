@@ -39,25 +39,27 @@ pub struct SseConfig {
     pub(crate) max_topics: usize,
 }
 
-/// Internal per-topic broadcast state and bounded replay ring.
+/// Per-topic broadcast channel and independently locked bounded replay ring.
 pub(crate) struct TopicState {
-    /// Live broadcast sender for this topic.
+    /// Live broadcast sender for this topic (lock-free fan-out).
     pub(crate) sender: Sender<SseEvent>,
     /// Bounded FIFO replay buffer storing `(sequence_id, event)`.
-    pub(crate) replay: VecDeque<(u64, SseEvent)>,
+    pub(crate) replay: Mutex<VecDeque<(u64, SseEvent)>>,
 }
 
-/// Shared interior state of an [`SseHub`].
+/// Shared sharded interior state of an [`SseHub`].
 pub(crate) struct SseHubInner {
     /// Configuration limits governing this hub.
     pub(crate) config: SseConfig,
     /// Monotonic event sequence generator across all topics.
     pub(crate) next_seq: AtomicU64,
-    /// Active topics indexed by topic name.
-    pub(crate) topics: Mutex<HashMap<String, TopicState>>,
+    /// Lock-free counter tracking total active topics across all shards.
+    pub(crate) active_topics: AtomicUsize,
+    /// 64-way lock-striped topic registry indexed by `XxHash3_64`.
+    pub(crate) shards: SseShardArray,
 }
 
-/// Thread-safe multi-topic Server-Sent Events pub/sub hub with `Last-Event-ID` replay.
+/// Thread-safe sharded multi-topic Server-Sent Events pub/sub hub with `Last-Event-ID` replay.
 #[derive(Clone)]
 pub struct SseHub {
     /// Shared hub state.

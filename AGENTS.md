@@ -17,15 +17,26 @@ Rust edition `2024`, unified workspace version in root `Cargo.toml`.
 | `http-request` | `request/` | Sync and async HTTP/1.1 + HTTP/2 client with opt-in keep-alive pooling, TLS session resumption, custom PEM roots, retries, form/multipart, and HTTP/SOCKS5 proxies |
 | `hyperlane-cli` | `cli/` | CLI project scaffolding and workflow tooling |
 | `hyperlane-performance` | `performance/` | Official CPU-pinned Docker and native loadgen / control / alloc-count benchmark harness |
-| `hyperlane-plugin-logger` | `plugin/logger/` | Console and file logger with CRLF/ANSI sanitization |
-| `hyperlane-plugin-negotiate` | `plugin/negotiate/` | `Accept-Encoding` compression and conditional `304 Not Modified` ETag middlewares |
-| `hyperlane-plugin-websocket` | `plugin/websocket/` | Room-based WebSocket broadcast and lifecycle hooks |
-| `hyperlane-plugin-sse` | `plugin/sse/` | WHATWG SSE framing, CRLF sanitization, topic pub/sub, `Last-Event-ID` replay, heartbeats |
-| `hyperlane-plugin-mq` | `plugin/mq/` | Async `MessageBroker` trait and `InMemoryBroker` (consumer groups, TTL, retries, visibility timeout, DLQ) |
-| `hyperlane-plugin-rpc` | `plugin/rpc/` | JSON-RPC 2.0 router, batch/notification dispatch, payload/batch caps, `RpcHook` |
-| `hyperlane-plugin-grpc` | `plugin/grpc/` | gRPC over HTTP/2 5-byte framing, bounded compression, status codes `0..=16`, `grpc-timeout`, `GrpcHook` |
-| `hyperlane-plugin-mcp` | `plugin/mcp/` | Model Context Protocol Streamable HTTP server, tools/resources/prompts registries, `Mcp-Session-Id`, `Origin` DNS-rebinding guard, `McpHook` |
-| `hyperlane-plugin-gateway` | `plugin/gateway/` | Reverse proxy & API gateway backed by pooled `http-request` (load balancing, circuit breaker, token-bucket rate limit, RFC 9110 hop-by-hop stripping, `GatewayHook`) |
+| `hyperlane-plugin-auth` | `plugin/auth/` | Pure-Rust HS256 JWT (`kid` rotation), API key, HTTP Basic, RBAC `AuthPrincipal`, extensible `Authenticator`, `AuthHook` |
+| `hyperlane-plugin-cache` | `plugin/cache/` | 64-way sharded bounded memory cache, single-flight coalescing, pluggable `CacheStore`, HTTP response caching (`CacheRequestHook`/`CacheResponseHook`) |
+| `hyperlane-plugin-cors` | `plugin/cors/` | Precompiled zero-alloc CORS headers, exact/suffix/predicate origins, credentials safety guard, preflight `OPTIONS`, `Vary` merging |
+| `hyperlane-plugin-gateway` | `plugin/gateway/` | Reverse proxy & API gateway backed by pooled `http-request` (allocation-free RR/Weighted/LC/P2C balancing, circuit breaker, lock-free GCRA limiter, `GatewayInterceptor`, RFC 9110 hop-by-hop stripping, `GatewayHook`) |
+| `hyperlane-plugin-grpc` | `plugin/grpc/` | gRPC over HTTP/2 5-byte framing, bounded compression, status codes `0..=16`, `grpc-timeout`, `GrpcInterceptor`, `GrpcHook` |
+| `hyperlane-plugin-health` | `plugin/health/` | `/healthz`, `/livez`, `/readyz` probes with concurrent async `HealthCheck`, per-probe timeout, snapshot TTL cache, lock-free drain flag, `HealthHook` |
+| `hyperlane-plugin-logger` | `plugin/logger/` | Non-blocking buffered console/file logger, Plain/JSON formats, `LogSink` trait, CRLF/ANSI sanitization, `RequestLogger`/`ResponseLogger` |
+| `hyperlane-plugin-mcp` | `plugin/mcp/` | Model Context Protocol Streamable HTTP server, `XxHash3_64` registries, 16-shard TTL sessions with high-entropy IDs, `Origin` DNS-rebinding guard, `McpHook` |
+| `hyperlane-plugin-metrics` | `plugin/metrics/` | Lock-free atomic counters, gauges, latency histograms, Prometheus OpenMetrics 0.0.4 `/metrics` scrape endpoint, `MetricsRequestHook`/`MetricsResponseHook` |
+| `hyperlane-plugin-mq` | `plugin/mq/` | Async `MessageBroker` trait and 64-shard `InMemoryBroker` (consumer groups, TTL, retries, $O(\log N)$ deadline heap, visibility timeout, DLQ) |
+| `hyperlane-plugin-negotiate` | `plugin/negotiate/` | `Accept-Encoding` compression and conditional `304 Not Modified` strong/weak ETag middlewares |
+| `hyperlane-plugin-rate-limit` | `plugin/rate_limit/` | 64-way sharded lock-free atomic GCRA & fixed-window limiter, bounded key store, `KeyExtractor`/`RateLimitStore` traits, RFC `RateLimit-*` headers, `RateLimitHook` |
+| `hyperlane-plugin-rpc` | `plugin/rpc/` | JSON-RPC 2.0 `XxHash3_64` router, concurrent batch/notification dispatch, payload/batch caps, `RpcInterceptor`, `RpcHook` |
+| `hyperlane-plugin-security` | `plugin/security/` | Prebuilt HSTS/CSP/COOP/COEP/CORP/Referrer headers, stateless HMAC-SHA256 CSRF protection, host/URI/body/traversal guards, `SecurityRule` trait |
+| `hyperlane-plugin-session` | `plugin/session/` | 64-shard bounded `InMemorySessionStore` + pluggable `SessionStore`, HMAC-SHA256 signed cookies, dirty-tracked zero-write reads, `regenerate_id()` fixation defense |
+| `hyperlane-plugin-shutdown` | `plugin/shutdown/` | Graceful shutdown coordinator with `SIGINT`/`SIGTERM` arming, lock-free RAII `ShutdownGuard` draining, LIFO async `ShutdownCallback` hooks |
+| `hyperlane-plugin-sse` | `plugin/sse/` | WHATWG SSE framing, CRLF sanitization, 64-way sharded topic pub/sub, `Last-Event-ID` replay, reusable-buffer heartbeats |
+| `hyperlane-plugin-static-files` | `plugin/static_files/` | Canonicalized traversal-proof static server, `FileExtension` MIME table, 64-shard hot-file cache, `.br`/`.gz` sidecars, `ETag`/`304`, RFC 9110 `Range` (`206`/`416`), SPA fallback |
+| `hyperlane-plugin-tracing` | `plugin/tracing/` | Lock-free 128-bit W3C Trace Context (`traceparent`/`tracestate`), `X-Request-Id`, `Server-Timing`, pluggable `SpanExporter` trait |
+| `hyperlane-plugin-websocket` | `plugin/websocket/` | Room-based WebSocket broadcast with lag recovery, lifecycle hooks, and opt-in `WebSocketPlugin` |
 
 ## Core Architectural Invariants
 

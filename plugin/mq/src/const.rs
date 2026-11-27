@@ -13,6 +13,15 @@ pub const DEFAULT_MQ_GROUP: &str = "default";
 /// Default suffix appended to a topic name for its dead-letter queue.
 pub const DEFAULT_MQ_DLQ_SUFFIX: &str = ".dlq";
 
+/// Number of lock-striped shards for topic and receipt indexes in [`crate::InMemoryBroker`].
+pub(crate) const MQ_SHARD_COUNT: usize = 64;
+
+/// 64-bit FNV-1a offset basis used for zero-dependency topic shard hashing.
+pub(crate) const FNV1A_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
+
+/// 64-bit FNV-1a prime multiplier.
+pub(crate) const FNV1A_PRIME: u64 = 0x0000_0100_0000_01b3;
+
 /// Error text returned when a consumer group queue reaches capacity.
 pub(crate) const ERR_MQ_QUEUE_FULL: &str = "Message queue capacity exceeded";
 

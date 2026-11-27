@@ -19,6 +19,9 @@ pub struct McpServerConfig {
     /// Maximum incoming request body size in bytes.
     #[get(type(copy))]
     pub(crate) max_body_size: usize,
+    /// Session idle TTL in milliseconds (`0` disables expiration).
+    #[get(type(copy))]
+    pub(crate) session_ttl_ms: u64,
 }
 
 /// Metadata describing one registered MCP tool.
@@ -120,19 +123,23 @@ pub(crate) struct RegisteredPrompt {
     pub(crate) handler: McpPromptHandler,
 }
 
-/// Thread-safe registry of MCP tools, resources, prompts, and active client sessions.
+/// Thread-safe registry of MCP tools, resources, prompts, and sharded active client sessions.
 #[derive(Clone)]
 pub struct McpRegistry {
-    /// Registered tools keyed by tool name.
-    pub(crate) tools: HashMap<String, RegisteredTool>,
-    /// Registered resources keyed by resource URI.
-    pub(crate) resources: HashMap<String, RegisteredResource>,
-    /// Registered prompts keyed by prompt name.
-    pub(crate) prompts: HashMap<String, RegisteredPrompt>,
-    /// Active session identifiers tracked across requests.
-    pub(crate) sessions: Arc<Mutex<HashSet<String>>>,
-    /// Monotonic counter used to mint distinct session ids.
+    /// Registered tools keyed by tool name (`XxHash3_64`).
+    pub(crate) tools: HashMapXxHash3_64<String, RegisteredTool>,
+    /// Registered resources keyed by resource URI (`XxHash3_64`).
+    pub(crate) resources: HashMapXxHash3_64<String, RegisteredResource>,
+    /// Registered prompts keyed by prompt name (`XxHash3_64`).
+    pub(crate) prompts: HashMapXxHash3_64<String, RegisteredPrompt>,
+    /// Sharded active session tables mapping session id to creation/activity timestamp.
+    pub(crate) session_shards: Arc<Vec<RwLock<HashMapXxHash3_64<String, Instant>>>>,
+    /// Lock-free active session count maintained across all shards.
+    pub(crate) session_count: Arc<AtomicUsize>,
+    /// Monotonic counter mixed with entropy to mint unpredictable session ids.
     pub(crate) next_session_seq: Arc<AtomicU64>,
+    /// Per-registry entropy seed used when minting session identifiers.
+    pub(crate) session_seed: u64,
 }
 
 /// Process-wide [`McpPlugin`] registry holding [`McpServerConfig`] and [`McpRegistry`].
@@ -146,4 +153,5 @@ pub struct McpPlugin {
 
 /// Opt-in [`ServerHook`] serving MCP Streamable HTTP (`POST` / `DELETE`) on the configured endpoint.
 #[derive(Clone, Copy, Debug, Default)]
+#[hyperlane::request_middleware(-60)]
 pub struct McpHook;

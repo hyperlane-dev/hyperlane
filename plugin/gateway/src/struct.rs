@@ -81,22 +81,16 @@ pub(crate) struct UpstreamRuntime {
     pub(crate) open_until_ms: AtomicU64,
 }
 
-/// Mutable state of one per-route token-bucket rate limiter.
-pub(crate) struct TokenBucketState {
-    /// Available floating tokens.
-    pub(crate) tokens: f64,
-    /// Last refill timestamp.
-    pub(crate) last_refill: Instant,
-}
-
-/// Thread-safe token-bucket rate limiter attached to a compiled route.
+/// Lock-free GCRA token-bucket rate limiter using a single atomic timestamp.
 pub(crate) struct TokenBucket {
-    /// Refill rate in tokens per second.
-    pub(crate) rate_per_sec: f64,
-    /// Maximum token capacity.
-    pub(crate) capacity: f64,
-    /// Protected token level and timestamp.
-    pub(crate) state: Mutex<TokenBucketState>,
+    /// Nanoseconds required to regenerate one request token.
+    pub(crate) emission_interval_ns: u64,
+    /// Burst window in nanoseconds (`emission_interval_ns * burst`).
+    pub(crate) burst_tolerance_ns: u64,
+    /// Monotonic origin timestamp for nanosecond arithmetic.
+    pub(crate) epoch: Instant,
+    /// Theoretical Arrival Time (TAT) in nanoseconds since `epoch`.
+    pub(crate) tat_ns: AtomicU64,
 }
 
 /// Compiled route entry carrying live upstream nodes, selector cursor, and optional limiter.
@@ -109,7 +103,7 @@ pub(crate) struct CompiledRoute {
     pub(crate) upstreams: Vec<Arc<UpstreamRuntime>>,
     /// Round-robin / weighted selection cursor.
     pub(crate) cursor: AtomicUsize,
-    /// Optional compiled token-bucket limiter.
+    /// Optional compiled lock-free GCRA limiter.
     pub(crate) limiter: Option<TokenBucket>,
 }
 
@@ -120,6 +114,8 @@ pub struct GatewayRuntime {
     pub(crate) config: GatewayConfig,
     /// Compiled routes sorted from longest prefix to shortest prefix.
     pub(crate) routes: Arc<Vec<CompiledRoute>>,
+    /// Pluggable interceptors invoked around upstream forwarding.
+    pub(crate) interceptors: Arc<Vec<SharedGatewayInterceptor>>,
 }
 
 /// Process-wide [`GatewayPlugin`] registry storing [`GatewayRuntime`].
@@ -131,4 +127,5 @@ pub struct GatewayPlugin {
 
 /// Opt-in [`ServerHook`] forwarding matched requests through [`GatewayPlugin`].
 #[derive(Clone, Copy, Debug, Default)]
+#[hyperlane::request_middleware(-50)]
 pub struct GatewayHook;

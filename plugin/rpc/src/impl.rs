@@ -155,6 +155,65 @@ impl Default for RpcConfig {
     }
 }
 
+/// Inherent implementation of [`RpcConfig`].
+impl RpcConfig {
+    /// Sets the HTTP endpoint path matched by [`RpcHook`].
+    ///
+    /// # Arguments
+    ///
+    /// - `E` - Endpoint path convertible into `String`.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - Updated configuration.
+    pub fn with_endpoint<E>(mut self, endpoint: E) -> Self
+    where
+        E: Into<String>,
+    {
+        self.set_endpoint(endpoint.into());
+        self
+    }
+
+    /// Sets the maximum accepted JSON-RPC request body size in bytes.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - Maximum body size in bytes.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - Updated configuration.
+    pub fn with_max_body_size(mut self, max_body_size: usize) -> Self {
+        self.set_max_body_size(max_body_size);
+        self
+    }
+
+    /// Sets the maximum batch array length permitted per request.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - Maximum items per batch.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - Updated configuration.
+    pub fn with_max_batch_size(mut self, max_batch_size: usize) -> Self {
+        self.set_max_batch_size(max_batch_size);
+        self
+    }
+}
+
+/// Default construction for [`RpcRouter`].
+impl Default for RpcRouter {
+    /// Constructs an empty [`RpcRouter`].
+    fn default() -> Self {
+        Self {
+            methods: hash_map_xx_hash3_64(),
+            interceptors: Vec::new(),
+        }
+    }
+}
+
 /// Inherent implementation of [`RpcRouter`].
 impl RpcRouter {
     /// Creates an empty [`RpcRouter`].
@@ -164,6 +223,21 @@ impl RpcRouter {
     /// - `Self` - Empty router.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Registers an extensible [`RpcInterceptor`] invoked before every method dispatch.
+    ///
+    /// # Arguments
+    ///
+    /// - `SharedRpcInterceptor` - Interceptor implementation.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Self` - This router for fluent chaining.
+    pub fn add_interceptor(&mut self, interceptor: SharedRpcInterceptor) -> &mut Self {
+        let Self { interceptors, .. } = self;
+        interceptors.push(interceptor);
+        self
     }
 
     /// Registers an async method handler under `name`.
@@ -182,7 +256,7 @@ impl RpcRouter {
         F: Fn(Option<Value>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Value, RpcError>> + Send + 'static,
     {
-        let Self { methods } = self;
+        let Self { methods, .. } = self;
         let boxed: RpcHandler = Arc::new(move |params: Option<Value>| Box::pin(handler(params)));
         methods.insert(name.into(), boxed);
         self
@@ -198,7 +272,7 @@ impl RpcRouter {
     ///
     /// - `bool` - `true` when registered.
     pub fn has_method(&self, name: &str) -> bool {
-        let Self { methods } = self;
+        let Self { methods, .. } = self;
         methods.contains_key(name)
     }
 
@@ -208,8 +282,54 @@ impl RpcRouter {
     ///
     /// - `Vec<String>` - Registered method names.
     pub fn method_names(&self) -> Vec<String> {
-        let Self { methods } = self;
+        let Self { methods, .. } = self;
         methods.keys().cloned().collect()
+    }
+
+    /// Resolves one incoming JSON value into either an immediate response or a ready async call.
+    ///
+    /// # Arguments
+    ///
+    /// - `Value` - Raw JSON object value.
+    ///
+    /// # Returns
+    ///
+    /// - `PreparedRpcCall` - Executable handler tuple or immediate reply/notification skip.
+    fn prepare_call(&self, raw: Value) -> PreparedRpcCall {
+        let Self {
+            methods,
+            interceptors,
+        } = self;
+        let req: RpcRequest = match from_value(raw) {
+            Ok(parsed) => parsed,
+            Err(_) => {
+                return Err(Some(Box::new(RpcResponse::failure(
+                    RpcId::Null,
+                    RpcError::invalid_request(),
+                ))));
+            }
+        };
+        if req.get_jsonrpc() != JSONRPC_VERSION || req.get_method().is_empty() {
+            let id: RpcId = req.try_get_id().unwrap_or(RpcId::Null);
+            return Err(Some(Box::new(RpcResponse::failure(
+                id,
+                RpcError::invalid_request(),
+            ))));
+        }
+        let params: Option<Value> = req.try_get_params();
+        for interceptor in interceptors {
+            if let Err(err) = interceptor.before_call(req.get_method(), &params) {
+                return Err(req
+                    .try_get_id()
+                    .map(|id: RpcId| Box::new(RpcResponse::failure(id, err))));
+            }
+        }
+        let Some(handler) = methods.get(req.get_method()) else {
+            return Err(req.try_get_id().map(|id: RpcId| {
+                Box::new(RpcResponse::failure(id, RpcError::method_not_found()))
+            }));
+        };
+        Ok((Arc::clone(handler), params, req.try_get_id()))
     }
 
     /// Dispatches one parsed JSON value representing a single JSON-RPC 2.0 call or notification.
@@ -222,34 +342,20 @@ impl RpcRouter {
     ///
     /// - `Option<RpcResponse>` - `None` for valid notifications, otherwise the response envelope.
     pub async fn dispatch_value(&self, raw: Value) -> Option<RpcResponse> {
-        let Self { methods } = self;
-        let req: RpcRequest = match from_value(raw) {
-            Ok(parsed) => parsed,
-            Err(_) => {
-                return Some(RpcResponse::failure(
-                    RpcId::Null,
-                    RpcError::invalid_request(),
-                ));
+        match self.prepare_call(raw) {
+            Ok((handler, params, id_opt)) => {
+                let outcome: Result<Value, RpcError> = handler(params).await;
+                let id: RpcId = id_opt?;
+                match outcome {
+                    Ok(value) => Some(RpcResponse::success(id, value)),
+                    Err(err) => Some(RpcResponse::failure(id, err)),
+                }
             }
-        };
-        if req.get_jsonrpc() != JSONRPC_VERSION || req.get_method().is_empty() {
-            let id: RpcId = req.get_id().unwrap_or(RpcId::Null);
-            return Some(RpcResponse::failure(id, RpcError::invalid_request()));
-        }
-        let Some(handler) = methods.get(req.get_method()) else {
-            return req
-                .get_id()
-                .map(|id: RpcId| RpcResponse::failure(id, RpcError::method_not_found()));
-        };
-        let outcome: Result<Value, RpcError> = handler(req.get_params()).await;
-        let id: RpcId = req.get_id()?;
-        match outcome {
-            Ok(value) => Some(RpcResponse::success(id, value)),
-            Err(err) => Some(RpcResponse::failure(id, err)),
+            Err(immediate) => immediate.map(|resp: Box<RpcResponse>| *resp),
         }
     }
 
-    /// Parses and dispatches raw JSON-RPC 2.0 request bytes (single call, notification, or batch).
+    /// Parses and dispatches raw JSON-RPC 2.0 request bytes (single call, notification, or concurrent batch).
     ///
     /// # Arguments
     ///
@@ -282,9 +388,28 @@ impl RpcRouter {
                     );
                     return Some(encode_rpc_response(&err_resp));
                 }
-                let mut responses: Vec<RpcResponse> = Vec::with_capacity(items.len());
+                let mut tasks: Vec<JoinHandle<Option<RpcResponse>>> =
+                    Vec::with_capacity(items.len());
                 for item in items {
-                    if let Some(resp) = self.dispatch_value(item).await {
+                    let prepared: PreparedRpcCall = self.prepare_call(item);
+                    let handle: JoinHandle<Option<RpcResponse>> = spawn(async move {
+                        match prepared {
+                            Ok((handler, params, id_opt)) => {
+                                let outcome: Result<Value, RpcError> = handler(params).await;
+                                let id: RpcId = id_opt?;
+                                match outcome {
+                                    Ok(value) => Some(RpcResponse::success(id, value)),
+                                    Err(err) => Some(RpcResponse::failure(id, err)),
+                                }
+                            }
+                            Err(immediate) => immediate.map(|resp: Box<RpcResponse>| *resp),
+                        }
+                    });
+                    tasks.push(handle);
+                }
+                let mut responses: Vec<RpcResponse> = Vec::with_capacity(tasks.len());
+                for task in tasks {
+                    if let Ok(Some(resp)) = task.await {
                         responses.push(resp);
                     }
                 }
@@ -372,7 +497,7 @@ impl ServerHook for RpcHook {
     ///
     /// # Returns
     ///
-    /// - `Status` - `Status::Continue` when unconfigured or path does not match; `Status::Stop` once answered.
+    /// - `Status` - `Status::Continue` when unconfigured or path does not match; `Status::Reject` once answered.
     async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
         let Some(plugin) = RpcPlugin::get() else {
             return Status::Continue;

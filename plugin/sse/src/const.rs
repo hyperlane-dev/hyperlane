@@ -25,6 +25,9 @@ pub const DEFAULT_SSE_CHANNEL_CAPACITY: usize = 256;
 /// Default maximum number of active topics allowed in one [`SseHub`].
 pub const DEFAULT_SSE_MAX_TOPICS: usize = 1024;
 
+/// Number of lock-striped topic shards inside [`crate::SseHub`].
+pub(crate) const SSE_SHARD_COUNT: usize = 64;
+
 /// SSE `id` field prefix.
 pub(crate) const SSE_FIELD_ID: &str = "id: ";
 

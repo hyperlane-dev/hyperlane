@@ -1,0 +1,19 @@
+[package]
+name = "hyperlane-plugin-session"
+autotests = false
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A high-concurrency sharded session management plugin for the Hyperlane framework with pluggable async SessionStore traits, optional HMAC-SHA256 signed cookies, dirty-tracked zero-write reads, and session-fixation ID regeneration."""
+keywords = ["http", "session", "cookie", "middleware", "hyperlane"]
+categories = ["network-programming", "web-programming"]
+exclude.workspace = true
+publish = true
+
+[dependencies]
+hyperlane = { workspace = true }
+
+lombok-macros = { workspace = true }

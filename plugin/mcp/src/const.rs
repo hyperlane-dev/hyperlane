@@ -13,6 +13,27 @@ pub const DEFAULT_MCP_MAX_SESSIONS: usize = 1024;
 /// Default maximum incoming JSON-RPC request body size (1 MiB).
 pub const DEFAULT_MCP_MAX_BODY_SIZE: usize = 1024 * 1024;
 
+/// Default MCP session idle TTL in milliseconds (30 minutes).
+pub const DEFAULT_MCP_SESSION_TTL_MS: u64 = 1_800_000;
+
+/// Number of independent session shards to reduce write-lock contention.
+pub(crate) const MCP_SESSION_SHARD_COUNT: usize = 16;
+
+/// Prefix prepended to generated MCP session identifiers.
+pub(crate) const MCP_SESSION_PREFIX: &str = "mcp-sess-";
+
+/// Lowercase hexadecimal alphabet used for stack-allocated session token formatting.
+pub(crate) const MCP_HEX_DIGITS: &[u8; 16] = b"0123456789abcdef";
+
+/// SplitMix64 Weyl increment constant.
+pub(crate) const SPLITMIX_GAMMA: u64 = 0x9E37_79B9_7F4A_7C15;
+
+/// SplitMix64 first avalanche multiplier.
+pub(crate) const SPLITMIX_MUL1: u64 = 0xBF58_476D_1CE4_E5B9;
+
+/// SplitMix64 second avalanche multiplier.
+pub(crate) const SPLITMIX_MUL2: u64 = 0x94D0_49BB_1331_11EB;
+
 /// JSON-RPC version string required by MCP messages.
 pub(crate) const MCP_JSONRPC_VERSION: &str = "2.0";
 

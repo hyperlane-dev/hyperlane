@@ -32,10 +32,12 @@ pub struct GrpcConfig {
 }
 
 /// Thread-safe registry mapping `/package.Service/Method` paths to unary async handlers.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct GrpcRouter {
-    /// Registered unary handlers keyed by full gRPC path.
-    pub(crate) methods: HashMap<String, GrpcHandler>,
+    /// Registered unary handlers keyed by full gRPC path with `XxHash3_64`.
+    pub(crate) methods: HashMapXxHash3_64<String, GrpcHandler>,
+    /// Registered interceptors invoked before each gRPC call.
+    pub(crate) interceptors: Vec<SharedGrpcInterceptor>,
 }
 
 /// Process-wide [`GrpcPlugin`] registry holding [`GrpcConfig`] and [`GrpcRouter`].
@@ -49,4 +51,5 @@ pub struct GrpcPlugin {
 
 /// Opt-in [`ServerHook`] dispatching gRPC `POST` requests with `Content-Type: application/grpc*`.
 #[derive(Clone, Copy, Debug, Default)]
+#[hyperlane::request_middleware(-65)]
 pub struct GrpcHook;

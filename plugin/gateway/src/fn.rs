@@ -84,14 +84,21 @@ pub fn build_upstream_url(
     } else {
         path
     };
-    if query.is_empty() {
-        format!("{base_url}{forward_path}")
-    } else {
-        format!("{base_url}{forward_path}?{query}")
+    let mut url: String =
+        String::with_capacity(base_url.len() + forward_path.len() + query.len() + 1);
+    url.push_str(base_url);
+    url.push_str(forward_path);
+    if !query.is_empty() {
+        url.push('?');
+        url.push_str(query);
     }
+    url
 }
 
 /// Reports whether `name` is an RFC 9110 hop-by-hop header that proxies must not forward.
+///
+/// Uses zero-allocation ASCII case-insensitive comparison for standard hop-by-hop headers
+/// and only lowercases when `extra_connection_headers` is non-empty.
 ///
 /// # Arguments
 ///
@@ -102,17 +109,22 @@ pub fn build_upstream_url(
 ///
 /// - `bool` - `true` when the header must be stripped before forwarding.
 pub fn is_hop_by_hop_header(name: &str, extra_connection_headers: &HashSet<String>) -> bool {
-    let lower: String = name.to_ascii_lowercase();
-    lower == CONNECTION
-        || lower == KEEP_ALIVE
-        || lower == PROXY_AUTHENTICATE
-        || lower == PROXY_AUTHORIZATION
-        || lower == HEADER_PROXY_CONNECTION
-        || lower == TE
-        || lower == HEADER_TRAILER
-        || lower == TRANSFER_ENCODING
-        || lower == UPGRADE
-        || extra_connection_headers.contains(&lower)
+    if name.eq_ignore_ascii_case(CONNECTION)
+        || name.eq_ignore_ascii_case(KEEP_ALIVE)
+        || name.eq_ignore_ascii_case(PROXY_AUTHENTICATE)
+        || name.eq_ignore_ascii_case(PROXY_AUTHORIZATION)
+        || name.eq_ignore_ascii_case(HEADER_PROXY_CONNECTION)
+        || name.eq_ignore_ascii_case(TE)
+        || name.eq_ignore_ascii_case(HEADER_TRAILER)
+        || name.eq_ignore_ascii_case(TRANSFER_ENCODING)
+        || name.eq_ignore_ascii_case(UPGRADE)
+    {
+        return true;
+    }
+    if extra_connection_headers.is_empty() {
+        return false;
+    }
+    extra_connection_headers.contains(&name.to_ascii_lowercase())
 }
 
 /// Extracts lowercased header names listed in `Connection` header values.

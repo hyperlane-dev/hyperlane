@@ -1,12 +1,20 @@
 use super::*;
 
 /// The configuration of the logger.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct LoggerConfig {
     /// The highest level that is written.
     pub(crate) level: LevelFilter,
     /// The file the log is appended to, when there is one.
     pub(crate) file: Option<String>,
+    /// Whether formatted lines are also echoed to standard output.
+    pub(crate) console: bool,
+    /// Output line format (plain text or structured JSON).
+    pub(crate) format: LogFormat,
+    /// Bounded non-blocking channel capacity for background file writes.
+    pub(crate) channel_capacity: usize,
+    /// Optional custom extensible output sink invoked alongside built-in outputs.
+    pub(crate) sink: Option<SharedLogSink>,
 }
 
 /// The plugin that writes the log of the server.

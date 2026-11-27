@@ -22,6 +22,12 @@ pub const HEADER_X_FORWARDED_PROTO: &str = "x-forwarded-proto";
 /// Standard `X-Gateway-Upstream` diagnostic header name.
 pub const HEADER_X_GATEWAY_UPSTREAM: &str = "x-gateway-upstream";
 
+/// Nanoseconds per second used by the lock-free GCRA rate limiter.
+pub(crate) const NANOS_PER_SECOND: u64 = 1_000_000_000;
+
+/// Golden-ratio odd multiplier used for Power-of-Two-Choices index mixing.
+pub(crate) const P2C_MIX_MULTIPLIER: usize = 0x9E37_79B9;
+
 /// Lowercase `http` protocol tag for `X-Forwarded-Proto`.
 pub(crate) const PROTO_HTTP: &str = "http";
 

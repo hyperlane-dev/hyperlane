@@ -1,0 +1,19 @@
+[package]
+name = "hyperlane-plugin-metrics"
+autotests = false
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A lock-free atomic Prometheus/OpenMetrics observability plugin for the Hyperlane framework with built-in HTTP request counters, in-flight gauges, latency histograms, custom user metric registration, and a scrapeable /metrics endpoint."""
+keywords = ["http", "metrics", "prometheus", "observability", "hyperlane"]
+categories = ["network-programming", "web-programming"]
+exclude.workspace = true
+publish = true
+
+[dependencies]
+hyperlane = { workspace = true }
+
+lombok-macros = { workspace = true }

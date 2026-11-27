@@ -8,4 +8,6 @@ pub enum LoadBalanceStrategy {
     LeastConnections,
     /// Distributes requests proportionally to each [`crate::UpstreamTarget`]'s weight.
     WeightedRoundRobin,
+    /// Picks two candidate upstreams and selects the one with fewer active connections (`O(1)`).
+    PowerOfTwoChoices,
 }

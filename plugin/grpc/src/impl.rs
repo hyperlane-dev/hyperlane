@@ -111,6 +111,37 @@ impl Default for GrpcConfig {
     }
 }
 
+/// Inherent implementation of [`GrpcConfig`].
+impl GrpcConfig {
+    /// Sets the maximum encoded and decoded message size in bytes.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - Maximum message length in bytes.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - Updated configuration.
+    pub fn with_max_message_size(mut self, max_message_size: usize) -> Self {
+        self.set_max_message_size(max_message_size);
+        self
+    }
+
+    /// Sets the outgoing response frame compression algorithm.
+    ///
+    /// # Arguments
+    ///
+    /// - `Compress` - Compression coding (`Compress::Unknown` = identity).
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - Updated configuration.
+    pub fn with_compression(mut self, compression: Compress) -> Self {
+        self.set_compression(compression);
+        self
+    }
+}
+
 /// Inherent implementation of [`GrpcFrame`].
 impl GrpcFrame {
     /// Creates an uncompressed [`GrpcFrame`] carrying `payload`.
@@ -129,6 +160,40 @@ impl GrpcFrame {
         }
     }
 
+    /// Encodes this frame directly into `out` in the 5-byte gRPC Length-Prefixed-Message wire format.
+    ///
+    /// # Arguments
+    ///
+    /// - `Compress` - Compression coding to apply (`Compress::Unknown` sends uncompressed).
+    /// - `&mut Vec<u8>` - Destination wire buffer (appended to).
+    ///
+    /// # Returns
+    ///
+    /// - `Result<(), GrpcError>` - `Ok(())` on success, or [`GrpcStatus::ResourceExhausted`] on length overflow.
+    pub fn encode_into(&self, encoding: Compress, out: &mut Vec<u8>) -> Result<(), GrpcError> {
+        let payload: &[u8] = self.get_payload().as_slice();
+        if matches!(encoding, Compress::Unknown) {
+            let len_u32: u32 = u32::try_from(payload.len()).map_err(|_| {
+                GrpcError::new(GrpcStatus::ResourceExhausted, ERR_GRPC_MSG_TOO_LARGE)
+            })?;
+            out.reserve(GRPC_FRAME_HEADER_LEN + payload.len());
+            out.push(0u8);
+            out.extend_from_slice(&len_u32.to_be_bytes());
+            out.extend_from_slice(payload);
+            return Ok(());
+        }
+        let compressed: Vec<u8> = encoding
+            .encode(payload, GRPC_DECOMPRESS_BUF_SIZE)
+            .into_owned();
+        let len_u32: u32 = u32::try_from(compressed.len())
+            .map_err(|_| GrpcError::new(GrpcStatus::ResourceExhausted, ERR_GRPC_MSG_TOO_LARGE))?;
+        out.reserve(GRPC_FRAME_HEADER_LEN + compressed.len());
+        out.push(1u8);
+        out.extend_from_slice(&len_u32.to_be_bytes());
+        out.extend_from_slice(&compressed);
+        Ok(())
+    }
+
     /// Encodes this frame into the 5-byte gRPC Length-Prefixed-Message wire format.
     ///
     /// # Arguments
@@ -139,24 +204,13 @@ impl GrpcFrame {
     ///
     /// - `Result<Vec<u8>, GrpcError>` - Wire bytes, or [`GrpcStatus::ResourceExhausted`] on length overflow.
     pub fn encode(&self, encoding: Compress) -> Result<Vec<u8>, GrpcError> {
-        let (flag, body): (u8, Vec<u8>) = if matches!(encoding, Compress::Unknown) {
-            (0u8, self.get_payload().clone())
-        } else {
-            let compressed: Vec<u8> = encoding
-                .encode(self.get_payload(), GRPC_DECOMPRESS_BUF_SIZE)
-                .into_owned();
-            (1u8, compressed)
-        };
-        let len_u32: u32 = u32::try_from(body.len())
-            .map_err(|_| GrpcError::new(GrpcStatus::ResourceExhausted, ERR_GRPC_MSG_TOO_LARGE))?;
-        let mut wire: Vec<u8> = Vec::with_capacity(GRPC_FRAME_HEADER_LEN + body.len());
-        wire.push(flag);
-        wire.extend_from_slice(&len_u32.to_be_bytes());
-        wire.extend_from_slice(&body);
+        let mut wire: Vec<u8> =
+            Vec::with_capacity(GRPC_FRAME_HEADER_LEN + self.get_payload().len());
+        self.encode_into(encoding, &mut wire)?;
         Ok(wire)
     }
 
-    /// Decodes one 5-byte length-prefixed gRPC wire frame enforcing `max_message_size` and decompression caps.
+    /// Decodes one 5-byte length-prefixed gRPC wire frame and returns `(frame, bytes_consumed)`.
     ///
     /// # Arguments
     ///
@@ -166,12 +220,12 @@ impl GrpcFrame {
     ///
     /// # Returns
     ///
-    /// - `Result<Self, GrpcError>` - Decoded frame or canonical [`GrpcError`].
-    pub fn decode(
+    /// - `Result<(Self, usize), GrpcError>` - Decoded frame and consumed byte length.
+    fn decode_prefix(
         raw: &[u8],
         encoding: Compress,
         max_message_size: usize,
-    ) -> Result<Self, GrpcError> {
+    ) -> Result<(Self, usize), GrpcError> {
         if raw.len() < GRPC_FRAME_HEADER_LEN {
             return Err(GrpcError::new(
                 GrpcStatus::Internal,
@@ -198,10 +252,13 @@ impl GrpcFrame {
         }
         let frame_slice: &[u8] = &raw[GRPC_FRAME_HEADER_LEN..body_end];
         if flag == 0 {
-            return Ok(Self {
-                compressed: false,
-                payload: frame_slice.to_vec(),
-            });
+            return Ok((
+                Self {
+                    compressed: false,
+                    payload: frame_slice.to_vec(),
+                },
+                body_end,
+            ));
         }
         if matches!(encoding, Compress::Unknown) {
             return Err(GrpcError::new(
@@ -218,10 +275,79 @@ impl GrpcFrame {
                 ERR_GRPC_MSG_TOO_LARGE,
             ));
         }
-        Ok(Self {
-            compressed: true,
-            payload: decoded,
-        })
+        Ok((
+            Self {
+                compressed: true,
+                payload: decoded,
+            },
+            body_end,
+        ))
+    }
+
+    /// Decodes one 5-byte length-prefixed gRPC wire frame enforcing `max_message_size` and decompression caps.
+    ///
+    /// # Arguments
+    ///
+    /// - `&[u8]` - Raw HTTP/2 request body bytes.
+    /// - `Compress` - Negotiated `grpc-encoding` coding (`Compress::Unknown` for identity).
+    /// - `usize` - Maximum allowed encoded and decoded payload length.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Self, GrpcError>` - Decoded frame or canonical [`GrpcError`].
+    pub fn decode(
+        raw: &[u8],
+        encoding: Compress,
+        max_message_size: usize,
+    ) -> Result<Self, GrpcError> {
+        let (frame, _): (Self, usize) = Self::decode_prefix(raw, encoding, max_message_size)?;
+        Ok(frame)
+    }
+
+    /// Decodes a sequence of concatenated gRPC frames up to `max_frames` for streaming batches.
+    ///
+    /// # Arguments
+    ///
+    /// - `&[u8]` - Raw HTTP/2 body containing zero or more length-prefixed frames.
+    /// - `Compress` - Negotiated `grpc-encoding` coding.
+    /// - `usize` - Maximum allowed per-frame size in bytes.
+    /// - `usize` - Maximum number of frames permitted to prevent DoS fan-out.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Vec<Self>, GrpcError>` - Decoded frames in wire order.
+    pub fn decode_many(
+        raw: &[u8],
+        encoding: Compress,
+        max_message_size: usize,
+        max_frames: usize,
+    ) -> Result<Vec<Self>, GrpcError> {
+        let mut frames: Vec<Self> = Vec::new();
+        let mut offset: usize = 0;
+        while offset < raw.len() {
+            if frames.len() >= max_frames {
+                return Err(GrpcError::new(
+                    GrpcStatus::ResourceExhausted,
+                    ERR_GRPC_MSG_TOO_LARGE,
+                ));
+            }
+            let (frame, consumed): (Self, usize) =
+                Self::decode_prefix(&raw[offset..], encoding, max_message_size)?;
+            frames.push(frame);
+            offset = offset.saturating_add(consumed);
+        }
+        Ok(frames)
+    }
+}
+
+/// Default construction for [`GrpcRouter`].
+impl Default for GrpcRouter {
+    /// Constructs an empty [`GrpcRouter`].
+    fn default() -> Self {
+        Self {
+            methods: hash_map_xx_hash3_64(),
+            interceptors: Vec::new(),
+        }
     }
 }
 
@@ -234,6 +360,21 @@ impl GrpcRouter {
     /// - `Self` - Empty service router.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Registers an extensible [`GrpcInterceptor`] invoked before every service dispatch.
+    ///
+    /// # Arguments
+    ///
+    /// - `SharedGrpcInterceptor` - Interceptor implementation.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Self` - This router for fluent chaining.
+    pub fn add_interceptor(&mut self, interceptor: SharedGrpcInterceptor) -> &mut Self {
+        let Self { interceptors, .. } = self;
+        interceptors.push(interceptor);
+        self
     }
 
     /// Registers a unary async gRPC method handler under full path `/package.Service/Method`.
@@ -252,7 +393,7 @@ impl GrpcRouter {
         F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Vec<u8>, GrpcError>> + Send + 'static,
     {
-        let Self { methods } = self;
+        let Self { methods, .. } = self;
         let boxed: GrpcHandler = Arc::new(move |payload: Vec<u8>| Box::pin(handler(payload)));
         methods.insert(path.into(), boxed);
         self
@@ -268,11 +409,11 @@ impl GrpcRouter {
     ///
     /// - `bool` - `true` when registered.
     pub fn has_method(&self, path: &str) -> bool {
-        let Self { methods } = self;
+        let Self { methods, .. } = self;
         methods.contains_key(path)
     }
 
-    /// Dispatches one gRPC unary call with frame decoding, optional timeout, and response framing.
+    /// Dispatches one gRPC unary call with interceptor check, frame decoding, optional timeout, and response framing.
     ///
     /// # Arguments
     ///
@@ -293,7 +434,15 @@ impl GrpcRouter {
         deadline: Option<Duration>,
         config: &GrpcConfig,
     ) -> (GrpcStatus, String, Vec<u8>) {
-        let Self { methods } = self;
+        let Self {
+            methods,
+            interceptors,
+        } = self;
+        for interceptor in interceptors {
+            if let Err(err) = interceptor.before_call(path) {
+                return (err.get_status(), err.encoded_message(), Vec::new());
+            }
+        }
         let Some(handler) = methods.get(path) else {
             return (
                 GrpcStatus::Unimplemented,
@@ -405,7 +554,7 @@ impl ServerHook for GrpcHook {
     ///
     /// # Returns
     ///
-    /// - `Status` - `Status::Continue` when unconfigured or non-gRPC; `Status::Stop` once answered.
+    /// - `Status` - `Status::Continue` when unconfigured or non-gRPC; `Status::Reject` once answered.
     async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
         let Some(plugin) = GrpcPlugin::get() else {
             return Status::Continue;
@@ -425,7 +574,6 @@ impl ServerHook for GrpcHook {
             let _: Result<(), ResponseError> = stream.try_send(&wire).await;
             return Status::Reject;
         }
-        let path: String = ctx.get_request().get_path().clone();
         let req_encoding: Compress = parse_grpc_encoding(
             ctx.get_request()
                 .try_get_header_back(GRPC_ENCODING_HEADER)
@@ -435,11 +583,16 @@ impl ServerHook for GrpcHook {
             .get_request()
             .try_get_header_back(GRPC_TIMEOUT_HEADER)
             .and_then(|val: String| parse_grpc_timeout(&val));
-        let raw_body: Vec<u8> = ctx.get_request().get_body().clone();
         let config: &GrpcConfig = plugin.get_config();
         let (status, encoded_msg, wire_body): (GrpcStatus, String, Vec<u8>) = plugin
             .get_router()
-            .dispatch(&path, &raw_body, req_encoding, deadline, config)
+            .dispatch(
+                ctx.get_request().get_path(),
+                ctx.get_request().get_body(),
+                req_encoding,
+                deadline,
+                config,
+            )
             .await;
         let response: &mut Response = ctx.get_mut_response();
         response

@@ -1,0 +1,19 @@
+[package]
+name = "hyperlane-plugin-rate-limit"
+autotests = false
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A 64-way sharded lock-free atomic GCRA and fixed-window rate limiter plugin for the Hyperlane framework with extensible KeyExtractor and RateLimitStore traits and RFC RateLimit headers."""
+keywords = ["http", "rate-limit", "gcra", "middleware", "hyperlane"]
+categories = ["network-programming", "web-programming"]
+exclude.workspace = true
+publish = true
+
+[dependencies]
+hyperlane = { workspace = true }
+
+lombok-macros = { workspace = true }

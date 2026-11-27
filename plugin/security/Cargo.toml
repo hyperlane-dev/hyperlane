@@ -1,0 +1,19 @@
+[package]
+name = "hyperlane-plugin-security"
+autotests = false
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A zero-allocation security hardening plugin for the Hyperlane framework providing prebuilt HSTS/CSP/COOP/COEP/CORP/Referrer headers, stateless HMAC-SHA256 CSRF protection, host/URI/body/path-traversal guards, and extensible SecurityRule hooks."""
+keywords = ["http", "security", "csrf", "headers", "hyperlane"]
+categories = ["network-programming", "web-programming"]
+exclude.workspace = true
+publish = true
+
+[dependencies]
+hyperlane = { workspace = true }
+
+lombok-macros = { workspace = true }

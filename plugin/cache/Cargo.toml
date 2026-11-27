@@ -1,0 +1,19 @@
+[package]
+name = "hyperlane-plugin-cache"
+autotests = false
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A 64-way sharded bounded in-memory and HTTP response cache plugin for the Hyperlane framework with TTL, byte-budget eviction, single-flight stampede coalescing, pluggable CacheStore traits, and RFC Cache-Control/Vary/Age/X-Cache handling."""
+keywords = ["http", "cache", "singleflight", "middleware", "hyperlane"]
+categories = ["network-programming", "web-programming"]
+exclude.workspace = true
+publish = true
+
+[dependencies]
+hyperlane = { workspace = true }
+
+lombok-macros = { workspace = true }

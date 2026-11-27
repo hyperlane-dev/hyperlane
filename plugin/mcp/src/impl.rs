@@ -35,7 +35,118 @@ impl Default for McpServerConfig {
             allowed_origins: Vec::new(),
             max_sessions: DEFAULT_MCP_MAX_SESSIONS,
             max_body_size: DEFAULT_MCP_MAX_BODY_SIZE,
+            session_ttl_ms: DEFAULT_MCP_SESSION_TTL_MS,
         }
+    }
+}
+
+/// Inherent fluent builders for [`McpServerConfig`].
+impl McpServerConfig {
+    /// Returns a configuration with the given advertised server name.
+    ///
+    /// # Arguments
+    ///
+    /// - `N` - Server name convertible into `String`.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - Updated configuration.
+    pub fn with_name<N>(mut self, name: N) -> Self
+    where
+        N: Into<String>,
+    {
+        self.set_name(name.into());
+        self
+    }
+
+    /// Returns a configuration with the given advertised server version.
+    ///
+    /// # Arguments
+    ///
+    /// - `V` - Version string convertible into `String`.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - Updated configuration.
+    pub fn with_version<V>(mut self, version: V) -> Self
+    where
+        V: Into<String>,
+    {
+        self.set_version(version.into());
+        self
+    }
+
+    /// Returns a configuration with the given MCP endpoint path.
+    ///
+    /// # Arguments
+    ///
+    /// - `E` - Endpoint path convertible into `String`.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - Updated configuration.
+    pub fn with_endpoint<E>(mut self, endpoint: E) -> Self
+    where
+        E: Into<String>,
+    {
+        self.set_endpoint(endpoint.into());
+        self
+    }
+
+    /// Returns a configuration with the given allowed `Origin` allowlist.
+    ///
+    /// # Arguments
+    ///
+    /// - `Vec<String>` - Allowed `Origin` header values.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - Updated configuration.
+    pub fn with_allowed_origins(mut self, allowed_origins: Vec<String>) -> Self {
+        self.set_allowed_origins(allowed_origins);
+        self
+    }
+
+    /// Returns a configuration with the given maximum concurrent session count.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - Maximum tracked concurrent sessions.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - Updated configuration.
+    pub fn with_max_sessions(mut self, max_sessions: usize) -> Self {
+        self.set_max_sessions(max_sessions);
+        self
+    }
+
+    /// Returns a configuration with the given maximum incoming body size in bytes.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - Maximum request body bytes.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - Updated configuration.
+    pub fn with_max_body_size(mut self, max_body_size: usize) -> Self {
+        self.set_max_body_size(max_body_size);
+        self
+    }
+
+    /// Returns a configuration with the given session idle TTL in milliseconds (`0` disables expiration).
+    ///
+    /// # Arguments
+    ///
+    /// - `u64` - Session TTL in milliseconds.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - Updated configuration.
+    pub fn with_session_ttl_ms(mut self, session_ttl_ms: u64) -> Self {
+        self.set_session_ttl_ms(session_ttl_ms);
+        self
     }
 }
 
@@ -90,18 +201,25 @@ impl Default for McpRegistry {
 
 /// Inherent implementation of [`McpRegistry`].
 impl McpRegistry {
-    /// Creates an empty [`McpRegistry`] with an isolated session table.
+    /// Creates an empty [`McpRegistry`] with a sharded session table.
     ///
     /// # Returns
     ///
     /// - `Self` - Ready MCP registry.
     pub fn new() -> Self {
+        let mut shards: Vec<RwLock<HashMapXxHash3_64<String, Instant>>> =
+            Vec::with_capacity(MCP_SESSION_SHARD_COUNT);
+        for _ in 0..MCP_SESSION_SHARD_COUNT {
+            shards.push(RwLock::new(hash_map_xx_hash3_64()));
+        }
         Self {
-            tools: HashMap::new(),
-            resources: HashMap::new(),
-            prompts: HashMap::new(),
-            sessions: Arc::new(Mutex::new(HashSet::new())),
+            tools: hash_map_xx_hash3_64(),
+            resources: hash_map_xx_hash3_64(),
+            prompts: hash_map_xx_hash3_64(),
+            session_shards: Arc::new(shards),
+            session_count: Arc::new(AtomicUsize::new(0)),
             next_session_seq: Arc::new(AtomicU64::new(1)),
+            session_seed: mcp_random_seed(),
         }
     }
 
@@ -199,66 +317,155 @@ impl McpRegistry {
     ///
     /// - `bool` - `true` if the session existed and was terminated.
     pub fn close_session(&self, session_id: &str) -> bool {
-        let Self { sessions, .. } = self;
-        sessions
-            .lock()
-            .map(|mut set: MutexGuard<'_, HashSet<String>>| set.remove(session_id))
-            .unwrap_or(false)
+        let Self {
+            session_shards,
+            session_count,
+            ..
+        } = self;
+        let shard_idx: usize = mcp_session_shard_index(session_id);
+        let removed: bool = session_shards[shard_idx]
+            .write()
+            .map(
+                |mut map: RwLockWriteGuard<'_, HashMapXxHash3_64<String, Instant>>| {
+                    map.remove(session_id).is_some()
+                },
+            )
+            .unwrap_or(false);
+        if removed {
+            session_count.fetch_sub(1, Ordering::Relaxed);
+        }
+        removed
     }
 
-    /// Returns the number of currently active MCP sessions.
+    /// Returns the number of currently active MCP sessions in `O(1)` time without locking.
     ///
     /// # Returns
     ///
     /// - `usize` - Count of live sessions.
     pub fn session_count(&self) -> usize {
-        let Self { sessions, .. } = self;
-        sessions
-            .lock()
-            .map(|set: MutexGuard<'_, HashSet<String>>| set.len())
-            .unwrap_or(0)
+        let Self { session_count, .. } = self;
+        session_count.load(Ordering::Relaxed)
     }
 
-    /// Allocates and stores one new session id within `max_sessions`.
+    /// Evicts all sessions whose elapsed lifetime exceeds `ttl_ms`.
+    ///
+    /// # Arguments
+    ///
+    /// - `u64` - Session TTL in milliseconds (`0` disables expiration).
+    ///
+    /// # Returns
+    ///
+    /// - `usize` - Number of expired sessions removed.
+    pub fn purge_expired_sessions(&self, ttl_ms: u64) -> usize {
+        if ttl_ms == 0 {
+            return 0;
+        }
+        let Self {
+            session_shards,
+            session_count,
+            ..
+        } = self;
+        let ttl: Duration = Duration::from_millis(ttl_ms);
+        let now: Instant = Instant::now();
+        let mut evicted: usize = 0;
+        for shard in session_shards.iter() {
+            if let Ok(mut map) = shard.write() {
+                let before: usize = map.len();
+                map.retain(|_: &String, seen: &mut Instant| now.duration_since(*seen) <= ttl);
+                evicted += before.saturating_sub(map.len());
+            }
+        }
+        if evicted > 0 {
+            session_count.fetch_sub(evicted, Ordering::Relaxed);
+        }
+        evicted
+    }
+
+    /// Allocates and stores one new session id within `max_sessions`, reclaiming expired ones first.
     ///
     /// # Arguments
     ///
     /// - `usize` - Maximum allowed concurrent sessions.
+    /// - `u64` - Session TTL in milliseconds (`0` disables expiration).
     ///
     /// # Returns
     ///
     /// - `Option<String>` - Newly created session identifier, or `None` when at capacity.
-    fn create_session(&self, max_sessions: usize) -> Option<String> {
+    fn create_session(&self, max_sessions: usize, ttl_ms: u64) -> Option<String> {
         let Self {
-            sessions,
+            session_shards,
+            session_count,
             next_session_seq,
+            session_seed,
             ..
         } = self;
-        let mut guard: MutexGuard<'_, HashSet<String>> = sessions.lock().ok()?;
-        if guard.len() >= max_sessions {
-            return None;
+        if session_count.load(Ordering::Relaxed) >= max_sessions && ttl_ms > 0 {
+            let _: usize = self.purge_expired_sessions(ttl_ms);
+        }
+        let mut observed: usize = session_count.load(Ordering::Relaxed);
+        loop {
+            if observed >= max_sessions {
+                return None;
+            }
+            match session_count.compare_exchange_weak(
+                observed,
+                observed + 1,
+                Ordering::AcqRel,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => break,
+                Err(actual) => observed = actual,
+            }
         }
         let seq: u64 = next_session_seq.fetch_add(1, Ordering::Relaxed);
-        let id: String = format!("mcp-sess-{seq:016x}");
-        guard.insert(id.clone());
+        let id: String = mint_mcp_session_id(*session_seed, seq);
+        let shard_idx: usize = mcp_session_shard_index(&id);
+        let Ok(mut map) = session_shards[shard_idx].write() else {
+            session_count.fetch_sub(1, Ordering::Relaxed);
+            return None;
+        };
+        map.insert(id.clone(), Instant::now());
         Some(id)
     }
 
-    /// Checks whether `session_id` is currently active in this registry.
+    /// Checks whether `session_id` is active and unexpired in this registry.
     ///
     /// # Arguments
     ///
     /// - `&str` - Session identifier to verify.
+    /// - `u64` - Session TTL in milliseconds (`0` disables expiration).
     ///
     /// # Returns
     ///
-    /// - `bool` - `true` when active.
-    fn has_session(&self, session_id: &str) -> bool {
-        let Self { sessions, .. } = self;
-        sessions
-            .lock()
-            .map(|set: MutexGuard<'_, HashSet<String>>| set.contains(session_id))
-            .unwrap_or(false)
+    /// - `bool` - `true` when active and unexpired.
+    fn has_session(&self, session_id: &str, ttl_ms: u64) -> bool {
+        let Self {
+            session_shards,
+            session_count,
+            ..
+        } = self;
+        let shard_idx: usize = mcp_session_shard_index(session_id);
+        let seen_opt: Option<Instant> = session_shards[shard_idx].read().ok().and_then(
+            |map: RwLockReadGuard<'_, HashMapXxHash3_64<String, Instant>>| {
+                map.get(session_id).copied()
+            },
+        );
+        let Some(seen) = seen_opt else {
+            return false;
+        };
+        if ttl_ms == 0 {
+            return true;
+        }
+        let ttl: Duration = Duration::from_millis(ttl_ms);
+        if Instant::now().duration_since(seen) <= ttl {
+            return true;
+        }
+        if let Ok(mut map) = session_shards[shard_idx].write()
+            && map.remove(session_id).is_some()
+        {
+            session_count.fetch_sub(1, Ordering::Relaxed);
+        }
+        false
     }
 
     /// Dispatches one raw MCP JSON-RPC 2.0 request body with session enforcement.
@@ -325,7 +532,7 @@ impl McpRegistry {
         let params: Value = obj.get(KEY_PARAMS).cloned().unwrap_or_else(|| json!({}));
         if method != METHOD_INITIALIZE
             && let Some(sid) = session_id
-            && !self.has_session(sid)
+            && !self.has_session(sid, config.get_session_ttl_ms())
         {
             return McpDispatchOutcome::UnknownSession;
         }
@@ -335,7 +542,9 @@ impl McpRegistry {
         let id: Value = id_opt.unwrap_or(Value::Null);
         match method {
             METHOD_INITIALIZE => {
-                let Some(new_sid) = self.create_session(config.get_max_sessions()) else {
+                let Some(new_sid) =
+                    self.create_session(config.get_max_sessions(), config.get_session_ttl_ms())
+                else {
                     return McpDispatchOutcome::SessionLimitReached;
                 };
                 let result: Value = mcp_initialize_result(config);
@@ -559,7 +768,7 @@ impl ServerHook for McpHook {
     ///
     /// # Returns
     ///
-    /// - `Status` - `Status::Continue` when unconfigured or path does not match; `Status::Stop` once answered.
+    /// - `Status` - `Status::Continue` when unconfigured or path does not match; `Status::Reject` once answered.
     async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
         let Some(plugin) = McpPlugin::get() else {
             return Status::Continue;
@@ -603,8 +812,7 @@ impl ServerHook for McpHook {
             let _: Result<(), ResponseError> = stream.try_send(&wire).await;
             return Status::Reject;
         }
-        let body: Vec<u8> = ctx.get_request().get_body().clone();
-        if body.len() > config.get_max_body_size() {
+        if ctx.get_request().get_body().len() > config.get_max_body_size() {
             ctx.get_mut_response()
                 .set_status_code(HttpStatus::PayloadTooLarge.code())
                 .set_body(Vec::new());
@@ -614,7 +822,7 @@ impl ServerHook for McpHook {
         }
         let outcome: McpDispatchOutcome = plugin
             .get_registry()
-            .handle_json_bytes(&body, session_id.as_deref(), config)
+            .handle_json_bytes(ctx.get_request().get_body(), session_id.as_deref(), config)
             .await;
         match outcome {
             McpDispatchOutcome::Response {
