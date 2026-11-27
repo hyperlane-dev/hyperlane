@@ -71,7 +71,6 @@ jobs:
       - name: Format check
         run: cargo fmt --all -- --check
 
-
   tests:
     needs: setup
     if: always() && (github.event_name == 'pull_request' || (github.event_name == 'push' && needs.setup.result == 'success'))
@@ -87,7 +86,6 @@ jobs:
           toolchain: stable
       - name: Run tests
         run: cargo test --workspace --all-features -- --nocapture
-
 
   clippy:
     needs: setup
@@ -105,7 +103,6 @@ jobs:
           components: clippy
       - name: Run clippy
         run: cargo clippy --workspace --all-features --all-targets
-
 
   build:
     needs: setup

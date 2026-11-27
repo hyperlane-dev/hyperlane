@@ -9,10 +9,11 @@ mod brotli;
 mod compress;
 mod deflate;
 mod gzip;
+mod xx_hash3_64;
+
 #[cfg(test)]
 #[path = "../tests/mod.rs"]
 mod tests;
-mod xx_hash3_64;
 
 pub use {compress::*, xx_hash3_64::*};
 

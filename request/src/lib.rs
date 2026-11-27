@@ -7,11 +7,12 @@ mod pool;
 mod protocol;
 mod request;
 mod response;
+mod tls;
+mod utils;
+
 #[cfg(test)]
 #[path = "../tests/mod.rs"]
 mod tests;
-mod tls;
-mod utils;
 
 pub use {request::*, response::*};
 

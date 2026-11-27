@@ -7,11 +7,12 @@ mod help;
 mod logger;
 mod new;
 mod template;
+mod version;
+mod watch;
+
 #[cfg(test)]
 #[path = "../tests/mod.rs"]
 mod tests;
-mod version;
-mod watch;
 
 pub use {command::*, config::*, help::*, logger::*, new::*, template::*, version::*, watch::*};
 

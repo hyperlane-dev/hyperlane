@@ -16,6 +16,7 @@ mod path;
 mod protocol;
 mod query;
 mod session;
+
 #[cfg(test)]
 #[path = "../tests/mod.rs"]
 mod tests;

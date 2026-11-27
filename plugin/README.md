@@ -70,37 +70,37 @@ plugin is held to the same rules as the framework.
 
 ## Official plugins in this repository
 
-| crate | path | hook order (req / resp) | capabilities |
-|---|---|---|---|
-| `hyperlane-plugin-tracing` | `plugin/tracing` | `-130` / `90` | lock-free 128-bit W3C `traceparent`/`tracestate`, `X-Request-Id`, `Server-Timing`, pluggable `SpanExporter` |
-| `hyperlane-plugin-logger` | `plugin/logger` | `-120` / `100` | non-blocking buffered console/file logging, Plain/JSON formats, `LogSink` trait, CRLF/ANSI sanitization |
-| `hyperlane-plugin-metrics` | `plugin/metrics` | `-115` / `95` | lock-free atomic counters, gauges, latency histograms, Prometheus 0.0.4 `/metrics` scrape endpoint |
-| `hyperlane-plugin-health` | `plugin/health` | `-110` / — | `/healthz`, `/livez`, `/readyz` probes with concurrent async `HealthCheck`, timeouts, snapshot cache, drain flag |
-| `hyperlane-plugin-security` | `plugin/security` | `-105` / `-75` | prebuilt HSTS/CSP/COOP/COEP/CORP/Referrer headers, stateless HMAC-SHA256 CSRF, host/URI/body/traversal guards, `SecurityRule` |
-| `hyperlane-plugin-cors` | `plugin/cors` | `-100` / `-80` | precompiled zero-alloc CORS headers, exact/suffix/predicate origin matching, credentials safety guard, `OPTIONS` preflight |
-| `hyperlane-plugin-rate-limit` | `plugin/rate_limit` | `-95` / — | 64-shard lock-free atomic GCRA & fixed-window limiter, bounded key store, `KeyExtractor`/`RateLimitStore` traits, RFC `RateLimit-*` headers |
-| `hyperlane-plugin-auth` | `plugin/auth` | `-90` / — | pure-Rust HS256 JWT (`kid` rotation), API key, HTTP Basic, RBAC `AuthPrincipal`, extensible async `Authenticator` |
-| `hyperlane-plugin-session` | `plugin/session` | `-85` / `-70` | 64-shard bounded `InMemorySessionStore` + pluggable `SessionStore`, HMAC-SHA256 signed cookies, dirty-tracked reads, `regenerate_id()` |
-| `hyperlane-plugin-cache` | `plugin/cache` | `-80` / `-65` | 64-shard bounded cache, single-flight stampede coalescing, pluggable `CacheStore`, HTTP `Cache-Control`/`Age`/`X-Cache` |
-| `hyperlane-plugin-rpc` | `plugin/rpc` | `-70` / — | JSON-RPC 2.0 `XxHash3_64` router, concurrent batch/notification dispatch, DoS caps, `RpcInterceptor`, `RpcHook` |
-| `hyperlane-plugin-grpc` | `plugin/grpc` | `-65` / — | gRPC over HTTP/2 5-byte framing, bounded compression, status codes `0..=16`, `grpc-timeout`, `GrpcInterceptor`, `GrpcHook` |
-| `hyperlane-plugin-mcp` | `plugin/mcp` | `-60` / — | Model Context Protocol Streamable HTTP server, `XxHash3_64` registries, 16-shard TTL sessions, `Origin` guard, `McpHook` |
-| `hyperlane-plugin-static-files` | `plugin/static_files` | `-55` / — | traversal-proof static server, `FileExtension` MIME table, 64-shard hot-file cache, `.br`/`.gz` sidecars, `ETag`/`304`, `Range` `206`/`416`, SPA fallback |
-| `hyperlane-plugin-gateway` | `plugin/gateway` | `-50` / — | reverse proxy & API gateway with pooled H1/H2 `http-request`, RR/Weighted/LC/P2C balancing, circuit breaker, lock-free GCRA limiter, `GatewayInterceptor` |
-| `hyperlane-plugin-negotiate` | `plugin/negotiate` | explicit | `Accept-Encoding` compression negotiation and conditional `304 Not Modified` strong/weak ETag validation |
-| `hyperlane-plugin-shutdown` | `plugin/shutdown` | control hook | graceful shutdown coordinator with `SIGINT`/`SIGTERM` arming, RAII `ShutdownGuard` draining, LIFO async `ShutdownCallback` hooks |
-| `hyperlane-plugin-websocket` | `plugin/websocket` | route helper | WebSocket room broadcast with lag recovery, connection lifecycle hooks, and opt-in `WebSocketPlugin` |
-| `hyperlane-plugin-sse` | `plugin/sse` | route helper | WHATWG Server-Sent Events framing, CRLF sanitization, 64-shard topic pub/sub, `Last-Event-ID` replay, heartbeats |
-| `hyperlane-plugin-mq` | `plugin/mq` | broker | pluggable `MessageBroker` trait and 64-shard `InMemoryBroker` with consumer groups, TTL, retries, $O(\log N)$ deadline heap, DLQ |
+| crate                           | path                  | hook order (req / resp) | capabilities                                                                                                                                              |
+| ------------------------------- | --------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hyperlane-plugin-tracing`      | `plugin/tracing`      | `-130` / `90`           | lock-free 128-bit W3C `traceparent`/`tracestate`, `X-Request-Id`, `Server-Timing`, pluggable `SpanExporter`                                               |
+| `hyperlane-plugin-logger`       | `plugin/logger`       | `-120` / `100`          | non-blocking buffered console/file logging, Plain/JSON formats, `LogSink` trait, CRLF/ANSI sanitization                                                   |
+| `hyperlane-plugin-metrics`      | `plugin/metrics`      | `-115` / `95`           | lock-free atomic counters, gauges, latency histograms, Prometheus 0.0.4 `/metrics` scrape endpoint                                                        |
+| `hyperlane-plugin-health`       | `plugin/health`       | `-110` / —              | `/healthz`, `/livez`, `/readyz` probes with concurrent async `HealthCheck`, timeouts, snapshot cache, drain flag                                          |
+| `hyperlane-plugin-security`     | `plugin/security`     | `-105` / `-75`          | prebuilt HSTS/CSP/COOP/COEP/CORP/Referrer headers, stateless HMAC-SHA256 CSRF, host/URI/body/traversal guards, `SecurityRule`                             |
+| `hyperlane-plugin-cors`         | `plugin/cors`         | `-100` / `-80`          | precompiled zero-alloc CORS headers, exact/suffix/predicate origin matching, credentials safety guard, `OPTIONS` preflight                                |
+| `hyperlane-plugin-rate-limit`   | `plugin/rate_limit`   | `-95` / —               | 64-shard lock-free atomic GCRA & fixed-window limiter, bounded key store, `KeyExtractor`/`RateLimitStore` traits, RFC `RateLimit-*` headers               |
+| `hyperlane-plugin-auth`         | `plugin/auth`         | `-90` / —               | pure-Rust HS256 JWT (`kid` rotation), API key, HTTP Basic, RBAC `AuthPrincipal`, extensible async `Authenticator`                                         |
+| `hyperlane-plugin-session`      | `plugin/session`      | `-85` / `-70`           | 64-shard bounded `InMemorySessionStore` + pluggable `SessionStore`, HMAC-SHA256 signed cookies, dirty-tracked reads, `regenerate_id()`                    |
+| `hyperlane-plugin-cache`        | `plugin/cache`        | `-80` / `-65`           | 64-shard bounded cache, single-flight stampede coalescing, pluggable `CacheStore`, HTTP `Cache-Control`/`Age`/`X-Cache`                                   |
+| `hyperlane-plugin-rpc`          | `plugin/rpc`          | `-70` / —               | JSON-RPC 2.0 `XxHash3_64` router, concurrent batch/notification dispatch, DoS caps, `RpcInterceptor`, `RpcHook`                                           |
+| `hyperlane-plugin-grpc`         | `plugin/grpc`         | `-65` / —               | gRPC over HTTP/2 5-byte framing, bounded compression, status codes `0..=16`, `grpc-timeout`, `GrpcInterceptor`, `GrpcHook`                                |
+| `hyperlane-plugin-mcp`          | `plugin/mcp`          | `-60` / —               | Model Context Protocol Streamable HTTP server, `XxHash3_64` registries, 16-shard TTL sessions, `Origin` guard, `McpHook`                                  |
+| `hyperlane-plugin-static-files` | `plugin/static_files` | `-55` / —               | traversal-proof static server, `FileExtension` MIME table, 64-shard hot-file cache, `.br`/`.gz` sidecars, `ETag`/`304`, `Range` `206`/`416`, SPA fallback |
+| `hyperlane-plugin-gateway`      | `plugin/gateway`      | `-50` / —               | reverse proxy & API gateway with pooled H1/H2 `http-request`, RR/Weighted/LC/P2C balancing, circuit breaker, lock-free GCRA limiter, `GatewayInterceptor` |
+| `hyperlane-plugin-negotiate`    | `plugin/negotiate`    | explicit                | `Accept-Encoding` compression negotiation and conditional `304 Not Modified` strong/weak ETag validation                                                  |
+| `hyperlane-plugin-shutdown`     | `plugin/shutdown`     | control hook            | graceful shutdown coordinator with `SIGINT`/`SIGTERM` arming, RAII `ShutdownGuard` draining, LIFO async `ShutdownCallback` hooks                          |
+| `hyperlane-plugin-websocket`    | `plugin/websocket`    | route helper            | WebSocket room broadcast with lag recovery, connection lifecycle hooks, and opt-in `WebSocketPlugin`                                                      |
+| `hyperlane-plugin-sse`          | `plugin/sse`          | route helper            | WHATWG Server-Sent Events framing, CRLF sanitization, 64-shard topic pub/sub, `Last-Event-ID` replay, heartbeats                                          |
+| `hyperlane-plugin-mq`           | `plugin/mq`           | broker                  | pluggable `MessageBroker` trait and 64-shard `InMemoryBroker` with consumer groups, TTL, retries, $O(\log N)$ deadline heap, DLQ                          |
 
 ## The plugins, in the order they are worth building
 
 ### P0 - the ground every service needs
 
-| plugin | what it gives |
-|---|---|
+| plugin                      | what it gives                                                                                                               |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `hyperlane-plugin-shutdown` | graceful shutdown: the framework already has the control hook, the plugin turns it into "configure it once and it is armed" |
-| `hyperlane-plugin-logger` | logging, with a file backend |
+| `hyperlane-plugin-logger`   | logging, with a file backend                                                                                                |
 
 Both are small, and the application already carries a working version of each,
 so upstreaming them is a move rather than a rewrite. A service that cannot shut
@@ -112,10 +112,10 @@ that joined it to the control hook is written again when the need is proven.
 
 ### P1 - what a web service is asked for every day
 
-| plugin | what it gives |
-|---|---|
-| `hyperlane-plugin-cors` | cross origin headers and preflight |
-| `hyperlane-plugin-compression` | gzip and brotli on the response |
+| plugin                          | what it gives                                                            |
+| ------------------------------- | ------------------------------------------------------------------------ |
+| `hyperlane-plugin-cors`         | cross origin headers and preflight                                       |
+| `hyperlane-plugin-compression`  | gzip and brotli on the response                                          |
 | `hyperlane-plugin-static-files` | serving files, with the content type table the framework already carries |
 
 None of the three is in the tree. Their rules are not framework state either,
@@ -135,12 +135,12 @@ of any other route.
 
 ### P2 - the data layer
 
-| plugin | what it gives |
-|---|---|
-| `hyperlane-plugin-database` | the connection and auto creation traits, with no driver behind them |
-| `hyperlane-plugin-postgresql` | the PostgreSQL driver |
-| `hyperlane-plugin-mysql` | the MySQL driver |
-| `hyperlane-plugin-redis` | the Redis client and its pool |
+| plugin                        | what it gives                                                       |
+| ----------------------------- | ------------------------------------------------------------------- |
+| `hyperlane-plugin-database`   | the connection and auto creation traits, with no driver behind them |
+| `hyperlane-plugin-postgresql` | the PostgreSQL driver                                               |
+| `hyperlane-plugin-mysql`      | the MySQL driver                                                    |
+| `hyperlane-plugin-redis`      | the Redis client and its pool                                       |
 
 The application already has this shape, down to the trait names. The base
 crate carries no driver, so it stays small; the driver crates carry theirs,
@@ -148,11 +148,11 @@ so they stay large and are published separately.
 
 ### P3 - running a service in production
 
-| plugin | what it gives |
-|---|---|
-| `hyperlane-plugin-env` | configuration loaded from the environment |
-| `hyperlane-plugin-metrics` | counters and timers in a scrapeable format |
-| `hyperlane-plugin-rate-limit` | a limit per client or per route |
+| plugin                        | what it gives                              |
+| ----------------------------- | ------------------------------------------ |
+| `hyperlane-plugin-env`        | configuration loaded from the environment  |
+| `hyperlane-plugin-metrics`    | counters and timers in a scrapeable format |
+| `hyperlane-plugin-rate-limit` | a limit per client or per route            |
 
 ### P4 - the rest, when the need is proven
 

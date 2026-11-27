@@ -1,7 +1,7 @@
 use super::*;
 
 pub(crate) type H2TlsSession = (
-    h2::client::SendRequest<Bytes>,
+    SendRequest<Bytes>,
     h2::client::Connection<ClientTlsStream, Bytes>,
 );
 

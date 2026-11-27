@@ -17,10 +17,11 @@ mod listener;
 mod protocol;
 mod route;
 mod server;
+mod tls;
+
 #[cfg(test)]
 #[path = "../tests/mod.rs"]
 mod tests;
-mod tls;
 
 pub use {config::*, context::*, error::*, hook::*, route::*, server::*};
 
