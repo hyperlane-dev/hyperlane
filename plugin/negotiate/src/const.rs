@@ -1,8 +1,11 @@
 /// The body length below which a response is answered without a content coding.
 pub(crate) const DEFAULT_MIN_LENGTH: usize = 256;
 
-/// The quote that opens and closes a strong entity-tag.
-pub(crate) const ENTITY_TAG_QUOTE: &str = "\"";
+/// The prefix marking a weak HTTP entity-tag per RFC 9110.
+pub(crate) const WEAK_ETAG_PREFIX: &str = "W/";
+
+/// Lowercase hexadecimal digits used for stack-allocated strong ETag formatting.
+pub(crate) const HEX_LOWER: &[u8; 16] = b"0123456789abcdef";
 
 /// The parameter delimiter inside a `Content-Type` header value.
 pub(crate) const MEDIA_TYPE_PARAM_DELIMITER: char = ';';

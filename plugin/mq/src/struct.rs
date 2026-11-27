@@ -83,27 +83,33 @@ pub(crate) struct InFlightEntry {
     pub(crate) group: String,
     /// Leased message.
     pub(crate) message: MqMessage,
-    /// Visibility deadline in Unix epoch milliseconds.
-    pub(crate) visible_after_ms: u64,
 }
 
-/// Mutable broker state protected by a mutex inside [`InMemoryBroker`].
-pub(crate) struct BrokerState {
-    /// Registered consumer groups per topic.
-    pub(crate) topic_groups: HashMap<String, HashSet<String>>,
-    /// Ready FIFO queues keyed by `(topic, group)`.
-    pub(crate) queues: HashMap<(String, String), VecDeque<MqMessage>>,
+/// Per-topic mutable state independently locked inside a [`TopicBroker`].
+pub(crate) struct TopicBrokerState {
+    /// Registered consumer groups on this topic.
+    pub(crate) groups: HashSet<String>,
+    /// Ready FIFO queues keyed by consumer group name.
+    pub(crate) queues: HashMap<String, VecDeque<MqMessage>>,
     /// Active leased deliveries keyed by `receipt_id`.
     pub(crate) in_flight: HashMap<u64, InFlightEntry>,
-    /// Dead-letter queues keyed by `<topic><dlq_suffix>`.
-    pub(crate) dlqs: HashMap<String, VecDeque<MqMessage>>,
-    /// Total published messages per topic.
-    pub(crate) published_totals: HashMap<String, u64>,
-    /// Total acknowledged messages per `(topic, group)`.
-    pub(crate) acked_totals: HashMap<(String, String), u64>,
+    /// Min-heap of `(visible_after_ms, receipt_id)` for `O(1)` peek / `O(log N)` reclaim.
+    pub(crate) deadlines: BinaryHeap<Reverse<(u64, u64)>>,
+    /// Dead-letter queue for this topic.
+    pub(crate) dlq: VecDeque<MqMessage>,
+    /// Total acknowledged messages per consumer group.
+    pub(crate) acked_totals: HashMap<String, u64>,
 }
 
-/// Shared interior state of [`InMemoryBroker`].
+/// Independently locked broker slice owning one topic.
+pub(crate) struct TopicBroker {
+    /// Cumulative messages published to this topic (lock-free).
+    pub(crate) published_total: AtomicU64,
+    /// Per-topic queues, in-flight leases, deadline heap, and DLQ.
+    pub(crate) state: Mutex<TopicBrokerState>,
+}
+
+/// Shared sharded interior state of [`InMemoryBroker`].
 pub(crate) struct InMemoryBrokerInner {
     /// Broker configuration.
     pub(crate) config: MqConfig,
@@ -111,22 +117,26 @@ pub(crate) struct InMemoryBrokerInner {
     pub(crate) next_msg_id: AtomicU64,
     /// Monotonic delivery receipt counter.
     pub(crate) next_receipt_id: AtomicU64,
-    /// Mutable topic, group, in-flight, and DLQ storage.
-    pub(crate) state: Mutex<BrokerState>,
+    /// 64-way sharded topic table isolating contention per topic.
+    pub(crate) topic_shards: TopicShardArray,
+    /// 64-way sharded receipt-to-topic index enabling `O(1)` ack/nack routing.
+    pub(crate) receipt_shards: ReceiptShardArray,
 }
 
-/// Production-ready in-memory [`MessageBroker`] implementation.
+/// Production-ready sharded high-concurrency in-memory [`MessageBroker`] implementation.
 #[derive(Clone)]
 pub struct InMemoryBroker {
-    /// Shared broker state.
+    /// Shared sharded broker state.
     pub(crate) inner: Arc<InMemoryBrokerInner>,
 }
 
-/// Process-wide [`MqPlugin`] registry storing [`MqConfig`] and a shared [`InMemoryBroker`].
+/// Process-wide [`MqPlugin`] registry storing [`MqConfig`], an [`InMemoryBroker`], and an optional custom [`MessageBroker`].
 #[derive(Clone)]
 pub struct MqPlugin {
     /// Active plugin configuration.
     pub(crate) config: MqConfig,
     /// Shared process-wide in-memory broker.
     pub(crate) broker: InMemoryBroker,
+    /// Optional custom pluggable broker backend installed via [`MqPlugin::init_with_broker`].
+    pub(crate) custom_broker: Option<SharedBroker>,
 }

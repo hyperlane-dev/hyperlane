@@ -1,0 +1,19 @@
+[package]
+name = "hyperlane-plugin-static-files"
+autotests = false
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A high-performance static file server plugin for the Hyperlane framework with canonicalized path-traversal protection, built-in FileExtension MIME detection, 64-way sharded hot-file cache, precompressed .br/.gz sidecars, ETag/304 conditional validation, RFC 9110 Range 206/416 support, and SPA fallback."""
+keywords = ["http", "static-files", "range", "etag", "hyperlane"]
+categories = ["network-programming", "web-programming"]
+exclude.workspace = true
+publish = true
+
+[dependencies]
+hyperlane = { workspace = true }
+
+lombok-macros = { workspace = true }

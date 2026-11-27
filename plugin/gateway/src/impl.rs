@@ -1,5 +1,25 @@
 use super::*;
 
+/// Inherent implementation of [`RateLimitConfig`].
+impl RateLimitConfig {
+    /// Creates a [`RateLimitConfig`] with sustained `requests_per_second` and `burst` capacity.
+    ///
+    /// # Arguments
+    ///
+    /// - `u64` - Sustained requests per second.
+    /// - `u64` - Maximum burst token capacity.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - Constructed rate-limit parameters.
+    pub fn new(requests_per_second: u64, burst: u64) -> Self {
+        Self {
+            requests_per_second,
+            burst,
+        }
+    }
+}
+
 /// Inherent implementation of [`UpstreamTarget`].
 impl UpstreamTarget {
     /// Creates an [`UpstreamTarget`] with default load-balancing weight `1`.
@@ -64,6 +84,48 @@ impl GatewayRoute {
             use_http2: false,
         }
     }
+
+    /// Configures whether the matched prefix is stripped before forwarding upstream.
+    ///
+    /// # Arguments
+    ///
+    /// - `bool` - `true` to strip prefix.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - Updated route.
+    pub fn with_strip_prefix(mut self, strip_prefix: bool) -> Self {
+        self.set_strip_prefix(strip_prefix);
+        self
+    }
+
+    /// Configures the upstream load-balancing strategy.
+    ///
+    /// # Arguments
+    ///
+    /// - `LoadBalanceStrategy` - Desired selection algorithm.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - Updated route.
+    pub fn with_strategy(mut self, strategy: LoadBalanceStrategy) -> Self {
+        self.set_strategy(strategy);
+        self
+    }
+
+    /// Configures an optional per-route lock-free GCRA rate limiter.
+    ///
+    /// # Arguments
+    ///
+    /// - `RateLimitConfig` - Sustained rate and burst parameters.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - Updated route.
+    pub fn with_rate_limit(mut self, rate_limit: RateLimitConfig) -> Self {
+        self.set_rate_limit(Some(rate_limit));
+        self
+    }
 }
 
 /// Default construction for [`GatewayConfig`].
@@ -81,7 +143,7 @@ impl Default for GatewayConfig {
 
 /// Inherent implementation of [`TokenBucket`].
 impl TokenBucket {
-    /// Builds a token-bucket rate limiter from `config`.
+    /// Builds a lock-free GCRA token-bucket rate limiter from `config`.
     ///
     /// # Arguments
     ///
@@ -89,42 +151,53 @@ impl TokenBucket {
     ///
     /// # Returns
     ///
-    /// - `Self` - Initialized full token bucket.
+    /// - `Self` - Initialized full lock-free limiter.
     pub(crate) fn new(config: RateLimitConfig) -> Self {
-        let cap: f64 = config.get_burst().max(1) as f64;
+        let rps: u64 = config.get_requests_per_second().max(1);
+        let burst: u64 = config.get_burst().max(1);
+        let emission_interval_ns: u64 = (NANOS_PER_SECOND / rps).max(1);
+        let burst_tolerance_ns: u64 = emission_interval_ns.saturating_mul(burst);
         Self {
-            rate_per_sec: config.get_requests_per_second().max(1) as f64,
-            capacity: cap,
-            state: Mutex::new(TokenBucketState {
-                tokens: cap,
-                last_refill: Instant::now(),
-            }),
+            emission_interval_ns,
+            burst_tolerance_ns,
+            epoch: Instant::now(),
+            tat_ns: AtomicU64::new(0),
         }
     }
 
-    /// Attempts to consume one request token, refilling proportionally to elapsed time.
+    /// Attempts to consume one request token via a lock-free atomic CAS loop.
     ///
     /// # Returns
     ///
     /// - `bool` - `true` when permitted; `false` when rate-limited.
     pub(crate) fn try_acquire(&self) -> bool {
         let Self {
-            rate_per_sec,
-            capacity,
-            state,
+            emission_interval_ns,
+            burst_tolerance_ns,
+            epoch,
+            tat_ns,
         } = self;
-        let Ok(mut guard) = state.lock() else {
-            return true;
-        };
-        let now: Instant = Instant::now();
-        let elapsed_secs: f64 = now.duration_since(guard.last_refill).as_secs_f64();
-        guard.tokens = (guard.tokens + elapsed_secs * *rate_per_sec).min(*capacity);
-        guard.last_refill = now;
-        if guard.tokens >= 1.0 {
-            guard.tokens -= 1.0;
-            true
-        } else {
-            false
+        let elapsed_ns: u64 = Instant::now()
+            .duration_since(*epoch)
+            .as_nanos()
+            .min(u64::MAX as u128) as u64;
+        let max_tat: u64 = elapsed_ns.saturating_add(*burst_tolerance_ns);
+        let mut observed: u64 = tat_ns.load(Ordering::Relaxed);
+        loop {
+            let base: u64 = observed.max(elapsed_ns);
+            let next_tat: u64 = base.saturating_add(*emission_interval_ns);
+            if next_tat > max_tat {
+                return false;
+            }
+            match tat_ns.compare_exchange_weak(
+                observed,
+                next_tat,
+                Ordering::AcqRel,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => return true,
+                Err(actual) => observed = actual,
+            }
         }
     }
 }
@@ -179,7 +252,7 @@ impl UpstreamRuntime {
 
 /// Inherent implementation of [`CompiledRoute`].
 impl CompiledRoute {
-    /// Selects one healthy upstream node according to this route's [`LoadBalanceStrategy`].
+    /// Selects one healthy upstream node without heap allocation according to [`LoadBalanceStrategy`].
     ///
     /// # Arguments
     ///
@@ -195,31 +268,42 @@ impl CompiledRoute {
             cursor,
             ..
         } = self;
-        let healthy: Vec<&Arc<UpstreamRuntime>> = upstreams
-            .iter()
-            .filter(|node: &&Arc<UpstreamRuntime>| node.is_available(now_ms))
-            .collect();
-        if healthy.is_empty() {
+        let len: usize = upstreams.len();
+        if len == 0 {
             return None;
         }
         match route.get_strategy() {
             LoadBalanceStrategy::RoundRobin => {
-                let idx: usize = cursor.fetch_add(1, Ordering::Relaxed) % healthy.len();
-                Some(Arc::clone(healthy[idx]))
+                let start: usize = cursor.fetch_add(1, Ordering::Relaxed) % len;
+                for offset in 0..len {
+                    let candidate: &Arc<UpstreamRuntime> = &upstreams[(start + offset) % len];
+                    if candidate.is_available(now_ms) {
+                        return Some(Arc::clone(candidate));
+                    }
+                }
+                None
             }
-            LoadBalanceStrategy::LeastConnections => healthy
-                .into_iter()
+            LoadBalanceStrategy::LeastConnections => upstreams
+                .iter()
+                .filter(|node: &&Arc<UpstreamRuntime>| node.is_available(now_ms))
                 .min_by_key(|node: &&Arc<UpstreamRuntime>| {
                     node.active_conns.load(Ordering::Relaxed)
                 })
                 .cloned(),
             LoadBalanceStrategy::WeightedRoundRobin => {
-                let total_weight: usize = healthy
+                let total_weight: usize = upstreams
                     .iter()
-                    .map(|node: &&Arc<UpstreamRuntime>| node.weight.max(1) as usize)
+                    .filter(|node: &&Arc<UpstreamRuntime>| node.is_available(now_ms))
+                    .map(|node: &Arc<UpstreamRuntime>| node.weight.max(1) as usize)
                     .sum();
+                if total_weight == 0 {
+                    return None;
+                }
                 let mut slot: usize = cursor.fetch_add(1, Ordering::Relaxed) % total_weight;
-                for node in healthy {
+                for node in upstreams {
+                    if !node.is_available(now_ms) {
+                        continue;
+                    }
                     let w: usize = node.weight.max(1) as usize;
                     if slot < w {
                         return Some(Arc::clone(node));
@@ -227,6 +311,37 @@ impl CompiledRoute {
                     slot -= w;
                 }
                 None
+            }
+            LoadBalanceStrategy::PowerOfTwoChoices => {
+                if len == 1 {
+                    let single: &Arc<UpstreamRuntime> = &upstreams[0];
+                    return single.is_available(now_ms).then(|| Arc::clone(single));
+                }
+                let tick: usize = cursor.fetch_add(1, Ordering::Relaxed);
+                let idx_a: usize = tick % len;
+                let step: usize = ((tick.wrapping_mul(P2C_MIX_MULTIPLIER) >> 16) % (len - 1)) + 1;
+                let idx_b: usize = (idx_a + step) % len;
+                let node_a: &Arc<UpstreamRuntime> = &upstreams[idx_a];
+                let node_b: &Arc<UpstreamRuntime> = &upstreams[idx_b];
+                let avail_a: bool = node_a.is_available(now_ms);
+                let avail_b: bool = node_b.is_available(now_ms);
+                match (avail_a, avail_b) {
+                    (true, true) => {
+                        if node_a.active_conns.load(Ordering::Relaxed)
+                            <= node_b.active_conns.load(Ordering::Relaxed)
+                        {
+                            Some(Arc::clone(node_a))
+                        } else {
+                            Some(Arc::clone(node_b))
+                        }
+                    }
+                    (true, false) => Some(Arc::clone(node_a)),
+                    (false, true) => Some(Arc::clone(node_b)),
+                    (false, false) => upstreams
+                        .iter()
+                        .find(|node: &&Arc<UpstreamRuntime>| node.is_available(now_ms))
+                        .cloned(),
+                }
             }
         }
     }
@@ -286,6 +401,34 @@ impl GatewayRuntime {
         Self {
             config,
             routes: Arc::new(compiled),
+            interceptors: Arc::new(Vec::new()),
+        }
+    }
+
+    /// Returns a [`GatewayRuntime`] with an additional pluggable [`GatewayInterceptor`].
+    ///
+    /// # Arguments
+    ///
+    /// - `I` - Interceptor implementation.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - Updated runtime carrying the interceptor.
+    pub fn with_interceptor<I>(self, interceptor: I) -> Self
+    where
+        I: GatewayInterceptor,
+    {
+        let Self {
+            config,
+            routes,
+            interceptors,
+        } = self;
+        let mut list: Vec<SharedGatewayInterceptor> = (*interceptors).clone();
+        list.push(Arc::new(interceptor));
+        Self {
+            config,
+            routes,
+            interceptors: Arc::new(list),
         }
     }
 
@@ -354,6 +497,7 @@ impl GatewayRuntime {
     ///
     /// - `bool` - `true` when a route matched and populated `ctx.response`; `false` otherwise.
     pub async fn forward(&self, ctx: &mut Context, peer_ip: Option<&str>) -> bool {
+        let Self { interceptors, .. } = self;
         let path: String = ctx.get_request().get_path().clone();
         let host_hdr: Option<String> = ctx.get_request().try_get_header_back(HOST);
         let Some(compiled) = self.match_route(host_hdr.as_deref(), &path) else {
@@ -367,8 +511,7 @@ impl GatewayRuntime {
                 .set_body(Vec::new());
             return true;
         }
-        let req_body: Vec<u8> = ctx.get_request().get_body().clone();
-        if req_body.len() > self.get_config().get_max_body_size() {
+        if ctx.get_request().get_body().len() > self.get_config().get_max_body_size() {
             ctx.get_mut_response()
                 .set_status_code(HttpStatus::PayloadTooLarge.code())
                 .set_body(Vec::new());
@@ -400,6 +543,12 @@ impl GatewayRuntime {
             &compiled.normalized_prefix,
             compiled.route.get_strip_prefix(),
         );
+        for interceptor in interceptors.iter() {
+            if !interceptor.before_forward(ctx, &target_url) {
+                return true;
+            }
+        }
+        let req_body: Vec<u8> = ctx.get_request().get_body().clone();
         let conn_vals: Vec<String> = ctx
             .get_request()
             .get_headers()
@@ -407,8 +556,13 @@ impl GatewayRuntime {
             .filter(|(k, _): &(&String, &RequestHeadersValue)| k.eq_ignore_ascii_case(CONNECTION))
             .flat_map(|(_, vals): (&String, &RequestHeadersValue)| vals.iter().cloned())
             .collect();
-        let extra_hop: HashSet<String> = extract_connection_header_tokens(&conn_vals);
-        let mut forward_headers: HashMap<String, String> = HashMap::new();
+        let extra_hop: HashSet<String> = if conn_vals.is_empty() {
+            HashSet::new()
+        } else {
+            extract_connection_header_tokens(&conn_vals)
+        };
+        let mut forward_headers: HashMap<String, String> =
+            HashMap::with_capacity(ctx.get_request().get_headers().len() + 3);
         for (name, values) in ctx.get_request().get_headers() {
             if name.eq_ignore_ascii_case(HOST)
                 || name.eq_ignore_ascii_case(HEADER_CONTENT_LENGTH)
@@ -451,7 +605,7 @@ impl GatewayRuntime {
         }
         let mut upstream_req: HttpRequest = builder.build();
         upstream.active_conns.fetch_add(1, Ordering::Relaxed);
-        let send_res: Result<HttpResponse, _> = upstream_req.send_async().await;
+        let send_res: Result<HttpResponse, RequestError> = upstream_req.send_async().await;
         upstream.active_conns.fetch_sub(1, Ordering::Relaxed);
         match send_res {
             Ok(resp) => {
@@ -469,8 +623,11 @@ impl GatewayRuntime {
                     .filter(|(k, _): &(&String, &String)| k.eq_ignore_ascii_case(CONNECTION))
                     .map(|(_, v): (&String, &String)| v.clone())
                     .collect();
-                let resp_extra_hop: HashSet<String> =
-                    extract_connection_header_tokens(&resp_conn_vals);
+                let resp_extra_hop: HashSet<String> = if resp_conn_vals.is_empty() {
+                    HashSet::new()
+                } else {
+                    extract_connection_header_tokens(&resp_conn_vals)
+                };
                 let out_resp: &mut Response = ctx.get_mut_response();
                 out_resp.set_status_code(resp.get_status_code());
                 for (name, value) in resp.get_headers() {
@@ -484,6 +641,9 @@ impl GatewayRuntime {
                 out_resp
                     .set_header(HEADER_X_GATEWAY_UPSTREAM, &upstream.base_url)
                     .set_body(resp.bytes());
+                for interceptor in interceptors.iter() {
+                    interceptor.after_forward(ctx, &upstream.base_url);
+                }
             }
             Err(_) => {
                 upstream.record_failure(
@@ -514,6 +674,19 @@ impl GatewayPlugin {
         GATEWAY_PLUGIN.get_or_init(|| Self {
             runtime: GatewayRuntime::new(config),
         })
+    }
+
+    /// Initializes the global [`GatewayPlugin`] once with a prebuilt [`GatewayRuntime`].
+    ///
+    /// # Arguments
+    ///
+    /// - `GatewayRuntime` - Compiled gateway runtime (including any attached interceptors).
+    ///
+    /// # Returns
+    ///
+    /// - `&'static Self` - Reference to the initialized global plugin.
+    pub fn init_runtime(runtime: GatewayRuntime) -> &'static Self {
+        GATEWAY_PLUGIN.get_or_init(|| Self { runtime })
     }
 
     /// Returns the initialized global [`GatewayPlugin`], if [`GatewayPlugin::init`] was called.
@@ -561,7 +734,7 @@ impl ServerHook for GatewayHook {
     ///
     /// # Returns
     ///
-    /// - `Status` - `Status::Continue` when unconfigured or no route matches; `Status::Stop` once forwarded.
+    /// - `Status` - `Status::Continue` when unconfigured or no route matches; `Status::Reject` once forwarded.
     async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
         let Some(plugin) = GatewayPlugin::get() else {
             return Status::Continue;

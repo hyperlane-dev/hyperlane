@@ -36,6 +36,34 @@ impl CompressConfig {
     pub fn get_min_length(&self) -> usize {
         self.min_length
     }
+
+    /// Updates the body length threshold in place.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - New minimum response body length for compression.
+    ///
+    /// # Returns
+    ///
+    /// - `&mut Self` - Mutable reference for fluent chaining.
+    pub fn set_min_length(&mut self, min_length: usize) -> &mut Self {
+        self.min_length = min_length;
+        self
+    }
+
+    /// Returns a copy of this configuration with an updated body length threshold.
+    ///
+    /// # Arguments
+    ///
+    /// - `usize` - New minimum response body length for compression.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - Updated configuration.
+    pub fn with_min_length(mut self, min_length: usize) -> Self {
+        self.set_min_length(min_length);
+        self
+    }
 }
 
 /// Inherent implementation of [`CompressMiddleware`].
@@ -57,6 +85,15 @@ impl CompressMiddleware {
         CONFIG
             .set(config)
             .map_err(|_: CompressConfig| COMPRESS_CONFIG_ALREADY_SET.to_owned())
+    }
+
+    /// Returns the installed global [`CompressConfig`], when [`CompressMiddleware::init`] was called.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<&'static CompressConfig>` - Installed configuration, or `None`.
+    pub fn get() -> Option<&'static CompressConfig> {
+        CONFIG.get()
     }
 
     /// The configuration the middleware works from.
@@ -173,6 +210,27 @@ impl ServerHook for CompressMiddleware {
 
 /// Inherent implementation of [`EntityTag`].
 impl EntityTag {
+    /// Formats a 64-bit digest into a quoted 18-byte ASCII strong tag without `format!`.
+    ///
+    /// # Arguments
+    ///
+    /// - `u64` - 64-bit hash digest.
+    ///
+    /// # Returns
+    ///
+    /// - `[u8; 18]` - ASCII bytes `\"<16 lowercase hex digits>\"`.
+    fn format_strong_bytes(digest: u64) -> [u8; 18] {
+        let mut buf: [u8; 18] = [b'"'; 18];
+        let mut idx: usize = 0;
+        while idx < 16 {
+            let shift: u32 = (15 - idx) as u32 * 4;
+            let nibble: usize = ((digest >> shift) & 0x0f) as usize;
+            buf[idx + 1] = HEX_LOWER[nibble];
+            idx += 1;
+        }
+        buf
+    }
+
     /// Builds the strong entity-tag of a representation.
     ///
     /// The tag is the quoted hexadecimal digest of the data, so the same data
@@ -188,10 +246,76 @@ impl EntityTag {
     pub fn strong(data: &[u8]) -> Self {
         let mut hasher: XxHash3_64 = XxHash3_64::default();
         hasher.write(data);
-        Self(format!(
-            "{ENTITY_TAG_QUOTE}{:016x}{ENTITY_TAG_QUOTE}",
-            hasher.finish()
-        ))
+        let buf: [u8; 18] = Self::format_strong_bytes(hasher.finish());
+        let tag: String = from_utf8(&buf).unwrap_or_default().to_owned();
+        Self(tag)
+    }
+
+    /// Builds a weak entity-tag (`W/"<hex>"`) of a representation per RFC 9110.
+    ///
+    /// # Arguments
+    ///
+    /// - `&[u8]` - The representation to tag.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - The weak entity-tag.
+    pub fn weak(data: &[u8]) -> Self {
+        let mut hasher: XxHash3_64 = XxHash3_64::default();
+        hasher.write(data);
+        let buf: [u8; 18] = Self::format_strong_bytes(hasher.finish());
+        let mut out: String = String::with_capacity(20);
+        out.push_str(WEAK_ETAG_PREFIX);
+        if let Ok(text) = from_utf8(&buf) {
+            out.push_str(text);
+        }
+        Self(out)
+    }
+
+    /// Reports whether this entity-tag carries the weak `W/` prefix.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` when weak.
+    pub fn is_weak(&self) -> bool {
+        self.as_str().starts_with(WEAK_ETAG_PREFIX)
+    }
+
+    /// Returns the opaque quoted portion of the tag without any `W/` prefix.
+    ///
+    /// # Returns
+    ///
+    /// - `&str` - Opaque quoted tag slice.
+    pub fn opaque_tag(&self) -> &str {
+        self.as_str()
+            .strip_prefix(WEAK_ETAG_PREFIX)
+            .unwrap_or(self.as_str())
+    }
+
+    /// Performs RFC 9110 §8.8.3.2 weak comparison against `other`.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Self` - Other entity-tag to compare.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` when opaque tags match.
+    pub fn weak_eq(&self, other: &Self) -> bool {
+        self.opaque_tag() == other.opaque_tag()
+    }
+
+    /// Performs RFC 9110 §8.8.3.2 strong comparison against `other`.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Self` - Other entity-tag to compare.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` when both tags are strong and opaque tags match.
+    pub fn strong_eq(&self, other: &Self) -> bool {
+        !self.is_weak() && !other.is_weak() && self.opaque_tag() == other.opaque_tag()
     }
 
     /// The entity-tag as the `ETag` field carries it.
@@ -206,33 +330,23 @@ impl EntityTag {
 
 /// Inherent implementation of [`ConditionalMiddleware`].
 impl ConditionalMiddleware {
-    /// Reads the validator of the response, computing one when it carries none.
-    ///
-    /// A response that already declares a validator keeps it, because the
-    /// application knows what its representation is better than a digest of the
-    /// bytes it happens to produce.
+    /// Finds an existing `ETag` header slice on `response` without allocating.
     ///
     /// # Arguments
     ///
-    /// - `&mut Response` - The response to read or write the validator of.
+    /// - `&Response` - Response to inspect.
     ///
     /// # Returns
     ///
-    /// - `EntityTag` - The validator the response answers with.
-    fn entity_tag(response: &mut Response) -> EntityTag {
-        let existing: Option<String> = response
+    /// - `Option<&str>` - Existing `ETag` header value if declared.
+    fn existing_etag(response: &Response) -> Option<&str> {
+        response
             .get_headers()
             .iter()
             .find(|(key, _): &(&String, &ResponseHeadersValue)| key.eq_ignore_ascii_case(ETAG))
-            .and_then(|(_, values): (&String, &ResponseHeadersValue)| values.back().cloned());
-        match existing {
-            Some(etag) => EntityTag(etag),
-            None => {
-                let etag: EntityTag = EntityTag::strong(response.get_body());
-                response.set_header(ETAG, etag.as_str());
-                etag
-            }
-        }
+            .and_then(|(_, values): (&String, &ResponseHeadersValue)| {
+                values.back().map(String::as_str)
+            })
     }
 }
 
@@ -277,8 +391,15 @@ impl ServerHook for ConditionalMiddleware {
         if !(200..300).contains(&status_code) || has_no_body(status_code) {
             return Status::Continue;
         }
-        let etag: EntityTag = Self::entity_tag(ctx.get_mut_response());
-        if ctx.get_request().matches_if_none_match(etag.as_str()) {
+        let matched: bool = if let Some(existing) = Self::existing_etag(ctx.get_response()) {
+            ctx.get_request().matches_if_none_match(existing)
+        } else {
+            let computed: EntityTag = EntityTag::strong(ctx.get_response().get_body());
+            let is_match: bool = ctx.get_request().matches_if_none_match(computed.as_str());
+            ctx.get_mut_response().set_header(ETAG, computed.as_str());
+            is_match
+        };
+        if matched {
             ctx.get_mut_response()
                 .set_status_code(HttpStatus::NotModified.code())
                 .set_body(EMPTY_STR);

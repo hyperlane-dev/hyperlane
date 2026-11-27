@@ -7,15 +7,17 @@
 mod r#const;
 mod r#enum;
 mod r#impl;
+mod r#static;
 mod r#struct;
+mod r#trait;
+
 #[cfg(test)]
 #[path = "../tests/mod.rs"]
 mod tests;
-mod r#trait;
 
 pub use {r#enum::*, r#struct::*, r#trait::*};
 
-use r#const::*;
+pub(crate) use {r#const::*, r#static::*};
 
 use std::{
     convert::Infallible,
@@ -24,10 +26,15 @@ use std::{
         NonZeroI8, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI128, NonZeroIsize, NonZeroU8,
         NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128, NonZeroUsize,
     },
+    sync::OnceLock,
 };
+
 use {
     hyperlane::{
-        tokio::sync::broadcast::{Receiver, error::SendError},
+        tokio::sync::broadcast::{
+            Receiver,
+            error::{RecvError, SendError},
+        },
         *,
     },
     lombok_macros::*,

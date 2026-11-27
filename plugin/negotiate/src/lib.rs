@@ -9,6 +9,7 @@ mod r#fn;
 mod r#impl;
 mod r#static;
 mod r#struct;
+
 #[cfg(test)]
 #[path = "../tests/mod.rs"]
 mod tests;
@@ -17,7 +18,7 @@ pub use r#struct::*;
 
 pub(crate) use {r#const::*, r#fn::*, r#static::*};
 
-use std::{hash::Hasher, sync::OnceLock};
+use std::{hash::Hasher, str::from_utf8, sync::OnceLock};
 
 use {
     http_compress::{Compress, XxHash3_64},

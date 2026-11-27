@@ -1,0 +1,21 @@
+[package]
+name = "hyperlane-plugin-auth"
+autotests = false
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A zero-external-crypto-dependency authentication and RBAC plugin for the Hyperlane framework providing pure-Rust HS256 JWT with kid rotation, API key and HTTP Basic authenticators, extensible async Authenticator traits, and constant-time verification."""
+keywords = ["http", "auth", "jwt", "rbac", "hyperlane"]
+categories = ["network-programming", "web-programming"]
+exclude.workspace = true
+publish = true
+
+[dependencies]
+hyperlane = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+lombok-macros = { workspace = true }

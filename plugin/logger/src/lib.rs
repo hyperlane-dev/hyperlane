@@ -1,29 +1,42 @@
 //! hyperlane-plugin-logger
 //!
-//! A logging plugin for the Hyperlane framework, writing the log of a server
-//! to the console, to a file, or to both.
+//! A high-concurrency logging plugin for the Hyperlane framework with
+//! non-blocking buffered file output, pluggable sinks, plain/JSON formats,
+//! and CRLF/ANSI log-forging sanitization.
 
 mod r#const;
+mod r#enum;
+mod r#fn;
 mod r#impl;
 mod r#static;
 mod r#struct;
+mod r#trait;
+mod r#type;
+
 #[cfg(test)]
 #[path = "../tests/mod.rs"]
 mod tests;
 
-pub use {log::LevelFilter, r#struct::*};
+pub use {r#const::*, r#enum::*, r#struct::*, r#trait::*, r#type::*};
 
-pub(crate) use r#static::*;
+pub use log::LevelFilter;
 
-use r#const::*;
+pub(crate) use {r#fn::*, r#static::*};
 
 use std::{
+    fmt::{self, Debug, Formatter},
     fs::{File, OpenOptions},
-    io::{Error, Write},
-    sync::{Mutex, OnceLock},
+    io::{self, BufWriter, Write, stdout},
+    sync::{
+        Arc, OnceLock,
+        atomic::{AtomicU64, Ordering},
+        mpsc::{Receiver, RecvError, SyncSender, TrySendError, sync_channel},
+    },
+    thread::{Builder, JoinHandle},
     time::Instant,
 };
 
-use hyperlane::{Context, ServerHook, Status, Stream};
-
-use log::{Metadata, Record, SetLoggerError, set_logger, set_max_level};
+use {
+    hyperlane::{Context, RequestMethod, ServerHook, Status, Stream},
+    log::{Level, Metadata, Record, SetLoggerError, log_enabled, set_logger, set_max_level},
+};

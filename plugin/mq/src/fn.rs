@@ -12,6 +12,38 @@ pub(crate) fn now_epoch_ms() -> u64 {
         .unwrap_or(0)
 }
 
+/// Computes a deterministic shard slot for `topic` using 64-bit FNV-1a hashing.
+///
+/// # Arguments
+///
+/// - `&str` - Topic name to hash.
+///
+/// # Returns
+///
+/// - `usize` - Shard index in `0..MQ_SHARD_COUNT`.
+pub(crate) fn mq_topic_shard_index(topic: &str) -> usize {
+    let mut hash: u64 = FNV1A_OFFSET_BASIS;
+    for &b in topic.as_bytes() {
+        hash ^= u64::from(b);
+        hash = hash.wrapping_mul(FNV1A_PRIME);
+    }
+    (hash as usize) & (MQ_SHARD_COUNT - 1)
+}
+
+/// Computes a shard slot for `receipt_id` using fast Fibonacci bit mixing.
+///
+/// # Arguments
+///
+/// - `u64` - Delivery receipt identifier.
+///
+/// # Returns
+///
+/// - `usize` - Shard index in `0..MQ_SHARD_COUNT`.
+pub(crate) fn mq_receipt_shard_index(receipt_id: u64) -> usize {
+    let mixed: u64 = receipt_id.wrapping_mul(0x9e37_79b9_7f4a_7c15);
+    ((mixed >> 58) as usize) & (MQ_SHARD_COUNT - 1)
+}
+
 /// Returns whether a message has passed its optional TTL deadline.
 ///
 /// # Arguments

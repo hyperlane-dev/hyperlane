@@ -1,6 +1,6 @@
 ---
 name: hyperlane
-description: Use when building, debugging, optimizing, or reviewing Hyperlane Rust HTTP/1.x, HTTP/2, HTTP/3 services, http-request clients, or Hyperlane plugins (logger, negotiate, websocket, sse, mq, rpc, grpc, mcp, gateway).
+description: Use when building, debugging, optimizing, or reviewing Hyperlane Rust HTTP/1.x, HTTP/2, HTTP/3 services, http-request clients, or Hyperlane plugins (auth, cache, cors, gateway, grpc, health, logger, mcp, metrics, mq, negotiate, rate_limit, rpc, security, session, shutdown, sse, static_files, tracing, websocket).
 ---
 
 # Hyperlane Development Skill
@@ -64,15 +64,26 @@ All plugins live under `plugin/` and follow the opt-in `OnceLock` (`init`/`get`)
 
 | Plugin | Key Types | Purpose |
 | --- | --- | --- |
-| `hyperlane-plugin-logger` | `Logger`, `LoggerConfig`, `LoggerHook` | Console/file logging with CRLF/ANSI sanitization |
-| `hyperlane-plugin-negotiate` | `CompressMiddleware`, `ConditionalMiddleware`, `EntityTag` | `Accept-Encoding` compression + `304 Not Modified` |
-| `hyperlane-plugin-websocket` | `WebSocketHook`, room broadcast | WebSocket upgrade, rooms, connection lifecycle |
-| `hyperlane-plugin-sse` | `SseEvent`, `SseHub`, `SseStream`, `SsePlugin` | CRLF-safe SSE framing, topic fan-out, `Last-Event-ID` replay, heartbeats |
-| `hyperlane-plugin-mq` | `MessageBroker`, `InMemoryBroker`, `MqMessage`, `MqPlugin` | Consumer groups, bounded queues, TTL, visibility timeout, retries, DLQ |
-| `hyperlane-plugin-rpc` | `RpcRouter`, `RpcRequest`, `RpcResponse`, `RpcHook`, `RpcPlugin` | JSON-RPC 2.0 single/batch/notification dispatch with DoS caps |
-| `hyperlane-plugin-grpc` | `GrpcFrame`, `GrpcRouter`, `GrpcStatus`, `GrpcHook`, `GrpcPlugin` | 5-byte gRPC framing, bounded compression, `grpc-timeout` enforcement |
-| `hyperlane-plugin-mcp` | `McpRegistry`, `McpTool`, `McpResource`, `McpPrompt`, `McpHook` | MCP Streamable HTTP server, `Mcp-Session-Id`, `Origin` DNS-rebinding guard |
-| `hyperlane-plugin-gateway` | `GatewayRuntime`, `GatewayRoute`, `GatewayHook`, `GatewayPlugin` | Reverse proxy with pooled H1/H2, LB strategies, circuit breaker, token-bucket rate limit, hop-by-hop stripping |
+| `hyperlane-plugin-tracing` | `TraceContext`, `SpanExporter`, `TracingRequestHook(-130)`, `TracingResponseHook(90)` | Lock-free W3C `traceparent`/`tracestate`, `X-Request-Id`, `Server-Timing`, span export |
+| `hyperlane-plugin-logger` | `LoggerPlugin`, `LoggerConfig`, `LogSink`, `RequestLogger(-120)`, `ResponseLogger(100)` | Non-blocking buffered console/file logging, Plain/JSON formats, CRLF/ANSI sanitization |
+| `hyperlane-plugin-metrics` | `MetricsRegistry`, `Counter`, `Gauge`, `Histogram`, `MetricsRequestHook(-115)`, `MetricsResponseHook(95)` | Lock-free Prometheus/OpenMetrics 0.0.4 `/metrics` observability |
+| `hyperlane-plugin-health` | `HealthRegistry`, `HealthCheck`, `HealthHook(-110)`, `HealthPlugin` | `/healthz`, `/livez`, `/readyz` concurrent probes, snapshot cache, graceful drain flag |
+| `hyperlane-plugin-security` | `SecurityConfig`, `SecurityRule`, `SecurityRequestHook(-105)`, `SecurityResponseHook(-75)` | Prebuilt HSTS/CSP/COOP/COEP/CORP headers, HMAC-SHA256 CSRF, host/URI/body/traversal guards |
+| `hyperlane-plugin-cors` | `CorsConfig`, `AllowOrigin`, `CorsRequestHook(-100)`, `CorsResponseHook(-80)` | Precompiled zero-alloc CORS headers, credentials safety guard, `OPTIONS` preflight |
+| `hyperlane-plugin-rate-limit` | `ShardedRateLimiter`, `KeyExtractor`, `RateLimitStore`, `RateLimitHook(-95)` | 64-shard lock-free GCRA & fixed-window limiter, bounded key store, RFC `RateLimit-*` headers |
+| `hyperlane-plugin-auth` | `JwtCodec`, `Authenticator`, `AuthPrincipal`, `AuthHook(-90)`, `AuthPlugin` | Pure-Rust HS256 JWT (`kid` rotation), API key, HTTP Basic, RBAC, async authenticators |
+| `hyperlane-plugin-session` | `SessionStore`, `InMemorySessionStore`, `SessionHandle`, `SessionRequestHook(-85)`, `SessionResponseHook(-70)` | 64-shard sessions, HMAC-SHA256 signed cookies, dirty-tracked reads, `regenerate_id()` |
+| `hyperlane-plugin-cache` | `ShardedMemoryCache`, `CacheStore`, `CacheRequestHook(-80)`, `CacheResponseHook(-65)` | 64-shard bounded cache, single-flight coalescing, RFC `Cache-Control`/`Age`/`X-Cache` |
+| `hyperlane-plugin-rpc` | `RpcRouter`, `RpcInterceptor`, `RpcHook(-70)`, `RpcPlugin` | JSON-RPC 2.0 `XxHash3_64` router, concurrent batch dispatch, DoS caps |
+| `hyperlane-plugin-grpc` | `GrpcFrame`, `GrpcRouter`, `GrpcInterceptor`, `GrpcHook(-65)`, `GrpcPlugin` | 5-byte gRPC framing, bounded compression, `grpc-timeout` enforcement |
+| `hyperlane-plugin-mcp` | `McpRegistry`, `McpTool`, `McpResource`, `McpPrompt`, `McpHook(-60)` | MCP Streamable HTTP server, 16-shard TTL sessions, `Origin` DNS-rebinding guard |
+| `hyperlane-plugin-static-files` | `StaticFilesRuntime`, `StaticFilesConfig`, `StaticFilesHook(-55)` | Traversal-proof static server, `FileExtension` MIME, 64-shard cache, `.br`/`.gz`, `Range`, SPA |
+| `hyperlane-plugin-gateway` | `GatewayRuntime`, `GatewayRoute`, `GatewayInterceptor`, `GatewayHook(-50)` | Reverse proxy with pooled H1/H2, RR/Weighted/LC/P2C LB, circuit breaker, lock-free GCRA |
+| `hyperlane-plugin-negotiate` | `CompressMiddleware`, `ConditionalMiddleware`, `EntityTag` | `Accept-Encoding` compression + `304 Not Modified` strong/weak ETag |
+| `hyperlane-plugin-shutdown` | `ShutdownCoordinator`, `ShutdownGuard`, `ShutdownCallback`, `ShutdownPlugin` | Graceful shutdown (`SIGINT`/`SIGTERM`), RAII draining, LIFO async callbacks |
+| `hyperlane-plugin-websocket` | `WebSocket`, `WebSocketConfig`, `WebSocketPlugin` | WebSocket room broadcast with lag recovery and lifecycle hooks |
+| `hyperlane-plugin-sse` | `SseEvent`, `SseHub`, `SseStream`, `SsePlugin` | CRLF-safe SSE framing, 64-shard topic fan-out, `Last-Event-ID` replay, heartbeats |
+| `hyperlane-plugin-mq` | `MessageBroker`, `InMemoryBroker`, `MqMessage`, `MqPlugin` | 64-shard consumer groups, TTL, $O(\log N)$ visibility timeout heap, retries, DLQ |
 
 ## Verification & Performance Rules
 

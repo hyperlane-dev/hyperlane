@@ -12,6 +12,13 @@ pub struct WebSocket {
     pub(crate) broadcast_map: BroadcastMap<Vec<u8>>,
 }
 
+/// Process-wide [`WebSocketPlugin`] singleton holding a shared [`WebSocket`] room hub.
+#[derive(Clone, Debug, Default)]
+pub struct WebSocketPlugin {
+    /// Shared WebSocket broadcast hub.
+    pub(crate) websocket: WebSocket,
+}
+
 /// Configuration for a WebSocket connection.
 ///
 /// This struct encapsulates all necessary parameters for setting up and managing

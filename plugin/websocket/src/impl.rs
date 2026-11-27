@@ -292,20 +292,31 @@ where
     pub fn get_key(broadcast_type: BroadcastType<B>) -> String {
         match broadcast_type {
             BroadcastType::PointToPoint(key1, key2) => {
-                let (first_key, second_key) = if key1 <= key2 {
+                let (first_key, second_key): (B, B) = if key1 <= key2 {
                     (key1, key2)
                 } else {
                     (key2, key1)
                 };
-                format!(
-                    "{}-{}-{}",
-                    POINT_TO_POINT_KEY,
-                    first_key.to_string(),
-                    second_key.to_string()
-                )
+                let first_str: String = first_key.to_string();
+                let second_str: String = second_key.to_string();
+                let mut key: String = String::with_capacity(
+                    POINT_TO_POINT_KEY.len() + first_str.len() + second_str.len() + 2,
+                );
+                key.push_str(POINT_TO_POINT_KEY);
+                key.push('-');
+                key.push_str(&first_str);
+                key.push('-');
+                key.push_str(&second_str);
+                key
             }
-            BroadcastType::PointToGroup(key) => {
-                format!("{}-{}", POINT_TO_GROUP_KEY, key.to_string())
+            BroadcastType::PointToGroup(group_key) => {
+                let group_str: String = group_key.to_string();
+                let mut key: String =
+                    String::with_capacity(POINT_TO_GROUP_KEY.len() + group_str.len() + 1);
+                key.push_str(POINT_TO_GROUP_KEY);
+                key.push('-');
+                key.push_str(&group_str);
+                key
             }
             BroadcastType::Unknown => String::new(),
         }
@@ -1053,13 +1064,16 @@ impl WebSocket {
                         }
                     },
                     msg_res = receiver.recv() => {
-                        if let Ok(msg) = &msg_res {
-                            if stream.try_send_list(&WebSocketFrame::create_frame_list(msg)).await.is_ok() {
-                                continue;
+                        match msg_res {
+                            Ok(msg) => {
+                                if stream.try_send_list(&WebSocketFrame::create_frame_list(&msg)).await.is_ok() {
+                                    continue;
+                                }
+                                break;
                             }
-                            break;
+                            Err(RecvError::Lagged(_)) => continue,
+                            Err(RecvError::Closed) => break,
                         }
-                        break;
                     }
                 }
             }
@@ -1078,5 +1092,48 @@ impl WebSocket {
             let _: Option<Broadcast<Vec<u8>>> = self.get_broadcast_map().unsubscribe(&key);
         }
         stream.set_closed(true);
+    }
+}
+
+/// Inherent implementation of [`WebSocketPlugin`].
+impl WebSocketPlugin {
+    /// Initializes the global [`WebSocketPlugin`] once with `websocket`.
+    ///
+    /// # Arguments
+    ///
+    /// - `WebSocket` - Shared WebSocket broadcast hub.
+    ///
+    /// # Returns
+    ///
+    /// - `&'static Self` - Reference to the initialized global plugin.
+    pub fn init(websocket: WebSocket) -> &'static Self {
+        WEBSOCKET_PLUGIN.get_or_init(|| Self { websocket })
+    }
+
+    /// Initializes the global [`WebSocketPlugin`] once with a default [`WebSocket`] hub.
+    ///
+    /// # Returns
+    ///
+    /// - `&'static Self` - Reference to the initialized global plugin.
+    pub fn init_default() -> &'static Self {
+        WEBSOCKET_PLUGIN.get_or_init(Self::default)
+    }
+
+    /// Returns the initialized global [`WebSocketPlugin`], if initialized.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<&'static Self>` - Reference to the global plugin, or `None`.
+    pub fn get() -> Option<&'static Self> {
+        WEBSOCKET_PLUGIN.get()
+    }
+
+    /// Returns the shared [`WebSocket`] broadcast hub.
+    ///
+    /// # Returns
+    ///
+    /// - `&WebSocket` - Shared WebSocket hub.
+    pub fn get_websocket(&self) -> &WebSocket {
+        &self.websocket
     }
 }

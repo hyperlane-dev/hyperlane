@@ -1,0 +1,19 @@
+[package]
+name = "hyperlane-plugin-cors"
+autotests = false
+version.workspace = true
+readme.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = """A zero-allocation precompiled CORS plugin for the Hyperlane framework with exact/suffix/predicate origin matching, safe credential reflection, RFC preflight handling, and Vary header merging."""
+keywords = ["http", "cors", "middleware", "security", "hyperlane"]
+categories = ["network-programming", "web-programming"]
+exclude.workspace = true
+publish = true
+
+[dependencies]
+hyperlane = { workspace = true }
+
+lombok-macros = { workspace = true }

@@ -61,11 +61,13 @@ pub struct RpcConfig {
     pub(crate) max_batch_size: usize,
 }
 
-/// Thread-safe registry mapping JSON-RPC method names to async handlers.
-#[derive(Clone, Default)]
+/// Thread-safe registry mapping JSON-RPC method names to async handlers with `XxHash3_64` lookup.
+#[derive(Clone)]
 pub struct RpcRouter {
     /// Registered method handlers keyed by method name.
-    pub(crate) methods: HashMap<String, RpcHandler>,
+    pub(crate) methods: HashMapXxHash3_64<String, RpcHandler>,
+    /// Registered interceptors invoked before each method call.
+    pub(crate) interceptors: Vec<SharedRpcInterceptor>,
 }
 
 /// Process-wide [`RpcPlugin`] registry holding [`RpcConfig`] and an immutable [`RpcRouter`].
@@ -79,4 +81,5 @@ pub struct RpcPlugin {
 
 /// Opt-in [`ServerHook`] dispatching HTTP `POST` requests on the configured JSON-RPC endpoint.
 #[derive(Clone, Copy, Debug, Default)]
+#[hyperlane::request_middleware(-70)]
 pub struct RpcHook;
