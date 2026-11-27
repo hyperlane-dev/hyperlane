@@ -8,6 +8,7 @@ use super::*;
 #[derive(Clone, Data, Debug)]
 pub struct Args {
     /// The command to execute
+    #[get(type(copy))]
     pub command: CommandType,
     /// Project name for new command
     #[get(type(clone))]
@@ -21,4 +22,10 @@ pub struct Args {
     /// Component name for template command
     #[get(type(clone))]
     pub component_name: Option<String>,
+    /// Verify formatting without writing files for the fmt command
+    #[get(type(copy))]
+    pub fmt_check: bool,
+    /// Optional target directory or file path for the fmt command
+    #[get(type(clone))]
+    pub fmt_path: Option<PathBuf>,
 }

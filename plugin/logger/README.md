@@ -16,10 +16,10 @@ does nothing until the logger is configured, so a service that never calls
 
 ## Configuration
 
-| field | meaning |
-|---|---|
-| `level` | the highest level that is written |
-| `file` | the file the log is appended to, when there is one |
+| field   | meaning                                            |
+| ------- | -------------------------------------------------- |
+| `level` | the highest level that is written                  |
+| `file`  | the file the log is appended to, when there is one |
 
 ## The request log
 

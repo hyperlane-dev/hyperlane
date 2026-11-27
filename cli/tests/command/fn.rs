@@ -40,6 +40,8 @@ fn test_args_debug_lists_optional_fields() {
         template_type: Some(TemplateType::Model),
         model_sub_type: Some(ModelSubType::Application),
         component_name: Some("thing".to_string()),
+        fmt_check: false,
+        fmt_path: None,
     };
     let debugged: String = format!("{args:?}");
     assert!(debugged.contains("proj"));

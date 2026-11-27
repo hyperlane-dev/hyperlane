@@ -8,9 +8,16 @@ pub fn print_help() {
     log::info!(
         "  template  Generate template components (controller|domain|exception|mapper|model|repository|service|utils|view)"
     );
+    log::info!(
+        "  fmt       Run unified crate-cli text/Rust formatting then normalize Hyperlane attributes"
+    );
     log::info!("  -h, --help      Print this help message");
     log::info!("  -v, --version   Print version information");
     log::info!("");
     log::info!("New Options:");
     log::info!("  <PROJECT_NAME>  Name of the project to create");
+    log::info!("");
+    log::info!("Fmt Options:");
+    log::info!("  --check         Verify formatting without modifying files");
+    log::info!("  --path <PATH>   Target workspace directory or file path");
 }

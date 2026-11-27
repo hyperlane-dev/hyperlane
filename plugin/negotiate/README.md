@@ -32,9 +32,9 @@ shorter than the threshold. Every coded response also declares
 not ask for. A `Vary` the response already declares is extended rather than
 replaced.
 
-| knob | default | meaning |
-|---|---|---|
-| `min_length` | `256` | the body length below which a response is answered without a coding |
+| knob         | default | meaning                                                             |
+| ------------ | ------- | ------------------------------------------------------------------- |
+| `min_length` | `256`   | the body length below which a response is answered without a coding |
 
 The threshold is process wide, because the framework registers a middleware by
 its type and builds a hook per request, so a server cannot carry a configuration

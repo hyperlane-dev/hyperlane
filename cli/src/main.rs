@@ -2,7 +2,7 @@
 
 use hyperlane_cli::*;
 
-use std::process::exit;
+use std::{env::current_dir, path::PathBuf, process::exit};
 
 /// Parses the command line arguments and dispatches the selected sub-command.
 #[tokio::main]
@@ -57,6 +57,33 @@ async fn main() {
             {
                 log::error!("template failed: {error}");
                 exit(1);
+            }
+        }
+        CommandType::Fmt => {
+            let target_root: PathBuf = match args.get_fmt_path() {
+                Some(path) => path,
+                None => match current_dir() {
+                    Ok(dir) => dir,
+                    Err(error) => {
+                        log::error!("fmt failed to resolve working directory: {error}");
+                        exit(1);
+                    }
+                },
+            };
+            match execute_fmt(&target_root, args.get_fmt_check()).await {
+                Ok(report) => {
+                    log::info!(
+                        "hyperlane fmt completed: text={}/{}, rust_attrs={}/{}",
+                        report.get_text_files_formatted(),
+                        report.get_text_files_scanned(),
+                        report.get_rust_files_formatted(),
+                        report.get_rust_files_scanned()
+                    );
+                }
+                Err(error) => {
+                    log::error!("fmt failed: {error}");
+                    exit(1);
+                }
             }
         }
         CommandType::Help => print_help(),

@@ -20,6 +20,7 @@ path = "src/main.rs"
 log = { workspace = true }
 tokio = { workspace = true }
 notify = { workspace = true }
+crate-cli = { workspace = true }
 thiserror = { workspace = true }
 color-output = { workspace = true }
 lombok-macros = { workspace = true }

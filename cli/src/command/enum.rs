@@ -7,6 +7,8 @@ pub enum CommandType {
     New,
     /// Generate template components
     Template,
+    /// Format workspace text files via crate-cli and normalize Hyperlane attributes
+    Fmt,
     /// Show help
     Help,
     /// Show version
