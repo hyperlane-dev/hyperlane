@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export PYTHONDONTWRITEBYTECODE=1
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+python3 - "$REPO_ROOT" <<'PY'
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+repo = Path(sys.argv[1]).resolve()
+if not (repo / "Cargo.toml").is_file():
+    sys.exit(0)
+
+
+def git_nul(*args: str) -> set[str]:
+    out = subprocess.run(
+        ["git", "-C", str(repo), *args],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+    ).stdout
+    return {os.fsdecode(part) for part in out.split(b"\0") if part}
+
+
+staged = git_nul("diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z")
+if not staged:
+    sys.exit(0)
+
+pre_dirty = git_nul("diff", "--name-only", "-z")
+
+env = dict(os.environ)
+extra_bins = [str(Path.home() / ".cargo" / "bin"), str(Path.home() / ".local" / "bin")]
+path_parts = [p for p in env.get("PATH", "").split(os.pathsep) if p]
+for bin_dir in reversed(extra_bins):
+    if bin_dir not in path_parts:
+        path_parts.insert(0, bin_dir)
+env["PATH"] = os.pathsep.join(path_parts)
+
+for cmd_name, install_hint in (
+    ("crate", "cargo install crate-cli"),
+    ("hyperlane", "cargo install hyperlane-cli"),
+):
+    binary = shutil.which(cmd_name, path=env["PATH"])
+    if binary is None:
+        print(
+            f"pre-commit (.githooks/hyperlane): '{cmd_name}' not found on PATH. "
+            f"Install with: {install_hint}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    print(f"pre-commit (.githooks/hyperlane): running {cmd_name} fmt ...", flush=True)
+    result = subprocess.run([binary, "fmt"], cwd=str(repo), env=env)
+    if result.returncode != 0:
+        sys.exit(result.returncode)
+
+post_dirty = git_nul("diff", "--name-only", "-z")
+to_stage = sorted(
+    path for path in post_dirty if path not in pre_dirty and (repo / path).exists()
+)
+if to_stage:
+    for idx in range(0, len(to_stage), 200):
+        subprocess.run(
+            ["git", "-C", str(repo), "add", "--", *to_stage[idx : idx + 200]],
+            check=True,
+        )
+    print(
+        f"pre-commit (.githooks/hyperlane): auto-staged {len(to_stage)} formatted file(s):",
+        flush=True,
+    )
+    for path in to_stage:
+        print(f"  + {path}", flush=True)
+else:
+    print("pre-commit (.githooks/hyperlane): all files already formatted", flush=True)
+PY
+
+if [[ "${GLOBAL_PRE_COMMIT_ACTIVE:-0}" != "1" ]]; then
+    SCRIPTS_DIR="$HOME/.agents/skills/rust-standards/scripts"
+    DEP_CHECK="$HOME/.git-hooks/dep_order_check.py"
+    STAGED_RS_TOML=$(git -C "$REPO_ROOT" diff --cached --name-only --diff-filter=ACMR -- \
+        ':(exclude)target/*' ':(exclude)*.lock' | grep -E '\.(rs|toml)$' || true)
+    if [[ -n "$STAGED_RS_TOML" && -d "$SCRIPTS_DIR" ]]; then
+        if printf '%s\n' "$STAGED_RS_TOML" | grep -q '\.toml$' && [[ -f "$DEP_CHECK" ]]; then
+            python3 "$DEP_CHECK" "$REPO_ROOT" "$SCRIPTS_DIR"
+        fi
+        if [[ -f "$SCRIPTS_DIR/staged_file_gate.py" ]]; then
+            python3 "$SCRIPTS_DIR/staged_file_gate.py" "$REPO_ROOT" --staged
+        fi
+    fi
+fi
